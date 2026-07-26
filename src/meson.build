@@ -8,6 +8,7 @@ pkgctl_core = static_library(
     'constraint.cpp',
     'error.cpp',
     'intent.cpp',
+    'operation.cpp',
     'outcome.cpp',
     'package.cpp',
   ],
