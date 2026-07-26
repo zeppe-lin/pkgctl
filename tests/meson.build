@@ -27,4 +27,7 @@ if not get_option('tests').disabled()
 
   manual_contract = find_program('check_manual_contract.sh')
   test('manual-contract', manual_contract, args: [meson.project_source_root()])
+
+  release_metadata = find_program('check_release_metadata.sh')
+  test('release-metadata', release_metadata, args: [meson.project_source_root()])
 endif

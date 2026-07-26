@@ -30,3 +30,4 @@ done
 CXX="$cxx" "$srcdir/tests/public_headers.sh" "$srcdir"
 "$srcdir/tests/check_source_contract.sh" "$srcdir"
 "$srcdir/tests/check_manual_contract.sh" "$srcdir"
+"$srcdir/tests/check_release_metadata.sh" "$srcdir"
