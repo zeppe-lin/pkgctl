@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Alexandr Savca
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+option(
+  'tests',
+  type: 'feature',
+  value: 'auto',
+  description: 'build the pkgctl regression suite',
+)
+
+option(
+  'manpages',
+  type: 'feature',
+  value: 'auto',
+  description: 'build scdoc manual pages',
+)
