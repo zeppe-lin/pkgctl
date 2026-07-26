@@ -6,4 +6,8 @@
  */
 #pragma once
 
+#include <pkgctl/constraint.h>
+#include <pkgctl/error.h>
+#include <pkgctl/intent.h>
+#include <pkgctl/package.h>
 #include <pkgctl/version.h>

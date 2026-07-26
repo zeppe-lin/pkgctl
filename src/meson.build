@@ -3,7 +3,13 @@
 
 pkgctl_core = static_library(
   'pkgctl-core',
-  'core.cpp',
+  [
+    'core.cpp',
+    'constraint.cpp',
+    'error.cpp',
+    'intent.cpp',
+    'package.cpp',
+  ],
   include_directories: pkgctl_inc,
   install: false,
 )
