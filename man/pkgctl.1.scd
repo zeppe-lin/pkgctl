@@ -18,7 +18,7 @@ pkgctl - inspect native package resolution and transaction authority
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-The next release acquires explicit native collections, reads one existing canonical
+Version 0.2.0 acquires explicit native collections, reads one existing canonical
 installed-state generation, resolves typed package requirements, composes one
 immutable cross-package transaction program, and prints deterministic reports.
 
@@ -121,5 +121,3 @@ summaries. It is not a persistent state format or a versioned IPC protocol.
 # SEE ALSO
 
 *pkgctl_orchestration*(7), *pkgcatalog-scan*(1), *pkgstate-check*(1)
-
-Version 0.1.0 remains the current published release at this boundary.

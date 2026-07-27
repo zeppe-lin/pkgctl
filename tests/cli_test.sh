@@ -58,7 +58,7 @@ recipe libfoo '  {}' >"$collection/libfoo/recipe.yml"
 recipe tool '  {}' >"$collection/tool/recipe.yml"
 
 binding=$($state_fixture "$state")
-[ "$($pkgctl --version)" = 'pkgctl 0.1.0' ]
+[ "$($pkgctl --version)" = 'pkgctl 0.2.0' ]
 $pkgctl --help | grep -F 'The commands are read-only.' >/dev/null
 
 catalog=$($pkgctl catalog --collection "core=$collection")

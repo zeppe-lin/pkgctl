@@ -6,7 +6,7 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-The next release provides a read-only native control loop:
+Release 0.2.0 provides a read-only native control loop:
 
 ```text
 explicit collection and target inputs
@@ -34,7 +34,7 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-The next release is deliberately read-only. It does not initialize state, fetch or
+Release 0.2.0 is deliberately read-only. It does not initialize state, fetch or
 build sources, inspect package artifacts, construct package-local filesystem
 plans, execute lifecycle programs, apply mutations, publish state, or expose
 `install`, `update`, `remove`, or `sysup` commands.
@@ -74,6 +74,3 @@ static dependencies are available.
 
 See `DESIGN.md` for the normative controller boundary and `TESTING.md` for the
 qualification contract.
-
-Release 0.1.0 establishes the provisional controller model that this
-next release supersedes.

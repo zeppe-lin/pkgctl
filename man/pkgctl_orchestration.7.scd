@@ -12,7 +12,7 @@ the read-only control state.
 
 # AUTHORITY PIPELINE
 
-The next release composes:
+Version 0.2.0 composes:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -83,5 +83,3 @@ session model.
 # SEE ALSO
 
 *pkgctl*(1), *libpkgresolve*(3), *libpkgtransaction*(3)
-
-Version 0.1.0 remains the current published release at this boundary.

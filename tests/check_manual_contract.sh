@@ -13,10 +13,8 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.1.0 remains the current published release' \
-  "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.1.0 remains the current published release' \
-  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.2.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.2.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'The canonical state store is opened with *open_existing*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null

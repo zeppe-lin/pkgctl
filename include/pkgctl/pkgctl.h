@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /*! \file pkgctl.h
- *  \brief Complete read-only pkgctl controller API.
+ *  \brief Complete internal pkgctl read-only controller API.
  */
 #pragma once
 
