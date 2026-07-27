@@ -13,9 +13,20 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.1.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.1.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
-grep -F '. forbid-node prevents' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.1.0 remains the current published release' \
+  "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.1.0 remains the current published release' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'The canonical state store is opened with *open_existing*' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+
+for obsolete in 'forbid-node' 'operation graph ordering' 'download named'; do
+  if grep -R -n -F "$obsolete" "$srcdir/man" >/dev/null 2>&1; then
+    echo "obsolete provisional controller semantic in manuals: $obsolete" >&2
+    exit 1
+  fi
+done
 
 if grep -nE '^[1-9][0-9]*\. ' "$srcdir"/man/*.scd >/dev/null 2>&1; then
   echo 'ordered scdoc lists must use dot-item markup' >&2

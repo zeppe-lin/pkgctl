@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 option(
+  'link_mode',
+  type: 'combo',
+  choices: ['shared', 'static'],
+  value: 'shared',
+  description: 'link pkgctl against shared or static authority libraries',
+)
+
+option(
   'tests',
   type: 'feature',
   value: 'auto',
@@ -9,16 +17,8 @@ option(
 )
 
 option(
-  'manpages',
+  'man_pages',
   type: 'feature',
   value: 'auto',
   description: 'build scdoc manual pages',
-)
-
-option(
-  'link_mode',
-  type: 'combo',
-  choices: ['shared', 'static'],
-  value: 'shared',
-  description: 'select shared or static dependency closure',
 )

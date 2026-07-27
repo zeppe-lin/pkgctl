@@ -2,111 +2,86 @@ PKGCTL_ORCHESTRATION(7)
 
 # NAME
 
-pkgctl_orchestration - pkgctl authority and transaction model
+pkgctl_orchestration - native pkgctl authority composition
 
 # DESCRIPTION
 
-pkgctl coordinates independent package authorities. It decides which authority
-to call next but does not recreate that authority's facts or decisions.
+*pkgctl* is a controller, not a package-model authority. It decides which exact
+component to call next, retains the resulting handoff identities, and presents
+the read-only control state.
+
+# AUTHORITY PIPELINE
+
+The next release composes:
+
+. explicit collection specifications through *libpkgcatalog-acquire*;
+. one sealed *libpkgcatalog* snapshot;
+. one existing *libpkgstate* snapshot for an exact target binding;
+. one *libpkgresolve* request and result;
+. one *libpkgtransaction* request and program.
+
+The controller does not reinterpret any returned value.
+
+# REQUESTS
+
+A catalog request owns only explicit collection roots, precedence positions,
+external diagnostic revisions, and resource limits.
+
+A resolution request adds an existing state location, exact target binding,
+build and target architectures, typed goals, and installed-authority policy.
+Goals use *libpkgsource* package, profile, scope, and lifecycle values.
+
+A transaction request adds a *libpkgtransaction* convergence policy. The native
+default is *preserve-unselected*. Exact convergence must be explicit.
+
+# SESSIONS
+
+A catalog session binds one exact catalog snapshot identity.
+
+A resolution session binds its catalog session, installed-state snapshot, and
+resolution result.
+
+A transaction session binds its resolution session and transaction program.
+
+Session identities are domain-separated SHA-256 values. Filesystem paths,
+command-line positions, and diagnostic revision labels are excluded. Semantic
+facts are already bound by the subordinate authority identities.
 
 # OWNED SEMANTICS
 
-The native pkgctl model owns:
+The controller owns command policy, authority-call sequencing, session binding,
+diagnostic ordering, and presentation.
 
-. user intent;
-. typed resolver and execution constraints;
-. immutable multi-package operation graphs;
-. dependency-safe execution ordering;
-. continuation and fail-fast policy;
-. orchestrator-native step outcomes;
-. transaction progress and recovery routing;
-. stable diagnostics and presentation.
+It does not own recipe parsing, collection sealing, installed truth, dependency
+selection, requirement witnesses, transaction nodes or edges, build results,
+package images, package-local plans, application evidence, or state
+publication.
 
-# EXTERNAL AUTHORITIES
+# READ-ONLY BOUNDARY
 
-The following meanings remain external:
+The canonical state store is opened with *open_existing* and read. A missing,
+corrupt, mismatched, or locked store is refused. The controller never creates a
+replacement empty snapshot or repairs state.
 
-. source capture and normalized build descriptions: libpkgsource;
-. build execution and exact artifact results: libpkgbuild;
-. archive inspection and normalized package images: libpkgimage;
-. canonical installed state: libpkgstate;
-. state projection into planner facts: libpkgstate-plan;
-. one-package transition decisions: libpkgplan;
-. physical application and recovery evidence: libpkgapply;
-. completed application projection into state publication:
-  libpkgstate-apply.
+Release 0.2.0 does not fetch, build, check, inspect artifacts, plan filesystem
+changes, execute lifecycle programs, mutate a target, recover an attempt, or
+publish state. It therefore exposes no effect-implying package commands.
 
-The pkgctl core does not depend on these libraries. Concrete adapters are added
-in dependency order and must not contaminate unrelated core headers or metadata.
+# REPORTS
 
-# INTENT
-
-Native user intent is a closed set:
-
-. install named packages;
-. update named installed packages;
-. remove named installed packages;
-. update every eligible installed package;
-. download named package inputs without installation.
-
-Target lists are canonical sets. Empty targeted requests and duplicate targets
-are invalid.
-
-# CONSTRAINTS
-
-Constraint classes are separate semantic axes:
-
-. exclude-target removes a package from the final execution target set;
-. forbid-node prevents a package from appearing in the resolved graph;
-. prune-subtree prevents traversal through one dependency subtree;
-. hold-installed-release prevents replacement of one installed release;
-. require-candidate requires an eligible source candidate.
-
-Different classes may name the same package. Exact duplicate typed constraints
-are invalid. No single ignore bit represents all classes.
-
-# OPERATION GRAPH
-
-Selection produces an immutable directed acyclic graph. Every operation has a
-stable local identity, one package, one transition kind, and zero or more exact
-prerequisite operation identities.
-
-Construction rejects:
-
-. duplicate operation identities;
-. multiple operations targeting one package;
-. duplicate prerequisites;
-. self-dependencies;
-. absent prerequisites;
-. dependency cycles.
-
-Execution order is a deterministic topological order. Among simultaneously
-ready operations, lexical operation identity determines order. Caller insertion
-order has no semantic effect.
-
-# OUTCOMES
-
-One step ends as succeeded, refused, failed, or skipped. Refusal is a complete
-policy or authority decision. Failure is an attempted step that did not
-complete. Skip means the step was deliberately not attempted.
-
-Failure domains are orchestrator-native. Raw process exits, signals, and backend
-status tables remain in concrete adapters and diagnostic evidence; they are not
-core transaction result values.
+Reports are deterministic diagnostic text. They expose exact authority
+identities and normalized summaries but are not authority themselves. Durable
+or machine-consumed protocols require separate versioned contracts.
 
 # CLEAN-ROOM BOUNDARY
 
-pkgctl is original Zeppe-Lin code. The pkgman implementation is not copied,
-translated, or used as an internal architecture template. Compatibility work may
-observe public interfaces and deployed behavior, but native pkgctl types do not
-inherit pkgman internals.
-
-# RELEASE 0.1.0
-
-Version 0.1.0 exposes the model and help/version CLI only. Transaction commands
-are intentionally unavailable until exact authority adapters and recovery paths
-are implemented and qualified.
+The *pkgman* implementation is not copied, translated, or used as an internal
+architecture template. Legacy configuration and command behavior may be
+translated later by a narrow frontend, but cannot alter the native request and
+session model.
 
 # SEE ALSO
 
-*pkgctl*(1)
+*pkgctl*(1), *libpkgresolve*(3), *libpkgtransaction*(3)
+
+Version 0.1.0 remains the current published release at this boundary.

@@ -7,9 +7,15 @@ Do not submit code copied or mechanically translated from `pkgman`, CRUX
 `prt-get`, or another package manager. Do not reproduce their internal type
 systems merely under new names.
 
-Changes should be small, contract-first commits. Each commit should compile and
-its tests should pass. New orchestration concepts require documented invariants
-and direct regression coverage before effectful adapters use them.
+`pkgctl` must not define alternate package references, profile semantics,
+resolver constraints, selected-package records, transaction graphs, package
+plans, application evidence, or installed-state records. Use the exact owning
+library values and retain their identities through the controller session.
+
+Changes should be small, contract-first commits. Every implementation commit
+must compile and its applicable tests must pass. New authority calls require
+exact dependency bundles, boundary tests, failure tests, and documentation of
+what remains deliberately unavailable.
 
 Use SPDX headers:
 

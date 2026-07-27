@@ -1,35 +1,48 @@
 # pkgctl testing
 
-The test suite protects orchestration semantics rather than implementation
-shape.
+The suite protects authority composition rather than implementation shape.
 
 ## Required qualification
 
 Every release must establish:
 
-- C++17 compilation under GCC and Clang with warnings as errors;
+- strict C++17 compilation under GCC and Clang;
 - independent usability of every internal public header;
-- intent and constraint validation;
-- operation-graph normalization and cycle rejection;
-- deterministic execution order independent of insertion order;
-- native outcome invariants without backend exit-code leakage;
-- CLI status and diagnostic contracts;
-- release metadata consistency;
-- clean `git diff --check`, `git show --check`, and `git fsck` results.
+- explicit request validation and duplicate-goal rejection;
+- deterministic authority and session identities;
+- path and diagnostic-provenance independence where non-semantic;
+- exact existing-state binding and read-only store access;
+- catalog, resolution, and transaction composition against exact tagged
+  dependency sources;
+- typed build, run, check, and lifecycle goal handling;
+- installed-versus-catalog and convergence-policy reporting;
+- CLI usage, authority-failure, and deterministic output contracts;
+- proof that successful commands do not alter the canonical state store;
+- release, source, manual, shell, and patch-hygiene contracts.
 
-## Clean-room regression
+## Negative authority tests
 
-Source and build files are checked for prohibited legacy implementation tokens.
-The check is intentionally narrow: documentation may name `pkgman` while
-explaining migration, but native headers and source must not import its internal
-vocabulary.
+Tests must reject:
 
-## Future integration tests
+- empty collection or resolution requests;
+- relative canonical-store paths;
+- duplicate semantic goals;
+- missing target-binding options;
+- missing or mismatched canonical stores;
+- transaction-only policy on another command;
+- unknown goal scopes, lifecycle actions, and collection revisions;
+- reintroduction of provisional pkgctl package-operation or legacy pkgman
+  semantics.
 
-Each authority adapter must be tested against exact repository source trees or
-installed releases. Stubs may test local control flow but cannot qualify an
-adapter release.
+## Linkage
 
-End-to-end tests must retain exact identities for source snapshots, build
-artifacts, package images, plans, application attempts, completed evidence,
-state publication requests, and publication receipts.
+Shared qualification must inspect the executable's direct dependency closure.
+Static qualification must use static authority archives where available. An
+unavailable external static dependency is reported rather than silently
+replaced by a shared object while claiming a fully static result.
+
+## Replay
+
+Published mboxes are independently applied to the supplied base bundle. Final
+trees and stable patch-ID columns must match, and each replayed commit boundary
+must pass its applicable tests.

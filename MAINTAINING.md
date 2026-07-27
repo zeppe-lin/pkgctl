@@ -2,28 +2,37 @@
 
 ## Authority review
 
-Before accepting a feature, identify which component owns every fact consumed
-or produced by the change. Reject changes that make `pkgctl` parse, infer, or
-recompute an authority value already owned by another library.
+Before accepting a feature, identify which component owns every consumed or
+produced fact. Reject changes that make `pkgctl` parse, infer, recompute, or
+serialize a value already owned by another library.
+
+Controller-owned policy must remain visibly separate from authority results.
+Defaults that can remove packages, mutate filesystems, initialize state, or
+publish state are prohibited.
 
 ## Dependency direction
 
-Core orchestration values remain independent of source, build, image, planner,
-application, and state libraries. Concrete adapters depend inward on the core
-and outward on exactly the authorities they compose.
+The executable directly depends on the exact libraries whose public values it
+uses. The internal `pkgctl-core` library is not installed and does not publish a
+second package-management API.
 
-An adapter must not add its dependencies to unrelated core pkg-config or header
-closures.
+A future effectful backend may depend on build, image, plan, apply, and state
+adapters. Those dependencies must be introduced only with the exact effect
+boundary and must not leak their semantics into request parsing or reporting.
 
 ## Compatibility policy
 
-`pkgman` compatibility is maintained through explicit translation and migration
-tests. Native semantics are not weakened to preserve accidental behavior.
+Historical `pkgman` compatibility belongs in an explicit translation frontend.
+Native command and session semantics are not weakened to preserve ambiguous
+legacy behavior.
 
 ## Release procedure
 
-1. run the complete GCC and Clang qualification suites;
-2. verify every patch boundary when publishing a series;
-3. update release metadata and manuals together;
-4. inspect linkage and installed metadata once external dependencies exist;
-5. tag signed releases only from a clean tree.
+1. qualify every commit boundary against exact tagged dependency bundles;
+2. run strict GCC and Clang builds and all controller tests;
+3. run ASan and UBSan over the complete authority closure;
+4. check shared and static linkage and direct dependency isolation;
+5. verify CLI read-only behavior and missing-state refusal;
+6. update release metadata and manuals together;
+7. compare independently replayed trees and stable patch IDs;
+8. tag signed releases only from a clean tree.

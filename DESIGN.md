@@ -2,129 +2,126 @@
 
 ## Purpose
 
-`pkgctl` is the orchestration authority for package transactions in Zeppe-Lin.
-It coordinates independent source, build, image, planning, application, and
-state authorities without absorbing their semantics.
+`pkgctl` is the Zeppe-Lin controller. It selects which authoritative component
+to call next, retains the exact handoff identities, and reports the resulting
+control state. It does not recreate the facts or decisions owned by those
+components.
 
 The central invariant is:
 
-> pkgctl decides what authority to call next, but it does not recreate the
-> authority's facts or decisions.
+> A controller session is evidence that exact authorities were composed; it is
+> not another package-source, resolver, transaction, planner, or state model.
+
+## Release 0.2.0 boundary
+
+The read-only pipeline is:
+
+```text
+catalog_request
+        ↓
+libpkgcatalog-acquire::acquire_catalog
+        ↓
+catalog_session
+        ↓
+libpkgstate::canonical_generation_store::open_existing + read
+        ↓
+libpkgresolve::resolve
+        ↓
+resolution_session
+        ↓
+libpkgtransaction::compose
+        ↓
+transaction_session
+```
+
+The controller never initializes a missing state store. The state pathname and
+all five target-binding identities are supplied explicitly. A binding mismatch,
+missing store, corrupt generation, or locked store is a state-authority failure.
 
 ## Owned semantics
 
-The native model owns only orchestration concerns:
+The controller owns only:
 
-1. user intent;
-2. typed transaction constraints;
-3. package-operation graph selection;
-4. execution ordering and continuation policy;
-5. per-step orchestration outcomes;
-6. transaction progress and recovery routing;
-7. stable diagnostics and presentation.
+1. explicit command input and defaults;
+2. collection argument order as acquisition precedence;
+3. explicit state location and target binding;
+4. explicit build and target architectures;
+5. typed resolution goals;
+6. installed-versus-catalog preference;
+7. opt-in transaction convergence policy;
+8. authority-call sequencing;
+9. controller session identities;
+10. deterministic line-oriented presentation.
 
-The model is deliberately independent of external command exit-code tables,
-archive naming conventions, source-directory formats, filesystem mutation
-rules, and installed-state serialization.
+Package and profile identities are `libpkgsource` values. Catalog candidates are
+`libpkgcatalog` values. Installed records are `libpkgstate` values. Selections
+and witnesses are `libpkgresolve` values. Operation nodes, edges, cohorts, and
+convergence semantics are `libpkgtransaction` values.
+
+## Requests
+
+`catalog_request` contains explicit acquisition specifications and document
+limits. It does not infer roots, collection names, revisions, or precedence.
+
+`resolution_request` adds one existing canonical state location, architecture
+context, typed goals, and resolver policy. Goals are normalized through the
+resolver's exact scope and subject values. Duplicate semantic goals are
+rejected even when their diagnostic origins differ.
+
+`transaction_request` adds one native convergence policy. The default is
+`preserve_unselected`. `converge_exact` is accepted only through an explicit CLI
+flag and means the caller supplied the complete desired target closure.
+
+## Sessions and identities
+
+A catalog session retains the explicit acquisition request and the resulting
+sealed catalog snapshot. Its identity binds the exact catalog identity.
+
+A resolution session retains the catalog session, one exact installed-state
+snapshot, and one exact resolution result. Its identity binds all three exact
+identities.
+
+A transaction session retains the resolution session and one exact transaction
+program. Its identity binds the resolution-session and transaction-program
+identities.
+
+Session identities use domain-separated SHA-256. Filesystem paths, command-line
+positions, collection declaration provenance, and external revision labels are
+not semantic authority and do not enter session identity. The sealed authority
+results already bind the normalized facts that matter.
+
+## Presentation
+
+Reports are deterministic line-oriented diagnostics. They expose exact session,
+catalog, installed-state, resolution, and transaction identities plus normalized
+candidate, selection, edge, goal, node, and cohort summaries.
+
+The report format is not a persistent catalog, state, resolver, transaction, or
+IPC protocol. A machine protocol must receive its own versioned contract rather
+than treating diagnostic text as authority.
 
 ## Non-authorities
 
-The following meanings remain external:
+Release 0.2.0 does not:
 
-| Meaning | Authority |
-| --- | --- |
-| source directory capture and normalization | `libpkgsource` |
-| build execution and exact artifact result | `libpkgbuild` |
-| archive inspection and normalized package image | `libpkgimage` |
-| canonical installed state | `libpkgstate` |
-| installed-state projection into planner facts | `libpkgstate-plan` |
-| one-package install, upgrade, and removal policy | `libpkgplan` |
-| physical application and recovery evidence | `libpkgapply` |
-| completed application projection into state publication | `libpkgstate-apply` |
-
-`pkgctl` must never create a second implementation of one of these meanings.
+- read historical `pkgman.conf`;
+- parse Pkgfile or a historical package database;
+- infer package identity from directory or archive names;
+- select dependency candidates itself;
+- compose package-operation graphs itself;
+- initialize or publish installed state;
+- fetch, build, or test sources;
+- inspect or create package artifacts;
+- construct `libpkgplan` requests;
+- execute lifecycle programs;
+- apply filesystem mutations;
+- promise transaction-wide atomicity or rollback.
 
 ## Clean-room rule
 
-The project begins from an empty licensed repository. Source code from `pkgman`
-or another package manager is not copied, mechanically translated, or used as a
-class-layout template.
+The project remains original Zeppe-Lin code. Public legacy commands and observed
+behavior may inform a future migration frontend, but native controller types and
+control flow do not inherit `pkgman`, CRUX `prt-get`, or `pkgmk` internals.
 
-Compatibility research may record:
-
-- public commands and options;
-- configuration accepted by deployed systems;
-- output consumed by scripts;
-- documented and observed behavior;
-- migration requirements and failure cases.
-
-Compatibility research must not preserve:
-
-- internal class names or inheritance structure;
-- transaction result enums;
-- resolver algorithms or control flow;
-- package-database parsers;
-- artifact-path reconstruction rules;
-- process-management implementation.
-
-## Transaction shape
-
-A complete future one-package transaction has this authority sequence:
-
-```text
-canonical state snapshot
-        |
-        v
-planner state projection + candidate facts + inspected image
-        |
-        v
-immutable package plan or typed refusal
-        |
-        v
-exact application request
-        |
-        v
-completed application evidence or recovery state
-        |
-        v
-state publication request
-        |
-        v
-stale-safe compare-and-publish receipt
-```
-
-A multi-package transaction composes these operations through an immutable DAG.
-It does not claim global atomicity across package builds, filesystem effects,
-and canonical state publication.
-
-## Root semantics
-
-There is no implicit global alternate root. A future target context must bind
-separate target, state-store, build-environment, application-backend, and
-lifecycle-environment identities.
-
-Until that complete contract exists, the supported execution mode is the host
-target with canonical state bound to that target. Unsupported cross-root
-requests must fail explicitly.
-
-## Compatibility
-
-`pkgman` remains a migration-era compatibility program. Native `pkgctl` commands
-and options are not required to preserve ambiguous legacy names.
-
-Compatibility aliases, if implemented, live in a narrow frontend and translate
-into native intent and constraint values. They do not alter the native model.
-
-## Release 0.1.0
-
-The first release establishes:
-
-- the clean-room project and license;
-- the internal testable orchestration library;
-- typed intent and constraints;
-- orchestrator-native step outcomes;
-- immutable validated operation graphs;
-- a non-operational CLI exposing only help and version.
-
-It performs no source inspection, building, archive opening, planning,
-application, state publication, lifecycle execution, or recovery.
+Compatibility translation must remain outside the native request and session
+model.

@@ -1,69 +1,79 @@
 # pkgctl
 
-`pkgctl` is the Zeppe-Lin package transaction orchestrator.
+`pkgctl` is the Zeppe-Lin package control-plane executable.
 
-The implementation is original C++17 code written for Zeppe-Lin. It is not
-derived from `pkgman`, CRUX `prt-get`, or another package manager. The project
-is licensed under GPL-3.0-or-later and is copyright Alexandr Savca.
+It coordinates sealed package authorities without reimplementing their
+semantics. The project is original C++17 code licensed under
+GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.1.0 establishes the orchestration model only. The executable supports
-`--help` and `--version`; package transaction commands deliberately fail until
-their authority composition is implemented and qualified.
+The next release provides a read-only native control loop:
+
+```text
+explicit collection and target inputs
+        ↓
+libpkgcatalog-acquire
+        ↓
+libpkgstate snapshot
+        ↓
+libpkgresolve result
+        ↓
+libpkgtransaction program
+        ↓
+deterministic report
+```
+
+The supported commands are:
+
+```text
+pkgctl catalog
+pkgctl resolve
+pkgctl transaction
+```
+
+Every collection root, target-state binding identity, architecture, goal scope,
+and destructive convergence choice is explicit. `transaction` defaults to
+`preserve-unselected`; exact convergence requires `--converge-exact`.
+
+The next release is deliberately read-only. It does not initialize state, fetch or
+build sources, inspect package artifacts, construct package-local filesystem
+plans, execute lifecycle programs, apply mutations, publish state, or expose
+`install`, `update`, `remove`, or `sysup` commands.
 
 ## Authority
 
-`pkgctl` owns:
+`pkgctl` owns only command policy, authority-call sequencing, read-only session
+binding, deterministic diagnostics, and presentation.
 
-- user intent and transaction policy;
-- typed resolver constraints;
-- immutable multi-package operation graphs;
-- sequencing of source, build, image, planning, application, and state
-  authorities;
-- transaction progress, diagnostics, and recovery routing.
+The following meanings remain external:
 
-`pkgctl` does not own package-source interpretation, package building, archive
-inspection, one-package transition policy, filesystem application, or canonical
-installed state. Those authorities belong to the dedicated Zeppe-Lin libraries.
+- recipe and profile syntax: `libpkgsource-yaml`;
+- available package universe: `libpkgcatalog` and
+  `libpkgcatalog-acquire`;
+- installed truth: `libpkgstate`;
+- exact dependency selection: `libpkgresolve`;
+- cross-package operation composition: `libpkgtransaction`;
+- later build, image, package-local plan, application, and publication effects:
+  their dedicated authorities.
 
-The intended dependency graph is:
-
-```text
-libpkgsource -> libpkgbuild
-libpkgimage
-libpkgstate -> libpkgstate-plan
-libpkgplan
-libpkgapply
-libpkgstate -> libpkgstate-apply
-                 ^
-                 |
-               pkgctl
-```
-
-The first release does not link any of these libraries. Adapters will be added
-in dependency order after the orchestration kernel is frozen.
-
-## Clean-room boundary
-
-The old `pkgman` codebase is a compatibility specimen, not a source substrate.
-Its command names, configuration, documented behavior, and observed failures
-may inform migration tests. Its implementation, internal types, control flow,
-and naming are not copied or translated.
-
-No `pkgmk` exit code, `pkgmk.conf` layout rule, archive filename convention, or
-legacy package-database grammar is part of the native `pkgctl` model.
+The provisional 0.1.0 intent, constraint, outcome, and operation-graph types are
+not retained. Their meanings are now owned by the native resolver and
+transaction libraries.
 
 ## Building
 
-With Meson:
-
 ```sh
-meson setup build
+meson setup build \
+  -Dlink_mode=shared \
+  -Dman_pages=enabled
 meson compile -C build
-meson test -C build
+meson test -C build --print-errorlogs
 ```
 
-The test suite can also be compiled directly with a C++17 compiler through
-`tests/run-direct.sh` once the model commits are present.
+Use `-Dlink_mode=static` for a static authority closure where all external
+static dependencies are available.
 
-See `DESIGN.md` for the normative authority graph and `TESTING.md` for the
+See `DESIGN.md` for the normative controller boundary and `TESTING.md` for the
 qualification contract.
+
+Release 0.1.0 establishes the provisional controller model that this
+next release supersedes.
