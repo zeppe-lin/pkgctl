@@ -14,7 +14,63 @@ project(
   ],
 )
 
+want_static = get_option('link_mode') == 'static'
 pkgctl_inc = include_directories('include')
+
+libcrypto_dep = dependency('libcrypto', required: true, static: want_static)
+libpkgsource_dep = dependency(
+  'libpkgsource',
+  version: '>=1.1.0',
+  required: true,
+  static: want_static,
+)
+libpkgsource_yaml_dep = dependency(
+  'libpkgsource-yaml',
+  version: '>=1.1.0',
+  required: true,
+  static: want_static,
+)
+libpkgcatalog_dep = dependency(
+  'libpkgcatalog',
+  version: '>=1.1.0',
+  required: true,
+  static: want_static,
+)
+libpkgcatalog_acquire_dep = dependency(
+  'libpkgcatalog-acquire',
+  version: '>=1.1.0',
+  required: true,
+  static: want_static,
+)
+libpkgstate_dep = dependency(
+  'libpkgstate',
+  version: '>=2.1.0',
+  required: true,
+  static: want_static,
+)
+libpkgresolve_dep = dependency(
+  'libpkgresolve',
+  version: '>=1.0.0',
+  required: true,
+  static: want_static,
+)
+libpkgtransaction_dep = dependency(
+  'libpkgtransaction',
+  version: '>=1.0.0',
+  required: true,
+  static: want_static,
+)
+
+pkgctl_authority_deps = [
+  libcrypto_dep,
+  libpkgsource_dep,
+  libpkgsource_yaml_dep,
+  libpkgcatalog_dep,
+  libpkgcatalog_acquire_dep,
+  libpkgstate_dep,
+  libpkgresolve_dep,
+  libpkgtransaction_dep,
+]
 
 subdir('src')
 subdir('cli')

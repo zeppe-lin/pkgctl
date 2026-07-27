@@ -14,3 +14,11 @@ option(
   value: 'auto',
   description: 'build scdoc manual pages',
 )
+
+option(
+  'link_mode',
+  type: 'combo',
+  choices: ['shared', 'static'],
+  value: 'shared',
+  description: 'select shared or static dependency closure',
+)

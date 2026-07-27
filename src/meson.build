@@ -5,18 +5,17 @@ pkgctl_core = static_library(
   'pkgctl-core',
   [
     'core.cpp',
-    'constraint.cpp',
     'error.cpp',
-    'intent.cpp',
-    'operation.cpp',
-    'outcome.cpp',
-    'package.cpp',
+    'identity.cpp',
+    'request.cpp',
   ],
   include_directories: pkgctl_inc,
+  dependencies: pkgctl_authority_deps,
   install: false,
 )
 
 pkgctl_core_dep = declare_dependency(
   link_with: pkgctl_core,
   include_directories: pkgctl_inc,
+  dependencies: pkgctl_authority_deps,
 )

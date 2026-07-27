@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /*! \file error.h
- *  \brief Typed pkgctl model failures.
+ *  \brief Stable controller-owned validation failures.
  */
 #pragma once
 
@@ -11,20 +11,13 @@
 
 namespace pkgctl {
 
-/*! \brief Stable construction and validation failure classes. */
 enum class error_code {
-  invalid_package_name,
-  invalid_intent,
-  invalid_constraint,
-  invalid_outcome,
-  invalid_operation,
-  duplicate_operation,
-  missing_prerequisite,
-  cyclic_operation_graph,
+  invalid_request,
+  invalid_session,
+  identity_failure,
 };
 
-/*! \brief Exception carrying a stable pkgctl error category. */
-class error : public std::invalid_argument {
+class error final : public std::invalid_argument {
 public:
   error(error_code code, std::string message);
   [[nodiscard]] error_code code() const noexcept;

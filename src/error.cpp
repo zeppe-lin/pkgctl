@@ -12,10 +12,6 @@ error::error(error_code code, std::string message)
 {
 }
 
-error_code
-error::code() const noexcept
-{
-  return code_;
-}
+error_code error::code() const noexcept { return code_; }
 
 } // namespace pkgctl
