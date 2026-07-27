@@ -9,6 +9,20 @@ if not get_option('tests').disabled()
   )
   test('request', request_test)
 
+  session_test = executable(
+    'session-test',
+    'session_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('session', session_test)
+
+  report_test = executable(
+    'report-test',
+    'report_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('report', report_test)
+
   version_test = executable(
     'version-test',
     'version_test.cpp',
@@ -17,10 +31,13 @@ if not get_option('tests').disabled()
   test('version', version_test)
 
   pkgctl_headers = [
+    'controller.h',
     'error.h',
     'identity.h',
     'pkgctl.h',
+    'report.h',
     'request.h',
+    'session.h',
     'version.h',
   ]
   foreach header : pkgctl_headers

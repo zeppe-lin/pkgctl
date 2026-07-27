@@ -4,10 +4,13 @@
 pkgctl_core = static_library(
   'pkgctl-core',
   [
+    'controller.cpp',
     'core.cpp',
     'error.cpp',
     'identity.cpp',
+    'report.cpp',
     'request.cpp',
+    'session.cpp',
   ],
   include_directories: pkgctl_inc,
   dependencies: pkgctl_authority_deps,
