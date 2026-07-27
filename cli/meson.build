@@ -3,7 +3,7 @@
 
 pkgctl_exe = executable(
   'pkgctl',
-  'main.cpp',
+  ['main.cpp', 'options.cpp'],
   dependencies: pkgctl_core_dep,
   install: true,
   install_dir: get_option('bindir'),

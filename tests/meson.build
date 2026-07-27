@@ -30,6 +30,15 @@ if not get_option('tests').disabled()
   )
   test('version', version_test)
 
+  state_fixture = executable(
+    'state-fixture',
+    'state_fixture.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+
+  cli_test = find_program('cli_test.sh')
+  test('cli', cli_test, args: [pkgctl_exe, state_fixture])
+
   pkgctl_headers = [
     'controller.h',
     'error.h',
