@@ -6,7 +6,14 @@ set -eu
 pkgctl=$1
 state_fixture=$2
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli.XXXXXX")
-trap 'rm -rf "$root"' EXIT HUP INT TERM
+cleanup()
+{
+  # Canonical generation directories are sealed read-only. Restore owner
+  # write permission only while removing the test fixture.
+  find "$root" -type d -exec chmod u+w {} + 2>/dev/null || :
+  rm -rf "$root"
+}
+trap cleanup EXIT HUP INT TERM
 collection=$root/collection
 state=$root/state
 mkdir -p "$collection/app" "$collection/libfoo" "$collection/tool"
