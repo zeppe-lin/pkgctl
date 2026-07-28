@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.3.0
+version=0.4.0
 
 require_line()
 {
@@ -20,15 +20,15 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 3;'
+  'inline constexpr unsigned version_minor = 4;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.3.0";'
+  'inline constexpr const char* version_string = "0.4.0";'
 
-grep -F '## 0.3.0 - 2026-07-28' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.3.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.3.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.4.0 - 2026-07-29' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.4.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.4.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
 for contract in \
   'libpkgsource >= 1.1.0' \

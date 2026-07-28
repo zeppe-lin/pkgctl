@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.3.0 established, and 0.4.0 retains, the read-only command pipeline:
+Version 0.4.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;

@@ -1,5 +1,57 @@
 # pkgctl changelog
 
+## 0.4.0 - 2026-07-29
+
+### Durable effect attempts
+
+- Added caller-nonced, append-only controller attempt snapshots for one exact
+  effectful operation session.
+- Recorded durable intent before every lifecycle, application, and publication
+  handoff and exact terminal evidence after each completed handoff.
+- Added a strict checksummed binary codec with bounded decoding, predecessor
+  linkage, and causal-shape validation.
+- Added an FD-anchored POSIX journal store with immutable non-replacing
+  publication, record and directory synchronization, and filename/content
+  identity validation.
+
+### Restart and reconciliation
+
+- Added pure restart classification and exact restart checkpoints retaining all
+  subordinate lifecycle, application, publication, and controller evidence.
+- Required external resolution for lifecycle intent without terminal execution
+  evidence.
+- Required the exact durable `libpkgapply` journal to resume an interrupted
+  application handoff.
+- Required a newly held target-mutation lease for every resumed attempt.
+- Retried publication only after observing the exact expected prior state.
+- Reconciled an interrupted publication from the exact resulting installed
+  state without publishing twice.
+- Refused contradictory installed state, stale records, missing subordinate
+  authority, and mismatched evidence instead of guessing.
+
+### Authority floors
+
+The authority floors are unchanged from 0.3.0:
+
+- `libpkgsource >= 1.1.0`;
+- `libpkgcatalog >= 1.1.0` and `libpkgcatalog-acquire >= 1.1.0`;
+- `libpkgstate >= 2.2.0` and `libpkgstate-apply >= 2.2.0`;
+- `libpkgimage >= 0.3.0`;
+- `libpkgexec >= 1.2.0`;
+- `libpkgapply >= 1.0.0` and `libpkgapply-exec >= 0.1.0`;
+- `libpkgresolve >= 1.0.0`;
+- `libpkgtransaction >= 1.1.0`.
+
+### Deliberate boundary
+
+- Preserved the semantic effect-session identity and the ordinary 0.3 result
+  identity path; reconciled results additionally bind the observed state.
+- Kept the executable read-only with only `catalog`, `resolve`, and
+  `transaction` commands.
+- Did not add cross-package scheduling, source construction, build execution,
+  effectful CLI policy, lifecycle replay assumptions, or application-journal
+  discovery.
+
 ## 0.3.0 - 2026-07-28
 
 ### Effectful operation sessions

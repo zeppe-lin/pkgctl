@@ -18,12 +18,12 @@ pkgctl - inspect native package resolution and transaction authority
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.3.0 acquires explicit native collections, reads one existing canonical
+Version 0.4.0 acquires explicit native collections, reads one existing canonical
 installed-state generation, resolves typed package requirements, composes one
 immutable cross-package transaction program, and prints deterministic reports.
 
-The controller library now also defines an exact single-operation effect
-session, but no effect-implying command is exposed. All commands in this release
+The controller library also defines an exact single-operation effect
+session and durable restart kernel, but no effect-implying command is exposed. All commands in this release
 remain read-only. They never initialize or publish state, build packages,
 inspect artifacts, construct package-local filesystem plans, execute lifecycle
 programs, or apply mutations.
