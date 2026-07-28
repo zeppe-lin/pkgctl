@@ -17,6 +17,8 @@
 #include <utility>
 #include <vector>
 
+#include <unistd.h>
+
 #include <libpkgbuild/libpkgbuild.h>
 #include <libpkgcatalog/collection.h>
 #include <libpkgimage/inspection_receipt.h>
@@ -64,6 +66,15 @@ std::string hex_digest(std::uint8_t value)
     result.push_back(digits[value & 0x0fU]);
   }
   return result;
+}
+
+pkgapply_exec::lifecycle_execution_identity test_lifecycle_execution_identity()
+{
+  // prepare() must be realizable by the unprivileged test runner.
+  return {pkgexec::interpreter_identity::from_sha256(hex_digest(91)),
+          static_cast<std::uint64_t>(::geteuid()),
+          static_cast<std::uint64_t>(::getegid()),
+          {}};
 }
 
 template<typename Identity>
@@ -996,9 +1007,7 @@ std::vector<pkgapply_exec::admitted_lifecycle_session> admit_lifecycle_sessions(
 {
   std::filesystem::create_directories(sessions_root);
   const auto nodes = pkgapply_exec::derive(application);
-  const pkgapply_exec::lifecycle_execution_identity identity{
-      pkgexec::interpreter_identity::from_sha256(hex_digest(91)),
-      0, 0, {}};
+  const auto identity = test_lifecycle_execution_identity();
   std::vector<pkgapply_exec::admitted_lifecycle_session> result;
   result.reserve(identities.size());
   for (std::size_t index = 0; index < identities.size(); ++index)
@@ -1229,9 +1238,7 @@ struct fixture final {
     if (pre == nullptr || post == nullptr)
       throw std::runtime_error("lifecycle fixture lacks derived nodes");
 
-    const pkgapply_exec::lifecycle_execution_identity identity{
-        pkgexec::interpreter_identity::from_sha256(hex_digest(91)),
-        0, 0, {}};
+    const auto identity = test_lifecycle_execution_identity();
     before.push_back(pkgapply_exec::admitted_lifecycle_session::admit(
         pkgapply::package_application_request(application), *pre,
         {pkgexec::root_view_identity::from_sha256(hex_digest(92)),
