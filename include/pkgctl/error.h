@@ -14,6 +14,9 @@ namespace pkgctl {
 enum class error_code {
   invalid_request,
   invalid_session,
+  invalid_effect_request,
+  invalid_effect_session,
+  driver_contract_violation,
   identity_failure,
 };
 

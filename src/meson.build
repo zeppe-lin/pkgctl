@@ -6,6 +6,7 @@ pkgctl_core = static_library(
   [
     'controller.cpp',
     'core.cpp',
+    'effect.cpp',
     'error.cpp',
     'identity.cpp',
     'report.cpp',

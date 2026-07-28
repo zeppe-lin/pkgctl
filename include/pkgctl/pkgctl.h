@@ -7,6 +7,7 @@
 #pragma once
 
 #include <pkgctl/controller.h>
+#include <pkgctl/effect.h>
 #include <pkgctl/error.h>
 #include <pkgctl/identity.h>
 #include <pkgctl/report.h>

@@ -44,7 +44,7 @@ libpkgcatalog_acquire_dep = dependency(
 )
 libpkgstate_dep = dependency(
   'libpkgstate',
-  version: '>=2.1.0',
+  version: '>=2.2.0',
   required: true,
   static: want_static,
 )
@@ -54,9 +54,39 @@ libpkgresolve_dep = dependency(
   required: true,
   static: want_static,
 )
+libpkgimage_dep = dependency(
+  'libpkgimage',
+  version: '>=0.3.0',
+  required: true,
+  static: want_static,
+)
+libpkgexec_dep = dependency(
+  'libpkgexec',
+  version: '>=1.2.0',
+  required: true,
+  static: want_static,
+)
+libpkgapply_dep = dependency(
+  'libpkgapply',
+  version: '>=1.0.0',
+  required: true,
+  static: want_static,
+)
+libpkgapply_exec_dep = dependency(
+  'libpkgapply-exec',
+  version: '>=0.1.0',
+  required: true,
+  static: want_static,
+)
+libpkgstate_apply_dep = dependency(
+  'libpkgstate-apply',
+  version: '>=2.2.0',
+  required: true,
+  static: want_static,
+)
 libpkgtransaction_dep = dependency(
   'libpkgtransaction',
-  version: '>=1.0.0',
+  version: '>=1.1.0',
   required: true,
   static: want_static,
 )
@@ -68,6 +98,11 @@ pkgctl_authority_deps = [
   libpkgcatalog_dep,
   libpkgcatalog_acquire_dep,
   libpkgstate_dep,
+  libpkgstate_apply_dep,
+  libpkgimage_dep,
+  libpkgexec_dep,
+  libpkgapply_dep,
+  libpkgapply_exec_dep,
   libpkgresolve_dep,
   libpkgtransaction_dep,
 ]
