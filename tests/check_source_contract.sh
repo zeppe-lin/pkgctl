@@ -33,6 +33,11 @@ fi
 for required in \
   'libpkgcatalog-acquire' \
   'libpkgstate' \
+  'libpkgstate-apply' \
+  'libpkgimage' \
+  'libpkgexec' \
+  'libpkgapply' \
+  'libpkgapply-exec' \
   'libpkgresolve' \
   'libpkgtransaction'; do
   grep -F "'$required'" "$srcdir/meson.build" >/dev/null || {
