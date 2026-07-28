@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.2.0
+version=0.3.0
 
 require_line()
 {
@@ -20,22 +20,28 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 2;'
+  'inline constexpr unsigned version_minor = 3;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.2.0";'
+  'inline constexpr const char* version_string = "0.3.0";'
 
-grep -F '## 0.2.0 - 2026-07-27' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.2.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.2.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.3.0 - 2026-07-28' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.3.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.3.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
 for contract in \
   'libpkgsource >= 1.1.0' \
   'libpkgcatalog >= 1.1.0' \
-  'libpkgstate >= 2.1.0' \
+  'libpkgcatalog-acquire >= 1.1.0' \
+  'libpkgstate >= 2.2.0' \
+  'libpkgstate-apply >= 2.2.0' \
+  'libpkgimage >= 0.3.0' \
+  'libpkgexec >= 1.2.0' \
+  'libpkgapply >= 1.0.0' \
+  'libpkgapply-exec >= 0.1.0' \
   'libpkgresolve >= 1.0.0' \
-  'libpkgtransaction >= 1.0.0'; do
+  'libpkgtransaction >= 1.1.0'; do
   grep -F "$contract" "$srcdir/CHANGELOG.md" >/dev/null || {
     echo "missing dependency floor in changelog: $contract" >&2
     exit 1

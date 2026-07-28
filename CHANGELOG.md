@@ -1,5 +1,56 @@
 # pkgctl changelog
 
+## 0.3.0 - 2026-07-28
+
+### Effectful operation sessions
+
+- Added one exact effectful controller session for a single install, upgrade, or
+  removal transaction node.
+- Bound the selected transaction node, exact `libpkgapply` request, caller-owned
+  lifecycle order, and admitted `libpkgapply-exec` sessions into controller
+  request and session identities.
+- Added an injected physical driver surface for lifecycle execution,
+  application, and installed-state publication.
+- Retained complete subordinate lifecycle, application, transaction, and
+  publication evidence in one terminal controller result.
+
+### Sequencing and publication
+
+- Required one outer target-mutation lease across pre-action lifecycle,
+  filesystem application, post-action lifecycle, and state publication.
+- Rechecked the lease after state publication so a completed backend receipt
+  cannot hide loss of the controller's exclusion authority.
+- Added exact install, upgrade, and removal sequencing, including historical
+  removal and incoming installation lifecycle nodes around one upgrade action.
+- Published installed state only after all required lifecycle and application
+  evidence completed successfully.
+- Carried one exact transaction-evidence identity into `libpkgstate` publication
+  and durable installation or upgrade receipts.
+- Distinguished lifecycle failure, incomplete application, lease loss,
+  non-completed publication, indeterminate publication, and completed outcome
+  without claiming rollback of arbitrary lifecycle side effects.
+
+### Authority floors
+
+- `libpkgsource >= 1.1.0`;
+- `libpkgcatalog >= 1.1.0` and `libpkgcatalog-acquire >= 1.1.0`;
+- `libpkgstate >= 2.2.0` and `libpkgstate-apply >= 2.2.0`;
+- `libpkgimage >= 0.3.0`;
+- `libpkgexec >= 1.2.0`;
+- `libpkgapply >= 1.0.0` and `libpkgapply-exec >= 0.1.0`;
+- `libpkgresolve >= 1.0.0`;
+- `libpkgtransaction >= 1.1.0`.
+
+### Deliberate boundary
+
+- The executable remains read-only and still exposes only `catalog`, `resolve`,
+  and `transaction`.
+- The effectful API accepts one already-planned, already-authorized package
+  operation; it does not fetch sources, build artifacts, derive plans, schedule
+  multiple packages, or choose recovery policy.
+- Transaction-wide filesystem/state atomicity and rollback of lifecycle effects
+  are not claimed.
+
 ## 0.2.0 - 2026-07-27
 
 ### Native control loop
