@@ -22,7 +22,15 @@ Every release must establish:
 - transaction provenance retained in publication requests and durable receipts;
 - explicit non-completed and indeterminate publication outcomes;
 - CLI usage, authority-failure, and deterministic output contracts;
-- proof that all exposed CLI commands remain read-only in 0.3.0;
+- durable intent and terminal snapshots around every irreversible handoff;
+- strict codec, predecessor-chain, causal-shape, and POSIX store validation;
+- conservative restart at every lifecycle, application, and publication crash
+  boundary;
+- exact `libpkgapply` journal required for application continuation;
+- publication retry only from the exact prior state and reconciliation only
+  from the exact resulting state;
+- a newly held outer lease required on every resumed attempt;
+- proof that all exposed CLI commands remain read-only in 0.4.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
 ## Effect authority tests
@@ -43,6 +51,27 @@ The effect suite must prove:
 - lease loss during publication prevents a completed controller outcome even
   when the state backend reports publication;
 - driver evidence for another request or authority universe is rejected.
+
+
+## Durable restart tests
+
+The restart suite must prove:
+
+- a fresh successful attempt records admission, intent, terminal evidence, and
+  one terminal controller snapshot in predecessor order;
+- interrupted pre- or post-lifecycle intent is never replayed automatically;
+- application intent without the exact application journal requires external
+  resolution;
+- the exact application journal permits `libpkgapply` continuation under the
+  newly held lease;
+- publication interrupted before state mutation retries the retained request
+  only after observing the exact expected prior snapshot;
+- publication interrupted after state mutation reconciles the exact resulting
+  snapshot without a second publication;
+- mismatched subordinate evidence, stale controller records, contradictory
+  installed state, or a lost replacement lease is rejected;
+- immutable POSIX snapshots remain readable, non-writable, non-replacing, and
+  discoverable across repeated directory scans.
 
 ## Negative authority tests
 

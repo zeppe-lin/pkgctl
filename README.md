@@ -6,36 +6,43 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.3.0 retains the read-only command pipeline from 0.2.0 and adds the
-first effectful controller-library boundary for one already-authorized package
-operation:
+Release 0.4.0 retains the read-only command pipeline and the one-operation
+controller session from 0.3.0, then closes the controller restart loop with a
+durable effect-attempt journal:
 
 ```text
-exact transaction session
+exact effectful operation session
         +
-exact libpkgapply request
-        +
-caller-selected lifecycle order
-        +
-one outer target-mutation lease
+caller-issued physical attempt nonce
         |
         v
-pre lifecycle through libpkgapply-exec
+append-only controller snapshots
+        |
+        +--> intent before every irreversible handoff
+        +--> exact subordinate terminal evidence afterward
         |
         v
-filesystem transition through libpkgapply
-        |
-        v
-post lifecycle through libpkgapply-exec
-        |
-        v
-provenance-bearing publication through libpkgstate
+fresh completion or conservative restart assessment
 ```
 
-The effectful session supports one exact install, upgrade, or removal node for
-one package. It retains subordinate lifecycle, application, transaction, and
-state-publication evidence. It does not promise rollback of lifecycle side
-effects or transaction-wide filesystem/state atomicity.
+One attempt records pre-lifecycle execution, application handoff, post-lifecycle
+execution, state-publication intent and evidence, and the terminal controller
+outcome. Each snapshot binds its predecessor and the exact effect-session
+identity. The supplied POSIX store is anchored to an explicit directory or
+directory descriptor; no ambient state path belongs to the library.
+
+Restart does not guess. An unresolved lifecycle intent requires external
+resolution. An application intent may continue only when the caller supplies
+the exact durable `libpkgapply` journal. An unresolved publication intent is
+reconciled by rereading authoritative `libpkgstate`: the exact prior state
+permits retry of the retained publication request, while the exact resulting
+state permits terminal reconciliation without publishing twice. Every restart
+uses a newly held physical target-mutation lease.
+
+The effectful session still supports one exact install, upgrade, or removal
+node for one package. It retains subordinate lifecycle, application,
+transaction, publication, and restart evidence. It does not promise rollback
+of lifecycle side effects or transaction-wide filesystem/state atomicity.
 
 The executable still exposes only:
 
@@ -49,18 +56,20 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.3.0. The controller library
+There are no effect-implying CLI commands in 0.4.0. The controller library
 requires callers to construct exact planner, application, lifecycle-session,
-lease, backend, and state-publication authorities explicitly.
+lease, journal-store, backend, and state-publication authorities explicitly.
 
-Release 0.2.0 established the read-only catalog, resolution, and transaction
-command pipeline retained by this release.
+Release 0.3.0 established the one-operation effectful session. Release 0.2.0
+established the read-only catalog, resolution, and transaction command pipeline
+retained by this release.
 
 ## Authority
 
 `pkgctl` owns command policy, authority-call sequencing, controller session
-binding, outer-lease observation, transaction-evidence composition, deterministic
-diagnostics, and presentation.
+binding, durable controller-attempt snapshots, conservative restart
+classification, outer-lease observation, transaction-evidence composition,
+deterministic diagnostics, and presentation.
 
 The following meanings remain external:
 

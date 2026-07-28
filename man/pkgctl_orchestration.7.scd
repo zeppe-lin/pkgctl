@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.3.0 retains the command pipeline introduced in 0.2.0:
+Version 0.3.0 established, and 0.4.0 retains, the read-only command pipeline:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -22,6 +22,40 @@ Version 0.3.0 retains the command pipeline introduced in 0.2.0:
 
 The canonical state store is opened with *open_existing* for these commands.
 The command frontend does not initialize or publish state.
+
+# DURABLE EFFECT ATTEMPTS
+
+Version 0.4.0 can retain the outer controller sequence as immutable journal
+snapshots. One caller-issued nonce distinguishes the physical attempt while the
+semantic effect-session identity remains unchanged.
+
+The controller records admission, then an intent before every lifecycle,
+application, and publication handoff, then exact terminal evidence after each
+completed handoff. Every snapshot binds its predecessor, sequence number,
+phase totals, subordinate result identities, and any transaction, publication,
+or terminal evidence.
+
+The supplied POSIX store is anchored to an explicit directory or directory
+descriptor. It publishes read-only snapshots without replacement and validates
+record identity, predecessor linkage, and encoded causal shape. It does not use
+an ambient package-manager state path.
+
+# RESTART
+
+Restart classification is conservative. Lifecycle intent without terminal
+execution evidence requires external resolution. Application intent continues
+only when the caller supplies the exact durable *libpkgapply* journal. Completed
+application evidence permits continuation into post lifecycle.
+
+Publication intent is reconciled by rereading authoritative installed state.
+The exact expected prior snapshot permits retry of the retained publication
+request. The exact resulting snapshot permits terminal completion without a
+second publication. Contradictory state or incomplete authority requires
+external resolution.
+
+A restarted attempt requires a newly held physical target-mutation lease.
+*pkgctl* does not scan for application journals, infer lifecycle success, or
+claim that a pre-crash lease survived.
 
 # EFFECTFUL LIBRARY SESSION
 
@@ -94,7 +128,7 @@ publication mechanics.
 
 # COMMAND BOUNDARY
 
-Release 0.3.0 exposes no effect-implying command. *catalog*, *resolve*, and
+Release 0.4.0 exposes no effect-implying command. *catalog*, *resolve*, and
 *transaction* remain read-only. Install, update, removal, multi-package
 scheduling, source acquisition, building, planning, and recovery policy require
 later explicit command contracts.

@@ -13,6 +13,91 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.4.0 durable attempt boundary
+
+Release 0.4.0 makes the outer controller sequence durably observable. One
+caller-issued `effect_attempt_nonce` distinguishes a physical controller attempt
+without changing the semantic effect-session identity. Admission creates one
+identified attempt, and every later record is a complete immutable snapshot
+binding:
+
+1. the exact effect-session identity and nonce;
+2. a monotonic sequence number and predecessor-record identity;
+3. the durable stage and any active lifecycle index;
+4. completed pre-lifecycle result identities;
+5. application receipt, application-journal, and completed-evidence identities;
+6. completed post-lifecycle result identities;
+7. transaction evidence and the exact state-publication request;
+8. publication receipt and resulting-state evidence;
+9. the terminal controller outcome and any reconciled state identity.
+
+The controller appends an intent snapshot before every irreversible authority
+call and a terminal-evidence snapshot after that call returns. The durable
+sequence is therefore:
+
+```text
+admitted
+  -> pre intent / pre terminal ...
+  -> application intent / application terminal
+  -> post intent / post terminal ...
+  -> publication intent / publication terminal
+  -> controller terminal
+```
+
+A checksummed record is not accepted merely because it decodes. The model also
+validates causal shape: application cannot precede the complete pre phase,
+post lifecycle cannot precede completed application evidence, publication
+cannot precede the complete post phase, and terminal outcomes must carry the
+subordinate evidence required by that outcome.
+
+### Storage boundary
+
+`effect_journal_store` is an injected controller authority. The supplied POSIX
+implementation is anchored to an explicit directory pathname or already-open
+directory descriptor. It publishes immutable, read-only snapshots without
+replacement, synchronizes record and directory durability, validates
+filename/content identity agreement, rejects corrupt or conflicting chains,
+and never searches ambient package-manager state.
+
+The controller journal does not replace the `libpkgapply` application journal.
+It records the application handoff and returned receipt; `libpkgapply` remains
+the sole authority for package-filesystem recovery.
+
+### Restart classification
+
+`assess_effect_restart()` is pure classification over one validated latest
+snapshot. Automatic continuation is conservative:
+
+- admission or completed pre-lifecycle evidence may continue normally;
+- lifecycle intent without terminal execution evidence requires external
+  resolution because lifecycle programs may be non-idempotent;
+- application intent requires the caller to supply the exact durable
+  `libpkgapply::application_journal_record` belonging to the request;
+- completed application evidence permits continuation into post lifecycle;
+- publication intent requires authoritative installed-state rereading;
+- an exact prior state permits retry of the retained publication request;
+- an exact resulting state permits terminal reconciliation without a second
+  publication;
+- contradictory state, missing subordinate authority, or mismatched evidence
+  requires external resolution.
+
+`pkgctl` does not scan for an application journal, infer it from filenames, or
+claim that the lease held before a crash survived. `resume_effectful_operation()`
+requires a newly held physical target-mutation lease and revalidates every
+supplied subordinate result against the durable controller record.
+
+A publication receipt already retained as indeterminate remains evidence. If
+rereading state cannot prove its exact resulting state, the controller does not
+discard that receipt and retry as though the first publication never happened.
+
+### Identity compatibility
+
+The semantic effect-session identity remains unchanged. Live control state,
+restart timing, physical paths, and store coordinates stay outside that
+identity. Ordinary 0.3-style results retain their existing identity domain;
+only a result sealed through installed-state reconciliation binds the additional
+reconciled-state identity.
+
 ## Release 0.3.0 effect boundary
 
 Release 0.3.0 adds one effectful library session for one exact target operation.
@@ -132,7 +217,8 @@ The controller owns only:
 10. explicit lifecycle ordering where the transaction graph leaves peers
     unordered;
 11. outer-lease observation around the composed effect sequence;
-12. deterministic line-oriented presentation.
+12. durable controller-attempt sequencing and restart classification;
+13. deterministic line-oriented presentation.
 
 Package and profile identities are `libpkgsource` values. Catalog candidates are
 `libpkgcatalog` values. Installed records are `libpkgstate` values. Selections
@@ -162,7 +248,9 @@ and one transaction program.
 An `effectful_operation_request` retains the transaction session, selected
 action node, exact application request, caller-selected lifecycle order, and an
 installation reason only for installation. An `effectful_operation_session`
-adds admitted lifecycle execution resources in the requested order.
+adds admitted lifecycle execution resources in the requested order. A durable
+effect attempt adds a caller nonce and append-only controller snapshots; it does
+not alter the semantic session identity.
 
 Session identities use domain-separated SHA-256. Diagnostic revisions,
 command-line positions, and host filesystem paths remain outside semantic
@@ -176,7 +264,7 @@ Reports remain deterministic line-oriented diagnostics. They expose exact
 session and subordinate authority identities but are not authority themselves.
 A machine protocol requires a separate versioned contract.
 
-Release 0.3.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
+Release 0.4.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
 `transaction` remain read-only. Source fetching, building missing artifacts,
 constructing package-local plans, selecting a multi-package execution schedule,
 recovering incomplete application attempts, and exposing install/update/remove
@@ -196,7 +284,9 @@ policy remain later controller work.
 - mutate package files outside `libpkgapply`;
 - publish installed state outside `libpkgstate`;
 - claim transaction-wide atomicity or rollback;
-- choose cross-package scheduling in the 0.3.0 effect boundary.
+- choose cross-package scheduling in the one-operation effect boundary;
+- discover, scan for, or reconstruct a `libpkgapply` application journal;
+- infer success for a lifecycle intent lacking terminal execution evidence.
 
 ## Clean-room rule
 
