@@ -16,6 +16,13 @@ if not get_option('tests').disabled()
   )
   test('session', session_test)
 
+  effect_journal_test = executable(
+    'effect-journal-test',
+    'effect_journal_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('effect-journal', effect_journal_test)
+
   effect_test = executable(
     'effect-test',
     'effect_test.cpp',
@@ -49,6 +56,10 @@ if not get_option('tests').disabled()
   pkgctl_headers = [
     'controller.h',
     'effect.h',
+    'effect_journal.h',
+    'effect_journal_codec.h',
+    'effect_restart.h',
+    'effect_store.h',
     'error.h',
     'identity.h',
     'pkgctl.h',

@@ -4,6 +4,10 @@
 #include "test_support.h"
 
 #include <pkgctl/effect.h>
+#include <pkgctl/effect_journal.h>
+#include <pkgctl/effect_journal_codec.h>
+#include <pkgctl/effect_restart.h>
+#include <pkgctl/effect_store.h>
 #include <pkgctl/error.h>
 
 #include <algorithm>
@@ -12,6 +16,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -1121,6 +1126,60 @@ enum class lease_release_point {
   during_publication,
 };
 
+enum class crash_point {
+  never,
+  pre_lifecycle,
+  application,
+  post_lifecycle,
+  publication_before_store,
+  publication_after_store,
+};
+
+class memory_effect_journal_store final : public pkgctl::effect_journal_store {
+public:
+  std::optional<pkgctl::effect_attempt_record> load_latest(
+      const pkgctl::session_identity& attempt) const override
+  {
+    const auto iterator = records_.find(attempt.hex());
+    if (iterator == records_.end() || iterator->second.empty())
+      return std::nullopt;
+    return iterator->second.back();
+  }
+
+  pkgctl::effect_attempt_record append(
+      const pkgctl::effect_attempt_record& record) override
+  {
+    auto& records = records_[record.attempt().hex()];
+    if (records.empty())
+    {
+      if (record.sequence() != 0U || record.previous())
+        throw std::runtime_error("invalid journal admission");
+    }
+    else if (record.sequence() != records.back().sequence() + 1U ||
+             !record.previous() ||
+             *record.previous() != records.back().identity())
+      throw std::runtime_error("invalid journal successor");
+    records.push_back(record);
+    return records.back();
+  }
+
+  std::size_t size(const pkgctl::session_identity& attempt) const
+  {
+    const auto iterator = records_.find(attempt.hex());
+    return iterator == records_.end() ? 0U : iterator->second.size();
+  }
+
+private:
+  std::map<std::string, std::vector<pkgctl::effect_attempt_record>> records_;
+};
+
+pkgctl::effect_attempt_nonce effect_nonce(std::uint8_t marker)
+{
+  pkgctl::effect_attempt_nonce::byte_array bytes{};
+  bytes.back() = marker;
+  return pkgctl::effect_attempt_nonce::from_bytes(bytes);
+}
+
 class driver final : public pkgctl::transaction_effect_driver {
 public:
   driver(pkgapply::lease_bound_state_projection projection,
@@ -1130,11 +1189,12 @@ public:
          std::optional<pkgsource::lifecycle_action> fail_lifecycle =
              std::nullopt,
          lease_release_point release = lease_release_point::never,
-         publication_mode publication = publication_mode::native)
+         publication_mode publication = publication_mode::native,
+         crash_point crash = crash_point::never)
       : projection_(std::move(projection)), lease_(outer_lease),
         application_(std::move(application)), store_(store),
         backend_(fail_lifecycle), release_(release),
-        publication_(publication)
+        publication_(publication), crash_(crash)
   {
   }
 
@@ -1144,15 +1204,33 @@ public:
   pkgapply_exec::lifecycle_execution_result execute_lifecycle(
       const pkgapply_exec::admitted_lifecycle_session& session) override
   {
-    trace_.push_back(std::string(pkgsource::to_string(session.node().action())));
-    return pkgapply_exec::execute(session, backend_);
+    const auto action = session.node().action();
+    trace_.push_back(std::string(pkgsource::to_string(action)));
+    if ((crash_ == crash_point::pre_lifecycle &&
+         action == pkgsource::lifecycle_action::pre_install) ||
+        (crash_ == crash_point::post_lifecycle &&
+         action == pkgsource::lifecycle_action::post_install))
+      throw std::runtime_error("simulated lifecycle interruption");
+    auto result = pkgapply_exec::execute(session, backend_);
+    lifecycle_results_.push_back(result);
+    return result;
   }
   pkgapply::application_receipt apply_application(
       const pkgapply::package_application_request&) override
   {
     trace_.push_back("apply");
+    if (crash_ == crash_point::application)
+      throw std::runtime_error("simulated application interruption");
     if (release_ == lease_release_point::after_application)
       lease_.release();
+    return application_;
+  }
+  pkgapply::application_receipt resume_application(
+      const pkgapply::package_application_request&,
+      const pkgapply::application_journal_record&) override
+  {
+    trace_.push_back("resume-apply");
+    ++resume_calls_;
     return application_;
   }
   pkgstate::state_publication_receipt publish_state(
@@ -1160,6 +1238,7 @@ public:
   {
     trace_.push_back("publish");
     ++publication_calls_;
+    last_publication_request_ = request;
     if (release_ == lease_release_point::during_publication)
       lease_.release();
     if (publication_ == publication_mode::rejected)
@@ -1169,10 +1248,21 @@ public:
       return pkgstate::state_publication_receipt::indeterminate(
           request, store_.read(), std::nullopt, "test/pkgctl-effect-v1",
           pkgstate::state_storage_atomicity_boundary::immutable_generation_selection);
-    return store_.compare_and_publish(request);
+    if (crash_ == crash_point::publication_before_store)
+      throw std::runtime_error("simulated pre-publication interruption");
+    auto receipt = store_.compare_and_publish(request);
+    if (crash_ == crash_point::publication_after_store)
+      throw std::runtime_error("simulated publication interruption");
+    return receipt;
   }
+  pkgstate::snapshot read_state() const override { return store_.read(); }
   std::size_t publication_calls() const noexcept { return publication_calls_; }
+  std::size_t resume_calls() const noexcept { return resume_calls_; }
   const std::vector<std::string>& trace() const noexcept { return trace_; }
+  const std::vector<pkgapply_exec::lifecycle_execution_result>&
+  lifecycle_results() const noexcept { return lifecycle_results_; }
+  const std::optional<pkgstate::state_publication_request>&
+  last_publication_request() const noexcept { return last_publication_request_; }
 private:
   pkgapply::lease_bound_state_projection projection_;
   mutation_lease& lease_;
@@ -1181,8 +1271,12 @@ private:
   scripted_execution_backend backend_;
   lease_release_point release_;
   publication_mode publication_;
+  crash_point crash_;
   std::size_t publication_calls_ = 0;
+  std::size_t resume_calls_ = 0;
   std::vector<std::string> trace_;
+  std::vector<pkgapply_exec::lifecycle_execution_result> lifecycle_results_;
+  std::optional<pkgstate::state_publication_request> last_publication_request_;
 };
 
 struct fixture final {
@@ -1254,6 +1348,23 @@ struct fixture final {
   }
 };
 
+pkgapply::application_journal_record
+application_restart_journal(const fixture& value)
+{
+  pkgapply::application_attempt_nonce::byte_array nonce_bytes{};
+  nonce_bytes.back() = 77U;
+  const auto attempt = pkgapply::application_attempt::make(
+      value.application.identity(), value.target.identity(),
+      value.target.mutation_backend(),
+      pkgapply::application_attempt_nonce::from_bytes(nonce_bytes));
+  const auto header = pkgapply::application_journal_header::make(
+      pkgplan::operation_kind::install, value.application.identity(),
+      value.application.plan().identity(), attempt, value.target.identity(),
+      value.application.control().identity(), value.projection.identity(),
+      value.outer_lease.identity(), value.target.mutation_backend());
+  return pkgapply::application_journal_record::make(
+      header, pkgapply::application_journal_state::preparing, {}, {});
+}
 
 struct upgrade_fixture final {
   test_support::temporary_directory temp;
@@ -1717,6 +1828,248 @@ void check_lease_loss()
   }
 }
 
+
+void check_durable_success()
+{
+  fixture value;
+  const auto session = pkgctl::effectful_operation_session::admit(
+      effect_request(value), value.before, value.after);
+  driver actuator(value.projection, value.outer_lease,
+                  value.receipt, value.store);
+  memory_effect_journal_store journal;
+  const auto result = pkgctl::execute_effectful_operation_durable(
+      session, effect_nonce(1), actuator, journal);
+  CHECK(result.succeeded());
+  const auto admission = pkgctl::effect_attempt_record::admit(
+      session.identity(), session.before().size(), session.after().size(),
+      effect_nonce(1));
+  const auto latest = journal.load_latest(admission.attempt());
+  CHECK(latest.has_value());
+  CHECK(latest && latest->stage() == pkgctl::effect_attempt_stage::terminal);
+  CHECK(latest && latest->terminal_outcome() &&
+        *latest->terminal_outcome() ==
+            pkgctl::effectful_operation_outcome::completed);
+  if (latest)
+  {
+    const auto decoded = pkgctl::decode_effect_attempt_record(
+        pkgctl::encode_effect_attempt_record(*latest));
+    CHECK(decoded.identity() == latest->identity());
+    CHECK(decoded.publication().has_value());
+    CHECK(decoded.terminal_outcome() == latest->terminal_outcome());
+  }
+  CHECK(journal.size(admission.attempt()) == 10U);
+}
+
+void check_restart_boundaries()
+{
+  {
+    fixture value;
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    driver actuator(value.projection, value.outer_lease,
+                    value.receipt, value.store, std::nullopt,
+                    lease_release_point::never, publication_mode::native,
+                    crash_point::pre_lifecycle);
+    memory_effect_journal_store journal;
+    bool interrupted = false;
+    try
+    {
+      (void)pkgctl::execute_effectful_operation_durable(
+          session, effect_nonce(2), actuator, journal);
+    }
+    catch (const std::runtime_error&)
+    {
+      interrupted = true;
+    }
+    CHECK(interrupted);
+    const auto admission = pkgctl::effect_attempt_record::admit(
+        session.identity(), session.before().size(), session.after().size(),
+        effect_nonce(2));
+    const auto latest = journal.load_latest(admission.attempt());
+    CHECK(latest && latest->stage() ==
+                        pkgctl::effect_attempt_stage::before_lifecycle_intent);
+    CHECK(latest && pkgctl::assess_effect_restart(*latest).disposition() ==
+                        pkgctl::effect_restart_disposition::
+                            external_resolution_required);
+  }
+  {
+    fixture value;
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    driver actuator(value.projection, value.outer_lease,
+                    value.receipt, value.store, std::nullopt,
+                    lease_release_point::never, publication_mode::native,
+                    crash_point::application);
+    memory_effect_journal_store journal;
+    try
+    {
+      (void)pkgctl::execute_effectful_operation_durable(
+          session, effect_nonce(3), actuator, journal);
+    }
+    catch (const std::runtime_error&)
+    {
+    }
+    const auto admission = pkgctl::effect_attempt_record::admit(
+        session.identity(), session.before().size(), session.after().size(),
+        effect_nonce(3));
+    const auto latest = journal.load_latest(admission.attempt());
+    CHECK(latest && latest->stage() ==
+                        pkgctl::effect_attempt_stage::application_intent);
+    CHECK(latest && pkgctl::assess_effect_restart(*latest).disposition() ==
+                        pkgctl::effect_restart_disposition::resume_application);
+    CHECK(actuator.lifecycle_results().size() == 1U);
+    const auto unresolved_checkpoint = pkgctl::effect_restart_checkpoint::make(
+        session, *latest, actuator.lifecycle_results(), std::nullopt, {},
+        std::nullopt, std::nullopt, std::nullopt);
+    const auto unresolved = pkgctl::resume_effectful_operation(
+        unresolved_checkpoint, actuator, journal);
+    CHECK(unresolved.external_resolution_required());
+    CHECK(!unresolved.operation());
+    CHECK(actuator.resume_calls() == 0U);
+
+    const auto checkpoint = pkgctl::effect_restart_checkpoint::make(
+        session, *latest, actuator.lifecycle_results(), std::nullopt, {},
+        std::nullopt, std::nullopt, application_restart_journal(value));
+    const auto restarted = pkgctl::resume_effectful_operation(
+        checkpoint, actuator, journal);
+    CHECK(!restarted.external_resolution_required());
+    CHECK(restarted.terminal());
+    CHECK(restarted.operation());
+    CHECK(restarted.operation() && restarted.operation()->succeeded());
+    CHECK(actuator.resume_calls() == 1U);
+    CHECK(actuator.trace() == std::vector<std::string>({
+        "pre-install", "apply", "resume-apply", "post-install", "publish"}));
+  }
+  {
+    fixture value;
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    driver actuator(value.projection, value.outer_lease,
+                    value.receipt, value.store, std::nullopt,
+                    lease_release_point::never, publication_mode::native,
+                    crash_point::post_lifecycle);
+    memory_effect_journal_store journal;
+    try
+    {
+      (void)pkgctl::execute_effectful_operation_durable(
+          session, effect_nonce(4), actuator, journal);
+    }
+    catch (const std::runtime_error&)
+    {
+    }
+    const auto admission = pkgctl::effect_attempt_record::admit(
+        session.identity(), session.before().size(), session.after().size(),
+        effect_nonce(4));
+    const auto latest = journal.load_latest(admission.attempt());
+    CHECK(latest && latest->stage() ==
+                        pkgctl::effect_attempt_stage::after_lifecycle_intent);
+    CHECK(latest && pkgctl::assess_effect_restart(*latest).disposition() ==
+                        pkgctl::effect_restart_disposition::
+                            external_resolution_required);
+  }
+}
+
+
+void check_publication_retry()
+{
+  fixture value;
+  const auto session = pkgctl::effectful_operation_session::admit(
+      effect_request(value), value.before, value.after);
+  driver interrupted_driver(
+      value.projection, value.outer_lease, value.receipt, value.store,
+      std::nullopt, lease_release_point::never, publication_mode::native,
+      crash_point::publication_before_store);
+  memory_effect_journal_store journal;
+  bool interrupted = false;
+  try
+  {
+    (void)pkgctl::execute_effectful_operation_durable(
+        session, effect_nonce(6), interrupted_driver, journal);
+  }
+  catch (const std::runtime_error&)
+  {
+    interrupted = true;
+  }
+  CHECK(interrupted);
+  const auto admission = pkgctl::effect_attempt_record::admit(
+      session.identity(), session.before().size(), session.after().size(),
+      effect_nonce(6));
+  const auto latest = journal.load_latest(admission.attempt());
+  CHECK(latest && latest->stage() ==
+                      pkgctl::effect_attempt_stage::publication_intent);
+  CHECK(interrupted_driver.lifecycle_results().size() == 2U);
+  CHECK(interrupted_driver.last_publication_request().has_value());
+  CHECK(value.store.read().identity() == value.expected.identity());
+
+  std::vector<pkgapply_exec::lifecycle_execution_result> before{
+      interrupted_driver.lifecycle_results().front()};
+  std::vector<pkgapply_exec::lifecycle_execution_result> after{
+      interrupted_driver.lifecycle_results().back()};
+  const auto checkpoint = pkgctl::effect_restart_checkpoint::make(
+      session, *latest, std::move(before), value.receipt, std::move(after),
+      interrupted_driver.last_publication_request(), std::nullopt, std::nullopt);
+  driver restart_driver(
+      value.projection, value.outer_lease, value.receipt, value.store);
+  const auto restarted = pkgctl::resume_effectful_operation(
+      checkpoint, restart_driver, journal);
+  CHECK(restarted.terminal());
+  CHECK(!restarted.external_resolution_required());
+  CHECK(restarted.operation() && restarted.operation()->succeeded());
+  CHECK(restarted.operation() && !restarted.operation()->reconciled_state());
+  CHECK(interrupted_driver.publication_calls() == 1U);
+  CHECK(restart_driver.publication_calls() == 1U);
+  CHECK(restart_driver.trace() == std::vector<std::string>({"publish"}));
+  CHECK(value.store.read().size() == 1U);
+}
+
+void check_publication_reconciliation()
+{
+  fixture value;
+  const auto session = pkgctl::effectful_operation_session::admit(
+      effect_request(value), value.before, value.after);
+  driver actuator(value.projection, value.outer_lease,
+                  value.receipt, value.store, std::nullopt,
+                  lease_release_point::never, publication_mode::native,
+                  crash_point::publication_after_store);
+  memory_effect_journal_store journal;
+  bool interrupted = false;
+  try
+  {
+    (void)pkgctl::execute_effectful_operation_durable(
+        session, effect_nonce(5), actuator, journal);
+  }
+  catch (const std::runtime_error&)
+  {
+    interrupted = true;
+  }
+  CHECK(interrupted);
+  const auto admission = pkgctl::effect_attempt_record::admit(
+      session.identity(), session.before().size(), session.after().size(),
+      effect_nonce(5));
+  const auto latest = journal.load_latest(admission.attempt());
+  CHECK(latest && latest->stage() ==
+                      pkgctl::effect_attempt_stage::publication_intent);
+  CHECK(actuator.lifecycle_results().size() == 2U);
+  CHECK(actuator.last_publication_request().has_value());
+
+  std::vector<pkgapply_exec::lifecycle_execution_result> before{
+      actuator.lifecycle_results().front()};
+  std::vector<pkgapply_exec::lifecycle_execution_result> after{
+      actuator.lifecycle_results().back()};
+  const auto checkpoint = pkgctl::effect_restart_checkpoint::make(
+      session, *latest, std::move(before), value.receipt, std::move(after),
+      actuator.last_publication_request(), std::nullopt, std::nullopt);
+  const auto restarted = pkgctl::resume_effectful_operation(
+      checkpoint, actuator, journal);
+  CHECK(restarted.terminal());
+  CHECK(!restarted.external_resolution_required());
+  CHECK(restarted.operation().has_value());
+  CHECK(restarted.operation() && restarted.operation()->succeeded());
+  CHECK(restarted.operation() && restarted.operation()->reconciled_state());
+  CHECK(actuator.publication_calls() == 1U);
+  CHECK(value.store.read().size() == 1U);
+}
+
 } // namespace
 
 int main()
@@ -1729,5 +2082,9 @@ int main()
   check_lifecycle_failures();
   check_publication_failures();
   check_lease_loss();
+  check_durable_success();
+  check_restart_boundaries();
+  check_publication_retry();
+  check_publication_reconciliation();
   return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
