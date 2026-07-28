@@ -14,6 +14,7 @@ namespace pkgctl {
 
 class session_identity final {
 public:
+  [[nodiscard]] static session_identity from_hex(std::string hex);
   [[nodiscard]] const std::string& hex() const noexcept;
   friend bool operator==(const session_identity& lhs,
                          const session_identity& rhs) noexcept;

@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <pkgctl/effect.h>
+#include <pkgctl/effect_journal.h>
+#include <pkgctl/effect_restart.h>
+#include <pkgctl/effect_store.h>
 #include <pkgctl/error.h>
 
 #include <algorithm>
@@ -467,7 +470,9 @@ session_identity result_identity(
     const std::vector<pkgapply_exec::lifecycle_execution_result>& after,
     const std::optional<pkgstate::transaction_evidence_identity>& transaction,
     const std::optional<pkgstate::state_publication_request>& publication_request,
-    const std::optional<pkgstate::state_publication_receipt>& publication_receipt)
+    const std::optional<pkgstate::state_publication_receipt>& publication_receipt,
+    const std::optional<pkgstate::installed_state_snapshot_identity>&
+        reconciled_state)
 {
   std::vector<std::string> fields{
       session.identity().hex(),
@@ -486,9 +491,97 @@ session_identity result_identity(
   fields.push_back(publication_receipt
                        ? publication_receipt->identity().string()
                        : std::string());
-  return make_session_identity("pkgctl/effectful-operation-result/1", fields);
+  if (!reconciled_state)
+    return make_session_identity("pkgctl/effectful-operation-result/1", fields);
+  fields.push_back(reconciled_state->string());
+  return make_session_identity("pkgctl/effectful-operation-result/2", fields);
 }
 
+effectful_operation_outcome publication_outcome(
+    const pkgstate::state_publication_receipt& receipt)
+{
+  switch (receipt.outcome())
+  {
+    case pkgstate::state_publication_outcome::published:
+      return effectful_operation_outcome::completed;
+    case pkgstate::state_publication_outcome::published_durability_unconfirmed:
+    case pkgstate::state_publication_outcome::indeterminate:
+      return effectful_operation_outcome::state_publication_indeterminate;
+    case pkgstate::state_publication_outcome::stale_expected_state:
+    case pkgstate::state_publication_outcome::request_rejected:
+    case pkgstate::state_publication_outcome::failed_before_publication:
+      return effectful_operation_outcome::state_publication_not_completed;
+  }
+  throw error(error_code::driver_contract_violation,
+              "state driver returned an invalid publication outcome");
+}
+
+pkgstate::snapshot resulting_snapshot(
+    const pkgstate::snapshot& expected,
+    const pkgstate::state_publication_request& request)
+{
+  if (request.expected_snapshot() != expected.identity() ||
+      request.target_binding() != expected.target_binding())
+    throw error(error_code::driver_contract_violation,
+                "publication request differs from the expected state authority");
+
+  auto packages = expected.packages();
+  for (const auto& delta : request.deltas())
+  {
+    const auto iterator = std::find_if(
+        packages.begin(), packages.end(), [&delta](const auto& package) {
+          return package.release().name() == delta.package_name();
+        });
+    switch (delta.kind())
+    {
+      case pkgstate::package_state_delta_kind::install:
+        if (iterator != packages.end() || !delta.proposed_package())
+          throw error(error_code::driver_contract_violation,
+                      "installation publication delta is not realizable");
+        packages.push_back(*delta.proposed_package());
+        break;
+      case pkgstate::package_state_delta_kind::replace:
+        if (iterator == packages.end() || !delta.expected_package() ||
+            !delta.proposed_package() ||
+            iterator->identity() != *delta.expected_package())
+          throw error(error_code::driver_contract_violation,
+                      "replacement publication delta is not realizable");
+        *iterator = *delta.proposed_package();
+        break;
+      case pkgstate::package_state_delta_kind::remove:
+        if (iterator == packages.end() || !delta.expected_package() ||
+            iterator->identity() != *delta.expected_package())
+          throw error(error_code::driver_contract_violation,
+                      "removal publication delta is not realizable");
+        packages.erase(iterator);
+        break;
+    }
+  }
+  return pkgstate::snapshot::make(expected.target_binding(), std::move(packages));
+}
+
+pkgstate::installed_state_snapshot_identity state_identity_from_string(
+    const std::string& value)
+{
+  return pkgstate::installed_state_snapshot_identity::parse(value);
+}
+
+pkgstate::transaction_evidence_identity transaction_identity_from_string(
+    const std::string& value)
+{
+  return pkgstate::transaction_evidence_identity::parse(value);
+}
+
+effect_attempt_record append_record(
+    effect_journal_store& store,
+    const effect_attempt_record& record)
+{
+  effect_attempt_record stored = store.append(record);
+  if (stored.identity() != record.identity())
+    throw error(error_code::driver_contract_violation,
+                "effect journal store returned another snapshot");
+  return stored;
+}
 
 } // namespace
 
@@ -648,6 +741,20 @@ effectful_operation_session::after() const noexcept { return after_; }
 const session_identity& effectful_operation_session::identity() const noexcept
 { return identity_; }
 
+pkgapply::application_receipt transaction_effect_driver::resume_application(
+    const pkgapply::package_application_request&,
+    const pkgapply::application_journal_record&)
+{
+  throw error(error_code::invalid_effect_session,
+              "effect driver does not support application restart");
+}
+
+pkgstate::snapshot transaction_effect_driver::read_state() const
+{
+  throw error(error_code::invalid_effect_session,
+              "effect driver does not support state reconciliation");
+}
+
 native_transaction_effect_driver::native_transaction_effect_driver(
     const pkgapply::lease_bound_state_projection& state,
     pkgapply::target_mutation_lease& lease,
@@ -700,6 +807,41 @@ native_transaction_effect_driver::apply_application(
               "application request has no operation body");
 }
 
+pkgapply::application_receipt
+native_transaction_effect_driver::resume_application(
+    const pkgapply::package_application_request& request,
+    const pkgapply::application_journal_record& journal)
+{
+  if (const auto* value = request.installation())
+  {
+    if (incoming_archive_ == nullptr)
+      throw error(error_code::invalid_effect_session,
+                  "installation restart lacks incoming archive authority");
+    return pkgapply::resume_application(
+        *value, state_, lease_, application_backend_, journal,
+        *incoming_archive_);
+  }
+  if (const auto* value = request.upgrade())
+  {
+    if (incoming_archive_ == nullptr)
+      throw error(error_code::invalid_effect_session,
+                  "upgrade restart lacks incoming archive authority");
+    return pkgapply::resume_application(
+        *value, state_, lease_, application_backend_, journal,
+        *incoming_archive_);
+  }
+  if (const auto* value = request.removal())
+    return pkgapply::resume_application(
+        *value, state_, lease_, application_backend_, journal);
+  throw error(error_code::invalid_effect_session,
+              "application restart request has no operation body");
+}
+
+pkgstate::snapshot native_transaction_effect_driver::read_state() const
+{
+  return state_store_.read();
+}
+
 pkgstate::state_publication_receipt
 native_transaction_effect_driver::publish_state(
     const pkgstate::state_publication_request& request)
@@ -715,16 +857,17 @@ effectful_operation_result effectful_operation_result::seal(
     std::vector<pkgapply_exec::lifecycle_execution_result> after,
     std::optional<pkgstate::transaction_evidence_identity> transaction_evidence,
     std::optional<pkgstate::state_publication_request> publication_request,
-    std::optional<pkgstate::state_publication_receipt> publication_receipt)
+    std::optional<pkgstate::state_publication_receipt> publication_receipt,
+    std::optional<pkgstate::installed_state_snapshot_identity> reconciled_state)
 {
   session_identity identity = result_identity(
       session, outcome, before, application, after, transaction_evidence,
-      publication_request, publication_receipt);
+      publication_request, publication_receipt, reconciled_state);
   return effectful_operation_result(
       std::move(session), outcome, std::move(before), std::move(application),
       std::move(after), std::move(transaction_evidence),
       std::move(publication_request), std::move(publication_receipt),
-      std::move(identity));
+      std::move(reconciled_state), std::move(identity));
 }
 
 effectful_operation_result::effectful_operation_result(
@@ -736,6 +879,7 @@ effectful_operation_result::effectful_operation_result(
     std::optional<pkgstate::transaction_evidence_identity> transaction_evidence,
     std::optional<pkgstate::state_publication_request> publication_request,
     std::optional<pkgstate::state_publication_receipt> publication_receipt,
+    std::optional<pkgstate::installed_state_snapshot_identity> reconciled_state,
     session_identity identity)
     : session_(std::move(session)), outcome_(outcome),
       before_(std::move(before)), application_(std::move(application)),
@@ -743,6 +887,7 @@ effectful_operation_result::effectful_operation_result(
       transaction_evidence_(std::move(transaction_evidence)),
       publication_request_(std::move(publication_request)),
       publication_receipt_(std::move(publication_receipt)),
+      reconciled_state_(std::move(reconciled_state)),
       identity_(std::move(identity))
 {
 }
@@ -768,6 +913,9 @@ effectful_operation_result::publication_request() const noexcept
 const std::optional<pkgstate::state_publication_receipt>&
 effectful_operation_result::publication_receipt() const noexcept
 { return publication_receipt_; }
+const std::optional<pkgstate::installed_state_snapshot_identity>&
+effectful_operation_result::reconciled_state() const noexcept
+{ return reconciled_state_; }
 const session_identity& effectful_operation_result::identity() const noexcept
 { return identity_; }
 
@@ -881,6 +1029,389 @@ effectful_operation_result execute_effectful_operation(
       std::move(session), outcome, std::move(before), std::move(application),
       std::move(after), std::move(transaction),
       std::move(publication_request), std::move(publication_receipt));
+}
+
+effectful_operation_result execute_effectful_operation_durable(
+    effectful_operation_session session,
+    const effect_attempt_nonce& nonce,
+    transaction_effect_driver& driver,
+    effect_journal_store& journal_store)
+{
+  const auto& request = session.request();
+  pkgapply::validate_target_mutation_lease(
+      request.application().target(), driver.state_projection(), driver.lease());
+
+  effect_attempt_record journal = append_record(
+      journal_store,
+      effect_attempt_record::admit(session.identity(), session.before().size(),
+                                   session.after().size(), nonce));
+
+  std::vector<pkgapply_exec::lifecycle_execution_result> before;
+  before.reserve(session.before().size());
+  for (std::size_t index = 0; index < session.before().size(); ++index)
+  {
+    if (!driver.lease().held())
+    {
+      journal = append_record(
+          journal_store,
+          journal.seal_terminal(effectful_operation_outcome::outer_lease_lost));
+      return effectful_operation_result::seal(
+          std::move(session), effectful_operation_outcome::outer_lease_lost,
+          std::move(before), std::nullopt, {}, std::nullopt, std::nullopt,
+          std::nullopt);
+    }
+    journal = append_record(journal_store, journal.begin_before(index));
+    auto result = driver.execute_lifecycle(session.before()[index]);
+    validate_lifecycle_result(session.before()[index], result);
+    const bool succeeded = result.succeeded();
+    before.push_back(result);
+    journal = append_record(journal_store, journal.complete_before(result));
+    if (!succeeded)
+    {
+      journal = append_record(
+          journal_store,
+          journal.seal_terminal(
+              effectful_operation_outcome::lifecycle_failed_before_application));
+      return effectful_operation_result::seal(
+          std::move(session),
+          effectful_operation_outcome::lifecycle_failed_before_application,
+          std::move(before), std::nullopt, {}, std::nullopt, std::nullopt,
+          std::nullopt);
+    }
+  }
+
+  if (!driver.lease().held())
+  {
+    journal = append_record(
+        journal_store,
+        journal.seal_terminal(effectful_operation_outcome::outer_lease_lost));
+    return effectful_operation_result::seal(
+        std::move(session), effectful_operation_outcome::outer_lease_lost,
+        std::move(before), std::nullopt, {}, std::nullopt, std::nullopt,
+        std::nullopt);
+  }
+
+  journal = append_record(journal_store, journal.begin_application());
+  pkgapply::application_receipt application =
+      driver.apply_application(request.application());
+  validate_application_receipt(request, driver.state_projection(), application);
+  journal = append_record(journal_store,
+                          journal.complete_application(application));
+  if (application.outcome() != pkgapply::application_attempt_outcome::completed)
+  {
+    journal = append_record(
+        journal_store,
+        journal.seal_terminal(
+            effectful_operation_outcome::application_not_completed));
+    return effectful_operation_result::seal(
+        std::move(session),
+        effectful_operation_outcome::application_not_completed,
+        std::move(before), std::move(application), {}, std::nullopt,
+        std::nullopt, std::nullopt);
+  }
+
+  std::vector<pkgapply_exec::lifecycle_execution_result> after;
+  after.reserve(session.after().size());
+  for (std::size_t index = 0; index < session.after().size(); ++index)
+  {
+    if (!driver.lease().held())
+    {
+      journal = append_record(
+          journal_store,
+          journal.seal_terminal(effectful_operation_outcome::outer_lease_lost));
+      return effectful_operation_result::seal(
+          std::move(session), effectful_operation_outcome::outer_lease_lost,
+          std::move(before), std::move(application), std::move(after),
+          std::nullopt, std::nullopt, std::nullopt);
+    }
+    journal = append_record(journal_store, journal.begin_after(index));
+    auto result = driver.execute_lifecycle(session.after()[index]);
+    validate_lifecycle_result(session.after()[index], result);
+    const bool succeeded = result.succeeded();
+    after.push_back(result);
+    journal = append_record(journal_store, journal.complete_after(result));
+    if (!succeeded)
+    {
+      journal = append_record(
+          journal_store,
+          journal.seal_terminal(
+              effectful_operation_outcome::lifecycle_failed_after_application));
+      return effectful_operation_result::seal(
+          std::move(session),
+          effectful_operation_outcome::lifecycle_failed_after_application,
+          std::move(before), std::move(application), std::move(after),
+          std::nullopt, std::nullopt, std::nullopt);
+    }
+  }
+
+  if (!driver.lease().held())
+  {
+    journal = append_record(
+        journal_store,
+        journal.seal_terminal(effectful_operation_outcome::outer_lease_lost));
+    return effectful_operation_result::seal(
+        std::move(session), effectful_operation_outcome::outer_lease_lost,
+        std::move(before), std::move(application), std::move(after),
+        std::nullopt, std::nullopt, std::nullopt);
+  }
+
+  const auto& completed = *application.completed_evidence();
+  auto transaction = transaction_evidence(session, before, completed, after);
+  auto publication_request = project_publication(
+      request, driver.state_projection(), completed, transaction);
+  journal = append_record(
+      journal_store, journal.begin_publication(transaction, publication_request));
+  auto publication_receipt = driver.publish_state(publication_request);
+  if (publication_receipt.request() != publication_request.identity())
+    throw error(error_code::driver_contract_violation,
+                "state driver returned evidence for another publication request");
+  journal = append_record(
+      journal_store, journal.complete_publication(publication_receipt));
+
+  if (!driver.lease().held())
+  {
+    journal = append_record(
+        journal_store,
+        journal.seal_terminal(effectful_operation_outcome::outer_lease_lost));
+    return effectful_operation_result::seal(
+        std::move(session), effectful_operation_outcome::outer_lease_lost,
+        std::move(before), std::move(application), std::move(after),
+        std::move(transaction), std::move(publication_request),
+        std::move(publication_receipt));
+  }
+
+  const auto outcome = publication_outcome(publication_receipt);
+  if (outcome != effectful_operation_outcome::state_publication_indeterminate)
+    journal = append_record(journal_store, journal.seal_terminal(outcome));
+  return effectful_operation_result::seal(
+      std::move(session), outcome, std::move(before), std::move(application),
+      std::move(after), std::move(transaction),
+      std::move(publication_request), std::move(publication_receipt));
+}
+
+effect_restart_result resume_effectful_operation(
+    effect_restart_checkpoint checkpoint,
+    transaction_effect_driver& driver,
+    effect_journal_store& journal_store)
+{
+  effect_attempt_record journal = checkpoint.record();
+  const auto latest = journal_store.load_latest(journal.attempt());
+  if (!latest || latest->identity() != journal.identity())
+    throw error(error_code::invalid_effect_session,
+                "restart checkpoint is not the latest durable controller record");
+
+  auto session = checkpoint.session();
+  auto before = checkpoint.before();
+  auto application = checkpoint.application();
+  auto after = checkpoint.after();
+  auto publication_request = checkpoint.publication_request();
+  auto publication_receipt = checkpoint.publication_receipt();
+
+  const auto current_transaction = [&]()
+      -> std::optional<pkgstate::transaction_evidence_identity> {
+    if (publication_request && publication_request->transaction_evidence())
+      return *publication_request->transaction_evidence();
+    if (journal.transaction_evidence())
+      return transaction_identity_from_string(*journal.transaction_evidence());
+    return std::nullopt;
+  };
+
+  auto finish = [&](effectful_operation_outcome outcome,
+                          std::optional<pkgstate::installed_state_snapshot_identity>
+                              reconciled = std::nullopt) {
+    journal = append_record(
+        journal_store, journal.seal_terminal(outcome, reconciled));
+    auto operation = effectful_operation_result::seal(
+        session, outcome, before, application, after, current_transaction(),
+        publication_request, publication_receipt, reconciled);
+    return effect_restart_result(
+        effect_restart_disposition::terminal, journal, std::move(operation));
+  };
+
+  auto assessment = assess_effect_restart(journal);
+  if (assessment.disposition() ==
+      effect_restart_disposition::external_resolution_required)
+    return effect_restart_result(assessment.disposition(), journal, std::nullopt);
+  if (assessment.disposition() ==
+          effect_restart_disposition::resume_application &&
+      !checkpoint.application_journal())
+    return effect_restart_result(
+        effect_restart_disposition::external_resolution_required,
+        journal, std::nullopt);
+
+  if (assessment.disposition() == effect_restart_disposition::terminal)
+  {
+    std::optional<pkgstate::installed_state_snapshot_identity> reconciled;
+    if (journal.reconciled_state())
+      reconciled = state_identity_from_string(*journal.reconciled_state());
+    auto operation = effectful_operation_result::seal(
+        std::move(session), *journal.terminal_outcome(), std::move(before),
+        std::move(application), std::move(after), current_transaction(),
+        std::move(publication_request), std::move(publication_receipt),
+        std::move(reconciled));
+    return effect_restart_result(
+        effect_restart_disposition::terminal, std::move(journal),
+        std::move(operation));
+  }
+
+  if (assessment.disposition() == effect_restart_disposition::seal_terminal)
+  {
+    switch (journal.stage())
+    {
+      case effect_attempt_stage::before_lifecycle_terminal:
+        return finish(
+            effectful_operation_outcome::lifecycle_failed_before_application);
+      case effect_attempt_stage::application_terminal:
+        return finish(effectful_operation_outcome::application_not_completed);
+      case effect_attempt_stage::after_lifecycle_terminal:
+        return finish(
+            effectful_operation_outcome::lifecycle_failed_after_application);
+      case effect_attempt_stage::publication_terminal:
+        return finish(publication_outcome(*publication_receipt));
+      default:
+        throw error(error_code::invalid_effect_session,
+                    "restart terminal disposition has no terminal evidence");
+    }
+  }
+
+  const auto& request = session.request();
+  if (!driver.lease().held())
+    throw error(error_code::invalid_effect_session,
+                "effect restart requires a newly held target lease");
+
+  if (assessment.disposition() ==
+      effect_restart_disposition::reconcile_publication)
+  {
+    if (!publication_request)
+      throw error(error_code::invalid_effect_session,
+                  "publication reconciliation lacks the exact request");
+    const auto observed = driver.read_state();
+    const auto& expected = request.transaction().resolution().installed();
+    const auto resulting = resulting_snapshot(expected, *publication_request);
+    if (observed.identity() == resulting.identity())
+      return finish(effectful_operation_outcome::completed,
+                    observed.identity());
+    if (observed.identity() != expected.identity() ||
+        journal.stage() == effect_attempt_stage::publication_terminal)
+    {
+      return effect_restart_result(
+          effect_restart_disposition::external_resolution_required,
+          journal, std::nullopt);
+    }
+    pkgapply::validate_target_mutation_lease(
+        request.application().target(), driver.state_projection(),
+        driver.lease());
+    publication_receipt = driver.publish_state(*publication_request);
+    if (publication_receipt->request() != publication_request->identity())
+      throw error(error_code::driver_contract_violation,
+                  "state driver returned evidence for another publication request");
+    journal = append_record(
+        journal_store, journal.complete_publication(*publication_receipt));
+    const auto outcome = publication_outcome(*publication_receipt);
+    if (outcome == effectful_operation_outcome::state_publication_indeterminate)
+      return effect_restart_result(
+          effect_restart_disposition::reconcile_publication, journal,
+          effectful_operation_result::seal(
+              session, outcome, before, application, after,
+              current_transaction(), publication_request,
+              publication_receipt));
+    return finish(outcome);
+  }
+
+  pkgapply::validate_target_mutation_lease(
+      request.application().target(), driver.state_projection(), driver.lease());
+
+  if (assessment.disposition() ==
+          effect_restart_disposition::continue_before_lifecycle ||
+      journal.stage() == effect_attempt_stage::admitted ||
+      journal.stage() == effect_attempt_stage::before_lifecycle_terminal)
+  {
+    for (std::size_t index = before.size(); index < session.before().size(); ++index)
+    {
+      if (!driver.lease().held())
+        return finish(effectful_operation_outcome::outer_lease_lost);
+      journal = append_record(journal_store, journal.begin_before(index));
+      auto result = driver.execute_lifecycle(session.before()[index]);
+      validate_lifecycle_result(session.before()[index], result);
+      const bool succeeded = result.succeeded();
+      before.push_back(result);
+      journal = append_record(journal_store, journal.complete_before(result));
+      if (!succeeded)
+        return finish(
+            effectful_operation_outcome::lifecycle_failed_before_application);
+    }
+  }
+
+  if (!application)
+  {
+    if (!driver.lease().held())
+      return finish(effectful_operation_outcome::outer_lease_lost);
+    if (journal.stage() != effect_attempt_stage::application_intent)
+      journal = append_record(journal_store, journal.begin_application());
+    if (assessment.disposition() == effect_restart_disposition::resume_application)
+    {
+      application = driver.resume_application(
+          request.application(), *checkpoint.application_journal());
+    }
+    else
+      application = driver.apply_application(request.application());
+    validate_application_receipt(
+        request, driver.state_projection(), *application);
+    journal = append_record(
+        journal_store, journal.complete_application(*application));
+    if (application->outcome() !=
+        pkgapply::application_attempt_outcome::completed)
+      return finish(effectful_operation_outcome::application_not_completed);
+  }
+
+  for (std::size_t index = after.size(); index < session.after().size(); ++index)
+  {
+    if (!driver.lease().held())
+      return finish(effectful_operation_outcome::outer_lease_lost);
+    journal = append_record(journal_store, journal.begin_after(index));
+    auto result = driver.execute_lifecycle(session.after()[index]);
+    validate_lifecycle_result(session.after()[index], result);
+    const bool succeeded = result.succeeded();
+    after.push_back(result);
+    journal = append_record(journal_store, journal.complete_after(result));
+    if (!succeeded)
+      return finish(
+          effectful_operation_outcome::lifecycle_failed_after_application);
+  }
+
+  if (!driver.lease().held())
+    return finish(effectful_operation_outcome::outer_lease_lost);
+
+  if (!publication_request)
+  {
+    const auto& completed = *application->completed_evidence();
+    const auto transaction = transaction_evidence(
+        session, before, completed, after);
+    publication_request = project_publication(
+        request, driver.state_projection(), completed, transaction);
+    journal = append_record(
+        journal_store,
+        journal.begin_publication(transaction, *publication_request));
+  }
+  publication_receipt = driver.publish_state(*publication_request);
+  if (publication_receipt->request() != publication_request->identity())
+    throw error(error_code::driver_contract_violation,
+                "state driver returned evidence for another publication request");
+  journal = append_record(
+      journal_store, journal.complete_publication(*publication_receipt));
+  if (!driver.lease().held())
+    return finish(effectful_operation_outcome::outer_lease_lost);
+  const auto outcome = publication_outcome(*publication_receipt);
+  if (outcome == effectful_operation_outcome::state_publication_indeterminate)
+  {
+    auto operation = effectful_operation_result::seal(
+        session, outcome, before, application, after, current_transaction(),
+        publication_request, publication_receipt);
+    return effect_restart_result(
+        effect_restart_disposition::reconcile_publication, journal,
+        std::move(operation));
+  }
+  return finish(outcome);
 }
 
 } // namespace pkgctl

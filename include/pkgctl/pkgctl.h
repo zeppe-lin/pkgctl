@@ -8,6 +8,10 @@
 
 #include <pkgctl/controller.h>
 #include <pkgctl/effect.h>
+#include <pkgctl/effect_journal.h>
+#include <pkgctl/effect_journal_codec.h>
+#include <pkgctl/effect_restart.h>
+#include <pkgctl/effect_store.h>
 #include <pkgctl/error.h>
 #include <pkgctl/identity.h>
 #include <pkgctl/report.h>

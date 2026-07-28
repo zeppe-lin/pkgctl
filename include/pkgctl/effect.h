@@ -11,6 +11,8 @@
 
 #include <libpkgapply-exec/libpkgapply-exec.h>
 #include <libpkgapply/apply.h>
+#include <libpkgapply/journal.h>
+#include <libpkgapply/restart.h>
 #include <libpkgstate-apply/adapter.h>
 #include <libpkgstate/canonical_store.h>
 
@@ -18,6 +20,11 @@
 #include <pkgctl/session.h>
 
 namespace pkgctl {
+
+class effect_attempt_nonce;
+class effect_journal_store;
+class effect_restart_checkpoint;
+class effect_restart_result;
 
 /*! \brief Caller-selected lifecycle order around one target action node. */
 class lifecycle_order final {
@@ -124,6 +131,15 @@ public:
 
   [[nodiscard]] virtual pkgstate::state_publication_receipt
   publish_state(const pkgstate::state_publication_request& request) = 0;
+
+  /*! \brief Resume one exact durable application handoff under the new lease. */
+  [[nodiscard]] virtual pkgapply::application_receipt
+  resume_application(
+      const pkgapply::package_application_request& request,
+      const pkgapply::application_journal_record& journal);
+
+  /*! \brief Reread authoritative installed state for publication reconciliation. */
+  [[nodiscard]] virtual pkgstate::snapshot read_state() const;
 };
 
 /*! \brief Native driver composing the exact apply, exec, and state APIs. */
@@ -148,6 +164,11 @@ public:
       override;
   [[nodiscard]] pkgstate::state_publication_receipt
   publish_state(const pkgstate::state_publication_request& request) override;
+  [[nodiscard]] pkgapply::application_receipt
+  resume_application(
+      const pkgapply::package_application_request& request,
+      const pkgapply::application_journal_record& journal) override;
+  [[nodiscard]] pkgstate::snapshot read_state() const override;
 
 private:
   const pkgapply::lease_bound_state_projection& state_;
@@ -186,11 +207,19 @@ public:
   publication_request() const noexcept;
   [[nodiscard]] const std::optional<pkgstate::state_publication_receipt>&
   publication_receipt() const noexcept;
+  [[nodiscard]] const std::optional<pkgstate::installed_state_snapshot_identity>&
+  reconciled_state() const noexcept;
   [[nodiscard]] const session_identity& identity() const noexcept;
 
 private:
   friend effectful_operation_result execute_effectful_operation(
       effectful_operation_session, transaction_effect_driver&);
+  friend effectful_operation_result execute_effectful_operation_durable(
+      effectful_operation_session, const effect_attempt_nonce&,
+      transaction_effect_driver&, effect_journal_store&);
+  friend effect_restart_result resume_effectful_operation(
+      effect_restart_checkpoint, transaction_effect_driver&,
+      effect_journal_store&);
 
   [[nodiscard]] static effectful_operation_result seal(
       effectful_operation_session session,
@@ -201,7 +230,9 @@ private:
       std::optional<pkgstate::transaction_evidence_identity>
           transaction_evidence,
       std::optional<pkgstate::state_publication_request> publication_request,
-      std::optional<pkgstate::state_publication_receipt> publication_receipt);
+      std::optional<pkgstate::state_publication_receipt> publication_receipt,
+      std::optional<pkgstate::installed_state_snapshot_identity>
+          reconciled_state = std::nullopt);
 
   effectful_operation_result(
       effectful_operation_session session,
@@ -213,6 +244,7 @@ private:
           transaction_evidence,
       std::optional<pkgstate::state_publication_request> publication_request,
       std::optional<pkgstate::state_publication_receipt> publication_receipt,
+      std::optional<pkgstate::installed_state_snapshot_identity> reconciled_state,
       session_identity identity);
 
   effectful_operation_session session_;
@@ -223,6 +255,7 @@ private:
   std::optional<pkgstate::transaction_evidence_identity> transaction_evidence_;
   std::optional<pkgstate::state_publication_request> publication_request_;
   std::optional<pkgstate::state_publication_receipt> publication_receipt_;
+  std::optional<pkgstate::installed_state_snapshot_identity> reconciled_state_;
   session_identity identity_;
 };
 
@@ -230,5 +263,12 @@ private:
 [[nodiscard]] effectful_operation_result execute_effectful_operation(
     effectful_operation_session session,
     transaction_effect_driver& driver);
+
+/*! \brief Execute one exact operation with durable intent/terminal snapshots. */
+[[nodiscard]] effectful_operation_result execute_effectful_operation_durable(
+    effectful_operation_session session,
+    const effect_attempt_nonce& nonce,
+    transaction_effect_driver& driver,
+    effect_journal_store& journal_store);
 
 } // namespace pkgctl

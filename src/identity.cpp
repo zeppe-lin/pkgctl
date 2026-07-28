@@ -53,6 +53,21 @@ std::string hex(const unsigned char* bytes, std::size_t size)
 
 } // namespace
 
+session_identity session_identity::from_hex(std::string value)
+{
+  if (value.size() != 64U)
+    throw error(error_code::identity_failure,
+                "controller identity is not a SHA-256 hex value");
+  for (const char digit : value)
+  {
+    if (!((digit >= '0' && digit <= '9') ||
+          (digit >= 'a' && digit <= 'f')))
+      throw error(error_code::identity_failure,
+                  "controller identity contains invalid hex");
+  }
+  return session_identity(std::move(value));
+}
+
 session_identity::session_identity(std::string hex) : hex_(std::move(hex)) {}
 const std::string& session_identity::hex() const noexcept { return hex_; }
 bool operator==(const session_identity& lhs,
