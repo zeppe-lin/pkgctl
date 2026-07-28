@@ -1,0 +1,88 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 Alexandr Savca
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -eu
+
+srcdir=${1:-.}
+model="$srcdir/include/pkgctl/effect_journal.h"
+model_source="$srcdir/src/effect_journal.cpp"
+restart="$srcdir/src/effect_restart.cpp"
+effect="$srcdir/src/effect.cpp"
+store="$srcdir/src/effect_store.cpp"
+codec="$srcdir/src/effect_journal_codec.cpp"
+
+for file in "$model" "$model_source" "$restart" "$effect" "$store" "$codec"; do
+  [ -s "$file" ] || {
+    echo "missing durable effect authority source: $file" >&2
+    exit 1
+  }
+done
+
+for required in \
+  'class effect_attempt_record final' \
+  'effect_attempt_record::admit' \
+  'effect_attempt_record::begin_application' \
+  'effect_attempt_record::begin_publication' \
+  'effect_attempt_record::seal_terminal' \
+  'execute_effectful_operation_durable' \
+  'resume_effectful_operation' \
+  'driver.resume_application' \
+  'driver.read_state' \
+  'effect_restart_disposition::external_resolution_required' \
+  'posix_effect_journal_store::from_directory_fd' \
+  '::rewinddir' \
+  '::linkat' \
+  '::fsync' \
+  'O_NOFOLLOW'; do
+  grep -F "$required" "$model" "$model_source" "$restart" "$effect" "$store" "$codec" \
+      >/dev/null || {
+    echo "missing durable effect contract: $required" >&2
+    exit 1
+  }
+done
+
+first_after()
+{
+  start=$1
+  token=$2
+  awk -v start="$start" -v token="$token" '
+    index($0, start) { active = 1 }
+    active && index($0, token) { print NR; exit }
+  ' "$effect"
+}
+
+check_order()
+{
+  start=$1
+  intent=$2
+  call=$3
+  intent_line=$(first_after "$start" "$intent")
+  call_line=$(first_after "$start" "$call")
+  [ -n "$intent_line" ] && [ -n "$call_line" ] &&
+      [ "$intent_line" -lt "$call_line" ] || {
+    echo "durable effect does not persist $intent before $call" >&2
+    exit 1
+  }
+}
+
+check_order execute_effectful_operation_durable \
+  journal.begin_before driver.execute_lifecycle
+check_order execute_effectful_operation_durable \
+  journal.begin_application driver.apply_application
+check_order execute_effectful_operation_durable \
+  journal.begin_after 'driver.execute_lifecycle(session.after'
+check_order execute_effectful_operation_durable \
+  journal.begin_publication driver.publish_state
+
+for forbidden in \
+  'libpkgexec-linux' \
+  'canonical_generation_store::initialize' \
+  '.journal_namespace()' \
+  '/var/lib/pkg'; do
+  if grep -F "$forbidden" \
+      "$model" "$model_source" "$restart" "$effect" "$store" "$codec" \
+      >/dev/null 2>&1; then
+    echo "forbidden durable-controller authority shortcut: $forbidden" >&2
+    exit 1
+  fi
+done

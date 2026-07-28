@@ -20,7 +20,7 @@ for source in "$srcdir"/src/*.cpp; do
   objects="$objects $object"
 done
 
-for test_source in request_test session_test effect_test report_test version_test; do
+for test_source in request_test session_test effect_journal_test effect_test report_test version_test; do
   # shellcheck disable=SC2086
   "$cxx" $flags "$srcdir/tests/$test_source.cpp" $objects $libs \
     -o "$tmp/$test_source"
@@ -47,5 +47,6 @@ done
 
 "$srcdir/tests/check_source_contract.sh" "$srcdir"
 "$srcdir/tests/check_effect_contract.sh" "$srcdir"
+"$srcdir/tests/check_restart_contract.sh" "$srcdir"
 "$srcdir/tests/check_manual_contract.sh" "$srcdir"
 "$srcdir/tests/check_release_metadata.sh" "$srcdir"

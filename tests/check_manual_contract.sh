@@ -22,6 +22,12 @@ grep -F 'One target-mutation lease must remain held' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'exposes no effect-implying command' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'DURABLE EFFECT ATTEMPTS' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'exact durable *libpkgapply* journal' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'newly held physical target-mutation lease' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 for obsolete in 'forbid-node' 'operation graph ordering' 'download named'; do
   if grep -R -n -F "$obsolete" "$srcdir/man" >/dev/null 2>&1; then

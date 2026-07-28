@@ -53,6 +53,6 @@ done
 if grep -R -n -E \
     'execute_effectful_operation|native_transaction_effect_driver' \
     "$srcdir/cli" >/dev/null 2>&1; then
-  echo '0.3 command frontend must remain read-only' >&2
+  echo 'effect command frontend must remain read-only' >&2
   exit 1
 fi

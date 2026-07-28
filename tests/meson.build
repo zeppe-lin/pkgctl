@@ -84,6 +84,9 @@ if not get_option('tests').disabled()
   effect_contract = find_program('check_effect_contract.sh')
   test('effect-contract', effect_contract, args: [meson.project_source_root()])
 
+  restart_contract = find_program('check_restart_contract.sh')
+  test('restart-contract', restart_contract, args: [meson.project_source_root()])
+
   manual_contract = find_program('check_manual_contract.sh')
   test('manual-contract', manual_contract, args: [meson.project_source_root()])
 
