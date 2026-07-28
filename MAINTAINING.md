@@ -16,9 +16,11 @@ The executable directly depends on the exact libraries whose public values it
 uses. The internal `pkgctl-core` library is not installed and does not publish a
 second package-management API.
 
-A future effectful backend may depend on build, image, plan, apply, and state
-adapters. Those dependencies must be introduced only with the exact effect
-boundary and must not leak their semantics into request parsing or reporting.
+The effectful controller layer may depend on image, plan, apply, execution,
+and state adapters only through their exact public values. It must not parse
+payloads, derive lifecycle programs, perform target mutation, or serialize
+installed state itself. Physical effects stay behind injected authority
+interfaces, and the CLI remains separate from the effect-session kernel.
 
 ## Compatibility policy
 
@@ -32,7 +34,8 @@ legacy behavior.
 2. run strict GCC and Clang builds and all controller tests;
 3. run ASan and UBSan over the complete authority closure;
 4. check shared and static linkage and direct dependency isolation;
-5. verify CLI read-only behavior and missing-state refusal;
+5. verify effect sequencing, outer-lease retention, publication provenance,
+   CLI read-only behavior, and missing-state refusal;
 6. update release metadata and manuals together;
 7. compare independently replayed trees and stable patch IDs;
 8. tag signed releases only from a clean tree.

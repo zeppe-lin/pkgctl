@@ -10,11 +10,88 @@ components.
 The central invariant is:
 
 > A controller session is evidence that exact authorities were composed; it is
-> not another package-source, resolver, transaction, planner, or state model.
+> not another package-source, resolver, transaction, planner, application, or
+> state model.
 
-## Release 0.2.0 boundary
+## Release 0.3.0 effect boundary
 
-The read-only pipeline is:
+Release 0.3.0 adds one effectful library session for one exact target operation.
+The caller supplies:
+
+1. one sealed `transaction_session`;
+2. one exact install, upgrade, or removal node from that transaction program;
+3. one matching `libpkgapply` application request;
+4. the exact pre- and post-action lifecycle-node order;
+5. admitted `libpkgapply-exec` sessions for those lifecycle nodes;
+6. one outer `libpkgapply` target-mutation lease and its state projection;
+7. physical application, lifecycle-execution, and state-publication authorities.
+
+The controller validates that all values belong to one transaction, installed
+state, package, target, and application authority universe before effects begin.
+The initial boundary rejects multi-package programs, runtime cohorts, and more
+than one target mutation.
+
+The sequence is:
+
+```text
+validate exact authority universe and outer lease
+        ↓
+execute every selected pre-action lifecycle node
+        ↓
+realize the exact libpkgapply request
+        ↓
+execute every selected post-action lifecycle node
+        ↓
+seal transaction evidence from all completed subordinate evidence
+        ↓
+project and publish libpkgstate with that transaction evidence
+```
+
+No state publication request is constructed until every required lifecycle node
+and the filesystem application have completed successfully. The same
+transaction-evidence identity is retained by the publication request and, for
+install or upgrade, the durable package receipt.
+
+### Lifecycle order
+
+`libpkgtransaction` determines which lifecycle nodes must occur before and after
+the selected action. Where multiple nodes on the same side have no graph edge
+between them, the graph deliberately does not choose their order. The caller
+supplies one exact order; `pkgctl` validates that it contains the complete phase
+set and binds the order into request identity.
+
+For upgrade, this permits one explicit order over both historical installed
+removal actions and incoming installation actions around the single upgrade
+node. The controller does not invent a synthetic remove action.
+
+### Outer lease
+
+One target-mutation lease must remain held from the first lifecycle effect
+through state publication. The controller checks the lease before every stage
+and again after publication. A lost lease is retained as a terminal controller
+outcome, including any subordinate evidence already produced. The controller
+does not silently promote a publication completed after lease loss.
+
+### Failure knowledge
+
+The effect result distinguishes:
+
+- lifecycle failure before application;
+- application not completed;
+- lifecycle failure after application;
+- outer lease loss;
+- state publication not completed;
+- state publication indeterminate;
+- completed publication.
+
+These are controller observations, not rollback claims. A post-action lifecycle
+failure can occur after the package filesystem transition completed. An
+indeterminate publication requires authoritative rereading of installed state.
+Arbitrary lifecycle side effects are never claimed reversible.
+
+## Release 0.2.0 read-only boundary
+
+The read-only pipeline remains:
 
 ```text
 catalog_request
@@ -34,9 +111,10 @@ libpkgtransaction::compose
 transaction_session
 ```
 
-The controller never initializes a missing state store. The state pathname and
-all five target-binding identities are supplied explicitly. A binding mismatch,
-missing store, corrupt generation, or locked store is a state-authority failure.
+The command frontend never initializes a missing state store. The state
+pathname and all five target-binding identities are supplied explicitly. A
+binding mismatch, missing store, corrupt generation, or locked store is a
+state-authority failure.
 
 ## Owned semantics
 
@@ -50,72 +128,75 @@ The controller owns only:
 6. installed-versus-catalog preference;
 7. opt-in transaction convergence policy;
 8. authority-call sequencing;
-9. controller session identities;
-10. deterministic line-oriented presentation.
+9. controller request, session, result, and transaction-evidence identities;
+10. explicit lifecycle ordering where the transaction graph leaves peers
+    unordered;
+11. outer-lease observation around the composed effect sequence;
+12. deterministic line-oriented presentation.
 
 Package and profile identities are `libpkgsource` values. Catalog candidates are
 `libpkgcatalog` values. Installed records are `libpkgstate` values. Selections
-and witnesses are `libpkgresolve` values. Operation nodes, edges, cohorts, and
-convergence semantics are `libpkgtransaction` values.
+and witnesses are `libpkgresolve` values. Transaction nodes and edges are
+`libpkgtransaction` values. Package-local plans and filesystem evidence are
+`libpkgplan` and `libpkgapply` values. Lifecycle nodes and execution evidence are
+`libpkgapply-exec` and `libpkgexec` values.
 
-## Requests
+## Requests and sessions
 
-`catalog_request` contains explicit acquisition specifications and document
+A `catalog_request` contains explicit acquisition specifications and document
 limits. It does not infer roots, collection names, revisions, or precedence.
 
-`resolution_request` adds one existing canonical state location, architecture
-context, typed goals, and resolver policy. Goals are normalized through the
-resolver's exact scope and subject values. Duplicate semantic goals are
-rejected even when their diagnostic origins differ.
+A `resolution_request` adds one existing canonical state location, architecture
+context, typed goals, and resolver policy. Duplicate semantic goals are rejected
+even when their diagnostic origins differ.
 
-`transaction_request` adds one native convergence policy. The default is
-`preserve_unselected`. `converge_exact` is accepted only through an explicit CLI
-flag and means the caller supplied the complete desired target closure.
+A `transaction_request` adds one native convergence policy. The default is
+`preserve_unselected`. `converge_exact` means the caller supplied the complete
+desired target closure and must be explicit.
 
-## Sessions and identities
+A catalog session retains the acquisition request and sealed catalog snapshot.
+A resolution session retains that catalog session, one installed-state snapshot,
+and one resolution result. A transaction session retains the resolution session
+and one transaction program.
 
-A catalog session retains the explicit acquisition request and the resulting
-sealed catalog snapshot. Its identity binds the exact catalog identity.
+An `effectful_operation_request` retains the transaction session, selected
+action node, exact application request, caller-selected lifecycle order, and an
+installation reason only for installation. An `effectful_operation_session`
+adds admitted lifecycle execution resources in the requested order.
 
-A resolution session retains the catalog session, one exact installed-state
-snapshot, and one exact resolution result. Its identity binds all three exact
-identities.
+Session identities use domain-separated SHA-256. Diagnostic revisions,
+command-line positions, and host filesystem paths remain outside semantic
+identity. Effect-session identity binds the lifecycle nodes, logical root-view
+identities, interpreter, and numeric credentials; host paths are call-scoped
+materialization coordinates.
 
-A transaction session retains the resolution session and one exact transaction
-program. Its identity binds the resolution-session and transaction-program
-identities.
+## Presentation and CLI boundary
 
-Session identities use domain-separated SHA-256. Filesystem paths, command-line
-positions, collection declaration provenance, and external revision labels are
-not semantic authority and do not enter session identity. The sealed authority
-results already bind the normalized facts that matter.
+Reports remain deterministic line-oriented diagnostics. They expose exact
+session and subordinate authority identities but are not authority themselves.
+A machine protocol requires a separate versioned contract.
 
-## Presentation
-
-Reports are deterministic line-oriented diagnostics. They expose exact session,
-catalog, installed-state, resolution, and transaction identities plus normalized
-candidate, selection, edge, goal, node, and cohort summaries.
-
-The report format is not a persistent catalog, state, resolver, transaction, or
-IPC protocol. A machine protocol must receive its own versioned contract rather
-than treating diagnostic text as authority.
+Release 0.3.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
+`transaction` remain read-only. Source fetching, building missing artifacts,
+constructing package-local plans, selecting a multi-package execution schedule,
+recovering incomplete application attempts, and exposing install/update/remove
+policy remain later controller work.
 
 ## Non-authorities
 
-Release 0.2.0 does not:
+`pkgctl` does not:
 
-- read historical `pkgman.conf`;
-- parse Pkgfile or a historical package database;
+- parse Pkgfile or the historical package database;
 - infer package identity from directory or archive names;
 - select dependency candidates itself;
-- compose package-operation graphs itself;
-- initialize or publish installed state;
-- fetch, build, or test sources;
-- inspect or create package artifacts;
-- construct `libpkgplan` requests;
-- execute lifecycle programs;
-- apply filesystem mutations;
-- promise transaction-wide atomicity or rollback.
+- compose transaction nodes or edges itself;
+- derive package-local filesystem consequences;
+- derive or reinterpret lifecycle programs;
+- execute through a Linux-specific backend directly;
+- mutate package files outside `libpkgapply`;
+- publish installed state outside `libpkgstate`;
+- claim transaction-wide atomicity or rollback;
+- choose cross-package scheduling in the 0.3.0 effect boundary.
 
 ## Clean-room rule
 

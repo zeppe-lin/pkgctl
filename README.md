@@ -1,28 +1,43 @@
 # pkgctl
 
-`pkgctl` is the Zeppe-Lin package control-plane executable.
+`pkgctl` is the Zeppe-Lin package control plane.
 
 It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.2.0 provides a read-only native control loop:
+Release 0.3.0 retains the read-only command pipeline from 0.2.0 and adds the
+first effectful controller-library boundary for one already-authorized package
+operation:
 
 ```text
-explicit collection and target inputs
-        ↓
-libpkgcatalog-acquire
-        ↓
-libpkgstate snapshot
-        ↓
-libpkgresolve result
-        ↓
-libpkgtransaction program
-        ↓
-deterministic report
+exact transaction session
+        +
+exact libpkgapply request
+        +
+caller-selected lifecycle order
+        +
+one outer target-mutation lease
+        |
+        v
+pre lifecycle through libpkgapply-exec
+        |
+        v
+filesystem transition through libpkgapply
+        |
+        v
+post lifecycle through libpkgapply-exec
+        |
+        v
+provenance-bearing publication through libpkgstate
 ```
 
-The supported commands are:
+The effectful session supports one exact install, upgrade, or removal node for
+one package. It retains subordinate lifecycle, application, transaction, and
+state-publication evidence. It does not promise rollback of lifecycle side
+effects or transaction-wide filesystem/state atomicity.
+
+The executable still exposes only:
 
 ```text
 pkgctl catalog
@@ -34,30 +49,38 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-Release 0.2.0 is deliberately read-only. It does not initialize state, fetch or
-build sources, inspect package artifacts, construct package-local filesystem
-plans, execute lifecycle programs, apply mutations, publish state, or expose
-`install`, `update`, `remove`, or `sysup` commands.
+There are no effect-implying CLI commands in 0.3.0. The controller library
+requires callers to construct exact planner, application, lifecycle-session,
+lease, backend, and state-publication authorities explicitly.
+
+Release 0.2.0 established the read-only catalog, resolution, and transaction
+command pipeline retained by this release.
 
 ## Authority
 
-`pkgctl` owns only command policy, authority-call sequencing, read-only session
-binding, deterministic diagnostics, and presentation.
+`pkgctl` owns command policy, authority-call sequencing, controller session
+binding, outer-lease observation, transaction-evidence composition, deterministic
+diagnostics, and presentation.
 
 The following meanings remain external:
 
 - recipe and profile syntax: `libpkgsource-yaml`;
 - available package universe: `libpkgcatalog` and
   `libpkgcatalog-acquire`;
-- installed truth: `libpkgstate`;
+- installed truth and publication: `libpkgstate` and
+  `libpkgstate-apply`;
 - exact dependency selection: `libpkgresolve`;
 - cross-package operation composition: `libpkgtransaction`;
-- later build, image, package-local plan, application, and publication effects:
-  their dedicated authorities.
+- package-local filesystem intent and mutation: `libpkgplan` and
+  `libpkgapply`;
+- lifecycle-node derivation and execution: `libpkgapply-exec` and
+  `libpkgexec`;
+- package-image authority: `libpkgimage`.
 
-The provisional 0.1.0 intent, constraint, outcome, and operation-graph types are
-not retained. Their meanings are now owned by the native resolver and
-transaction libraries.
+`pkgctl` does not infer transaction order beyond the exact transaction graph.
+For lifecycle nodes not ordered relative to each other by that graph, the
+caller supplies an explicit order and the controller binds it into the effect
+request identity.
 
 ## Building
 
