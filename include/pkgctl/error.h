@@ -16,6 +16,9 @@ enum class error_code {
   invalid_session,
   invalid_effect_request,
   invalid_effect_session,
+  invalid_construction_request,
+  invalid_construction_session,
+  construction_driver_contract_violation,
   driver_contract_violation,
   identity_failure,
 };
