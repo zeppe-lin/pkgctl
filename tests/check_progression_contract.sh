@@ -23,6 +23,7 @@ for required in \
   'class transaction_progress final' \
   'transaction_progress begin' \
   'advance_construction' \
+  'advance_check' \
   'advance_effect' \
   'pre_lifecycle_before_action' \
   'action_before_post_lifecycle' \
@@ -37,11 +38,6 @@ for required in \
     exit 1
   }
 done
-
-if grep -F 'advance_check' "$header" "$source" >/dev/null 2>&1; then
-  echo 'transaction progression must not manufacture check completion authority' >&2
-  exit 1
-fi
 
 for forbidden in \
   'execute_construction(' \
@@ -62,7 +58,7 @@ for forbidden in \
 done
 
 if grep -R -n -E \
-    'transaction_progress|advance_construction|advance_effect' \
+    'transaction_progress|advance_construction|advance_check|advance_effect' \
     "$srcdir/cli" >/dev/null 2>&1; then
   echo 'transaction progression must not acquire a command frontend' >&2
   exit 1

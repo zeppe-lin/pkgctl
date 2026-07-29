@@ -8,7 +8,7 @@ cxx=${CXX:-c++}
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-direct.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
-modules='libpkgsource libpkgsource-yaml libpkgsource-plan libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-exec libpkgresolve libpkgtransaction libcrypto'
+modules='libpkgsource libpkgsource-yaml libpkgsource-plan libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec libcrypto'
 cflags=$(pkg-config --cflags $modules)
 libs=$(pkg-config --libs $modules)
 flags="-std=c++17 -Wall -Wextra -Wpedantic -Werror -I$srcdir/include $cflags"
@@ -20,7 +20,7 @@ for source in "$srcdir"/src/*.cpp; do
   objects="$objects $object"
 done
 
-for test_source in construction_test request_test session_test effect_journal_test effect_test report_test version_test; do
+for test_source in check_test construction_test request_test session_test effect_journal_test effect_test report_test version_test; do
   # shellcheck disable=SC2086
   "$cxx" $flags "$srcdir/tests/$test_source.cpp" $objects $libs \
     -o "$tmp/$test_source"
@@ -48,6 +48,7 @@ done
 "$srcdir/tests/check_construction_contract.sh" "$srcdir"
 "$srcdir/tests/check_preparation_contract.sh" "$srcdir"
 "$srcdir/tests/check_progression_contract.sh" "$srcdir"
+"$srcdir/tests/check_check_contract.sh" "$srcdir"
 "$srcdir/tests/check_source_contract.sh" "$srcdir"
 "$srcdir/tests/check_effect_contract.sh" "$srcdir"
 "$srcdir/tests/check_restart_contract.sh" "$srcdir"

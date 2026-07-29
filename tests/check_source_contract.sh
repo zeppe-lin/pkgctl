@@ -52,7 +52,9 @@ for required in \
   'libpkgapply' \
   'libpkgapply-exec' \
   'libpkgresolve' \
-  'libpkgtransaction'; do
+  'libpkgtransaction' \
+  'libpkgcheck' \
+  'libpkgcheck-exec'; do
   grep -F "'$required'" "$srcdir/meson.build" >/dev/null || {
     echo "missing native authority dependency: $required" >&2
     exit 1

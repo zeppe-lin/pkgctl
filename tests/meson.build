@@ -105,6 +105,9 @@ if not get_option('tests').disabled()
   progression_contract = find_program('check_progression_contract.sh')
   test('progression-contract', progression_contract, args: [meson.project_source_root()])
 
+  check_contract = find_program('check_check_contract.sh')
+  test('check-contract', check_contract, args: [meson.project_source_root()])
+
   source_contract = find_program('check_source_contract.sh')
   test('source-contract', source_contract, args: [meson.project_source_root()])
 

@@ -13,8 +13,8 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.7.1' "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.7.1' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.8.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.8.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'The canonical state store is opened with *open_existing*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
@@ -26,7 +26,9 @@ grep -F 'TRANSACTION PROGRESSION' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'does not choose among' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
-grep -F 'no check-completion API' \
+grep -F 'TRANSACTION CHECK SESSION' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'independent ready work may advance concurrently' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'OPERATION PREPARATION' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'typed refusal' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
