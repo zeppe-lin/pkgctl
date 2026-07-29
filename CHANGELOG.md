@@ -1,5 +1,31 @@
 # pkgctl changelog
 
+## 0.8.0 - 2026-07-30
+
+- Adds pure `transaction_check_request` admission for one exact ready check node
+  and its retained successful construction evidence.
+- Separates concrete host resource admission into `transaction_check_session`,
+  preserving the request/session boundary used by candidate construction.
+- Delegates exact source, built-package, multi-input, root-view, temporary,
+  interpreter, credential, and resource-limit admission to
+  `libpkgcheck-exec >= 0.1.1`.
+- Adds injected check execution with exact check-request and execution-request
+  driver-contract validation.
+- Adds `advance_check()` terminal progression: passed evidence satisfies the
+  exact node; failed evidence fails it and blocks dependent graph units.
+- Accepts completion after unrelated progression advancement only while the
+  exact check node remains ready and its retained construction authority is
+  unchanged.
+- Rejects missing, duplicate, forged, aliased, cross-transaction,
+  stale-construction, duplicate-completion, foreign-request, and throwing-driver
+  evidence.
+- Retains deterministic controller identities for pure requests, concrete
+  sessions, terminal results, and rebuilt transaction progress.
+- Adds direct dependencies on `libpkgcheck >= 0.1.0` and
+  `libpkgcheck-exec >= 0.1.1`.
+- Exposes no new CLI command and adds no ready-peer selection, automatic
+  execution, retry, rollback, or durable check-session policy.
+
 ## 0.7.1 - 2026-07-29
 
 Authority-closure migration release.
