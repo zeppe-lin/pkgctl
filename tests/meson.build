@@ -72,6 +72,7 @@ if not get_option('tests').disabled()
     'identity.h',
     'pkgctl.h',
     'preparation.h',
+    'progression.h',
     'report.h',
     'request.h',
     'session.h',
@@ -92,6 +93,9 @@ if not get_option('tests').disabled()
 
   preparation_contract = find_program('check_preparation_contract.sh')
   test('preparation-contract', preparation_contract, args: [meson.project_source_root()])
+
+  progression_contract = find_program('check_progression_contract.sh')
+  test('progression-contract', progression_contract, args: [meson.project_source_root()])
 
   source_contract = find_program('check_source_contract.sh')
   test('source-contract', source_contract, args: [meson.project_source_root()])

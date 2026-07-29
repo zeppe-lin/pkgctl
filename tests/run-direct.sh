@@ -47,6 +47,7 @@ done
 
 "$srcdir/tests/check_construction_contract.sh" "$srcdir"
 "$srcdir/tests/check_preparation_contract.sh" "$srcdir"
+"$srcdir/tests/check_progression_contract.sh" "$srcdir"
 "$srcdir/tests/check_source_contract.sh" "$srcdir"
 "$srcdir/tests/check_effect_contract.sh" "$srcdir"
 "$srcdir/tests/check_restart_contract.sh" "$srcdir"
