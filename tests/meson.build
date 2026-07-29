@@ -86,6 +86,9 @@ if not get_option('tests').disabled()
     test('public-header-' + header, header_test)
   endforeach
 
+  construction_contract = find_program('check_construction_contract.sh')
+  test('construction-contract', construction_contract, args: [meson.project_source_root()])
+
   source_contract = find_program('check_source_contract.sh')
   test('source-contract', source_contract, args: [meson.project_source_root()])
 

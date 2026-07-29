@@ -34,6 +34,9 @@ for required in \
   'libpkgcatalog-acquire' \
   'libpkgstate' \
   'libpkgstate-apply' \
+  'libpkgfetch' \
+  'libpkgbuild' \
+  'libpkgbuild-exec' \
   'libpkgimage' \
   'libpkgexec' \
   'libpkgapply' \
