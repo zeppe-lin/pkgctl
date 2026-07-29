@@ -1,5 +1,59 @@
 # pkgctl changelog
 
+## 0.6.0 - 2026-07-29
+
+### One-operation preparation
+
+- Added one exact preparation request for transaction install, upgrade, and
+  removal nodes.
+- Required incoming operations to bind one completed construction result to the
+  exact transaction build node and `build_before_target` edge.
+- Projected canonical installed truth through `libpkgstate-plan` and incoming
+  candidate, image, and artifact truth through `libpkgbuild-plan`.
+- Reinspected exact artifact bytes through an injected backend and required the
+  archive digest, normalized image identity, and entry count to reproduce
+  construction evidence without requiring one inspection backend identity.
+- Admitted the exact incoming package authority through `libpkgapply` before
+  package-local planning.
+
+### Planning and request sealing
+
+- Called the operation-specific `libpkgplan` install, upgrade, or removal
+  planner using caller-supplied observations, runtime closure, normalized
+  package policy, target context, and execution guarantees.
+- Retained typed planning refusal as a terminal preparation result with no
+  partial package plan, application request, or effect request.
+- Sealed successful plans into exact `libpkgapply` requests and the existing
+  one-operation effect request, including explicit lifecycle order and install
+  reason authority.
+- Kept removal independent of construction and incoming artifact projection.
+
+### Deliberate boundary
+
+- Preparation may inspect retained artifact bytes but performs no target
+  observation, target lease acquisition, lifecycle execution, application, or
+  state publication.
+- Added no recursive construction, check execution, cross-package scheduler,
+  durable preparation journal, Linux-backend policy, or effectful CLI command.
+- Retained the construction, durable effect, and restart contracts from 0.5.0
+  and 0.4.0 unchanged.
+
+### Authority floors
+
+- `libpkgsource >= 1.1.0` and `libpkgsource-plan >= 1.1.0`;
+- `libpkgcatalog >= 1.1.0` and `libpkgcatalog-acquire >= 1.1.0`;
+- `libpkgstate >= 2.2.0`, `libpkgstate-plan >= 2.2.0`, and
+  `libpkgstate-apply >= 2.2.0`;
+- `libpkgfetch >= 0.1.0`;
+- `libpkgbuild >= 1.0.0`, `libpkgbuild-exec >= 0.1.0`, and
+  `libpkgbuild-plan >= 1.0.0`;
+- `libpkgimage >= 0.3.0`;
+- `libpkgplan >= 0.2.0`;
+- `libpkgexec >= 1.2.0`;
+- `libpkgapply >= 1.0.0` and `libpkgapply-exec >= 0.1.0`;
+- `libpkgresolve >= 1.0.0`;
+- `libpkgtransaction >= 1.1.0`.
+
 ## 0.5.0 - 2026-07-29
 
 ### Candidate construction sessions
