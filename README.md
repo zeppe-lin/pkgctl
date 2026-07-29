@@ -6,45 +6,53 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.5.0 adds the first package-construction library session while
-retaining the durable target-effect kernel from 0.4.0:
+Release 0.6.0 adds one-operation preparation between completed construction
+and the existing target-effect kernel:
 
 ```text
-exact transaction build node
+exact install, upgrade, or removal transaction node
         +
-verified package-input tree identities
+completed construction result for incoming operations
         +
-explicit source/store and build coordinates
+canonical installed-state snapshot
+        +
+caller observations, runtime closure, policy, and lifecycle order
         |
         v
-libpkgfetch source materialization
+libpkgstate-plan and libpkgbuild-plan projections
         |
         v
-sealed libpkgbuild request
+libpkgplan success or typed refusal
         |
         v
-libpkgbuild-exec execution and independent artifact inspection
+sealed libpkgapply request and pkgctl effect request
 ```
 
-The controller validates one exact catalog-backed build node before effects. It
-requires every package input to match the resolver's exact dependency selection
-and binds the source snapshot, input-set identity, resolver-selected architectures,
-build policy, acquisition bounds, logical root view, interpreter, and numeric
-credentials. Source and store roots, dependency-tree paths, workspace paths,
-and artifact destinations remain call-scoped effect coordinates.
+For installation and upgrade, the controller requires the exact completed
+construction ordered before the selected target node. It reinspects the sealed
+artifact through an injected `libpkgimage` backend, requires the same archive
+digest, normalized image identity, and entry count recorded by construction,
+and admits one `libpkgapply` incoming-package authority. A different compatible
+inspection backend may produce the evidence; backend identity is not package
+truth.
 
-Construction does not recursively schedule dependencies. The caller supplies
-every exact package-input subject, tree identity, and host tree. `pkgctl` invokes
-an injected backend-neutral construction driver, retains the complete verified
-source materialization and build-execution result, and promotes completion only
-when `libpkgbuild-exec` returns a successful build with independent archive
-inspection evidence.
+For all three operation kinds, `libpkgstate-plan` projects the complete
+canonical snapshot into planner facts. The caller remains authoritative for the
+target observations, normalized package policy, runtime closure, target
+application context, execution guarantees, and lifecycle order. `pkgctl` calls
+the exact `libpkgplan` operation and retains either its complete plan or its
+typed refusal. A refusal is terminal preparation knowledge: no application or
+effect request is manufactured.
 
-Release 0.4.0 closed the restart loop for the separate one-operation target
-mutation sequence. That durable effect journal remains unchanged. Construction
-attempts are not restart journals in 0.5.0: an interrupted build is not inferred
-successful or replayed automatically, and no installed state is published from
-a construction result.
+Preparation is read-only authority composition. Incoming preparation performs
+exact-byte artifact inspection, but it does not acquire the target lease,
+execute lifecycle programs, mutate package files, or publish installed state.
+Removal preparation does not inspect an incoming artifact at all.
+
+Release 0.5.0 established one exact package-construction session. Release 0.4.0
+closed the restart loop for the separate one-operation target mutation
+sequence. Construction and preparation are not added to the durable effect
+journal in 0.6.0.
 
 The executable still exposes only:
 
@@ -58,13 +66,9 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.5.0. The construction API is a
-controller-library boundary for callers that already possess exact dependency
-trees, execution resources, and backend authority.
-
-Release 0.3.0 established the one-operation effectful session. Release 0.2.0
-established the read-only catalog, resolution, and transaction command pipeline
-retained by this release.
+There are no effect-implying CLI commands in 0.6.0. Recursive construction,
+check execution, cross-package scheduling, durable construction or preparation
+attempts, and effectful command policy remain outside this release.
 
 ## Authority
 
@@ -78,10 +82,12 @@ The following meanings remain external:
 - recipe and profile syntax: `libpkgsource-yaml`;
 - available package universe: `libpkgcatalog` and
   `libpkgcatalog-acquire`;
-- installed truth and publication: `libpkgstate` and
-  `libpkgstate-apply`;
+- installed truth, planner projection, and publication: `libpkgstate`,
+  `libpkgstate-plan`, and `libpkgstate-apply`;
 - exact dependency selection: `libpkgresolve`;
 - cross-package operation composition: `libpkgtransaction`;
+- candidate and artifact planner projection: `libpkgsource-plan` and
+  `libpkgbuild-plan`;
 - package-local filesystem intent and mutation: `libpkgplan` and
   `libpkgapply`;
 - lifecycle-node derivation and execution: `libpkgapply-exec` and

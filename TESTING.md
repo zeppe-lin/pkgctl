@@ -24,6 +24,11 @@ Every release must establish:
 - real local-source materialization and independent package archive inspection;
 - failed builds retained without artifact promotion;
 - construction identity independence from host paths;
+- exact action/construction/state binding before package-local planning;
+- artifact reinspection reproducing construction archive and image evidence;
+- successful install and removal preparation through official adapters;
+- typed planner refusal retained without application or effect promotion;
+- removal preparation proven independent of incoming artifact authority;
 - explicit non-completed and indeterminate publication outcomes;
 - CLI usage, authority-failure, and deterministic output contracts;
 - durable intent and terminal snapshots around every irreversible handoff;
@@ -34,7 +39,7 @@ Every release must establish:
 - publication retry only from the exact prior state and reconciliation only
   from the exact resulting state;
 - a newly held outer lease required on every resumed attempt;
-- proof that all exposed CLI commands remain read-only in 0.5.0;
+- proof that all exposed CLI commands remain read-only in 0.6.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
 ## Effect authority tests
@@ -57,7 +62,6 @@ The effect suite must prove:
 - driver evidence for another request or authority universe is rejected.
 
 
-
 ## Construction tests
 
 The construction suite must prove:
@@ -73,6 +77,28 @@ The construction suite must prove:
 - a driver result from another source or build request is rejected;
 - equivalent call-scoped host paths do not alter construction identity;
 - the same suite passes for root and an ordinary build UID.
+
+## Operation preparation tests
+
+The preparation suite must prove:
+
+- only an exact target `install`, `upgrade`, or `remove` node is admitted;
+- incoming operations require the matching completed construction node and the
+  exact `build_before_target` transaction edge;
+- canonical installed truth is projected through `libpkgstate-plan`;
+- incoming candidate, artifact, and image facts are projected through
+  `libpkgbuild-plan` and admitted through `libpkgapply`;
+- reinspection retains the construction archive digest, normalized image
+  identity, and entry count without requiring one backend identity;
+- caller target observations, runtime closure, normalized policy, application
+  context, execution control, lifecycle order, and installation reason remain
+  explicit inputs;
+- official planner success seals matching application and effect requests;
+- official planner refusal remains terminal and creates no partial plan,
+  application request, or effect request;
+- removal never invokes incoming-artifact projection;
+- no preparation path executes lifecycle, application, publication, or CLI
+  effects.
 
 ## Durable restart tests
 

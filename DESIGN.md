@@ -13,6 +13,79 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.6.0 operation-preparation boundary
+
+Release 0.6.0 prepares one exact target action already present in a sealed
+transaction program. It accepts only `install`, `upgrade`, or `remove`. The
+caller supplies:
+
+1. the exact `transaction_session` and target-action node;
+2. one matching completed `construction_result` for install or upgrade;
+3. one caller-authoritative application target and execution-control snapshot;
+4. complete target observations and normalized package policy;
+5. one resolved runtime-closure identity for incoming operations;
+6. one complete lifecycle order and, for installation, an installation reason;
+7. one injected read-only artifact-projection driver.
+
+The controller first projects the complete canonical installed snapshot through
+`libpkgstate-plan`. Incoming operations must identify the exact transaction
+`build` node ordered before the target action, and both nodes must carry one
+resolver selection. `libpkgbuild-plan` then reopens the retained artifact,
+verifies its bytes and payload against the build result, and projects the exact
+candidate, image, and artifact facts required by `libpkgplan`.
+
+Preparation requires the new inspection to reproduce the construction receipt's
+archive digest, normalized image identity, and entry count. The inspection
+backend identity may differ: it is evidence provenance, not package truth. The
+result identity nevertheless retains the exact new receipt and incoming-package
+authority actually used for planning.
+
+The package-local sequence is:
+
+```text
+validate transaction action and construction binding
+        ↓
+project complete installed truth through libpkgstate-plan
+        ↓
+reinspect and project incoming artifact through libpkgbuild-plan
+        ↓
+admit incoming package authority through libpkgapply
+        ↓
+call the exact libpkgplan install, upgrade, or removal planner
+        ↓
+retain typed refusal, or seal libpkgapply and pkgctl effect requests
+```
+
+Removal has no incoming side and never calls the artifact driver. For upgrade,
+the old installed authority is taken from the exact transaction snapshot; it is
+not reconstructed from current candidate control.
+
+### Preparation refusal
+
+A `libpkgplan` refusal is a complete terminal preparation result. `pkgctl`
+retains its operation-specific refusal identity and code together with every
+projection already established, but creates no package plan, application
+request, or effect request. Adapter exceptions and controller cross-binding
+violations remain errors rather than synthetic planning refusals.
+
+### Preparation identity
+
+Preparation-request identity binds the transaction session, exact action node,
+completed construction where required, target application context, execution
+control, observations, runtime closure, normalized policy, lifecycle order, and
+installation reason. Preparation-result identity adds the projected installed
+ownership universe, exact build/candidate/artifact/image/inspection evidence,
+incoming application authority, and either the planner refusal or the complete
+plan, application, and effect identities.
+
+### Read-only boundary
+
+Preparation performs no target mutation. Incoming preparation may read exact
+artifact bytes through an injected `libpkgimage` backend, but it does not acquire
+the target lease, admit executable lifecycle sessions, call `libpkgapply`, or
+publish installed state. It adds no scheduler, recursive construction, check
+execution, durable preparation journal, or command frontend.
+
 ## Release 0.5.0 construction boundary
 
 Release 0.5.0 adds one backend-neutral construction session for one exact
@@ -30,10 +103,11 @@ The caller supplies:
 7. one injected backend-neutral construction driver.
 
 Admission proves that the selected node is a catalog-authorized build node, its
-candidate source and release agree with resolver authority, all build/check
-inputs form a valid `libpkgbuild` input set, each input matches the resolver's exact required package, release, source snapshot, and build environment, and
-every concrete dependency tree belongs to one exact requested input. Call-scoped paths are normalized and
-checked for unsafe overlap before source acquisition begins.
+candidate source and release agree with resolver authority, and all build/check
+inputs form a valid `libpkgbuild` input set. Each input must match the resolver's
+exact required package, release, source snapshot, and build environment. Every
+concrete dependency tree belongs to one exact requested input. Call-scoped paths
+are normalized and checked for unsafe overlap before source acquisition begins.
 
 The sequence is:
 
@@ -288,7 +362,8 @@ The controller owns only:
 11. outer-lease observation around the composed effect sequence;
 12. durable controller-attempt sequencing and restart classification;
 13. exact one-node source/build construction sequencing;
-14. deterministic line-oriented presentation.
+14. package-local projection, planning, and request-sealing order;
+15. deterministic line-oriented presentation.
 
 Package and profile identities are `libpkgsource` values. Catalog candidates are
 `libpkgcatalog` values. Installed records are `libpkgstate` values. Selections
@@ -321,6 +396,12 @@ bounds. A `construction_session` adds explicit source/store and build coordinate
 concrete package-input trees, interpreter, credentials, and compression. Host
 paths remain outside semantic identity.
 
+An `operation_preparation_request` retains one exact target action, its completed
+construction where required, caller target observations and policy, target
+application authority, execution control, runtime closure, lifecycle order, and
+installation reason. Its result retains either one official planner refusal or
+the exact plan, application request, and effect request.
+
 An `effectful_operation_request` retains the transaction session, selected
 action node, exact application request, caller-selected lifecycle order, and an
 installation reason only for installation. An `effectful_operation_session`
@@ -340,9 +421,9 @@ Reports remain deterministic line-oriented diagnostics. They expose exact
 session and subordinate authority identities but are not authority themselves.
 A machine protocol requires a separate versioned contract.
 
-Release 0.5.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
-`transaction` remain read-only. Recursive construction scheduling, check execution,
-constructing package-local plans, selecting a multi-package execution schedule,
+Release 0.6.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
+`transaction` remain read-only. Recursive construction scheduling, check
+execution, selecting a multi-package execution schedule, durable preparation,
 recovering incomplete application attempts, and exposing install/update/remove
 policy remain later controller work.
 
@@ -356,7 +437,7 @@ policy remain later controller work.
 - compose transaction nodes or edges itself;
 - derive package-local filesystem consequences;
 - derive or reinterpret lifecycle programs;
-- reinterpret source digests, build payloads, or archive inspection;
+- reinterpret source digests, build payloads, or archive inspection semantics;
 - execute through a Linux-specific backend directly;
 - mutate package files outside `libpkgapply`;
 - publish installed state outside `libpkgstate`;

@@ -22,7 +22,9 @@ evidence is complete and that lease loss is never hidden. Durable changes must
 write intent before effects, retain exact subordinate evidence afterward, and
 stop rather than guess when restart authority is incomplete. Construction
 changes must bind one exact transaction node and retain subordinate fetch/build
-evidence without interpreting it.
+evidence without interpreting it. Preparation changes must compose the official
+state, source/build, planner, and application adapters; typed planner refusal
+must never be converted into a partial effect request.
 
 Use SPDX headers:
 

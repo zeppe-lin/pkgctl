@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.5.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.6.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -40,6 +40,33 @@ Host paths, cache hits, redirect observations, and timing remain outside
 construction identity. The boundary does not recursively schedule dependencies,
 execute check nodes, publish installed state, or construct a Linux backend.
 Interrupted construction is not inferred successful or automatically replayed.
+
+# OPERATION PREPARATION
+
+Version 0.6.0 can prepare one exact transaction *install*, *upgrade*, or
+*remove* node for the existing effect kernel. The caller supplies the complete
+target observations, normalized package policy, target application context,
+execution control, lifecycle order, and an installation reason where required.
+Incoming operations additionally require one resolved runtime-closure identity
+and the matching completed construction result.
+
+The controller projects canonical installed truth through *libpkgstate-plan*.
+For install and upgrade, it requires the exact transaction *build* node ordered
+before the target action, reinspects the retained artifact through an injected
+*libpkgimage* backend, and projects candidate, image, and artifact facts through
+*libpkgbuild-plan*. The archive digest, normalized image identity, and entry
+count must reproduce construction evidence. Inspection backend identity may
+differ.
+
+The exact *libpkgplan* operation returns either one complete package-local plan
+or a typed refusal. A refusal is terminal preparation knowledge and creates no
+*libpkgapply* or effect request. A successful plan is sealed into the exact
+*libpkgapply* request and existing one-operation *pkgctl* effect request. Removal
+never invokes incoming-artifact projection.
+
+Preparation may read exact artifact bytes, but it does not acquire the target
+lease, execute lifecycle programs, apply package files, or publish installed
+state. It has no command frontend and no durable preparation journal.
 
 # DURABLE EFFECT ATTEMPTS
 
@@ -146,7 +173,7 @@ publication mechanics.
 
 # COMMAND BOUNDARY
 
-Release 0.5.0 exposes no effect-implying command. *catalog*, *resolve*, and
+Release 0.6.0 exposes no effect-implying command. *catalog*, *resolve*, and
 *transaction* remain read-only. Install, update, removal, multi-package
 scheduling, recursive construction, planning, and recovery policy require
 later explicit command contracts.
@@ -166,5 +193,6 @@ frontend, but cannot alter the native request and session model.
 # SEE ALSO
 
 *pkgctl*(1), *libpkgfetch*(3), *libpkgbuild*(3),
-*libpkgbuild-exec*(3), *libpkgapply*(3), *libpkgapply-exec*(3),
+*libpkgbuild-exec*(3), *libpkgplan*(3), *libpkgapply*(3),
+*libpkgapply-exec*(3),
 *libpkgstate*(3), *libpkgtransaction*(3)

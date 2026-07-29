@@ -20,6 +20,12 @@ The construction layer may depend on source, fetch, build, build-exec, image,
 and backend-neutral execution authorities, but must not schedule dependency
 graphs or construct a Linux backend.
 
+The preparation layer may depend on the published state-plan, source-plan,
+build-plan, planner, image, and application values. It may inspect exact artifact
+bytes through an injected backend, but must not observe target paths itself,
+normalize package policy, discover runtime closure, execute lifecycle programs,
+mutate the target, or publish state.
+
 The effectful controller layer may depend on image, plan, apply, execution,
 and state adapters only through their exact public values. It must not parse
 payloads, derive lifecycle programs, perform target mutation, or serialize
@@ -44,9 +50,10 @@ legacy behavior.
 3. run ASan and UBSan over the complete authority closure;
 4. check shared and static linkage and direct dependency isolation;
 5. verify construction authority binding, source/build evidence retention,
-   effect sequencing, intent-before-effect persistence, exact restart
-   checkpoints, outer-lease reacquisition, publication reconciliation,
-   publication provenance, CLI read-only behavior, and missing-state refusal;
+   preparation projection and typed refusal, effect sequencing,
+   intent-before-effect persistence, exact restart checkpoints, outer-lease
+   reacquisition, publication reconciliation, publication provenance, CLI
+   read-only behavior, and missing-state refusal;
 6. update release metadata and manuals together;
 7. compare independently replayed trees and stable patch IDs;
 8. tag signed releases only from a clean tree.
