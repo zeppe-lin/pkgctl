@@ -58,13 +58,18 @@ Identity source_identity(char value)
   return Identity::from_sha256(std::string(64U, value));
 }
 
-pkgsource::source_snapshot tool_source(std::string_view digest,
-                                      std::string version = "1.0",
-                                      bool with_dependency = true)
+pkgsource::source_snapshot tool_source(
+    std::string_view digest,
+    std::string version = "1.0",
+    bool with_dependency = true,
+    std::optional<pkgsource::program> check_program = std::nullopt)
 {
   using namespace pkgsource;
+  const auto syntax = check_program
+      ? source_syntax::recipe_yaml_v2
+      : source_syntax::recipe_yaml_v1;
   return seal_source(
-      source_origin("tool/recipe.yml"), source_syntax::recipe_yaml_v1,
+      source_origin("tool/recipe.yml"), syntax,
       recipe_declaration(
           package_release(package_reference("tool"), std::move(version), 1),
           package_metadata("Tool", std::nullopt, std::nullopt,
@@ -85,7 +90,8 @@ pkgsource::source_snapshot tool_source(std::string_view digest,
           architecture_requirements(
               {architecture_reference("x86_64")},
               {architecture_reference("x86_64")}),
-          declaration_provenance("tool/recipe.yml", "$", 1, 1)),
+          declaration_provenance("tool/recipe.yml", "$", 1, 1),
+          std::move(check_program)),
       profile_catalog::seal({}));
 }
 
@@ -652,7 +658,9 @@ void check_check_progression()
   pkgstate::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
-  auto source = tool_source(sha256_text(payload), "1.0", false);
+  auto source = tool_source(
+      sha256_text(payload), "1.0", false,
+      pkgsource::program(pkgsource::program_language::posix_shell, "true\n"));
   auto transaction = transaction_session(
       source, dependency_source(), store.read(), temporary.path() / "state",
       false, false, true);
@@ -670,6 +678,8 @@ void check_check_progression()
   const auto initial_progress = progression.identity();
   CHECK(progression.status(build_node(transaction).identity()) ==
         pkgctl::transaction_node_status::ready);
+  CHECK(check_node(transaction).check_program());
+  CHECK(check_node(transaction).check_program()->material() == "true\n");
   CHECK(progression.status(check_node(transaction).identity()) ==
         pkgctl::transaction_node_status::pending);
   CHECK(progression.ready_units().size() == 1U);
