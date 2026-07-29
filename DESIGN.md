@@ -13,6 +13,50 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.8.0 transaction-check boundary
+
+Release 0.8.0 closes one exact check unit without adding scheduler policy.
+The boundary is deliberately split in two.
+
+`transaction_check_request::make()` is pure controller admission. It accepts a
+`transaction_progress` and one check-node identity. The node must be exactly
+ready, must have one exact `build_before_check` predecessor, and that build node
+must already retain successful construction evidence in the same progression.
+The resulting request retains the transaction session, preparation-progression
+identity, check-node identity, complete construction result, and the sealed
+`libpkgcheck` request.
+
+`transaction_check_session::admit()` binds that pure request to concrete
+source, built-package, check-input, root-view, private-temporary, interpreter,
+credential, and resource-limit coordinates. The exact resources are delegated
+to `libpkgcheck-exec >= 0.1.1`. Lower missing, duplicate, forged, aliased, or
+path-invalid resource failures are surfaced as controller-owned
+`invalid_check_session` refusal. The controller session identity binds the
+concrete coordinates and the exact prepared `libpkgexec` request identity.
+
+Execution remains injected. `execute_transaction_check()` asks one
+`transaction_check_driver` for terminal evidence and validates that both the
+check request and execution request are exact. A native driver composes
+`libpkgcheck-exec` with an injected `libpkgexec` backend. Driver exceptions,
+foreign requests, and lower backend-contract failures are controller driver
+contract violations; they are never promoted into transaction progress.
+
+`advance_check()` accepts passed or failed terminal evidence only when the
+transaction, program, check node, check request, execution request, and retained
+construction authority all remain exact. Passed evidence satisfies the check
+node. Failed evidence fails it and blocks graph successors by ordinary
+progression derivation.
+
+Completion admission intentionally does not require equality with the whole
+progress identity captured during preparation. Independent ready units may
+advance concurrently. A prepared check remains admissible when its exact node
+is still ready and the exact construction evidence on which it depends remains
+retained. This is concurrency without stale-dependency amnesty.
+
+The release adds no ready-peer selection, retry policy, backend construction,
+automatic execution, transaction-wide cancellation, durable check-session
+store, or effectful CLI command.
+
 ## Release 0.7.1 transaction-progression boundary
 
 Release 0.7.1 makes controller knowledge about one immutable transaction
@@ -21,9 +65,10 @@ program explicit. A `transaction_progress` value retains:
 1. the exact sealed `transaction_session`;
 2. the current canonical `libpkgstate` snapshot epoch;
 3. accepted terminal `construction_result` values by exact build node;
-4. accepted terminal `effectful_operation_result` values by exact target action;
-5. derived status for every transaction node;
-6. every graph-ready realization unit, without selecting one.
+4. accepted terminal `transaction_check_result` values by exact check node;
+5. accepted terminal `effectful_operation_result` values by exact target action;
+6. derived status for every transaction node;
+7. every graph-ready realization unit, without selecting one.
 
 Progression starts from the installed snapshot retained by the transaction's
 resolution. Exact `retain` nodes are initially satisfied. All other status is
@@ -94,20 +139,20 @@ than falling back to the transaction's original snapshot.
 ### Progression identity
 
 Progression identity binds the transaction session, current state snapshot,
-ordered terminal construction and effect identities, every derived node status,
+ordered terminal construction, check, and effect identities, every derived node status,
 and the ready-unit identities derived from that authority. Host paths, execution
 timing, and caller choice among ready units remain outside the identity.
 
 ### Deliberate boundary
 
 Progression is pure controller-state derivation. It does not materialize
-sources, execute builds or checks, prepare operations, execute lifecycle or
+sources, execute builds or checks, prepare check resources or operations, execute lifecycle or
 application effects, publish state, resume journals, or call a platform
 backend. Check units may become ready but there is deliberately no
 `advance_check()` API: no supplied authority currently defines a sealed check
 request and terminal check result.
 
-Release 0.7.1 adds no durable progression store or effectful command frontend.
+Release 0.8.0 adds no durable progression/check store or effectful command frontend.
 
 ## Release 0.6.0 operation-preparation boundary
 
@@ -530,7 +575,7 @@ Reports remain deterministic line-oriented diagnostics. They expose exact
 session and subordinate authority identities but are not authority themselves.
 A machine protocol requires a separate versioned contract.
 
-Release 0.7.1 adds no effect-implying CLI command. `catalog`, `resolve`, and
+Release 0.8.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
 `transaction` remain read-only. Recursive construction scheduling, check
 execution, selecting among ready units, durable progression or preparation,
 recovering incomplete application

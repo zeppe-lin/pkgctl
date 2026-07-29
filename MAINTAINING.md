@@ -26,6 +26,13 @@ bytes through an injected backend, but must not observe target paths itself,
 normalize package policy, discover runtime closure, execute lifecycle programs,
 mutate the target, or publish state.
 
+The check layer may depend on transaction progression, construction evidence,
+`libpkgcheck`, and `libpkgcheck-exec`. Pure request admission must remain usable
+before host paths exist. Concrete resources, interpreter identity, credentials,
+and limits belong only to the admitted check session. The controller must not
+reimplement input-tree matching, resource-layout construction, process-status
+classification, or backend execution.
+
 The effectful controller layer may depend on image, plan, apply, execution,
 and state adapters only through their exact public values. It must not parse
 payloads, derive lifecycle programs, perform target mutation, or serialize
@@ -50,7 +57,8 @@ legacy behavior.
 3. run ASan and UBSan over the complete authority closure;
 4. check shared and static linkage and direct dependency isolation;
 5. verify construction authority binding, source/build evidence retention,
-   preparation projection and typed refusal, effect sequencing,
+   check request/session/result binding, canonical multi-input projection,
+   concurrency-safe check progression, preparation projection and typed refusal, effect sequencing,
    intent-before-effect persistence, exact restart checkpoints, outer-lease
    reacquisition, publication reconciliation, publication provenance, CLI
    read-only behavior, and missing-state refusal;

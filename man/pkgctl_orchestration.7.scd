@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.7.1 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.8.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -43,7 +43,7 @@ Interrupted construction is not inferred successful or automatically replayed.
 
 # TRANSACTION PROGRESSION
 
-Version 0.7.1 retains immutable controller knowledge for one transaction
+Version 0.8.0 retains immutable controller knowledge for one transaction
 program. Progression starts at the exact installed snapshot used by resolution
 and records accepted terminal construction and effect evidence.
 
@@ -66,13 +66,48 @@ the supplied resulting snapshot. Definitive failure does not advance state.
 Lost-lease and indeterminate-publication outcomes require further resolution and
 are not terminal progression evidence.
 
-Check units can become ready, but Version 0.7.1 defines no check-completion API.
-No current authority seals a check request and terminal check result.
+Version 0.8.0 admits a pure check request only for one exact ready check node
+whose unique build predecessor already has successful retained construction
+evidence. Concrete source, built-package, check-input, root-view, temporary,
+interpreter, credential, and resource-limit coordinates are admitted separately
+through *libpkgcheck-exec*.
+
+Terminal check evidence must bind the exact check and execution requests. Passed
+evidence satisfies the check node; failed evidence fails it and blocks dependent
+units. Completion may follow unrelated progression advancement only while the
+same node remains ready and the same construction evidence remains retained.
+
+# TRANSACTION CHECK SESSION
+
+A *transaction_check_request* is pure controller authority. It binds one exact
+ready check node, its unique build predecessor, the successful construction
+result retained by progression, and the sealed *libpkgcheck* request. It needs
+no host paths or backend.
+
+A *transaction_check_session* separately admits concrete source, checked
+package, check-input, root-view, and private temporary trees together with exact
+interpreter identity, numeric credentials, supplementary groups, and resource
+limits. *pkgctl* delegates resource matching and execution-request construction
+to *libpkgcheck-exec* and requires Version 0.1.1 or later.
+
+Execution occurs only through an injected driver. Foreign check requests,
+foreign execution requests, backend-contract failures, and thrown driver
+exceptions are rejected. They are not terminal package-check evidence.
+
+*advance_check* accepts passed or failed terminal evidence only for the same
+transaction, program, check node, execution request, and retained construction.
+It does not require the whole preparation-progress identity to remain unchanged;
+independent ready work may advance concurrently without invalidating exact
+check dependencies.
+
+The check boundary does not select a ready unit, unpack artifacts, discover
+resources, construct a platform backend, retry failures, persist sessions, or
+expose an effectful command.
 
 # OPERATION PREPARATION
 
 Version 0.6.0 introduced preparation for one exact transaction *install*,
-*upgrade*, or *remove* node. Version 0.7.1 requires that action to be ready in a
+*upgrade*, or *remove* node. Version 0.8.0 requires that action to be ready in a
 *transaction_progress* value and projects planner facts from its current state
 epoch rather than the transaction's original snapshot. The caller supplies the
 complete target observations, normalized package policy, target application context,
@@ -145,7 +180,7 @@ removal node from an already sealed transaction session. The caller supplies:
 
 The initial 0.3 effect boundary rejected multi-package programs, runtime
 cohorts, and more than one target mutation. Version 0.6.0 admits one exact action
-from the complete retained transaction program. Version 0.7.1 additionally
+from the complete retained transaction program. Version 0.8.0 additionally
 binds that request to the exact expected state epoch used for planning. Other
 package nodes, target mutations, and runtime cohorts remain inert; this request
 does not choose or execute a cross-package schedule.
@@ -207,7 +242,7 @@ publication mechanics.
 
 # COMMAND BOUNDARY
 
-Release 0.7.1 exposes no effect-implying command. *catalog*, *resolve*, and
+Release 0.8.0 exposes no effect-implying command. *catalog*, *resolve*, and
 *transaction* remain read-only. Install, update, removal, multi-package
 scheduling, recursive construction, planning, and recovery policy require
 later explicit command contracts.
@@ -229,4 +264,5 @@ frontend, but cannot alter the native request and session model.
 *pkgctl*(1), *libpkgfetch*(3), *libpkgbuild*(3),
 *libpkgbuild-exec*(3), *libpkgplan*(3), *libpkgapply*(3),
 *libpkgapply-exec*(3),
-*libpkgstate*(3), *libpkgtransaction*(3)
+*libpkgstate*(3), *libpkgtransaction*(3), *libpkgcheck*(3),
+*libpkgcheck-exec*(3)

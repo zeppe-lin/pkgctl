@@ -25,7 +25,7 @@ Every release must establish:
 - failed builds retained without artifact promotion;
 - construction identity independence from host paths;
 - exact action/construction/current-state binding before package-local planning;
-- immutable transaction progression from exact terminal evidence;
+- immutable transaction progression from exact construction, check, and effect evidence;
 - operation-unit readiness with lifecycle phase nodes absorbed without losing
   node-level terminal status;
 - simultaneous exposure of independent ready units without controller
@@ -48,7 +48,13 @@ Every release must establish:
 - publication retry only from the exact prior state and reconciliation only
   from the exact resulting state;
 - a newly held outer lease required on every resumed attempt;
-- proof that all exposed CLI commands remain read-only in 0.7.1;
+- pure check-request admission before concrete host resources exist;
+- exact check-session resource admission with canonical multi-input projection;
+- deterministic check request, session, execution, result, and progression identities;
+- refusal of missing, duplicate, forged, aliased, cross-transaction, cross-node,
+  stale-construction, duplicate-completion, and driver-contract evidence;
+- concurrency-safe check completion after unrelated progression advancement;
+- proof that all exposed CLI commands remain read-only in 0.8.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
 ## Effect authority tests
@@ -109,9 +115,38 @@ The progression suite must prove:
   failed, and unexecuted lifecycle-node status;
 - effect evidence from another transaction or older state epoch is refused;
 - lost-lease and indeterminate-publication effects are not accepted as terminal;
-- check units may become ready but no check-completion authority is manufactured;
-- progression exposes no execution, publication, scheduler-selection, or CLI
-  path.
+- passed check evidence satisfies only its exact check node;
+- failed check evidence preserves the exact failure kind and blocks dependents;
+- prepared check evidence survives unrelated progress only while its node and
+  retained construction authority remain exact;
+- progression itself exposes no execution, publication, scheduler-selection,
+  or CLI path.
+
+
+## Transaction check tests
+
+The check suite must prove:
+
+- only one exact ready check node with one `build_before_check` predecessor is
+  admitted;
+- the pure controller request binds the same transaction and exact successful
+  construction retained by progression;
+- concrete source, package, check-input, root-view, temporary, interpreter,
+  credential, and limit authority is admitted separately;
+- multiple check inputs canonicalize to the sealed request order regardless of
+  caller order, with exact `/check/inputs/<identity>` bindings;
+- lower execution-admission failures are reported as
+  `invalid_check_session`;
+- returned check and execution request identities must match the admitted
+  session exactly;
+- native and custom driver exceptions are contract violations, not terminal
+  package-check evidence;
+- repeated equivalent requests, sessions, and results have deterministic
+  identities;
+- duplicate, cross-transaction, foreign-construction, and stale-node evidence
+  is refused;
+- unrelated ready-unit progress does not invalidate an otherwise exact
+  prepared check session.
 
 ## Operation preparation tests
 
