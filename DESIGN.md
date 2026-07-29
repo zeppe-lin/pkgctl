@@ -13,6 +13,102 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.7.0 transaction-progression boundary
+
+Release 0.7.0 makes controller knowledge about one immutable transaction
+program explicit. A `transaction_progress` value retains:
+
+1. the exact sealed `transaction_session`;
+2. the current canonical `libpkgstate` snapshot epoch;
+3. accepted terminal `construction_result` values by exact build node;
+4. accepted terminal `effectful_operation_result` values by exact target action;
+5. derived status for every transaction node;
+6. every graph-ready realization unit, without selecting one.
+
+Progression starts from the installed snapshot retained by the transaction's
+resolution. Exact `retain` nodes are initially satisfied. All other status is
+derived from graph predecessors and retained terminal evidence; the controller
+does not reinterpret resolver reasons or compose new transaction edges.
+
+### Realization units
+
+A raw transaction node is not always a physically selectable unit. Every
+`build` node is one construction unit and every `check` node is one check unit.
+An `install`, `upgrade`, or `remove` node absorbs the lifecycle nodes connected
+to it by exact `pre_lifecycle_before_action` and
+`action_before_post_lifecycle` phase edges. The resulting operation unit is
+ready only when every predecessor outside that member set is satisfied.
+
+This unit boundary prevents the controller from waiting for an internal
+pre-lifecycle node before selecting the operation that must execute it. It does
+not erase node-level evidence. A successful effect satisfies all members. After
+a definitive failed effect, executed lifecycle nodes retain their individual
+success or failure, the target action is failed, and unexecuted lifecycle
+members are blocked.
+
+Independent ready units remain simultaneously visible in canonical primary-node
+order. Progression supplies no priority, tie-break, parallelism, fairness,
+resource, retry, or failure-containment policy.
+
+### Evidence admission
+
+`advance_construction()` accepts evidence only when:
+
+- the construction belongs to the same transaction session;
+- its exact build node is currently ready;
+- that node has no earlier terminal construction evidence.
+
+A successful result satisfies the build node; a failed result fails it and
+blocks dependent units through normal graph derivation.
+
+`advance_effect()` additionally requires the effect request's expected state to
+be the exact current progression epoch. A completed effect must carry the exact
+state-publication request and either a successful `libpkgstate` publication
+receipt proving the caller-supplied resulting snapshot or authoritative restart
+reconciliation naming that snapshot. Only then does progression replace its
+current state epoch.
+
+Definitive lifecycle, application, or publication failure terminates the
+operation without advancing state. Lost-lease and indeterminate-publication
+outcomes are not terminal progression evidence because authoritative state is
+not yet known.
+
+### Current-state preparation
+
+Operation preparation now accepts `transaction_progress`, not a bare
+transaction session. The selected target action must be ready, and incoming
+construction must already be retained by that progression. Planner state facts
+are projected from `current_state()`.
+
+Installation requires the package still to be absent. Upgrade and removal
+require the exact installed-package identity captured by the original
+transaction action to remain present unchanged in the current epoch. This keeps
+the original transaction authoritative while refusing silent re-resolution
+after earlier effects.
+
+Every effect request retains its exact expected state snapshot. Application
+preconditions, target binding, publication projection, durable restart, and
+later progression admission therefore share one explicit state epoch rather
+than falling back to the transaction's original snapshot.
+
+### Progression identity
+
+Progression identity binds the transaction session, current state snapshot,
+ordered terminal construction and effect identities, every derived node status,
+and the ready-unit identities derived from that authority. Host paths, execution
+timing, and caller choice among ready units remain outside the identity.
+
+### Deliberate boundary
+
+Progression is pure controller-state derivation. It does not materialize
+sources, execute builds or checks, prepare operations, execute lifecycle or
+application effects, publish state, resume journals, or call a platform
+backend. Check units may become ready but there is deliberately no
+`advance_check()` API: no supplied authority currently defines a sealed check
+request and terminal check result.
+
+Release 0.7.0 adds no durable progression store or effectful command frontend.
+
 ## Release 0.6.0 operation-preparation boundary
 
 Release 0.6.0 prepares one exact target action already present in a sealed
@@ -403,16 +499,22 @@ bounds. A `construction_session` adds explicit source/store and build coordinate
 concrete package-input trees, interpreter, credentials, and compression. Host
 paths remain outside semantic identity.
 
-An `operation_preparation_request` retains one exact target action, its completed
-construction where required, caller target observations and policy, target
-application authority, execution control, runtime closure, lifecycle order, and
-installation reason. Its result retains either one official planner refusal or
-the exact plan, application request, and effect request.
+A `transaction_progress` retains the transaction session, current canonical
+state epoch, accepted terminal construction and effect evidence, exact node
+status, and every graph-ready realization unit.
 
-An `effectful_operation_request` retains the transaction session, selected
-action node, exact application request, caller-selected lifecycle order, and an
-installation reason only for installation. An `effectful_operation_session`
-adds admitted lifecycle execution resources in the requested order. A durable
+An `operation_preparation_request` retains that progression, one exact ready
+target action, its completed construction where required, caller target
+observations and policy, target application authority, execution control,
+runtime closure, lifecycle order, and installation reason. Its result retains
+either one official planner refusal or the exact plan, application request, and
+effect request.
+
+An `effectful_operation_request` retains the transaction session, exact expected
+state epoch, selected action node, exact application request, caller-selected
+lifecycle order, and an installation reason only for installation. An
+`effectful_operation_session` adds admitted lifecycle execution resources in
+the requested order. A durable
 effect attempt adds a caller nonce and append-only controller snapshots; it does
 not alter the semantic session identity.
 
@@ -428,11 +530,12 @@ Reports remain deterministic line-oriented diagnostics. They expose exact
 session and subordinate authority identities but are not authority themselves.
 A machine protocol requires a separate versioned contract.
 
-Release 0.6.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
+Release 0.7.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
 `transaction` remain read-only. Recursive construction scheduling, check
-execution, selecting a multi-package execution schedule, durable preparation,
-recovering incomplete application attempts, and exposing install/update/remove
-policy remain later controller work.
+execution, selecting among ready units, durable progression or preparation,
+recovering incomplete application
+attempts, and exposing install/update/remove policy remain later controller
+work.
 
 ## Non-authorities
 
@@ -449,7 +552,7 @@ policy remain later controller work.
 - mutate package files outside `libpkgapply`;
 - publish installed state outside `libpkgstate`;
 - claim transaction-wide atomicity or rollback;
-- choose cross-package scheduling in the one-operation effect boundary;
+- choose among graph-ready units or execute a cross-package schedule;
 - discover, scan for, or reconstruct a `libpkgapply` application journal;
 - infer success for a lifecycle intent lacking terminal execution evidence.
 

@@ -6,58 +6,55 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.6.0 adds one-operation preparation between completed construction
-and the existing target-effect kernel:
+Release 0.7.0 adds evidence-driven progression over one immutable transaction
+program:
 
 ```text
-exact install, upgrade, or removal transaction node
+sealed transaction session
         +
-completed construction result for incoming operations
+current canonical state epoch
         +
-canonical installed-state snapshot
-        +
-caller observations, runtime closure, policy, and lifecycle order
+accepted construction and effect evidence
         |
         v
-libpkgstate-plan and libpkgbuild-plan projections
+pending / ready / satisfied / failed / blocked nodes
         |
         v
-libpkgplan success or typed refusal
-        |
-        v
-sealed libpkgapply request and pkgctl effect request
+all graph-ready construction, check, and operation units
 ```
 
-For installation and upgrade, the controller requires the exact completed
-construction ordered before the selected target node. It reinspects the sealed
-artifact through an injected `libpkgimage` backend, requires the same archive
-digest, normalized image identity, and entry count recorded by construction,
-and admits one `libpkgapply` incoming-package authority. A different compatible
-inspection backend may produce the evidence; backend identity is not package
-truth.
+A target action and its exact pre- and post-lifecycle phase nodes form one
+operation unit. The unit becomes ready only when every predecessor outside the
+unit is satisfied. This avoids treating the lifecycle edges inside one physical
+operation as a scheduler deadlock while retaining exact status for every node.
+Independent ready units remain visible together; `pkgctl` does not choose among
+them.
 
-For all three operation kinds, `libpkgstate-plan` projects the complete
-canonical snapshot into planner facts. The caller remains authoritative for the
-target observations, normalized package policy, runtime closure, target
-application context, execution guarantees, and lifecycle order. `pkgctl` calls
-the exact `libpkgplan` operation and retains either its complete plan or its
-typed refusal. A refusal is terminal preparation knowledge: no application or
-effect request is manufactured.
+Progression begins at the installed snapshot retained by the transaction's
+resolution. Exact successful or failed construction evidence can terminate one
+ready build node. Exact effect evidence can terminate one ready operation unit.
+A successful effect advances the current state epoch only when its retained
+`libpkgstate` publication receipt, or authoritative restart reconciliation,
+proves the caller-supplied resulting snapshot. Definitive failure does not
+advance state. Indeterminate publication and lost-lease results are not accepted
+as terminal progression evidence.
 
-Preparation is read-only authority composition. Incoming preparation performs
-exact-byte artifact inspection, but it does not acquire the target lease,
-execute lifecycle programs, mutate package files, or publish installed state.
-Removal preparation does not inspect an incoming artifact at all.
+Operation preparation now consumes a `transaction_progress` value rather than
+planning against the transaction's original snapshot forever. The selected
+action must be ready in the graph. Install still requires absence in the current
+epoch; upgrade and removal require the historical installed authority captured
+by the transaction to remain exactly current. Every sealed effect request also
+retains the precise state epoch against which its application was planned, so
+later stale evidence is refused.
 
-The resulting effect request retains the complete sealed transaction session but
-selects only one exact target action and its exact lifecycle phase set. Other
-package nodes, target actions, and runtime cohorts are not executed or ordered by
-that request; cross-package scheduling remains a separate controller boundary.
+Check nodes may become ready and are reported as check units, but this release
+has no check-completion API. A separate typed check authority is required before
+a scheduler can honestly advance them.
 
-Release 0.5.0 established one exact package-construction session. Release 0.4.0
-closed the restart loop for the separate one-operation target mutation
-sequence. Construction and preparation are not added to the durable effect
-journal in 0.6.0.
+Release 0.6.0 established one-operation preparation between completed
+construction and the target-effect kernel. Release 0.5.0 established one exact
+package-construction session, and 0.4.0 closed the restart loop for one target
+mutation sequence.
 
 The executable still exposes only:
 
@@ -71,16 +68,19 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.6.0. Recursive construction,
-check execution, cross-package scheduling, durable construction or preparation
-attempts, and effectful command policy remain outside this release.
+There are no effect-implying CLI commands in 0.7.0. Progression executes no
+source acquisition, build, check, planner, lifecycle, application, publication,
+or restart authority. Ready-peer selection, parallelism, retry policy,
+transaction-wide rollback, durable progression storage, and effectful command
+policy remain outside this release.
 
 ## Authority
 
 `pkgctl` owns command policy, authority-call sequencing, controller session
-binding, durable controller-attempt snapshots, conservative restart
-classification, outer-lease observation, transaction-evidence composition,
-deterministic diagnostics, and presentation.
+binding, evidence-driven transaction progression, current-state epoch binding,
+durable controller-attempt snapshots, conservative restart classification,
+outer-lease observation, transaction-evidence composition, deterministic
+diagnostics, and presentation.
 
 The following meanings remain external:
 
@@ -103,9 +103,9 @@ The following meanings remain external:
 - package-image authority: `libpkgimage`.
 
 `pkgctl` does not infer transaction order beyond the exact transaction graph.
-For lifecycle nodes not ordered relative to each other by that graph, the
-caller supplies an explicit order and the controller binds it into the effect
-request identity.
+It exposes every ready unit and does not choose among ready peers. For lifecycle
+nodes not ordered relative to each other by that graph, the caller supplies an
+explicit order and the controller binds it into the effect request identity.
 
 ## Building
 

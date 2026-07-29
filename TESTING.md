@@ -24,7 +24,16 @@ Every release must establish:
 - real local-source materialization and independent package archive inspection;
 - failed builds retained without artifact promotion;
 - construction identity independence from host paths;
-- exact action/construction/state binding before package-local planning;
+- exact action/construction/current-state binding before package-local planning;
+- immutable transaction progression from exact terminal evidence;
+- operation-unit readiness with lifecycle phase nodes absorbed without losing
+  node-level terminal status;
+- simultaneous exposure of independent ready units without controller
+  selection;
+- canonical state-epoch advancement only from exact publication or reconciled
+  effect authority;
+- refusal of out-of-order, duplicate, cross-transaction, stale-state, and
+  indeterminate progression evidence;
 - artifact reinspection reproducing construction archive and image evidence;
 - successful install and removal preparation through official adapters;
 - typed planner refusal retained without application or effect promotion;
@@ -39,7 +48,7 @@ Every release must establish:
 - publication retry only from the exact prior state and reconciliation only
   from the exact resulting state;
 - a newly held outer lease required on every resumed attempt;
-- proof that all exposed CLI commands remain read-only in 0.6.0;
+- proof that all exposed CLI commands remain read-only in 0.7.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
 ## Effect authority tests
@@ -77,6 +86,32 @@ The construction suite must prove:
 - a driver result from another source or build request is rejected;
 - equivalent call-scoped host paths do not alter construction identity;
 - the same suite passes for root and an ordinary build UID.
+
+## Transaction progression tests
+
+The progression suite must prove:
+
+- progression begins at the transaction resolution's exact installed snapshot;
+- exact retain nodes are initially satisfied;
+- build and check nodes form individual units while each target action absorbs
+  its exact pre/post lifecycle phase nodes;
+- internal lifecycle phase edges do not deadlock operation readiness;
+- external predecessors across any operation member still gate the whole unit;
+- independent ready construction or operation units remain visible together;
+- out-of-order or duplicate construction evidence is refused;
+- successful construction satisfies only its exact build node;
+- failed construction fails that node and blocks graph dependents;
+- operation preparation accepts only a ready action and construction already
+  retained by the same progression;
+- successful effect evidence advances to the exact caller-supplied state proven
+  by publication receipt or restart reconciliation;
+- definitive failed effects do not advance state and retain exact executed,
+  failed, and unexecuted lifecycle-node status;
+- effect evidence from another transaction or older state epoch is refused;
+- lost-lease and indeterminate-publication effects are not accepted as terminal;
+- check units may become ready but no check-completion authority is manufactured;
+- progression exposes no execution, publication, scheduler-selection, or CLI
+  path.
 
 ## Operation preparation tests
 
