@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 if not get_option('tests').disabled()
+  check_test = executable(
+    'check-test',
+    'check_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('check', check_test)
+
   construction_test = executable(
     'construction-test',
     'construction_test.cpp',
@@ -61,6 +68,7 @@ if not get_option('tests').disabled()
   test('cli', cli_test, args: [pkgctl_exe, state_fixture])
 
   pkgctl_headers = [
+    'check.h',
     'construction.h',
     'controller.h',
     'effect.h',
