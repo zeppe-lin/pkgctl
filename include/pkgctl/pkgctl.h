@@ -15,6 +15,7 @@
 #include <pkgctl/effect_store.h>
 #include <pkgctl/error.h>
 #include <pkgctl/identity.h>
+#include <pkgctl/preparation.h>
 #include <pkgctl/report.h>
 #include <pkgctl/request.h>
 #include <pkgctl/session.h>

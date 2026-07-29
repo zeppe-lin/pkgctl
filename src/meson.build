@@ -14,6 +14,7 @@ pkgctl_core = static_library(
     'effect_store.cpp',
     'error.cpp',
     'identity.cpp',
+    'preparation.cpp',
     'report.cpp',
     'request.cpp',
     'session.cpp',
