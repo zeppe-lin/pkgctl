@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.7.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.7.1 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -43,7 +43,7 @@ Interrupted construction is not inferred successful or automatically replayed.
 
 # TRANSACTION PROGRESSION
 
-Version 0.7.0 retains immutable controller knowledge for one transaction
+Version 0.7.1 retains immutable controller knowledge for one transaction
 program. Progression starts at the exact installed snapshot used by resolution
 and records accepted terminal construction and effect evidence.
 
@@ -66,13 +66,13 @@ the supplied resulting snapshot. Definitive failure does not advance state.
 Lost-lease and indeterminate-publication outcomes require further resolution and
 are not terminal progression evidence.
 
-Check units can become ready, but Version 0.7.0 defines no check-completion API.
+Check units can become ready, but Version 0.7.1 defines no check-completion API.
 No current authority seals a check request and terminal check result.
 
 # OPERATION PREPARATION
 
 Version 0.6.0 introduced preparation for one exact transaction *install*,
-*upgrade*, or *remove* node. Version 0.7.0 requires that action to be ready in a
+*upgrade*, or *remove* node. Version 0.7.1 requires that action to be ready in a
 *transaction_progress* value and projects planner facts from its current state
 epoch rather than the transaction's original snapshot. The caller supplies the
 complete target observations, normalized package policy, target application context,
@@ -145,7 +145,7 @@ removal node from an already sealed transaction session. The caller supplies:
 
 The initial 0.3 effect boundary rejected multi-package programs, runtime
 cohorts, and more than one target mutation. Version 0.6.0 admits one exact action
-from the complete retained transaction program. Version 0.7.0 additionally
+from the complete retained transaction program. Version 0.7.1 additionally
 binds that request to the exact expected state epoch used for planning. Other
 package nodes, target mutations, and runtime cohorts remain inert; this request
 does not choose or execute a cross-package schedule.
@@ -207,7 +207,7 @@ publication mechanics.
 
 # COMMAND BOUNDARY
 
-Release 0.7.0 exposes no effect-implying command. *catalog*, *resolve*, and
+Release 0.7.1 exposes no effect-implying command. *catalog*, *resolve*, and
 *transaction* remain read-only. Install, update, removal, multi-package
 scheduling, recursive construction, planning, and recovery policy require
 later explicit command contracts.

@@ -48,7 +48,7 @@ Every release must establish:
 - publication retry only from the exact prior state and reconciliation only
   from the exact resulting state;
 - a newly held outer lease required on every resumed attempt;
-- proof that all exposed CLI commands remain read-only in 0.7.0;
+- proof that all exposed CLI commands remain read-only in 0.7.1;
 - release, source, manual, shell, and patch-hygiene contracts.
 
 ## Effect authority tests

@@ -5,6 +5,6 @@
 namespace pkgctl {
 inline constexpr unsigned version_major = 0;
 inline constexpr unsigned version_minor = 7;
-inline constexpr unsigned version_patch = 0;
-inline constexpr const char* version_string = "0.7.0";
+inline constexpr unsigned version_patch = 1;
+inline constexpr const char* version_string = "0.7.1";
 } // namespace pkgctl

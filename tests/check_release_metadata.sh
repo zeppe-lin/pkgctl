@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.7.0
+version=0.7.1
 
 require_line()
 {
@@ -22,33 +22,34 @@ require_line "$srcdir/include/pkgctl/version.h" \
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_minor = 7;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_patch = 0;'
+  'inline constexpr unsigned version_patch = 1;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.7.0";'
+  'inline constexpr const char* version_string = "0.7.1";'
 
-grep -F '## 0.7.0 - 2026-07-29' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.7.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.7.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.7.1 - 2026-07-29' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.7.1' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.7.1' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
 for contract in \
-  'libpkgsource >= 1.1.0' \
-  'libpkgsource-plan >= 1.1.0' \
-  'libpkgcatalog >= 1.1.0' \
-  'libpkgcatalog-acquire >= 1.1.0' \
-  'libpkgstate >= 2.2.0' \
-  'libpkgstate-plan >= 2.2.0' \
-  'libpkgstate-apply >= 2.2.0' \
-  'libpkgfetch >= 0.1.0' \
-  'libpkgbuild >= 1.0.0' \
-  'libpkgbuild-exec >= 0.1.0' \
-  'libpkgbuild-plan >= 1.0.0' \
+  'libpkgsource >= 2.0.0' \
+  'libpkgsource-yaml >= 2.0.0' \
+  'libpkgsource-plan >= 2.0.0' \
+  'libpkgcatalog >= 2.0.0' \
+  'libpkgcatalog-acquire >= 2.0.0' \
+  'libpkgstate >= 2.3.0' \
+  'libpkgstate-plan >= 2.3.0' \
+  'libpkgstate-apply >= 2.3.0' \
+  'libpkgfetch >= 1.0.0' \
+  'libpkgbuild >= 2.0.0' \
+  'libpkgbuild-exec >= 1.0.0' \
+  'libpkgbuild-plan >= 2.0.0' \
   'libpkgimage >= 0.3.0' \
   'libpkgplan >= 0.2.0' \
-  'libpkgexec >= 1.2.0' \
-  'libpkgapply >= 1.0.0' \
-  'libpkgapply-exec >= 0.1.0' \
-  'libpkgresolve >= 1.0.0' \
-  'libpkgtransaction >= 1.1.0'; do
+  'libpkgexec >= 1.3.0' \
+  'libpkgapply >= 2.0.0' \
+  'libpkgapply-exec >= 1.0.0' \
+  'libpkgresolve >= 2.0.0' \
+  'libpkgtransaction >= 2.0.0'; do
   grep -F "$contract" "$srcdir/CHANGELOG.md" >/dev/null || {
     echo "missing dependency floor in changelog: $contract" >&2
     exit 1

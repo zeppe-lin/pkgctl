@@ -4,8 +4,8 @@
 #include <string_view>
 static_assert(pkgctl::version_major == 0);
 static_assert(pkgctl::version_minor == 7);
-static_assert(pkgctl::version_patch == 0);
+static_assert(pkgctl::version_patch == 1);
 int main()
 {
-  return std::string_view(pkgctl::version_string) == "0.7.0" ? 0 : 1;
+  return std::string_view(pkgctl::version_string) == "0.7.1" ? 0 : 1;
 }

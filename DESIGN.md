@@ -13,9 +13,9 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
-## Release 0.7.0 transaction-progression boundary
+## Release 0.7.1 transaction-progression boundary
 
-Release 0.7.0 makes controller knowledge about one immutable transaction
+Release 0.7.1 makes controller knowledge about one immutable transaction
 program explicit. A `transaction_progress` value retains:
 
 1. the exact sealed `transaction_session`;
@@ -107,7 +107,7 @@ backend. Check units may become ready but there is deliberately no
 `advance_check()` API: no supplied authority currently defines a sealed check
 request and terminal check result.
 
-Release 0.7.0 adds no durable progression store or effectful command frontend.
+Release 0.7.1 adds no durable progression store or effectful command frontend.
 
 ## Release 0.6.0 operation-preparation boundary
 
@@ -530,7 +530,7 @@ Reports remain deterministic line-oriented diagnostics. They expose exact
 session and subordinate authority identities but are not authority themselves.
 A machine protocol requires a separate versioned contract.
 
-Release 0.7.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
+Release 0.7.1 adds no effect-implying CLI command. `catalog`, `resolve`, and
 `transaction` remain read-only. Recursive construction scheduling, check
 execution, selecting among ready units, durable progression or preparation,
 recovering incomplete application

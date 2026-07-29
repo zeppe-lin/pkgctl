@@ -1,5 +1,26 @@
 # pkgctl changelog
 
+## 0.7.1 - 2026-07-29
+
+Authority-closure migration release.
+
+- Raised every source-derived dependency floor to the generation-2 ABI
+  closure.
+- Requires `libpkgsource >= 2.0.0`, `libpkgsource-yaml >= 2.0.0`, and
+  `libpkgsource-plan >= 2.0.0`;
+  `libpkgcatalog >= 2.0.0` and `libpkgcatalog-acquire >= 2.0.0`;
+  `libpkgstate >= 2.3.0`, `libpkgstate-plan >= 2.3.0`, and
+  `libpkgstate-apply >= 2.3.0`; `libpkgfetch >= 1.0.0`;
+  `libpkgbuild >= 2.0.0`, `libpkgbuild-exec >= 1.0.0`, and
+  `libpkgbuild-plan >= 2.0.0`; `libpkgimage >= 0.3.0`;
+  `libpkgplan >= 0.2.0`; `libpkgexec >= 1.3.0`;
+  `libpkgapply >= 2.0.0` and `libpkgapply-exec >= 1.0.0`;
+  `libpkgresolve >= 2.0.0`; and `libpkgtransaction >= 2.0.0`.
+- Adds no controller semantics, scheduler policy, check completion, or
+  effectful CLI command.
+- Preserves every 0.7.0 progression, preparation, effect, restart, and journal
+  identity domain.
+
 ## 0.7.0 - 2026-07-29
 
 ### Transaction progression

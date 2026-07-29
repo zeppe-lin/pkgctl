@@ -6,7 +6,7 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.7.0 adds evidence-driven progression over one immutable transaction
+Release 0.7.1 adds evidence-driven progression over one immutable transaction
 program:
 
 ```text
@@ -68,7 +68,7 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.7.0. Progression executes no
+There are no effect-implying CLI commands in 0.7.1. Progression executes no
 source acquisition, build, check, planner, lifecycle, application, publication,
 or restart authority. Ready-peer selection, parallelism, retry policy,
 transaction-wide rollback, durable progression storage, and effectful command
