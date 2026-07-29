@@ -8,7 +8,7 @@ cxx=${CXX:-c++}
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-direct.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
-modules='libpkgsource libpkgsource-yaml libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgimage libpkgexec libpkgapply libpkgapply-exec libpkgresolve libpkgtransaction libcrypto'
+modules='libpkgsource libpkgsource-yaml libpkgsource-plan libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-exec libpkgresolve libpkgtransaction libcrypto'
 cflags=$(pkg-config --cflags $modules)
 libs=$(pkg-config --libs $modules)
 flags="-std=c++17 -Wall -Wextra -Wpedantic -Werror -I$srcdir/include $cflags"
@@ -46,6 +46,7 @@ EOF_INNER
 done
 
 "$srcdir/tests/check_construction_contract.sh" "$srcdir"
+"$srcdir/tests/check_preparation_contract.sh" "$srcdir"
 "$srcdir/tests/check_source_contract.sh" "$srcdir"
 "$srcdir/tests/check_effect_contract.sh" "$srcdir"
 "$srcdir/tests/check_restart_contract.sh" "$srcdir"

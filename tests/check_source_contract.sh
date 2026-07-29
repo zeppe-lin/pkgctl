@@ -12,7 +12,6 @@ for token in \
   'pkgmksetting' \
   'libpkgcore' \
   'build_and_run' \
-  'package_operation' \
   'operation_graph' \
   'install_intent' \
   'system_update_intent' \
@@ -24,6 +23,13 @@ for token in \
   fi
 done
 
+if grep -R -n -E \
+    '(^|[[:space:]])(class|struct|using)[[:space:]]+package_operation([[:space:];=]|$)' \
+    "$srcdir/include/pkgctl" "$srcdir/src" >/dev/null 2>&1; then
+  echo 'controller-defined package operation model found' >&2
+  exit 1
+fi
+
 if grep -R -n 'SPDX-License-Identifier: GPL-2' \
     "$srcdir/include" "$srcdir/src" "$srcdir/cli" >/dev/null 2>&1; then
   echo 'GPL-2 SPDX identifier found in native source' >&2
@@ -33,11 +39,15 @@ fi
 for required in \
   'libpkgcatalog-acquire' \
   'libpkgstate' \
+  'libpkgstate-plan' \
   'libpkgstate-apply' \
   'libpkgfetch' \
   'libpkgbuild' \
   'libpkgbuild-exec' \
+  'libpkgsource-plan' \
+  'libpkgbuild-plan' \
   'libpkgimage' \
+  'libpkgplan' \
   'libpkgexec' \
   'libpkgapply' \
   'libpkgapply-exec' \
