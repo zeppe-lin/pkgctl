@@ -1,5 +1,47 @@
 # pkgctl changelog
 
+## 0.5.0 - 2026-07-29
+
+### Candidate construction sessions
+
+- Added one exact controller construction request for a catalog-backed
+  transaction build node.
+- Bound the transaction, source snapshot, canonical package-input set, selected
+  architectures, build policy, and bounded acquisition policy into controller
+  identity. Package inputs must match the resolver's exact required release and
+  source authority.
+- Added an admitted call-scoped session carrying explicit source/store roots,
+  dependency-tree paths, root view, workspace/output/artifact paths, interpreter,
+  credentials, and compression.
+- Added an injected construction driver and native composition of `libpkgfetch`
+  with `libpkgbuild-exec`.
+- Retained complete verified source materialization, execution evidence, build
+  result, artifact binding, and independent archive-inspection evidence.
+- Promoted completion only for successful builds with complete artifact evidence;
+  failed executions remain failed builds and do not publish artifacts.
+
+### Authority and compatibility
+
+- Kept all host paths, cache/transport observations, and timing outside semantic
+  construction identity.
+- Kept the construction layer backend-neutral and free of `libpkgexec-linux`.
+- Added no recursive dependency scheduler, check-node execution, target plan,
+  state publication, durable construction journal, or effectful CLI command.
+- Retained the durable target-effect and restart contracts from 0.4.0 unchanged.
+
+### Authority floors
+
+- `libpkgsource >= 1.1.0`;
+- `libpkgcatalog >= 1.1.0` and `libpkgcatalog-acquire >= 1.1.0`;
+- `libpkgstate >= 2.2.0` and `libpkgstate-apply >= 2.2.0`;
+- `libpkgfetch >= 0.1.0`;
+- `libpkgbuild >= 1.0.0` and `libpkgbuild-exec >= 0.1.0`;
+- `libpkgimage >= 0.3.0`;
+- `libpkgexec >= 1.2.0`;
+- `libpkgapply >= 1.0.0` and `libpkgapply-exec >= 0.1.0`;
+- `libpkgresolve >= 1.0.0`;
+- `libpkgtransaction >= 1.1.0`.
+
 ## 0.4.0 - 2026-07-29
 
 ### Durable effect attempts
