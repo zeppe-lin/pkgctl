@@ -121,6 +121,17 @@ const construction_result* find_construction(
   return found == values.end() ? nullptr : &*found;
 }
 
+const transaction_check_result* find_check(
+    const std::vector<transaction_check_result>& values,
+    const node_id& node)
+{
+  const auto found = std::find_if(
+      values.begin(), values.end(), [&](const auto& value) {
+        return value.session().request().check_node() == node;
+      });
+  return found == values.end() ? nullptr : &*found;
+}
+
 const effectful_operation_result* find_effect(
     const std::vector<effectful_operation_result>& values,
     const node_id& node)
@@ -153,6 +164,7 @@ void apply_lifecycle_results(
 std::map<std::string, transaction_node_status> derive_statuses(
     const transaction_session& transaction,
     const std::vector<construction_result>& constructions,
+    const std::vector<transaction_check_result>& checks,
     const std::vector<effectful_operation_result>& effects,
     const std::vector<unit_spec>& unit_specs)
 {
@@ -171,6 +183,14 @@ std::map<std::string, transaction_node_status> derive_statuses(
     if (unit.kind == transaction_unit_kind::construction)
     {
       const auto* evidence = find_construction(constructions, unit.primary);
+      if (evidence != nullptr)
+        state[unit.primary.hex()] = evidence->succeeded()
+            ? transaction_node_status::satisfied
+            : transaction_node_status::failed;
+    }
+    else if (unit.kind == transaction_unit_kind::check)
+    {
+      const auto* evidence = find_check(checks, unit.primary);
       if (evidence != nullptr)
         state[unit.primary.hex()] = evidence->succeeded()
             ? transaction_node_status::satisfied
@@ -311,11 +331,12 @@ transaction_progress transaction_progress::rebuild(
     transaction_session transaction,
     pkgstate::snapshot current_state,
     std::vector<construction_result> constructions,
+    std::vector<transaction_check_result> checks,
     std::vector<effectful_operation_result> effects)
 {
   const auto unit_specs = units(transaction);
   const auto status = derive_statuses(
-      transaction, constructions, effects, unit_specs);
+      transaction, constructions, checks, effects, unit_specs);
 
   std::vector<transaction_progress::node_record> nodes;
   nodes.reserve(transaction.program().nodes().size());
@@ -341,6 +362,12 @@ transaction_progress transaction_progress::rebuild(
         value.session().request().build_node().hex());
     identity_fields.push_back(value.identity().hex());
   }
+  identity_fields.push_back(std::to_string(checks.size()));
+  for (const auto& value : checks)
+  {
+    identity_fields.push_back(value.session().request().check_node().hex());
+    identity_fields.push_back(value.identity().hex());
+  }
   identity_fields.push_back(std::to_string(effects.size()));
   for (const auto& value : effects)
   {
@@ -361,8 +388,8 @@ transaction_progress transaction_progress::rebuild(
       "pkgctl/transaction-progress/1", identity_fields);
   return transaction_progress(
       std::move(transaction), std::move(current_state),
-      std::move(constructions), std::move(effects), std::move(nodes),
-      std::move(ready), std::move(identity));
+      std::move(constructions), std::move(checks), std::move(effects),
+      std::move(nodes), std::move(ready), std::move(identity));
 }
 
 ready_transaction_unit::ready_transaction_unit(
@@ -388,15 +415,16 @@ transaction_progress::transaction_progress(
     transaction_session transaction,
     pkgstate::snapshot current_state,
     std::vector<construction_result> constructions,
+    std::vector<transaction_check_result> checks,
     std::vector<effectful_operation_result> effects,
     std::vector<node_record> nodes,
     std::vector<ready_transaction_unit> ready_units,
     session_identity identity)
     : transaction_(std::move(transaction)),
       current_state_(std::move(current_state)),
-      constructions_(std::move(constructions)), effects_(std::move(effects)),
-      nodes_(std::move(nodes)), ready_units_(std::move(ready_units)),
-      identity_(std::move(identity))
+      constructions_(std::move(constructions)), checks_(std::move(checks)),
+      effects_(std::move(effects)), nodes_(std::move(nodes)),
+      ready_units_(std::move(ready_units)), identity_(std::move(identity))
 {
 }
 
@@ -404,7 +432,7 @@ transaction_progress transaction_progress::begin(transaction_session transaction
 {
   auto initial_state = transaction.resolution().installed();
   return transaction_progress::rebuild(
-      std::move(transaction), std::move(initial_state), {}, {});
+      std::move(transaction), std::move(initial_state), {}, {}, {});
 }
 
 const transaction_session& transaction_progress::transaction() const noexcept
@@ -413,6 +441,8 @@ const pkgstate::snapshot& transaction_progress::current_state() const noexcept
 { return current_state_; }
 const std::vector<construction_result>&
 transaction_progress::constructions() const noexcept { return constructions_; }
+const std::vector<transaction_check_result>&
+transaction_progress::checks() const noexcept { return checks_; }
 const std::vector<effectful_operation_result>&
 transaction_progress::effects() const noexcept { return effects_; }
 
@@ -444,6 +474,9 @@ transaction_progress::ready_units() const noexcept { return ready_units_; }
 const construction_result* transaction_progress::construction(
     const node_id& node) const noexcept
 { return find_construction(constructions_, node); }
+const transaction_check_result* transaction_progress::check(
+    const node_id& node) const noexcept
+{ return find_check(checks_, node); }
 const effectful_operation_result* transaction_progress::effect(
     const node_id& node) const noexcept
 { return find_effect(effects_, node); }
@@ -487,7 +520,62 @@ transaction_progress advance_construction(
   });
   return transaction_progress::rebuild(
       progress.transaction(), progress.current_state(),
-                 std::move(constructions), progress.effects());
+      std::move(constructions), progress.checks(), progress.effects());
+}
+
+transaction_progress advance_check(
+    transaction_progress progress,
+    transaction_check_result check)
+{
+  const auto& session = check.session();
+  const auto& request = session.request();
+  const auto& check_authority = request.check();
+  const auto& check_node = request.check_node();
+
+  if (request.transaction().identity() != progress.transaction().identity())
+    throw error(error_code::invalid_progression,
+                "check evidence belongs to another transaction");
+  if (check_authority.transaction() !=
+      progress.transaction().program().identity())
+    throw error(error_code::invalid_progression,
+                "check request names another transaction program");
+  if (check_authority.check_node().identity() != check_node)
+    throw error(error_code::invalid_progression,
+                "check result contradicts its controller request node");
+  if (check.execution().check().request().identity() !=
+      check_authority.identity())
+    throw error(error_code::invalid_progression,
+                "check result belongs to another check request");
+  if (check.execution().execution().request().identity() !=
+      session.execution_request())
+    throw error(error_code::invalid_progression,
+                "check result belongs to another execution request");
+  if (progress.status(check_node) != transaction_node_status::ready)
+    throw error(error_code::invalid_progression,
+                "check evidence does not belong to a ready check node");
+  if (progress.check(check_node) != nullptr)
+    throw error(error_code::invalid_progression,
+                "check node already has terminal execution evidence");
+
+  const auto& build_node = check_authority.build_node().identity();
+  const auto* construction = progress.construction(build_node);
+  if (construction == nullptr || !construction->succeeded() ||
+      construction->identity() != request.construction().identity() ||
+      construction->build().build().identity() !=
+          check_authority.build().identity())
+    throw error(error_code::invalid_progression,
+                "check evidence is not bound to the retained construction");
+
+  auto checks = progress.checks();
+  checks.push_back(std::move(check));
+  std::sort(checks.begin(), checks.end(), [](const auto& lhs,
+                                             const auto& rhs) {
+    return lhs.session().request().check_node() <
+           rhs.session().request().check_node();
+  });
+  return transaction_progress::rebuild(
+      progress.transaction(), progress.current_state(),
+      progress.constructions(), std::move(checks), progress.effects());
 }
 
 transaction_progress advance_effect(
@@ -539,7 +627,7 @@ transaction_progress advance_effect(
   });
   return transaction_progress::rebuild(
       progress.transaction(), std::move(next_state),
-                 progress.constructions(), std::move(effects));
+      progress.constructions(), progress.checks(), std::move(effects));
 }
 
 } // namespace pkgctl

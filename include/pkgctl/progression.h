@@ -9,6 +9,7 @@
 #include <optional>
 #include <vector>
 
+#include <pkgctl/check.h>
 #include <pkgctl/construction.h>
 #include <pkgctl/effect.h>
 
@@ -65,6 +66,8 @@ public:
   [[nodiscard]] const pkgstate::snapshot& current_state() const noexcept;
   [[nodiscard]] const std::vector<construction_result>&
   constructions() const noexcept;
+  [[nodiscard]] const std::vector<transaction_check_result>&
+  checks() const noexcept;
   [[nodiscard]] const std::vector<effectful_operation_result>&
   effects() const noexcept;
 
@@ -77,6 +80,8 @@ public:
 
   [[nodiscard]] const construction_result* construction(
       const pkgtransaction::transaction_node_identity& build_node) const noexcept;
+  [[nodiscard]] const transaction_check_result* check(
+      const pkgtransaction::transaction_node_identity& check_node) const noexcept;
   [[nodiscard]] const effectful_operation_result* effect(
       const pkgtransaction::transaction_node_identity& action_node) const noexcept;
 
@@ -87,6 +92,8 @@ public:
 private:
   friend transaction_progress advance_construction(
       transaction_progress, construction_result);
+  friend transaction_progress advance_check(
+      transaction_progress, transaction_check_result);
   friend transaction_progress advance_effect(
       transaction_progress, effectful_operation_result,
       std::optional<pkgstate::snapshot>);
@@ -100,12 +107,14 @@ private:
       transaction_session transaction,
       pkgstate::snapshot current_state,
       std::vector<construction_result> constructions,
+      std::vector<transaction_check_result> checks,
       std::vector<effectful_operation_result> effects);
 
   transaction_progress(
       transaction_session transaction,
       pkgstate::snapshot current_state,
       std::vector<construction_result> constructions,
+      std::vector<transaction_check_result> checks,
       std::vector<effectful_operation_result> effects,
       std::vector<node_record> nodes,
       std::vector<ready_transaction_unit> ready_units,
@@ -114,6 +123,7 @@ private:
   transaction_session transaction_;
   pkgstate::snapshot current_state_;
   std::vector<construction_result> constructions_;
+  std::vector<transaction_check_result> checks_;
   std::vector<effectful_operation_result> effects_;
   std::vector<node_record> nodes_;
   std::vector<ready_transaction_unit> ready_units_;
@@ -124,6 +134,11 @@ private:
 [[nodiscard]] transaction_progress advance_construction(
     transaction_progress progress,
     construction_result construction);
+
+/*! \brief Accept one ready check node's terminal execution evidence. */
+[[nodiscard]] transaction_progress advance_check(
+    transaction_progress progress,
+    transaction_check_result check);
 
 /*! \brief Accept one ready target unit's terminal effect evidence.
  *

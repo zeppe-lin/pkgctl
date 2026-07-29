@@ -4,6 +4,7 @@
 pkgctl_core = static_library(
   'pkgctl-core',
   [
+    'check.cpp',
     'construction.cpp',
     'controller.cpp',
     'core.cpp',

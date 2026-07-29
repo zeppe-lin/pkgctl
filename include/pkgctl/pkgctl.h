@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <pkgctl/check.h>
 #include <pkgctl/construction.h>
 #include <pkgctl/controller.h>
 #include <pkgctl/effect.h>

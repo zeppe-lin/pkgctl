@@ -132,6 +132,18 @@ libpkgtransaction_dep = dependency(
   required: true,
   static: want_static,
 )
+libpkgcheck_dep = dependency(
+  'libpkgcheck',
+  version: '>=0.1.0',
+  required: true,
+  static: want_static,
+)
+libpkgcheck_exec_dep = dependency(
+  'libpkgcheck-exec',
+  version: '>=0.1.1',
+  required: true,
+  static: want_static,
+)
 
 pkgctl_authority_deps = [
   libcrypto_dep,
@@ -154,6 +166,8 @@ pkgctl_authority_deps = [
   libpkgapply_exec_dep,
   libpkgresolve_dep,
   libpkgtransaction_dep,
+  libpkgcheck_dep,
+  libpkgcheck_exec_dep,
 ]
 
 subdir('src')
