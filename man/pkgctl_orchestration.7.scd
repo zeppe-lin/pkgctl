@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.4.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.5.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -22,6 +22,24 @@ Version 0.4.0 retains the read-only command pipeline introduced in 0.2.0:
 
 The canonical state store is opened with *open_existing* for these commands.
 The command frontend does not initialize or publish state.
+
+# CANDIDATE CONSTRUCTION
+
+Version 0.5.0 can construct one exact catalog-backed transaction *build* node.
+The caller supplies the exact package-input facts and trees, source/store and
+build coordinates, closed build policy, interpreter, credentials, and an
+injected backend-neutral construction driver.
+
+The controller validates the node and resources before effects, materializes
+the sealed source snapshot through *libpkgfetch*, seals the exact *libpkgbuild*
+request from observed digests and resolver architectures, and executes one
+*libpkgbuild-exec* session. Completion requires successful build evidence and
+independent archive inspection through *libpkgimage*.
+
+Host paths, cache hits, redirect observations, and timing remain outside
+construction identity. The boundary does not recursively schedule dependencies,
+execute check nodes, publish installed state, or construct a Linux backend.
+Interrupted construction is not inferred successful or automatically replayed.
 
 # DURABLE EFFECT ATTEMPTS
 
@@ -128,9 +146,9 @@ publication mechanics.
 
 # COMMAND BOUNDARY
 
-Release 0.4.0 exposes no effect-implying command. *catalog*, *resolve*, and
+Release 0.5.0 exposes no effect-implying command. *catalog*, *resolve*, and
 *transaction* remain read-only. Install, update, removal, multi-package
-scheduling, source acquisition, building, planning, and recovery policy require
+scheduling, recursive construction, planning, and recovery policy require
 later explicit command contracts.
 
 # REPORTS
@@ -147,5 +165,6 @@ frontend, but cannot alter the native request and session model.
 
 # SEE ALSO
 
-*pkgctl*(1), *libpkgapply*(3), *libpkgapply-exec*(3), *libpkgstate*(3),
-*libpkgtransaction*(3)
+*pkgctl*(1), *libpkgfetch*(3), *libpkgbuild*(3),
+*libpkgbuild-exec*(3), *libpkgapply*(3), *libpkgapply-exec*(3),
+*libpkgstate*(3), *libpkgtransaction*(3)

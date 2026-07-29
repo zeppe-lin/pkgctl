@@ -13,6 +13,75 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.5.0 construction boundary
+
+Release 0.5.0 adds one backend-neutral construction session for one exact
+catalog-backed `build` node already present in a sealed transaction program.
+The caller supplies:
+
+1. the exact `transaction_session` and build-node identity;
+2. every exact `libpkgbuild` package-input subject and tree identity;
+3. resolver-selected build and target architectures retained by the node;
+4. one closed build policy and bounded source-acquisition policy;
+5. explicit local-source, content-store, root-view, workspace, output, and
+   artifact coordinates;
+6. concrete dependency-tree paths, interpreter identity, and numeric
+   credentials;
+7. one injected backend-neutral construction driver.
+
+Admission proves that the selected node is a catalog-authorized build node, its
+candidate source and release agree with resolver authority, all build/check
+inputs form a valid `libpkgbuild` input set, each input matches the resolver's exact required package, release, source snapshot, and build environment, and
+every concrete dependency tree belongs to one exact requested input. Call-scoped paths are normalized and
+checked for unsafe overlap before source acquisition begins.
+
+The sequence is:
+
+```text
+validate construction authority and resources
+        ↓
+materialize the exact source snapshot through libpkgfetch
+        ↓
+translate observed digests into the complete libpkgbuild source set
+        ↓
+seal the exact build request using resolver architectures and caller policy
+        ↓
+admit and execute one libpkgbuild-exec session
+        ↓
+retain verified materialization, execution evidence, build result,
+artifact binding, and independent image-inspection receipt
+```
+
+The controller promotes `completed` only when the build result succeeded and
+independent artifact-inspection evidence is present. A backend or adapter
+failure remains a failed build result. Materialization exceptions and driver
+contract violations remain explicit failures; they are not converted into
+synthetic success or partial authority.
+
+### Construction identity
+
+Construction-request identity binds the transaction-session identity, exact
+build node, source snapshot, canonical build-input set, selected architectures,
+build policy, and acquisition bounds. Construction-session identity adds the
+logical root-view identity, interpreter, canonical credentials, and artifact
+compression.
+
+Local source roots, content-store roots, dependency-tree paths, workspace and
+output paths, artifact destinations, cache hits, redirects, and transfer timing
+remain operational coordinates or evidence. Equivalent sessions at different
+host paths therefore retain one semantic identity.
+
+### Deliberate exclusions
+
+The 0.5 boundary does not recursively schedule requirements, choose a build
+order, create package-input trees, execute check nodes, construct package-local
+application plans, publish installed state, or expose construction commands.
+It does not depend on `libpkgexec-linux`; a caller injects the execution backend.
+
+Construction is not added to the durable target-effect journal. A build intent
+without terminal evidence is not treated as completed or automatically replayed.
+Durable construction attempts require a later explicit controller contract.
+
 ## Release 0.4.0 durable attempt boundary
 
 Release 0.4.0 makes the outer controller sequence durably observable. One
@@ -218,7 +287,8 @@ The controller owns only:
     unordered;
 11. outer-lease observation around the composed effect sequence;
 12. durable controller-attempt sequencing and restart classification;
-13. deterministic line-oriented presentation.
+13. exact one-node source/build construction sequencing;
+14. deterministic line-oriented presentation.
 
 Package and profile identities are `libpkgsource` values. Catalog candidates are
 `libpkgcatalog` values. Installed records are `libpkgstate` values. Selections
@@ -245,6 +315,12 @@ A resolution session retains that catalog session, one installed-state snapshot,
 and one resolution result. A transaction session retains the resolution session
 and one transaction program.
 
+A `construction_request` retains one exact transaction build node, canonical
+package-input facts, selected architectures, build policy, and source-acquisition
+bounds. A `construction_session` adds explicit source/store and build coordinates,
+concrete package-input trees, interpreter, credentials, and compression. Host
+paths remain outside semantic identity.
+
 An `effectful_operation_request` retains the transaction session, selected
 action node, exact application request, caller-selected lifecycle order, and an
 installation reason only for installation. An `effectful_operation_session`
@@ -264,8 +340,8 @@ Reports remain deterministic line-oriented diagnostics. They expose exact
 session and subordinate authority identities but are not authority themselves.
 A machine protocol requires a separate versioned contract.
 
-Release 0.4.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
-`transaction` remain read-only. Source fetching, building missing artifacts,
+Release 0.5.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
+`transaction` remain read-only. Recursive construction scheduling, check execution,
 constructing package-local plans, selecting a multi-package execution schedule,
 recovering incomplete application attempts, and exposing install/update/remove
 policy remain later controller work.
@@ -280,6 +356,7 @@ policy remain later controller work.
 - compose transaction nodes or edges itself;
 - derive package-local filesystem consequences;
 - derive or reinterpret lifecycle programs;
+- reinterpret source digests, build payloads, or archive inspection;
 - execute through a Linux-specific backend directly;
 - mutate package files outside `libpkgapply`;
 - publish installed state outside `libpkgstate`;

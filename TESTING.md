@@ -20,6 +20,10 @@ Every release must establish:
 - one outer target lease observed before every effect and after publication;
 - no state publication after lifecycle or application failure;
 - transaction provenance retained in publication requests and durable receipts;
+- exact construction-node admission and source/build authority binding;
+- real local-source materialization and independent package archive inspection;
+- failed builds retained without artifact promotion;
+- construction identity independence from host paths;
 - explicit non-completed and indeterminate publication outcomes;
 - CLI usage, authority-failure, and deterministic output contracts;
 - durable intent and terminal snapshots around every irreversible handoff;
@@ -30,7 +34,7 @@ Every release must establish:
 - publication retry only from the exact prior state and reconciliation only
   from the exact resulting state;
 - a newly held outer lease required on every resumed attempt;
-- proof that all exposed CLI commands remain read-only in 0.4.0;
+- proof that all exposed CLI commands remain read-only in 0.5.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
 ## Effect authority tests
@@ -52,6 +56,23 @@ The effect suite must prove:
   when the state backend reports publication;
 - driver evidence for another request or authority universe is rejected.
 
+
+
+## Construction tests
+
+The construction suite must prove:
+
+- only an exact catalog-backed transaction `build` node is admitted;
+- build/check package-input facts match exact resolver selections before acquisition;
+- source and content-store coordinates are explicit and path-safe;
+- source bytes are admitted through `libpkgfetch`, not trusted by pathname;
+- the sealed build request uses the exact observed materialization, resolver
+  architectures, input set, and build policy;
+- successful artifact evidence includes independent `libpkgimage` inspection;
+- backend failure remains a failed build with no published artifact;
+- a driver result from another source or build request is rejected;
+- equivalent call-scoped host paths do not alter construction identity;
+- the same suite passes for root and an ordinary build UID.
 
 ## Durable restart tests
 

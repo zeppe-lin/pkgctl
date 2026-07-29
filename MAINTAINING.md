@@ -16,6 +16,10 @@ The executable directly depends on the exact libraries whose public values it
 uses. The internal `pkgctl-core` library is not installed and does not publish a
 second package-management API.
 
+The construction layer may depend on source, fetch, build, build-exec, image,
+and backend-neutral execution authorities, but must not schedule dependency
+graphs or construct a Linux backend.
+
 The effectful controller layer may depend on image, plan, apply, execution,
 and state adapters only through their exact public values. It must not parse
 payloads, derive lifecycle programs, perform target mutation, or serialize
@@ -39,7 +43,8 @@ legacy behavior.
 2. run strict GCC and Clang builds and all controller tests;
 3. run ASan and UBSan over the complete authority closure;
 4. check shared and static linkage and direct dependency isolation;
-5. verify effect sequencing, intent-before-effect persistence, exact restart
+5. verify construction authority binding, source/build evidence retention,
+   effect sequencing, intent-before-effect persistence, exact restart
    checkpoints, outer-lease reacquisition, publication reconciliation,
    publication provenance, CLI read-only behavior, and missing-state refusal;
 6. update release metadata and manuals together;

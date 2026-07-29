@@ -13,8 +13,8 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.4.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.4.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.5.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.5.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'The canonical state store is opened with *open_existing*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
@@ -22,6 +22,8 @@ grep -F 'One target-mutation lease must remain held' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'exposes no effect-implying command' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'CANDIDATE CONSTRUCTION' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'independent archive inspection' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'DURABLE EFFECT ATTEMPTS' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'exact durable *libpkgapply* journal' \

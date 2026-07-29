@@ -6,43 +6,45 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.4.0 retains the read-only command pipeline and the one-operation
-controller session from 0.3.0, then closes the controller restart loop with a
-durable effect-attempt journal:
+Release 0.5.0 adds the first package-construction library session while
+retaining the durable target-effect kernel from 0.4.0:
 
 ```text
-exact effectful operation session
+exact transaction build node
         +
-caller-issued physical attempt nonce
+verified package-input tree identities
+        +
+explicit source/store and build coordinates
         |
         v
-append-only controller snapshots
-        |
-        +--> intent before every irreversible handoff
-        +--> exact subordinate terminal evidence afterward
+libpkgfetch source materialization
         |
         v
-fresh completion or conservative restart assessment
+sealed libpkgbuild request
+        |
+        v
+libpkgbuild-exec execution and independent artifact inspection
 ```
 
-One attempt records pre-lifecycle execution, application handoff, post-lifecycle
-execution, state-publication intent and evidence, and the terminal controller
-outcome. Each snapshot binds its predecessor and the exact effect-session
-identity. The supplied POSIX store is anchored to an explicit directory or
-directory descriptor; no ambient state path belongs to the library.
+The controller validates one exact catalog-backed build node before effects. It
+requires every package input to match the resolver's exact dependency selection
+and binds the source snapshot, input-set identity, resolver-selected architectures,
+build policy, acquisition bounds, logical root view, interpreter, and numeric
+credentials. Source and store roots, dependency-tree paths, workspace paths,
+and artifact destinations remain call-scoped effect coordinates.
 
-Restart does not guess. An unresolved lifecycle intent requires external
-resolution. An application intent may continue only when the caller supplies
-the exact durable `libpkgapply` journal. An unresolved publication intent is
-reconciled by rereading authoritative `libpkgstate`: the exact prior state
-permits retry of the retained publication request, while the exact resulting
-state permits terminal reconciliation without publishing twice. Every restart
-uses a newly held physical target-mutation lease.
+Construction does not recursively schedule dependencies. The caller supplies
+every exact package-input subject, tree identity, and host tree. `pkgctl` invokes
+an injected backend-neutral construction driver, retains the complete verified
+source materialization and build-execution result, and promotes completion only
+when `libpkgbuild-exec` returns a successful build with independent archive
+inspection evidence.
 
-The effectful session still supports one exact install, upgrade, or removal
-node for one package. It retains subordinate lifecycle, application,
-transaction, publication, and restart evidence. It does not promise rollback
-of lifecycle side effects or transaction-wide filesystem/state atomicity.
+Release 0.4.0 closed the restart loop for the separate one-operation target
+mutation sequence. That durable effect journal remains unchanged. Construction
+attempts are not restart journals in 0.5.0: an interrupted build is not inferred
+successful or replayed automatically, and no installed state is published from
+a construction result.
 
 The executable still exposes only:
 
@@ -56,9 +58,9 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.4.0. The controller library
-requires callers to construct exact planner, application, lifecycle-session,
-lease, journal-store, backend, and state-publication authorities explicitly.
+There are no effect-implying CLI commands in 0.5.0. The construction API is a
+controller-library boundary for callers that already possess exact dependency
+trees, execution resources, and backend authority.
 
 Release 0.3.0 established the one-operation effectful session. Release 0.2.0
 established the read-only catalog, resolution, and transaction command pipeline
@@ -84,6 +86,9 @@ The following meanings remain external:
   `libpkgapply`;
 - lifecycle-node derivation and execution: `libpkgapply-exec` and
   `libpkgexec`;
+- source acquisition and verification: `libpkgfetch`;
+- build request/result and execution realization: `libpkgbuild` and
+  `libpkgbuild-exec`;
 - package-image authority: `libpkgimage`.
 
 `pkgctl` does not infer transaction order beyond the exact transaction graph.

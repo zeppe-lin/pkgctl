@@ -20,7 +20,9 @@ what remains deliberately unavailable. Effectful
 changes must prove that no state is published before all required subordinate
 evidence is complete and that lease loss is never hidden. Durable changes must
 write intent before effects, retain exact subordinate evidence afterward, and
-stop rather than guess when restart authority is incomplete.
+stop rather than guess when restart authority is incomplete. Construction
+changes must bind one exact transaction node and retain subordinate fetch/build
+evidence without interpreting it.
 
 Use SPDX headers:
 
