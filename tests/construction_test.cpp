@@ -4,9 +4,11 @@
 #include "test_support.h"
 
 #include <pkgctl/construction.h>
+#include <pkgctl/preparation.h>
 #include <pkgctl/error.h>
 
 #include <libpkgresolve/resolver.h>
+#include <libpkgimage/libarchive_backend.h>
 #include <libpkgtransaction/composer.h>
 
 #include <openssl/evp.h>
@@ -122,7 +124,8 @@ pkgctl::transaction_session transaction_session(
     const pkgsource::source_snapshot& source,
     const pkgsource::source_snapshot& dependency,
     const pkgstate::snapshot& installed,
-    const fs::path& state_path)
+    const fs::path& state_path,
+    bool include_target = false)
 {
   auto catalog = catalog_snapshot(source, dependency);
   std::vector<pkgcatalog::acquire::collection_specification> specifications;
@@ -139,6 +142,11 @@ pkgctl::transaction_session transaction_session(
       pkgsource::requirement_scope::build(),
       pkgsource::requirement_subject(pkgsource::package_reference("tool")),
       "<test>");
+  if (include_target)
+    goals.emplace_back(
+        pkgsource::requirement_scope::run(),
+        pkgsource::requirement_subject(pkgsource::package_reference("tool")),
+        "<test-target>");
   pkgresolve::architecture_context architectures(
       pkgsource::architecture_reference("x86_64"),
       pkgsource::architecture_reference("x86_64"));
@@ -169,6 +177,96 @@ const pkgtransaction::transaction_node& build_node(
         node.package().name() == "tool")
       return node;
   throw std::runtime_error("transaction fixture lacks build node");
+}
+
+const pkgtransaction::transaction_node& install_node(
+    const pkgctl::transaction_session& session)
+{
+  for (const auto& node : session.program().nodes())
+    if (node.action() == pkgtransaction::transaction_action_kind::install &&
+        node.package().name() == "tool")
+      return node;
+  throw std::runtime_error("transaction fixture lacks install node");
+}
+
+template<typename Identity>
+Identity plan_identity(std::uint8_t value)
+{
+  pkgplan::sha256_digest_bytes bytes{};
+  bytes.fill(value);
+  return Identity::from_sha256(bytes);
+}
+
+template<typename Identity>
+Identity apply_identity(std::uint8_t value)
+{
+  static constexpr char digits[] = "0123456789abcdef";
+  std::string text = "v1:sha256:";
+  for (std::size_t index = 0; index < 32U; ++index)
+  {
+    const auto byte = static_cast<std::uint8_t>(value + index);
+    text.push_back(digits[(byte >> 4U) & 0x0fU]);
+    text.push_back(digits[byte & 0x0fU]);
+  }
+  return Identity::parse(text);
+}
+
+template<typename Destination, typename Source>
+Destination translate_identity(const Source& value)
+{
+  return Destination::parse(value.string());
+}
+
+pkgapply::application_target_context application_target(
+    const pkgstate::state_target_binding& state_target,
+    const pkgplan::target_system_context_identity& target)
+{
+  return pkgapply::application_target_context::make(
+      target,
+      translate_identity<pkgapply::managed_target_identity>(
+          state_target.managed_target()),
+      translate_identity<pkgapply::root_view_identity>(
+          state_target.root_view()),
+      apply_identity<pkgapply::observation_backend_identity>(11),
+      apply_identity<pkgapply::mutation_backend_identity>(12),
+      apply_identity<pkgapply::mutation_exclusion_domain_identity>(13),
+      apply_identity<pkgapply::active_object_namespace_identity>(14),
+      apply_identity<pkgapply::rejected_object_store_identity>(15),
+      apply_identity<pkgapply::staging_namespace_identity>(16),
+      apply_identity<pkgapply::journal_namespace_identity>(17),
+      apply_identity<pkgapply::execution_capability_profile_identity>(18));
+}
+
+pkgapply::application_execution_control execution_control()
+{
+  return pkgapply::application_execution_control::make(
+      pkgapply::application_recovery_requirement::exact_prior_state,
+      pkgapply::application_durability_requirement::all_application_domains,
+      pkgapply::application_cancellation_policy::recover_after_target_mutation);
+}
+
+pkgplan::package_policy_snapshot package_policy()
+{
+  return pkgplan::package_policy_snapshot(
+      plan_identity<pkgplan::policy_snapshot_identity>(50),
+      pkgplan::normalized_path_policy(
+          pkgplan::incoming_path_policy::activate(),
+          pkgplan::obsolete_path_policy::remove(),
+          pkgplan::shared_ownership_policy::forbid,
+          pkgplan::directory_cleanup_policy::remove_if_empty),
+      {});
+}
+
+pkgplan::target_observation_set empty_target_observations(
+    const pkgplan::target_system_context_identity& target)
+{
+  std::vector<pkgplan::target_path_observation> observations;
+  for (const char* path : {"usr", "usr/bin", "usr/bin/tool"})
+    observations.push_back(pkgplan::target_path_observation::absent(
+        pkgplan::package_path::parse(path)));
+  return pkgplan::target_observation_set(
+      plan_identity<pkgplan::observation_set_identity>(51), target,
+      pkgplan::fact_set_completeness::complete, std::move(observations));
 }
 
 const pkgresolve::selected_package& dependency_selection(
@@ -373,6 +471,65 @@ void check_success()
   CHECK(fs::is_regular_file(session.paths().build.artifact_path));
 }
 
+void check_install_preparation()
+{
+  test_support::temporary_directory temporary;
+  test_support::initialize_state(temporary.path() / "state");
+  pkgstate::canonical_generation_store store(
+      temporary.path() / "state", test_support::binding());
+  const std::string payload = "source payload\n";
+  auto source = tool_source(sha256_text(payload));
+  auto transaction = transaction_session(
+      source, dependency_source(), store.read(), temporary.path() / "state",
+      true);
+  auto session = construction_session(transaction, temporary.path());
+  test_support::write(session.paths().local_source_root / "payload", payload);
+
+  fixture_backend backend(backend_mode::succeed);
+  pkgctl::native_construction_driver construction_driver(backend);
+  auto construction = pkgctl::execute_construction(session, construction_driver);
+
+  const auto target_system =
+      plan_identity<pkgplan::target_system_context_identity>(52);
+  auto request = pkgctl::operation_preparation_request::install(
+      transaction, install_node(transaction).identity(), construction,
+      application_target(store.read().target_binding(), target_system),
+      execution_control(), empty_target_observations(target_system),
+      plan_identity<pkgplan::runtime_dependency_closure_identity>(53),
+      package_policy(), pkgctl::lifecycle_order::make({}, {}),
+      pkgstate::installation_reason::explicit_request());
+  pkgimage::libarchive_backend archives;
+  pkgctl::native_operation_preparation_driver preparation_driver(archives);
+  const auto result = pkgctl::prepare_operation(
+      std::move(request), preparation_driver);
+
+  CHECK(result.prepared());
+  CHECK(result.artifact().has_value());
+  CHECK(result.incoming().has_value());
+  CHECK(!result.refusal());
+  CHECK(result.plan() &&
+        result.plan()->kind() == pkgplan::operation_kind::install);
+  CHECK(result.application() && result.application()->installation());
+  CHECK(result.application() && result.plan() &&
+        result.application()->plan() == result.plan()->identity());
+  CHECK(result.application() && result.incoming() &&
+        result.application()->incoming() &&
+        result.application()->incoming()->identity() ==
+            result.incoming()->identity());
+  CHECK(result.effect() &&
+        result.effect()->action_node() == install_node(transaction).identity());
+  CHECK(result.effect() && result.application() &&
+        result.effect()->application().identity() ==
+            result.application()->identity());
+  CHECK(result.artifact() && construction.build().artifact_inspection() &&
+        result.artifact()->image().receipt().archive_digest() ==
+            construction.build().artifact_inspection()->archive_digest());
+  CHECK(result.artifact()->image().receipt().image_identity() ==
+        construction.build().artifact_inspection()->image_identity());
+  CHECK(result.artifact()->image().receipt().entry_count() ==
+        construction.build().artifact_inspection()->entry_count());
+}
+
 void check_failed_build()
 {
   test_support::temporary_directory temporary;
@@ -561,6 +718,7 @@ int main()
   try
   {
     check_success();
+    check_install_preparation();
     check_failed_build();
     check_admission();
     check_identity_and_driver_contract();

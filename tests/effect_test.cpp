@@ -9,6 +9,7 @@
 #include <pkgctl/effect_restart.h>
 #include <pkgctl/effect_store.h>
 #include <pkgctl/error.h>
+#include <pkgctl/preparation.h>
 
 #include <algorithm>
 #include <array>
@@ -1548,6 +1549,76 @@ pkgctl::effectful_operation_request effect_request(
           pkgtransaction::transaction_action_kind::remove));
 }
 
+class unused_preparation_driver final
+    : public pkgctl::operation_preparation_driver {
+public:
+  [[nodiscard]] pkgbuild::plan_adapter::artifact_projection
+  project_artifact(const pkgctl::construction_result&) override
+  {
+    throw std::runtime_error(
+        "removal preparation attempted incoming artifact projection");
+  }
+};
+
+void check_removal_preparation()
+{
+  removal_fixture value;
+  const auto path = pkgplan::package_path::parse("tool");
+  auto observations = pkgplan::target_observation_set(
+      plan_identity<pkgplan::observation_set_identity>(80),
+      value.target_system, pkgplan::fact_set_completeness::complete,
+      {pkgplan::target_path_observation::present(
+          pkgplan::filesystem_object_fact(path, planner_regular(2)))});
+  auto request = pkgctl::operation_preparation_request::remove(
+      value.transaction,
+      action_node(value.transaction,
+                  pkgtransaction::transaction_action_kind::remove)
+          .identity(),
+      value.target, execution_control(), std::move(observations), policy(),
+      operation_lifecycle_order(
+          value.transaction, pkgtransaction::transaction_action_kind::remove));
+  unused_preparation_driver driver;
+  const auto result = pkgctl::prepare_operation(std::move(request), driver);
+  CHECK(result.prepared());
+  CHECK(!result.artifact());
+  CHECK(!result.incoming());
+  CHECK(!result.refusal());
+  CHECK(result.plan() && result.plan()->identity() == value.plan.identity());
+  CHECK(result.application() &&
+        result.application()->identity() == value.application.identity());
+  const auto expected_effect = effect_request(value);
+  CHECK(result.effect() &&
+        result.effect()->identity() == expected_effect.identity());
+}
+
+void check_removal_preparation_refusal()
+{
+  removal_fixture value;
+  auto observations = pkgplan::target_observation_set(
+      plan_identity<pkgplan::observation_set_identity>(81),
+      value.target_system, pkgplan::fact_set_completeness::complete, {});
+  auto request = pkgctl::operation_preparation_request::remove(
+      value.transaction,
+      action_node(value.transaction,
+                  pkgtransaction::transaction_action_kind::remove)
+          .identity(),
+      value.target, execution_control(), std::move(observations), policy(),
+      operation_lifecycle_order(
+          value.transaction, pkgtransaction::transaction_action_kind::remove));
+  unused_preparation_driver driver;
+  const auto result = pkgctl::prepare_operation(std::move(request), driver);
+  CHECK(!result.prepared());
+  CHECK(result.outcome() ==
+        pkgctl::operation_preparation_outcome::planning_refused);
+  CHECK(result.refusal() && result.refusal()->removal());
+  CHECK(result.refusal() &&
+        result.refusal()->code() ==
+            pkgplan::planning_refusal_code::incomplete_fact_universe);
+  CHECK(!result.plan());
+  CHECK(!result.application());
+  CHECK(!result.effect());
+}
+
 void check_removal_success()
 {
   removal_fixture value;
@@ -2076,6 +2147,8 @@ int main()
 {
   check_success();
   check_upgrade_success();
+  check_removal_preparation();
+  check_removal_preparation_refusal();
   check_removal_success();
   check_request_refusal();
   check_application_failure();

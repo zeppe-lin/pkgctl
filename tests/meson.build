@@ -71,6 +71,7 @@ if not get_option('tests').disabled()
     'error.h',
     'identity.h',
     'pkgctl.h',
+    'preparation.h',
     'report.h',
     'request.h',
     'session.h',
