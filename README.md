@@ -49,6 +49,11 @@ exact-byte artifact inspection, but it does not acquire the target lease,
 execute lifecycle programs, mutate package files, or publish installed state.
 Removal preparation does not inspect an incoming artifact at all.
 
+The resulting effect request retains the complete sealed transaction session but
+selects only one exact target action and its exact lifecycle phase set. Other
+package nodes, target actions, and runtime cohorts are not executed or ordered by
+that request; cross-package scheduling remains a separate controller boundary.
+
 Release 0.5.0 established one exact package-construction session. Release 0.4.0
 closed the restart loop for the separate one-operation target mutation
 sequence. Construction and preparation are not added to the durable effect

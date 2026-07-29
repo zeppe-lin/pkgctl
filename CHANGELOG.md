@@ -23,9 +23,13 @@
   package policy, target context, and execution guarantees.
 - Retained typed planning refusal as a terminal preparation result with no
   partial package plan, application request, or effect request.
-- Sealed successful plans into exact `libpkgapply` requests and the existing
-  one-operation effect request, including explicit lifecycle order and install
-  reason authority.
+- Sealed successful plans into exact `libpkgapply` requests and one-operation
+  effect requests, including explicit lifecycle order and install reason
+  authority.
+- Allowed an effect request to retain the complete transaction program while
+  selecting exactly one target action; unrelated package nodes, other target
+  actions, and runtime cohorts remain inert until an external scheduler chooses
+  them.
 - Kept removal independent of construction and incoming artifact projection.
 
 ### Deliberate boundary
@@ -35,8 +39,9 @@
   state publication.
 - Added no recursive construction, check execution, cross-package scheduler,
   durable preparation journal, Linux-backend policy, or effectful CLI command.
-- Retained the construction, durable effect, and restart contracts from 0.5.0
-  and 0.4.0 unchanged.
+- Retained construction, durable effect execution, restart, and effect-request
+  identity contracts from 0.5.0 and 0.4.0; only effect-request admission was
+  widened from the initial single-package program restriction.
 
 ### Authority floors
 

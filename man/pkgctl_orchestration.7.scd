@@ -113,8 +113,11 @@ removal node from an already sealed transaction session. The caller supplies:
 . one outer target-mutation lease and state projection;
 . injected application, execution, and state-publication authorities.
 
-The initial effect boundary rejects multi-package programs, runtime cohorts,
-and more than one target mutation.
+The initial 0.3 effect boundary rejected multi-package programs, runtime
+cohorts, and more than one target mutation. Version 0.6.0 admits one exact action
+from the complete retained transaction program. Other package nodes, target
+mutations, and runtime cohorts remain inert; this request does not choose or
+execute a cross-package schedule.
 
 # EFFECT ORDER
 

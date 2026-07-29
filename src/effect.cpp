@@ -187,32 +187,6 @@ void validate_action_authority(
   }
 }
 
-void validate_single_package_program(
-    const pkgtransaction::transaction_program& program,
-    const pkgtransaction::transaction_node& action)
-{
-  std::size_t target_mutations = 0;
-  for (const auto& node : program.nodes())
-  {
-    if (node.package() != action.package())
-      throw error(error_code::invalid_effect_request,
-                  "effectful session v1 requires a single-package transaction program");
-    if (node.environment() == pkgresolve::resolution_environment::target &&
-        (node.action() == pkgtransaction::transaction_action_kind::install ||
-         node.action() == pkgtransaction::transaction_action_kind::upgrade ||
-         node.action() == pkgtransaction::transaction_action_kind::remove))
-    {
-      ++target_mutations;
-      if (node.identity() != action.identity())
-        throw error(error_code::invalid_effect_request,
-                    "transaction program contains another target mutation");
-    }
-  }
-  if (target_mutations != 1U || !program.runtime_cohorts().empty())
-    throw error(error_code::invalid_effect_request,
-                "effectful session v1 requires one acyclic target mutation");
-}
-
 std::vector<pkgtransaction::transaction_node_identity> required_lifecycle(
     const pkgtransaction::transaction_program& program,
     const pkgtransaction::transaction_node_identity& action,
@@ -643,7 +617,6 @@ effectful_operation_request effectful_operation_request::make(
     throw error(error_code::invalid_effect_request,
                 "effect action node is absent from the transaction program");
   validate_action_authority(transaction, *action, application);
-  validate_single_package_program(transaction.program(), *action);
   validate_lifecycle_order(transaction.program(), action_node, lifecycle);
 
   if (application.kind() == pkgplan::operation_kind::install)

@@ -94,6 +94,8 @@ The preparation suite must prove:
   context, execution control, lifecycle order, and installation reason remain
   explicit inputs;
 - official planner success seals matching application and effect requests;
+- preparation can select one exact action from a transaction that also contains
+  other package nodes without treating those nodes as an execution schedule;
 - official planner refusal remains terminal and creates no partial plan,
   application request, or effect request;
 - removal never invokes incoming-artifact projection;
@@ -131,7 +133,8 @@ Tests must also reject:
 - missing or mismatched canonical stores;
 - transaction-only policy on another command;
 - unknown goal scopes, lifecycle actions, and collection revisions;
-- multi-package or runtime-cohort effect programs in the initial effect boundary;
+- effect requests whose selected action, application authority, or lifecycle
+  phase set does not match the retained transaction program;
 - reintroduction of provisional pkgctl package-operation or legacy pkgman
   semantics.
 

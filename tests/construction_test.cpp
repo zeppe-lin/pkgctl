@@ -482,6 +482,8 @@ void check_install_preparation()
   auto transaction = transaction_session(
       source, dependency_source(), store.read(), temporary.path() / "state",
       true);
+  CHECK(!transaction.program().nodes_for(
+      pkgsource::package_reference("dep")).empty());
   auto session = construction_session(transaction, temporary.path());
   test_support::write(session.paths().local_source_root / "payload", payload);
 
@@ -518,6 +520,8 @@ void check_install_preparation()
             result.incoming()->identity());
   CHECK(result.effect() &&
         result.effect()->action_node() == install_node(transaction).identity());
+  CHECK(result.effect() &&
+        result.effect()->transaction().identity() == transaction.identity());
   CHECK(result.effect() && result.application() &&
         result.effect()->application().identity() ==
             result.application()->identity());

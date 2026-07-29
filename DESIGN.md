@@ -60,6 +60,13 @@ Removal has no incoming side and never calls the artifact driver. For upgrade,
 the old installed authority is taken from the exact transaction snapshot; it is
 not reconstructed from current candidate control.
 
+The effect request retains the complete transaction session and selects one exact
+target action from it. Release 0.6.0 therefore removes the initial 0.3 admission
+restriction to single-package, single-mutation, acyclic programs. This does not
+choose a schedule: all unrelated nodes, other target mutations, and runtime
+cohorts remain inert authority until an external scheduler selects another exact
+action.
+
 ### Preparation refusal
 
 A `libpkgplan` refusal is a complete terminal preparation result. `pkgctl`
