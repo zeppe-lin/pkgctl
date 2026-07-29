@@ -1,5 +1,68 @@
 # pkgctl changelog
 
+## 0.7.0 - 2026-07-29
+
+### Transaction progression
+
+- Added immutable transaction progression anchored to one sealed transaction
+  session, one current canonical state epoch, and exact accepted terminal
+  construction and effect evidence.
+- Collapsed each target action and its exact pre/post lifecycle phase nodes into
+  one ready operation unit while retaining per-node status and evidence.
+- Treated exact retain nodes as initially satisfied and derived pending, ready,
+  satisfied, failed, and blocked nodes only from the transaction graph and
+  retained terminal evidence.
+- Exposed every ready construction, check, and operation unit without selecting
+  among ready peers. Check units can become ready but have no completion API
+  until a separate check authority exists.
+- Refused out-of-order, duplicate, cross-transaction, stale-state, and
+  indeterminate evidence instead of advancing controller knowledge.
+
+### State epochs and operation preparation
+
+- Advanced the current canonical state epoch only from a completed effect whose
+  exact `libpkgstate` publication receipt or reconciled state proves the supplied
+  resulting snapshot.
+- Bound every effect request to the exact state snapshot against which its
+  application plan was prepared; failed effects from an older epoch are rejected
+  as stale as strictly as successful effects.
+- Rebased operation preparation on `transaction_progress`, using its current
+  state and requiring the selected action to be graph-ready.
+- Required install absence and unchanged historical installed authority for
+  upgrade or removal in the current epoch, preventing silent reinterpretation of
+  a transaction after earlier effects.
+- Preserved exact lifecycle-node terminal knowledge after failed operations:
+  executed successful nodes remain satisfied, the failed node remains failed,
+  and unexecuted members remain blocked.
+
+### Deliberate boundary
+
+- Progression performs no source acquisition, build, check, planning, lifecycle,
+  application, publication, restart, or backend effect.
+- Added no ready-peer selection policy, parallelism, retry policy,
+  transaction-wide rollback, durable progression store, or effectful CLI
+  command.
+- The existing read-only `catalog`, `resolve`, and `transaction` commands remain
+  unchanged.
+
+### Authority floors
+
+The authority floors are unchanged from 0.6.0:
+
+- `libpkgsource >= 1.1.0` and `libpkgsource-plan >= 1.1.0`;
+- `libpkgcatalog >= 1.1.0` and `libpkgcatalog-acquire >= 1.1.0`;
+- `libpkgstate >= 2.2.0`, `libpkgstate-plan >= 2.2.0`, and
+  `libpkgstate-apply >= 2.2.0`;
+- `libpkgfetch >= 0.1.0`;
+- `libpkgbuild >= 1.0.0`, `libpkgbuild-exec >= 0.1.0`, and
+  `libpkgbuild-plan >= 1.0.0`;
+- `libpkgimage >= 0.3.0`;
+- `libpkgplan >= 0.2.0`;
+- `libpkgexec >= 1.2.0`;
+- `libpkgapply >= 1.0.0` and `libpkgapply-exec >= 0.1.0`;
+- `libpkgresolve >= 1.0.0`;
+- `libpkgtransaction >= 1.1.0`.
+
 ## 0.6.0 - 2026-07-29
 
 ### One-operation preparation
