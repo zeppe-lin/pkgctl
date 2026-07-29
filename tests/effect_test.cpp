@@ -1440,7 +1440,7 @@ pkgctl::effectful_operation_request effect_request(
     const upgrade_fixture& value)
 {
   return pkgctl::effectful_operation_request::make(
-      value.transaction,
+      value.transaction, value.expected,
       action_node(value.transaction,
                   pkgtransaction::transaction_action_kind::upgrade)
           .identity(),
@@ -1539,7 +1539,7 @@ pkgctl::effectful_operation_request effect_request(
     const removal_fixture& value)
 {
   return pkgctl::effectful_operation_request::make(
-      value.transaction,
+      value.transaction, value.expected,
       action_node(value.transaction,
                   pkgtransaction::transaction_action_kind::remove)
           .identity(),
@@ -1570,7 +1570,7 @@ void check_removal_preparation()
       {pkgplan::target_path_observation::present(
           pkgplan::filesystem_object_fact(path, planner_regular(2)))});
   auto request = pkgctl::operation_preparation_request::remove(
-      value.transaction,
+      pkgctl::transaction_progress::begin(value.transaction),
       action_node(value.transaction,
                   pkgtransaction::transaction_action_kind::remove)
           .identity(),
@@ -1598,7 +1598,7 @@ void check_removal_preparation_refusal()
       plan_identity<pkgplan::observation_set_identity>(81),
       value.target_system, pkgplan::fact_set_completeness::complete, {});
   auto request = pkgctl::operation_preparation_request::remove(
-      value.transaction,
+      pkgctl::transaction_progress::begin(value.transaction),
       action_node(value.transaction,
                   pkgtransaction::transaction_action_kind::remove)
           .identity(),
@@ -1638,12 +1638,88 @@ void check_removal_success()
   CHECK(result.publication_request().has_value());
   CHECK(result.publication_request()->transaction_evidence() ==
         result.transaction_evidence());
+
+  auto progression = pkgctl::transaction_progress::begin(value.transaction);
+  const auto& action = action_node(
+      value.transaction, pkgtransaction::transaction_action_kind::remove);
+  CHECK(progression.status(action.identity()) ==
+        pkgctl::transaction_node_status::ready);
+  const auto unit = std::find_if(
+      progression.ready_units().begin(), progression.ready_units().end(),
+      [&](const auto& candidate) {
+        return candidate.primary_node() == action.identity();
+      });
+  CHECK(unit != progression.ready_units().end());
+  CHECK(unit != progression.ready_units().end() &&
+        unit->kind() == pkgctl::transaction_unit_kind::operation);
+  CHECK(unit != progression.ready_units().end() &&
+        unit->members().size() == 3U);
+
+  bool refused = false;
+  try
+  {
+    (void)pkgctl::advance_effect(progression, result, value.expected);
+  }
+  catch (const pkgctl::error& problem)
+  {
+    refused = problem.code() == pkgctl::error_code::invalid_progression;
+  }
+  CHECK(refused);
+
+  const auto resulting_state = value.store.read();
+  progression = pkgctl::advance_effect(
+      std::move(progression), result, resulting_state);
+  CHECK(progression.current_state().identity() == resulting_state.identity());
+  CHECK(progression.status(action.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  for (const auto& node : value.transaction.program().nodes())
+  {
+    if (node.action() == pkgtransaction::transaction_action_kind::lifecycle)
+      CHECK(progression.status(node.identity()) ==
+            pkgctl::transaction_node_status::satisfied);
+  }
+  CHECK(progression.complete());
+}
+
+void check_removal_progression_failure()
+{
+  removal_fixture value;
+  const auto session = pkgctl::effectful_operation_session::admit(
+      effect_request(value), value.before, value.after);
+  driver actuator(
+      value.projection, value.outer_lease, value.receipt, value.store,
+      pkgsource::lifecycle_action::pre_remove);
+  const auto result = pkgctl::execute_effectful_operation(session, actuator);
+  CHECK(result.outcome() ==
+        pkgctl::effectful_operation_outcome::
+            lifecycle_failed_before_application);
+
+  auto progression = pkgctl::transaction_progress::begin(value.transaction);
+  const auto initial_state = progression.current_state().identity();
+  progression = pkgctl::advance_effect(
+      std::move(progression), result);
+  const auto& action = action_node(
+      value.transaction, pkgtransaction::transaction_action_kind::remove);
+  const auto order = operation_lifecycle_order(
+      value.transaction, pkgtransaction::transaction_action_kind::remove);
+  CHECK(progression.status(action.identity()) ==
+        pkgctl::transaction_node_status::failed);
+  CHECK(order.before().size() == 1U);
+  CHECK(order.after().size() == 1U);
+  CHECK(progression.status(order.before().front()) ==
+        pkgctl::transaction_node_status::failed);
+  CHECK(progression.status(order.after().front()) ==
+        pkgctl::transaction_node_status::blocked);
+  CHECK(progression.current_state().identity() == initial_state);
+  CHECK(progression.failed());
+  CHECK(!progression.complete());
 }
 
 pkgctl::effectful_operation_request effect_request(const fixture& value)
 {
   return pkgctl::effectful_operation_request::make(
-      value.transaction, install_node(value.transaction).identity(),
+      value.transaction, value.expected,
+      install_node(value.transaction).identity(),
       pkgapply::package_application_request(value.application),
       operation_lifecycle_order(value.transaction),
       pkgstate::installation_reason::explicit_request());
@@ -1711,7 +1787,7 @@ void check_request_refusal()
   try
   {
     (void)pkgctl::effectful_operation_request::make(
-        value.transaction, build->identity(),
+        value.transaction, value.expected, build->identity(),
         pkgapply::package_application_request(value.application),
         pkgctl::lifecycle_order::make({}, {}),
         pkgstate::installation_reason::explicit_request());
@@ -1726,7 +1802,8 @@ void check_request_refusal()
   try
   {
     (void)pkgctl::effectful_operation_request::make(
-        value.transaction, install_node(value.transaction).identity(),
+        value.transaction, value.expected,
+        install_node(value.transaction).identity(),
         pkgapply::package_application_request(value.application),
         pkgctl::lifecycle_order::make({}, {}),
         pkgstate::installation_reason::explicit_request());
@@ -1741,7 +1818,8 @@ void check_request_refusal()
   try
   {
     (void)pkgctl::effectful_operation_request::make(
-        value.transaction, install_node(value.transaction).identity(),
+        value.transaction, value.expected,
+        install_node(value.transaction).identity(),
         pkgapply::package_application_request(value.application),
         operation_lifecycle_order(value.transaction));
   }
@@ -2150,6 +2228,7 @@ int main()
   check_removal_preparation();
   check_removal_preparation_refusal();
   check_removal_success();
+  check_removal_progression_failure();
   check_request_refusal();
   check_application_failure();
   check_lifecycle_failures();

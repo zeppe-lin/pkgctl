@@ -59,7 +59,8 @@ Identity source_identity(char value)
 }
 
 pkgsource::source_snapshot tool_source(std::string_view digest,
-                                      std::string version = "1.0")
+                                      std::string version = "1.0",
+                                      bool with_dependency = true)
 {
   using namespace pkgsource;
   return seal_source(
@@ -73,11 +74,13 @@ pkgsource::source_snapshot tool_source(std::string_view digest,
               pkgsource::digest(pkgsource::digest_algorithm::sha256,
                                 std::string(digest)))},
           program(program_language::posix_shell, "true\n"),
-          {requirement_declaration(
-              requirement_scope::build(),
-              requirement_subject(package_reference("dep")),
-              declaration_provenance(
-                  "tool/recipe.yml", "requirements.build[0]", 12, 5))},
+          with_dependency
+              ? std::vector<requirement_declaration>{requirement_declaration(
+                    requirement_scope::build(),
+                    requirement_subject(package_reference("dep")),
+                    declaration_provenance(
+                        "tool/recipe.yml", "requirements.build[0]", 12, 5))}
+              : std::vector<requirement_declaration>{},
           {},
           architecture_requirements(
               {architecture_reference("x86_64")},
@@ -125,7 +128,9 @@ pkgctl::transaction_session transaction_session(
     const pkgsource::source_snapshot& dependency,
     const pkgstate::snapshot& installed,
     const fs::path& state_path,
-    bool include_target = false)
+    bool include_target = false,
+    bool include_unrelated_dependency = false,
+    bool include_check = false)
 {
   auto catalog = catalog_snapshot(source, dependency);
   std::vector<pkgcatalog::acquire::collection_specification> specifications;
@@ -147,6 +152,16 @@ pkgctl::transaction_session transaction_session(
         pkgsource::requirement_scope::run(),
         pkgsource::requirement_subject(pkgsource::package_reference("tool")),
         "<test-target>");
+  if (include_unrelated_dependency)
+    goals.emplace_back(
+        pkgsource::requirement_scope::build(),
+        pkgsource::requirement_subject(pkgsource::package_reference("dep")),
+        "<test-unrelated>");
+  if (include_check)
+    goals.emplace_back(
+        pkgsource::requirement_scope::check(),
+        pkgsource::requirement_subject(pkgsource::package_reference("tool")),
+        "<test-check>");
   pkgresolve::architecture_context architectures(
       pkgsource::architecture_reference("x86_64"),
       pkgsource::architecture_reference("x86_64"));
@@ -187,6 +202,16 @@ const pkgtransaction::transaction_node& install_node(
         node.package().name() == "tool")
       return node;
   throw std::runtime_error("transaction fixture lacks install node");
+}
+
+const pkgtransaction::transaction_node& check_node(
+    const pkgctl::transaction_session& session)
+{
+  for (const auto& node : session.program().nodes())
+    if (node.action() == pkgtransaction::transaction_action_kind::check &&
+        node.package().name() == "tool")
+      return node;
+  throw std::runtime_error("transaction fixture lacks check node");
 }
 
 template<typename Identity>
@@ -446,6 +471,38 @@ pkgctl::construction_session construction_session(
       });
 }
 
+pkgctl::construction_session construction_session_without_inputs(
+    const pkgctl::transaction_session& transaction,
+    const fs::path& root)
+{
+  const auto& node = build_node(transaction);
+  auto request = pkgctl::construction_request::make(
+      transaction, node.identity(), {},
+      pkgbuild::build_policy::make(
+          pkgbuild::environment_policy::hermetic(2, 0022, 1700000000)));
+  pkgctl::construction_paths paths{
+      root / "sources",
+      root / "store",
+      {
+          pkgexec::root_view_identity::from_sha256(std::string(64U, 'b')),
+          root / "root-view",
+          root / "session",
+          root / "package",
+          root / "artifact" / "tool.tar",
+      },
+  };
+  fs::create_directories(paths.local_source_root);
+  fs::create_directories(paths.build.root_view_path);
+  return pkgctl::construction_session::admit(
+      std::move(request), std::move(paths), {},
+      {
+          pkgexec::interpreter_identity::from_sha256(std::string(64U, 'c')),
+          static_cast<std::uint64_t>(::geteuid()),
+          static_cast<std::uint64_t>(::getegid()),
+          {},
+      });
+}
+
 void check_success()
 {
   test_support::temporary_directory temporary;
@@ -469,6 +526,20 @@ void check_success()
   CHECK(result.build().build().outcome() == pkgbuild::build_outcome::succeeded);
   CHECK(result.build().artifact_inspection().has_value());
   CHECK(fs::is_regular_file(session.paths().build.artifact_path));
+
+  auto progression = pkgctl::transaction_progress::begin(transaction);
+  CHECK(progression.status(build_node(transaction).identity()) ==
+        pkgctl::transaction_node_status::pending);
+  bool refused = false;
+  try
+  {
+    (void)pkgctl::advance_construction(progression, result);
+  }
+  catch (const pkgctl::error& problem)
+  {
+    refused = problem.code() == pkgctl::error_code::invalid_progression;
+  }
+  CHECK(refused);
 }
 
 void check_install_preparation()
@@ -478,13 +549,14 @@ void check_install_preparation()
   pkgstate::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
-  auto source = tool_source(sha256_text(payload));
+  auto source = tool_source(sha256_text(payload), "1.0", false);
   auto transaction = transaction_session(
       source, dependency_source(), store.read(), temporary.path() / "state",
-      true);
+      true, true);
   CHECK(!transaction.program().nodes_for(
       pkgsource::package_reference("dep")).empty());
-  auto session = construction_session(transaction, temporary.path());
+  auto session = construction_session_without_inputs(
+      transaction, temporary.path());
   test_support::write(session.paths().local_source_root / "payload", payload);
 
   fixture_backend backend(backend_mode::succeed);
@@ -493,8 +565,28 @@ void check_install_preparation()
 
   const auto target_system =
       plan_identity<pkgplan::target_system_context_identity>(52);
+  auto progression = pkgctl::transaction_progress::begin(transaction);
+  CHECK(progression.status(build_node(transaction).identity()) ==
+        pkgctl::transaction_node_status::ready);
+  bool dependency_ready = false;
+  for (const auto& node : transaction.program().nodes())
+  {
+    if (node.action() == pkgtransaction::transaction_action_kind::build &&
+        node.package().name() == "dep")
+    {
+      dependency_ready =
+          progression.status(node.identity()) ==
+          pkgctl::transaction_node_status::ready;
+    }
+  }
+  CHECK(dependency_ready);
+  progression = pkgctl::advance_construction(
+      std::move(progression), construction);
+  CHECK(progression.status(install_node(transaction).identity()) ==
+        pkgctl::transaction_node_status::ready);
+
   auto request = pkgctl::operation_preparation_request::install(
-      transaction, install_node(transaction).identity(), construction,
+      progression, install_node(transaction).identity(), construction,
       application_target(store.read().target_binding(), target_system),
       execution_control(), empty_target_observations(target_system),
       plan_identity<pkgplan::runtime_dependency_closure_identity>(53),
@@ -525,6 +617,9 @@ void check_install_preparation()
   CHECK(result.effect() && result.application() &&
         result.effect()->application().identity() ==
             result.application()->identity());
+  CHECK(result.effect() &&
+        result.effect()->expected_state().identity() ==
+            progression.current_state().identity());
   CHECK(result.artifact() && construction.build().artifact_inspection() &&
         result.artifact()->image().receipt().archive_digest() ==
             construction.build().artifact_inspection()->archive_digest());
@@ -532,6 +627,96 @@ void check_install_preparation()
         construction.build().artifact_inspection()->image_identity());
   CHECK(result.artifact()->image().receipt().entry_count() ==
         construction.build().artifact_inspection()->entry_count());
+}
+
+void check_check_progression()
+{
+  test_support::temporary_directory temporary;
+  test_support::initialize_state(temporary.path() / "state");
+  pkgstate::canonical_generation_store store(
+      temporary.path() / "state", test_support::binding());
+  const std::string payload = "source payload\n";
+  auto source = tool_source(sha256_text(payload), "1.0", false);
+  auto transaction = transaction_session(
+      source, dependency_source(), store.read(), temporary.path() / "state",
+      false, false, true);
+  auto session = construction_session_without_inputs(
+      transaction, temporary.path());
+  test_support::write(session.paths().local_source_root / "payload", payload);
+
+  fixture_backend backend(backend_mode::succeed);
+  pkgctl::native_construction_driver driver(backend);
+  auto construction = pkgctl::execute_construction(session, driver);
+
+  auto progression = pkgctl::transaction_progress::begin(transaction);
+  const auto repeated = pkgctl::transaction_progress::begin(transaction);
+  CHECK(progression.identity() == repeated.identity());
+  const auto initial_progress = progression.identity();
+  CHECK(progression.status(build_node(transaction).identity()) ==
+        pkgctl::transaction_node_status::ready);
+  CHECK(progression.status(check_node(transaction).identity()) ==
+        pkgctl::transaction_node_status::pending);
+  CHECK(progression.ready_units().size() == 1U);
+  CHECK(progression.ready_units().front().kind() ==
+        pkgctl::transaction_unit_kind::construction);
+
+  progression = pkgctl::advance_construction(
+      std::move(progression), construction);
+  CHECK(progression.identity() != initial_progress);
+  CHECK(progression.status(check_node(transaction).identity()) ==
+        pkgctl::transaction_node_status::ready);
+  bool duplicate_refused = false;
+  try
+  {
+    (void)pkgctl::advance_construction(progression, construction);
+  }
+  catch (const pkgctl::error& problem)
+  {
+    duplicate_refused =
+        problem.code() == pkgctl::error_code::invalid_progression;
+  }
+  CHECK(duplicate_refused);
+  CHECK(progression.ready_units().size() == 1U);
+  CHECK(progression.ready_units().front().kind() ==
+        pkgctl::transaction_unit_kind::check);
+  CHECK(progression.ready_units().front().primary_node() ==
+        check_node(transaction).identity());
+  CHECK(!progression.complete());
+  CHECK(!progression.failed());
+}
+
+void check_failed_progression()
+{
+  test_support::temporary_directory temporary;
+  test_support::initialize_state(temporary.path() / "state");
+  pkgstate::canonical_generation_store store(
+      temporary.path() / "state", test_support::binding());
+  const std::string payload = "source payload\n";
+  auto source = tool_source(sha256_text(payload), "1.0", false);
+  auto transaction = transaction_session(
+      source, dependency_source(), store.read(), temporary.path() / "state",
+      true);
+  auto session = construction_session_without_inputs(
+      transaction, temporary.path());
+  test_support::write(session.paths().local_source_root / "payload", payload);
+
+  fixture_backend backend(backend_mode::fail);
+  pkgctl::native_construction_driver driver(backend);
+  auto construction = pkgctl::execute_construction(session, driver);
+  CHECK(!construction.succeeded());
+
+  auto progression = pkgctl::transaction_progress::begin(transaction);
+  const auto initial_state = progression.current_state().identity();
+  progression = pkgctl::advance_construction(
+      std::move(progression), construction);
+  CHECK(progression.status(build_node(transaction).identity()) ==
+        pkgctl::transaction_node_status::failed);
+  CHECK(progression.status(install_node(transaction).identity()) ==
+        pkgctl::transaction_node_status::blocked);
+  CHECK(progression.current_state().identity() == initial_state);
+  CHECK(progression.failed());
+  CHECK(!progression.complete());
+  CHECK(progression.ready_units().empty());
 }
 
 void check_failed_build()
@@ -723,6 +908,8 @@ int main()
   {
     check_success();
     check_install_preparation();
+    check_check_progression();
+    check_failed_progression();
     check_failed_build();
     check_admission();
     check_identity_and_driver_contract();

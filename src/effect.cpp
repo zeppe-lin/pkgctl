@@ -107,6 +107,7 @@ std::string reason_kind(const pkgstate::installation_reason& reason)
 
 void validate_action_authority(
     const transaction_session& transaction,
+    const pkgstate::snapshot& expected_state,
     const pkgtransaction::transaction_node& action,
     const pkgapply::package_application_request& application)
 {
@@ -117,34 +118,59 @@ void validate_action_authority(
                 "selected transaction node is not the requested target action");
   }
 
-  if (action.package().name() != application_release(application).name())
+  const std::string& package_name = application_release(application).name();
+  if (action.package().name() != package_name)
     throw error(error_code::invalid_effect_request,
                 "transaction action package differs from application plan");
 
+  if (expected_state.target_binding() !=
+      transaction.resolution().installed().target_binding())
+    throw error(error_code::invalid_effect_request,
+                "effect state epoch belongs to another transaction target");
+
   const auto& required = preconditions(application);
   if (!same_string_identity(required.installed_snapshot(),
-                            transaction.resolution().installed().identity()) ||
+                            expected_state.identity()) ||
       !same_string_identity(required.ownership_inventory(),
-                            transaction.resolution().installed().ownership_identity()))
+                            expected_state.ownership_identity()))
   {
     throw error(error_code::invalid_effect_request,
-                "application plan is not based on the transaction state snapshot");
+                "application plan is not based on the effect state epoch");
   }
 
-  const auto& state_target =
-      transaction.resolution().installed().target_binding();
+  const auto& state_target = expected_state.target_binding();
   if (!same_string_identity(application.target().managed_target(),
                             state_target.managed_target()) ||
       !same_string_identity(application.target().root_view(),
                             state_target.root_view()))
   {
     throw error(error_code::invalid_effect_request,
-                "application target differs from the transaction state target");
+                "application target differs from the effect state epoch");
+  }
+
+  if (application.kind() == pkgplan::operation_kind::install)
+  {
+    if (expected_state.find_package(package_name) != nullptr)
+      throw error(error_code::invalid_effect_request,
+                  "installation action is stale in the effect state epoch");
+  }
+  else
+  {
+    const pkgstate::installed_package* original = nullptr;
+    if (application.kind() == pkgplan::operation_kind::remove)
+      original = action.installed();
+    else
+      original = transaction.resolution().installed().find_package(package_name);
+    const auto* current = expected_state.find_package(package_name);
+    if (original == nullptr || current == nullptr ||
+        original->identity() != current->identity())
+      throw error(error_code::invalid_effect_request,
+                  "target action installed authority is stale in the effect state epoch");
   }
 
   if (application.kind() == pkgplan::operation_kind::remove)
   {
-    const auto* installed = action.installed();
+    const auto* installed = expected_state.find_package(package_name);
     const auto* removal = application.removal();
     if (installed == nullptr || removal == nullptr ||
         !same_string_identity(removal->plan().inputs().package(),
@@ -173,8 +199,7 @@ void validate_action_authority(
   if (application.kind() == pkgplan::operation_kind::upgrade)
   {
     const auto* upgrade = application.upgrade();
-    const auto* installed = transaction.resolution().installed().find_package(
-        application_release(application).name());
+    const auto* installed = expected_state.find_package(package_name);
     if (upgrade == nullptr || installed == nullptr ||
         !same_string_identity(upgrade->plan().inputs().old_package(),
                               installed->identity()) ||
@@ -182,7 +207,7 @@ void validate_action_authority(
                               installed->control().identity()))
     {
       throw error(error_code::invalid_effect_request,
-                  "upgrade old-package authority differs from transaction state");
+                  "upgrade old-package authority differs from the effect state epoch");
     }
   }
 }
@@ -393,7 +418,7 @@ pkgstate::state_publication_request project_publication(
     const pkgapply::completed_application_evidence& evidence,
     pkgstate::transaction_evidence_identity transaction)
 {
-  const auto& expected = request.transaction().resolution().installed();
+  const auto& expected = request.expected_state();
   if (const auto* value = request.application().installation())
   {
     if (!request.installation_reason())
@@ -591,12 +616,14 @@ lifecycle_order::after() const noexcept { return after_; }
 
 effectful_operation_request::effectful_operation_request(
     transaction_session transaction,
+    pkgstate::snapshot expected_state,
     pkgtransaction::transaction_node_identity action_node,
     pkgapply::package_application_request application,
     lifecycle_order lifecycle,
     std::optional<pkgstate::installation_reason> installation_reason,
     session_identity identity)
     : transaction_(std::move(transaction)),
+      expected_state_(std::move(expected_state)),
       action_node_(std::move(action_node)),
       application_(std::move(application)),
       lifecycle_(std::move(lifecycle)),
@@ -607,6 +634,7 @@ effectful_operation_request::effectful_operation_request(
 
 effectful_operation_request effectful_operation_request::make(
     transaction_session transaction,
+    pkgstate::snapshot expected_state,
     pkgtransaction::transaction_node_identity action_node,
     pkgapply::package_application_request application,
     lifecycle_order lifecycle,
@@ -616,7 +644,7 @@ effectful_operation_request effectful_operation_request::make(
   if (action == nullptr)
     throw error(error_code::invalid_effect_request,
                 "effect action node is absent from the transaction program");
-  validate_action_authority(transaction, *action, application);
+  validate_action_authority(transaction, expected_state, *action, application);
   validate_lifecycle_order(transaction.program(), action_node, lifecycle);
 
   if (application.kind() == pkgplan::operation_kind::install)
@@ -632,8 +660,8 @@ effectful_operation_request effectful_operation_request::make(
   }
 
   std::vector<std::string> fields{
-      transaction.identity().hex(), action_node.hex(),
-      application.identity().string()};
+      transaction.identity().hex(), expected_state.identity().string(),
+      action_node.hex(), application.identity().string()};
   const auto before = identity_text(lifecycle.before());
   fields.push_back(std::to_string(before.size()));
   fields.insert(fields.end(), before.begin(), before.end());
@@ -644,15 +672,18 @@ effectful_operation_request effectful_operation_request::make(
                        ? reason_kind(*installation_reason)
                        : std::string());
   session_identity identity = make_session_identity(
-      "pkgctl/effectful-operation-request/1", fields);
+      "pkgctl/effectful-operation-request/2", fields);
   return effectful_operation_request(
-      std::move(transaction), std::move(action_node), std::move(application),
+      std::move(transaction), std::move(expected_state),
+      std::move(action_node), std::move(application),
       std::move(lifecycle), std::move(installation_reason),
       std::move(identity));
 }
 
 const transaction_session& effectful_operation_request::transaction() const noexcept
 { return transaction_; }
+const pkgstate::snapshot& effectful_operation_request::expected_state() const noexcept
+{ return expected_state_; }
 const pkgtransaction::transaction_node_identity&
 effectful_operation_request::action_node() const noexcept { return action_node_; }
 const pkgapply::package_application_request&
@@ -1259,7 +1290,7 @@ effect_restart_result resume_effectful_operation(
       throw error(error_code::invalid_effect_session,
                   "publication reconciliation lacks the exact request");
     const auto observed = driver.read_state();
-    const auto& expected = request.transaction().resolution().installed();
+    const auto& expected = request.expected_state();
     const auto resulting = resulting_snapshot(expected, *publication_request);
     if (observed.identity() == resulting.identity())
       return finish(effectful_operation_outcome::completed,

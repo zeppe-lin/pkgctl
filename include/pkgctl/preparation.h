@@ -14,8 +14,7 @@
 #include <libpkgplan/libpkgplan.h>
 #include <libpkgstate-plan/adapter.h>
 
-#include <pkgctl/construction.h>
-#include <pkgctl/effect.h>
+#include <pkgctl/progression.h>
 
 namespace pkgctl {
 
@@ -23,7 +22,7 @@ namespace pkgctl {
 class operation_preparation_request final {
 public:
   [[nodiscard]] static operation_preparation_request install(
-      transaction_session transaction,
+      transaction_progress progression,
       pkgtransaction::transaction_node_identity action_node,
       construction_result construction,
       pkgapply::application_target_context target,
@@ -35,7 +34,7 @@ public:
       pkgstate::installation_reason installation_reason);
 
   [[nodiscard]] static operation_preparation_request upgrade(
-      transaction_session transaction,
+      transaction_progress progression,
       pkgtransaction::transaction_node_identity action_node,
       construction_result construction,
       pkgapply::application_target_context target,
@@ -46,7 +45,7 @@ public:
       lifecycle_order lifecycle);
 
   [[nodiscard]] static operation_preparation_request remove(
-      transaction_session transaction,
+      transaction_progress progression,
       pkgtransaction::transaction_node_identity action_node,
       pkgapply::application_target_context target,
       pkgapply::application_execution_control control,
@@ -55,7 +54,9 @@ public:
       lifecycle_order lifecycle);
 
   [[nodiscard]] pkgplan::operation_kind kind() const noexcept;
+  [[nodiscard]] const transaction_progress& progression() const noexcept;
   [[nodiscard]] const transaction_session& transaction() const noexcept;
+  [[nodiscard]] const pkgstate::snapshot& current_state() const noexcept;
   [[nodiscard]] const pkgtransaction::transaction_node_identity&
   action_node() const noexcept;
   [[nodiscard]] const std::optional<construction_result>&
@@ -78,7 +79,7 @@ public:
 private:
   operation_preparation_request(
       pkgplan::operation_kind kind,
-      transaction_session transaction,
+      transaction_progress progression,
       pkgtransaction::transaction_node_identity action_node,
       std::optional<construction_result> construction,
       pkgapply::application_target_context target,
@@ -92,7 +93,7 @@ private:
       session_identity identity);
 
   pkgplan::operation_kind kind_;
-  transaction_session transaction_;
+  transaction_progress progression_;
   pkgtransaction::transaction_node_identity action_node_;
   std::optional<construction_result> construction_;
   pkgapply::application_target_context target_;

@@ -52,6 +52,7 @@ class effectful_operation_request final {
 public:
   [[nodiscard]] static effectful_operation_request make(
       transaction_session transaction,
+      pkgstate::snapshot expected_state,
       pkgtransaction::transaction_node_identity action_node,
       pkgapply::package_application_request application,
       lifecycle_order lifecycle,
@@ -59,6 +60,7 @@ public:
           std::nullopt);
 
   [[nodiscard]] const transaction_session& transaction() const noexcept;
+  [[nodiscard]] const pkgstate::snapshot& expected_state() const noexcept;
   [[nodiscard]] const pkgtransaction::transaction_node_identity&
   action_node() const noexcept;
   [[nodiscard]] const pkgapply::package_application_request&
@@ -71,6 +73,7 @@ public:
 private:
   effectful_operation_request(
       transaction_session transaction,
+      pkgstate::snapshot expected_state,
       pkgtransaction::transaction_node_identity action_node,
       pkgapply::package_application_request application,
       lifecycle_order lifecycle,
@@ -78,6 +81,7 @@ private:
       session_identity identity);
 
   transaction_session transaction_;
+  pkgstate::snapshot expected_state_;
   pkgtransaction::transaction_node_identity action_node_;
   pkgapply::package_application_request application_;
   lifecycle_order lifecycle_;

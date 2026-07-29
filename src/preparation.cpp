@@ -101,7 +101,7 @@ bool has_build_before_target_edge(
 }
 
 void validate_target_authority(
-    const transaction_session& transaction,
+    const transaction_progress& progression,
     const pkgapply::application_target_context& target,
     const pkgplan::target_observation_set& observations)
 {
@@ -109,22 +109,23 @@ void validate_target_authority(
     throw error(error_code::invalid_preparation_request,
                 "target observations belong to another planner context");
 
-  const auto& state_target = transaction.resolution().installed().target_binding();
+  const auto& state_target = progression.current_state().target_binding();
   if (!same_string_identity(target.managed_target(),
                             state_target.managed_target()) ||
       !same_string_identity(target.root_view(), state_target.root_view()))
   {
     throw error(error_code::invalid_preparation_request,
-                "application target differs from transaction installed state");
+                "application target differs from the progression state epoch");
   }
 }
 
 void validate_construction_authority(
-    const transaction_session& transaction,
+    const transaction_progress& progression,
     const pkgtransaction::transaction_node& action,
     const pkgtransaction::transaction_node_identity& action_node,
     const construction_result& construction)
 {
+  const auto& transaction = progression.transaction();
   if (!construction.succeeded())
     throw error(error_code::invalid_preparation_request,
                 "incoming operation requires completed construction");
@@ -161,6 +162,14 @@ void validate_construction_authority(
                 "construction build node is not ordered before the action");
   }
 
+  const auto* retained = progression.construction(build_node);
+  if (retained == nullptr || retained->identity() != construction.identity())
+    throw error(error_code::invalid_preparation_request,
+                "construction is not retained by transaction progression");
+  if (progression.status(action_node) != transaction_node_status::ready)
+    throw error(error_code::invalid_preparation_request,
+                "target operation is not ready in transaction progression");
+
   if (!construction.build().artifact_inspection())
     throw error(error_code::invalid_preparation_request,
                 "completed construction lacks archive inspection evidence");
@@ -168,7 +177,7 @@ void validate_construction_authority(
 
 session_identity request_identity(
     pkgplan::operation_kind kind,
-    const transaction_session& transaction,
+    const transaction_progress& progression,
     const pkgtransaction::transaction_node_identity& action_node,
     const std::optional<construction_result>& construction,
     const pkgapply::application_target_context& target,
@@ -182,7 +191,8 @@ session_identity request_identity(
 {
   std::vector<std::string> fields{
       std::to_string(static_cast<unsigned int>(kind)),
-      transaction.identity().hex(), action_node.hex(),
+      progression.identity().hex(),
+      progression.current_state().identity().string(), action_node.hex(),
       construction ? construction->identity().hex() : std::string(),
       target.identity().string(), control.identity().string(),
       observations.identity().string(),
@@ -194,7 +204,7 @@ session_identity request_identity(
                        ? installation_reason_identity(*installation_reason)
                        : std::string());
   return make_session_identity(
-      "pkgctl/operation-preparation-request/1", fields);
+      "pkgctl/operation-preparation-request/2", fields);
 }
 
 const pkgplan::installed_package_fact& require_installed_projection(
@@ -250,7 +260,7 @@ void validate_artifact_projection(
 pkgstate::plan_adapter::installed_state_projection project_state(
     const operation_preparation_request& request)
 {
-  const auto& installed = request.transaction().resolution().installed();
+  const auto& installed = request.current_state();
   return pkgstate::plan_adapter::project_installed_state(
       installed,
       pkgstate::plan_adapter::planning_target_context(
@@ -323,7 +333,7 @@ session_identity prepared_identity(
 
 operation_preparation_request::operation_preparation_request(
     pkgplan::operation_kind kind,
-    transaction_session transaction,
+    transaction_progress progression,
     pkgtransaction::transaction_node_identity action_node,
     std::optional<construction_result> construction,
     pkgapply::application_target_context target,
@@ -334,7 +344,7 @@ operation_preparation_request::operation_preparation_request(
     lifecycle_order lifecycle,
     std::optional<pkgstate::installation_reason> installation_reason,
     session_identity identity)
-    : kind_(kind), transaction_(std::move(transaction)),
+    : kind_(kind), progression_(std::move(progression)),
       action_node_(std::move(action_node)),
       construction_(std::move(construction)), target_(std::move(target)),
       control_(std::move(control)), observations_(std::move(observations)),
@@ -346,7 +356,7 @@ operation_preparation_request::operation_preparation_request(
 }
 
 operation_preparation_request operation_preparation_request::install(
-    transaction_session transaction,
+    transaction_progress progression,
     pkgtransaction::transaction_node_identity action_node,
     construction_result construction,
     pkgapply::application_target_context target,
@@ -357,11 +367,15 @@ operation_preparation_request operation_preparation_request::install(
     lifecycle_order lifecycle,
     pkgstate::installation_reason installation_reason)
 {
+  const auto& transaction = progression.transaction();
   const auto& action = require_action(
       transaction, action_node, pkgplan::operation_kind::install);
-  validate_target_authority(transaction, target, observations);
+  validate_target_authority(progression, target, observations);
   validate_construction_authority(
-      transaction, action, action_node, construction);
+      progression, action, action_node, construction);
+  if (progression.current_state().find_package(action.package().name()) != nullptr)
+    throw error(error_code::invalid_preparation_request,
+                "installation action is stale in the progression state epoch");
 
   std::optional<construction_result> construction_value(std::move(construction));
   std::optional<pkgplan::runtime_dependency_closure_identity>
@@ -369,11 +383,11 @@ operation_preparation_request operation_preparation_request::install(
   std::optional<pkgstate::installation_reason>
       reason_value(std::move(installation_reason));
   auto identity = request_identity(
-      pkgplan::operation_kind::install, transaction, action_node,
+      pkgplan::operation_kind::install, progression, action_node,
       construction_value, target, control, observations, closure_value,
       policy, lifecycle, reason_value);
   return operation_preparation_request(
-      pkgplan::operation_kind::install, std::move(transaction),
+      pkgplan::operation_kind::install, std::move(progression),
       std::move(action_node), std::move(construction_value),
       std::move(target), std::move(control), std::move(observations),
       std::move(closure_value), std::move(policy), std::move(lifecycle),
@@ -381,7 +395,7 @@ operation_preparation_request operation_preparation_request::install(
 }
 
 operation_preparation_request operation_preparation_request::upgrade(
-    transaction_session transaction,
+    transaction_progress progression,
     pkgtransaction::transaction_node_identity action_node,
     construction_result construction,
     pkgapply::application_target_context target,
@@ -391,21 +405,30 @@ operation_preparation_request operation_preparation_request::upgrade(
     pkgplan::package_policy_snapshot policy,
     lifecycle_order lifecycle)
 {
+  const auto& transaction = progression.transaction();
   const auto& action = require_action(
       transaction, action_node, pkgplan::operation_kind::upgrade);
-  validate_target_authority(transaction, target, observations);
+  validate_target_authority(progression, target, observations);
   validate_construction_authority(
-      transaction, action, action_node, construction);
+      progression, action, action_node, construction);
+  const auto* original = transaction.resolution().installed().find_package(
+      action.package().name());
+  const auto* current = progression.current_state().find_package(
+      action.package().name());
+  if (original == nullptr || current == nullptr ||
+      original->identity() != current->identity())
+    throw error(error_code::invalid_preparation_request,
+                "upgrade installed authority is stale in the progression epoch");
 
   std::optional<construction_result> construction_value(std::move(construction));
   std::optional<pkgplan::runtime_dependency_closure_identity>
       closure_value(std::move(runtime_closure));
   auto identity = request_identity(
-      pkgplan::operation_kind::upgrade, transaction, action_node,
+      pkgplan::operation_kind::upgrade, progression, action_node,
       construction_value, target, control, observations, closure_value,
       policy, lifecycle, std::nullopt);
   return operation_preparation_request(
-      pkgplan::operation_kind::upgrade, std::move(transaction),
+      pkgplan::operation_kind::upgrade, std::move(progression),
       std::move(action_node), std::move(construction_value),
       std::move(target), std::move(control), std::move(observations),
       std::move(closure_value), std::move(policy), std::move(lifecycle),
@@ -413,7 +436,7 @@ operation_preparation_request operation_preparation_request::upgrade(
 }
 
 operation_preparation_request operation_preparation_request::remove(
-    transaction_session transaction,
+    transaction_progress progression,
     pkgtransaction::transaction_node_identity action_node,
     pkgapply::application_target_context target,
     pkgapply::application_execution_control control,
@@ -421,19 +444,28 @@ operation_preparation_request operation_preparation_request::remove(
     pkgplan::package_policy_snapshot policy,
     lifecycle_order lifecycle)
 {
+  const auto& transaction = progression.transaction();
   const auto& action = require_action(
       transaction, action_node, pkgplan::operation_kind::remove);
   if (action.installed() == nullptr)
     throw error(error_code::invalid_preparation_request,
                 "removal action lacks installed package authority");
-  validate_target_authority(transaction, target, observations);
+  const auto* current = progression.current_state().find_package(
+      action.package().name());
+  if (current == nullptr || current->identity() != action.installed()->identity())
+    throw error(error_code::invalid_preparation_request,
+                "removal installed authority is stale in the progression epoch");
+  if (progression.status(action_node) != transaction_node_status::ready)
+    throw error(error_code::invalid_preparation_request,
+                "target operation is not ready in transaction progression");
+  validate_target_authority(progression, target, observations);
 
   auto identity = request_identity(
-      pkgplan::operation_kind::remove, transaction, action_node,
+      pkgplan::operation_kind::remove, progression, action_node,
       std::nullopt, target, control, observations, std::nullopt,
       policy, lifecycle, std::nullopt);
   return operation_preparation_request(
-      pkgplan::operation_kind::remove, std::move(transaction),
+      pkgplan::operation_kind::remove, std::move(progression),
       std::move(action_node), std::nullopt, std::move(target),
       std::move(control), std::move(observations), std::nullopt,
       std::move(policy), std::move(lifecycle), std::nullopt,
@@ -442,9 +474,15 @@ operation_preparation_request operation_preparation_request::remove(
 
 pkgplan::operation_kind operation_preparation_request::kind() const noexcept
 { return kind_; }
+const transaction_progress&
+operation_preparation_request::progression() const noexcept
+{ return progression_; }
 const transaction_session&
 operation_preparation_request::transaction() const noexcept
-{ return transaction_; }
+{ return progression_.transaction(); }
+const pkgstate::snapshot&
+operation_preparation_request::current_state() const noexcept
+{ return progression_.current_state(); }
 const pkgtransaction::transaction_node_identity&
 operation_preparation_request::action_node() const noexcept
 { return action_node_; }
@@ -642,7 +680,8 @@ operation_preparation_result prepare_operation(
         pkgapply::removal_application_request::make(
             *planning.plan(), request.target(), request.control()));
     auto effect = effectful_operation_request::make(
-        request.transaction(), request.action_node(), application,
+        request.transaction(), request.current_state(),
+        request.action_node(), application,
         request.lifecycle());
     return operation_preparation_result::success(
         std::move(request), std::move(installed), std::nullopt, std::nullopt,
@@ -679,7 +718,8 @@ operation_preparation_result prepare_operation(
         pkgapply::installation_application_request::make(
             *planning.plan(), incoming, request.target(), request.control()));
     auto effect = effectful_operation_request::make(
-        request.transaction(), request.action_node(), application,
+        request.transaction(), request.current_state(),
+        request.action_node(), application,
         request.lifecycle(), request.installation_reason());
     return operation_preparation_result::success(
         std::move(request), std::move(installed), std::move(artifact),
@@ -688,8 +728,7 @@ operation_preparation_result prepare_operation(
   }
 
   const auto* native_installed =
-      request.transaction().resolution().installed().find_package(
-          action->package().name());
+      request.current_state().find_package(action->package().name());
   if (native_installed == nullptr)
     throw error(error_code::invalid_preparation_request,
                 "upgrade action has no installed package authority");
@@ -710,8 +749,8 @@ operation_preparation_result prepare_operation(
       pkgapply::upgrade_application_request::make(
           *planning.plan(), incoming, request.target(), request.control()));
   auto effect = effectful_operation_request::make(
-      request.transaction(), request.action_node(), application,
-      request.lifecycle());
+      request.transaction(), request.current_state(),
+      request.action_node(), application, request.lifecycle());
   return operation_preparation_result::success(
       std::move(request), std::move(installed), std::move(artifact),
       std::move(incoming), std::move(plan), std::move(application),
