@@ -540,6 +540,22 @@ void check_success()
     refused = problem.code() == pkgctl::error_code::invalid_progression;
   }
   CHECK(refused);
+
+  auto other_transaction = transaction_session(
+      tool_source(sha256_text(payload), "2.0"), dependency_source(),
+      store.read(), temporary.path() / "state");
+  auto other_progression =
+      pkgctl::transaction_progress::begin(other_transaction);
+  refused = false;
+  try
+  {
+    (void)pkgctl::advance_construction(other_progression, result);
+  }
+  catch (const pkgctl::error& problem)
+  {
+    refused = problem.code() == pkgctl::error_code::invalid_progression;
+  }
+  CHECK(refused);
 }
 
 void check_install_preparation()
