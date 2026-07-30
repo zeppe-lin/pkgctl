@@ -1,5 +1,76 @@
 # pkgctl changelog
 
+## 0.10.0 - 2026-07-30
+
+### Durable transaction-run ownership
+
+- Adds caller-nonced `transaction_run_journal_record` snapshots admitted before
+  the first dispatch reservation and advanced by exactly one legal ledger
+  transition.
+- Binds every snapshot to the exact transaction, dispatch policy, predecessor,
+  sequence, run, progression, canonical state epoch, terminal flags, and
+  immutable dispatch-record identities.
+- Reopens dispatch ownership only after the caller rehydrates the exact
+  `transaction_progress`; stored identities never fabricate construction,
+  check, effect, or installed-state evidence.
+- Revalidates durable graph units, predecessor evidence, completed attempt and
+  terminal evidence, and active operation state epochs before rebuilding a run.
+- Adds conservative restart assessment: release a still-reserved unit, recover
+  a started construction or check from external evidence, or inspect the exact
+  effect-attempt history retained by a started operation.
+- Binds every started operation dispatch to its exact admitted effect attempt,
+  and preserves that identity through uncertainty observations and terminal
+  completion.
+
+### Cross-journal operation start
+
+- Adds `commit_operation_dispatch_start()`, which commits the exact
+  effect-attempt admission before committing the started run snapshot and
+  invokes no effect driver.
+- Verifies the authority returned by both abstract stores and reports a typed
+  store-contract violation rather than accepting foreign committed records.
+- Makes an interrupted cross-journal start exactly retryable with the same
+  transaction run, dispatch, session, and effect-attempt nonce.
+- Treats a committed effect admission with an uncommitted started run as an
+  orphan admission: restart still sees a releasable reservation and never
+  infers that target mutation began.
+- Treats a committed started run with a missing effect journal as unresolved
+  ownership requiring exact effect-journal inspection; no terminal result is
+  fabricated.
+
+### Crash-consistent run store
+
+- Adds a bounded deterministic binary run-journal codec and an explicit POSIX
+  store rooted at a caller-selected directory or directory descriptor.
+- Publishes immutable read-only snapshots without replacement, then atomically
+  advances a checksummed read-only head as the physical commit point.
+- Loads only the exact self-contained head-selected snapshot; missing, corrupt,
+  writable, symlinked, or contradictory heads and snapshots fail closed.
+- Makes exact retries idempotent before and after head publication and across
+  concurrent processes, while requiring byte-for-byte equality for an already
+  published snapshot.
+- Documents that the store is crash-consistent but not an anti-rollback trust
+  anchor, and that complete snapshots are bounded to 16 MiB with no discovery,
+  compaction, or garbage collection in this release.
+- Adds no semantic-evidence serialization, resource recovery, automatic driver
+  execution, retry policy, rollback, or effect-implying CLI command.
+
+### Authority floors
+
+- `libpkgsource >= 2.0.0`, `libpkgsource-yaml >= 2.0.0`, and
+  `libpkgsource-plan >= 2.0.0`;
+- `libpkgcatalog >= 2.0.0` and `libpkgcatalog-acquire >= 2.0.0`;
+- `libpkgstate >= 2.3.0`, `libpkgstate-plan >= 2.3.0`, and
+  `libpkgstate-apply >= 2.3.0`;
+- `libpkgfetch >= 1.0.0`;
+- `libpkgbuild >= 2.0.0`, `libpkgbuild-exec >= 1.0.0`, and
+  `libpkgbuild-plan >= 2.0.0`;
+- `libpkgimage >= 0.3.0` and `libpkgplan >= 0.2.0`;
+- `libpkgexec >= 1.3.0`;
+- `libpkgapply >= 2.0.0` and `libpkgapply-exec >= 1.0.0`;
+- `libpkgresolve >= 2.0.0` and `libpkgtransaction >= 2.1.0`;
+- `libpkgcheck >= 0.1.0` and `libpkgcheck-exec >= 0.1.1`.
+
 ## 0.9.1 - 2026-07-30
 
 ### Effect-journal commit-point hardening
