@@ -28,8 +28,13 @@ Every release must establish:
 - immutable transaction progression from exact construction, check, and effect evidence;
 - operation-unit readiness with lifecycle phase nodes absorbed without losing
   node-level terminal status;
-- simultaneous exposure of independent ready units without controller
-  selection;
+- simultaneous exposure of independent ready units before dispatch policy;
+- deterministic reservation of the first canonical unit allowed by explicit
+  construction/check capacities and one hard operation lane;
+- explicit reserved, started, completed, and released-unstarted ownership;
+- exact predecessor, package-input, state-epoch, and attempt-session binding;
+- stop-after-terminal-failure containment without discarding already-started
+  work;
 - canonical state-epoch advancement only from exact publication or reconciled
   effect authority;
 - refusal of out-of-order, duplicate, cross-transaction, stale-state, and
@@ -54,8 +59,46 @@ Every release must establish:
 - refusal of missing, duplicate, forged, aliased, cross-transaction, cross-node,
   stale-construction, duplicate-completion, and driver-contract evidence;
 - concurrency-safe check completion after unrelated progression advancement;
-- proof that all exposed CLI commands remain read-only in 0.8.0;
+- proof that all exposed CLI commands remain read-only in 0.9.0;
 - release, source, manual, shell, and patch-hygiene contracts.
+
+## Transaction dispatch tests
+
+The dispatch suite must prove:
+
+- zero capacities, zero nonces, malformed hexadecimal nonces, duplicate nonces,
+  foreign dispatches, and invalid ledger transitions are refused;
+- equivalent progress and policy values produce the same run, reservation,
+  record, and dispatch identities;
+- canonical ready-unit order is deterministic and capacity exhaustion does not
+  mutate the run;
+- construction and check capacity is explicit while operation capacity is
+  exactly one;
+- active dispatches cannot overlap any graph member, including absorbed
+  lifecycle nodes;
+- unstarted reservations can be released, retain their historical record, and
+  cannot reuse their nonce;
+- started work cannot be released as unstarted;
+- each construction input matches one exact transaction requirement edge and
+  the exact selected or retained package authority;
+- successful predecessor construction, build-result, artifact, and dispatch
+  dependency identities all match before a dependent build starts;
+- check-scoped inputs are constructed before the checked package and inherited
+  exactly by the later check request;
+- a check dispatch accepts only the exact construction already retained by
+  progression and captured at reservation;
+- an operation dispatch accepts only the exact transaction action, admitted
+  effect session, and reserved canonical state epoch;
+- duplicate, cross-transaction, cross-node, cross-session, forged-predecessor,
+  stale-state, and wrong-kind completion evidence is refused;
+- terminal construction, check, and effect evidence delegates progression to
+  the existing `advance_*()` authority;
+- lost-lease and indeterminate-publication results remain active ordered
+  observations and cannot carry resulting state;
+- terminal failure prevents new reservations and starting merely reserved work,
+  while already-started independent work can still report exact evidence;
+- dispatch performs no backend call, resource discovery, retry, thread creation,
+  durable persistence, or CLI action.
 
 ## Effect authority tests
 

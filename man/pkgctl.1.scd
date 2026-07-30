@@ -19,17 +19,17 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.8.0 acquires explicit native collections, reads one existing canonical
+Version 0.9.0 acquires explicit native collections, reads one existing canonical
 installed-state generation, resolves typed package requirements, composes one
 immutable cross-package transaction program, and prints deterministic reports.
 
 The controller library also defines exact one-candidate construction,
-transaction progression, exact check request/session/result, one-operation preparation, single-operation effect,
+transaction progression, immutable dispatch ownership, exact check request/session/result, one-operation preparation, single-operation effect,
 and durable restart sessions, but no effect-implying command is exposed.
-Progression reports every graph-ready construction, check, or operation unit
-without selecting one. Library clients may admit and execute one exact ready
-check through injected authority, then advance progression with exact terminal
-evidence. Preparation can inspect exact artifact bytes and seal
+Progression reports every graph-ready construction, check, or operation unit.
+Library clients may reserve one canonical policy-allowed unit, bind an exact
+admitted session, and retire it only with matching terminal evidence. The
+controller still invokes no work automatically. Preparation can inspect exact artifact bytes and seal
 package-local plan/application handoffs when called by a library client. All
 executable commands remain read-only: they never initialize or publish state,
 materialize sources, build packages, inspect artifacts, plan package changes,

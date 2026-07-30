@@ -27,7 +27,11 @@ state, source/build, planner, and application adapters; typed planner refusal
 must never be converted into a partial effect request. Check changes must keep
 pure transaction admission separate from concrete host resources, delegate
 execution semantics to `libpkgcheck` and `libpkgcheck-exec`, and refuse foreign
-or stale terminal evidence before progression.
+or stale terminal evidence before progression. Dispatch changes must keep
+reservation separate from execution admission, retain exact predecessor and
+attempt identities, forbid duplicate ownership, and never release started work
+as if it were unstarted. Failure containment must stop new work without erasing
+terminal evidence from already-started independent work.
 
 Use SPDX headers:
 

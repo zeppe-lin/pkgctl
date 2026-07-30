@@ -13,6 +13,98 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.9.0 transaction-dispatch boundary
+
+Release 0.9.0 adds immutable ownership of selected but unfinished work. It does
+not add an execution loop. The distinction is deliberate:
+
+```text
+dispatch:    who owns this unfinished realization unit?
+progression: what terminal facts are now known?
+```
+
+A `transaction_run` retains one exact `transaction_progress`, one explicit
+`transaction_dispatch_policy`, and the complete lifetime ledger of dispatch
+records. Its identity binds all three. Records are never removed: completed and
+released attempts remain present so a caller-issued nonce cannot be reused and
+historical ownership cannot disappear from the run.
+
+### Deterministic reservation
+
+`reserve_next()` scans the canonical `ready_units()` order and reserves the
+first unit allowed by policy. Construction and check capacities are explicit
+positive bounds. Operation capacity is an invariant fixed at one. Active graph
+members may not overlap, so an operation reservation owns its target action and
+all absorbed lifecycle nodes as one indivisible unit.
+
+A 32-byte, nonzero caller nonce identifies the physical dispatch attempt. The
+nonce is not randomness authority and does not change transaction semantics; it
+prevents two attempts for the same semantic unit from becoming
+indistinguishable. A nonce is consumed for the lifetime of the run even when an
+unstarted reservation is released.
+
+Reservation captures the current progression identity, canonical state epoch,
+and exact terminal evidence for every non-retain predecessor outside the unit.
+The dispatch identity binds that evidence. Completion after unrelated progress
+is therefore valid only while the same unit remains ready and its exact direct
+predecessor evidence remains unchanged.
+
+### Reserved and started work
+
+Dispatch records have four explicit states:
+
+1. `reserved` — ownership exists, but no execution authority has been admitted;
+2. `started` — one exact construction, check, or effect session is bound;
+3. `completed` — authoritative terminal evidence advanced progression;
+4. `released_unstarted` — ownership was returned before execution admission.
+
+Only `reserved` work may be released. A started operation cannot be converted
+back into unstarted work merely because the controller has not yet received
+terminal evidence. This prevents lost processes, lease loss, or publication
+uncertainty from being misreported as harmless cancellation.
+
+Starting a construction dispatch validates every exact package-input edge. A
+built input must reproduce the selected package release, source snapshot, build
+result, artifact, and retained predecessor construction evidence. A retained
+installed input must still name the same installed package in the current state
+and reproduce its source and build provenance. `libpkgtransaction >= 2.1.0`
+orders both build- and check-scoped package inputs before the construction that
+seals them.
+
+Starting a check dispatch requires the exact construction result already
+retained by progression and captured by the dispatch dependency. Starting an
+operation requires the exact action, transaction, admitted effect session, and
+state epoch against which the operation was reserved.
+
+### Completion and uncertainty
+
+Construction and check completion require the exact started session, then
+delegate terminal graph truth to `advance_construction()` or `advance_check()`.
+The dispatch layer does not reinterpret subordinate outcomes.
+
+Definitive operation results delegate to `advance_effect()`. Lost outer lease
+and indeterminate publication are not terminal. Their exact result identities
+are retained as ordered observations while the dispatch stays active. A later
+authoritative result for the same exact effect session may retire it. An
+uncertain observation cannot carry a resulting state snapshot.
+
+### Failure containment
+
+The only 0.9.0 containment mode is
+`stop_after_terminal_failure`. Once progression contains terminal failure, no
+new unit is reserved and merely reserved work may not start. Already-started
+independent work may still report exact terminal evidence. This separates
+failure containment from fabrication: work known to have started must still be
+accounted for.
+
+### Deliberate boundary
+
+Dispatch performs no source acquisition, build, check, lifecycle, application,
+publication, backend construction, retry, or rollback. It creates no threads,
+wait loop, resource paths, durable run journal, or effectful CLI command.
+Adaptive priorities, work stealing, critical-path scoring, fairness, and
+transaction-wide continuation after failure remain outside this release.
+
 ## Release 0.8.0 transaction-check boundary
 
 Release 0.8.0 closes one exact check unit without adding scheduler policy.

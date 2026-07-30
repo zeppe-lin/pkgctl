@@ -6,46 +6,49 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.8.0 closes exact check sessions over transaction progression:
+Release 0.9.0 establishes immutable transaction dispatch and in-flight
+ownership:
 
 ```text
-ready transaction check unit
-        +
-retained successful construction evidence
+transaction_progress + bounded dispatch policy
         |
         v
-pure transaction_check_request
-        +
-caller-provided concrete source/package/input/root/temp resources
+canonical ready-unit reservation
         |
         v
-admitted transaction_check_session
-        |
-        v
-exact libpkgcheck-exec terminal evidence
-        |
-        v
-advance_check() -> satisfied or failed check node
+reserved -> started -> completed
+        |             \
+        |              -> uncertain operation observation
+        \
+         -> released-unstarted
 ```
 
-A pure request can be created before host paths exist. It binds one ready check
-node to the exact successful construction already retained by the same
-transaction progression. Concrete execution resources are admitted separately
-through `libpkgcheck-exec >= 0.1.1`; missing, duplicate, forged, aliased, or
-path-overlapping resources never become a controller session.
+A caller-issued 32-byte nonce distinguishes each physical dispatch attempt.
+`reserve_next()` chooses the first canonical ready unit allowed by explicit
+construction/check capacities, one hard operation lane, graph-member exclusion,
+and stop-after-terminal-failure containment. The returned `transaction_run`
+retains every reservation for the lifetime of the run, so a nonce or graph unit
+cannot be silently dispatched twice.
 
-A terminal passed result satisfies only the exact check node. A terminal failed
-result fails that node and blocks dependent units through ordinary graph
-progression. Duplicate, cross-transaction, cross-node, stale-construction, and
-mismatched execution evidence is refused. A session prepared at one progression
-epoch may still complete after an unrelated ready unit advances the same
-transaction, provided the exact check node remains ready and its retained
-construction authority is unchanged.
+Reservation is not execution. A unit becomes `started` only after an exact
+construction, check, or operation session is admitted against the retained
+transaction and predecessor evidence. Unstarted work can be released. Started
+work cannot be called unstarted again. Construction and check completion retire
+only the exact started session. Definitive operation evidence retires the
+operation; lost-lease and indeterminate-publication evidence remains an active
+observation until authoritative resolution arrives.
 
-The controller does not choose ready units or automatically invoke a backend.
-It retains the exact transaction, check-node, construction, check-request,
-execution-request, execution-result, and check-result identities across the
-handoff.
+The ledger binds exact successful predecessor evidence. Check-scoped package
+inputs are ordered before construction by `libpkgtransaction >= 2.1.0`, then
+verified against the retained build result and artifact before a construction
+session starts. Retained installed inputs must still be the same exact package
+in the current state. Failure containment prevents both new reservations and
+starting merely reserved work after terminal failure, while already-started
+independent work may still submit exact terminal evidence.
+
+Release 0.8.0 closed exact check request, concrete session, execution, and
+terminal progression evidence. Dispatch composes those existing boundaries; it
+does not invoke them automatically.
 
 Release 0.7.1 established evidence-driven transaction progression and
 current-state epochs. A target action and its exact pre- and post-lifecycle
@@ -70,17 +73,19 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.8.0. The command frontend executes no source acquisition, build, check, planner,
+There are no effect-implying CLI commands in 0.9.0. The command frontend
+executes no source acquisition, build, check, planner,
 lifecycle, application, publication, or restart authority. The internal check
 controller invokes execution only through an injected driver supplied by a
-library client. Ready-peer selection, parallelism, retry policy,
-transaction-wide rollback, durable progression storage, and effectful command
-policy remain outside this release.
+library client. Automatic execution, retry policy, adaptive scheduling, durable
+run storage, transaction-wide rollback, and effectful command policy remain outside
+this release.
 
 ## Authority
 
 `pkgctl` owns command policy, authority-call sequencing, controller session
-binding, evidence-driven transaction progression, current-state epoch binding,
+binding, deterministic dispatch reservation, in-flight ownership,
+evidence-driven transaction progression, current-state epoch binding,
 durable controller-attempt snapshots, conservative restart classification,
 outer-lease observation, transaction-evidence composition, deterministic
 diagnostics, and presentation.
@@ -107,10 +112,12 @@ The following meanings remain external:
   `libpkgbuild-exec`;
 - package-image authority: `libpkgimage`.
 
-`pkgctl` does not infer transaction order beyond the exact transaction graph.
-It exposes every ready unit and does not choose among ready peers. For lifecycle
-nodes not ordered relative to each other by that graph, the caller supplies an
-explicit order and the controller binds it into the effect request identity.
+`transaction_progress` does not infer transaction order beyond the exact
+transaction graph and exposes every ready unit. The dispatch ledger may reserve
+the first canonical ready unit allowed by explicit capacity and failure policy;
+it does not invent graph edges or execute the reservation. For lifecycle nodes
+not ordered relative to each other by that graph, the caller supplies an exact
+order and the controller binds it into the effect request identity.
 
 ## Building
 

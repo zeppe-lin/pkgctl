@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.8.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.9.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -76,6 +76,41 @@ Terminal check evidence must bind the exact check and execution requests. Passed
 evidence satisfies the check node; failed evidence fails it and blocks dependent
 units. Completion may follow unrelated progression advancement only while the
 same node remains ready and the same construction evidence remains retained.
+
+# TRANSACTION DISPATCH
+
+Version 0.9.0 adds an immutable *transaction_run* ledger for ready units that
+have been selected but have not yet produced terminal evidence. Progression
+continues to expose all ready units; dispatch policy may reserve the first unit
+in canonical order that fits explicit construction and check capacities. Target
+operations use one non-configurable mutation lane.
+
+Each reservation binds a nonzero caller-issued 32-byte nonce, the exact ready
+unit, the current state epoch, and terminal evidence for every external
+non-retain predecessor. Nonces and records remain in the run after completion or
+release, preventing silent attempt reuse.
+
+A dispatch is first *reserved*. It becomes *started* only when an exact admitted
+construction, check, or effect session is bound. Only a reserved dispatch can be
+*released-unstarted*. Started work remains owned until authoritative terminal
+evidence arrives. Construction and check results must belong to the exact
+started session. Operation results that report lost lease or indeterminate
+publication remain ordered observations on an active dispatch; they cannot
+carry a resulting state snapshot.
+
+Before construction starts, every package input must match one exact
+*libpkgtransaction* requirement edge and exact selected or retained package
+truth. Build and artifact identities must reproduce successful predecessor
+construction evidence. Retained installed inputs must still be the same package
+in the current canonical state. *libpkgtransaction* Version 2.1.0 or later orders
+both build- and check-scoped package inputs before the construction that seals
+them.
+
+The only containment policy in this release stops new reservations and starting
+merely reserved work after terminal failure. Already-started independent work
+may still submit exact terminal evidence. Dispatch creates no threads, invokes
+no driver, builds no backend, allocates no resource path, persists no run, and
+exposes no effect-implying command.
 
 # TRANSACTION CHECK SESSION
 

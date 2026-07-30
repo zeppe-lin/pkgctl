@@ -33,6 +33,14 @@ and limits belong only to the admitted check session. The controller must not
 reimplement input-tree matching, resource-layout construction, process-status
 classification, or backend execution.
 
+The dispatch layer may depend on transaction progression and exact admitted
+construction, check, and effect sessions. It owns deterministic reservation,
+bounded in-flight capacity, caller attempt nonces, and immutable ownership
+records. It must not execute a driver, create a backend, allocate resource paths,
+construct new transaction edges, or infer success from reservation state.
+Check-scoped package inputs require `libpkgtransaction >= 2.1.0` so exact input
+authority precedes the construction that seals it.
+
 The effectful controller layer may depend on image, plan, apply, execution,
 and state adapters only through their exact public values. It must not parse
 payloads, derive lifecycle programs, perform target mutation, or serialize
@@ -58,7 +66,9 @@ legacy behavior.
 4. check shared and static linkage and direct dependency isolation;
 5. verify construction authority binding, source/build evidence retention,
    check request/session/result binding, canonical multi-input projection,
-   concurrency-safe check progression, preparation projection and typed refusal, effect sequencing,
+   concurrency-safe check progression, deterministic dispatch reservation,
+   exact predecessor and state-epoch binding, operation-lane serialization,
+   failure containment, preparation projection and typed refusal, effect sequencing,
    intent-before-effect persistence, exact restart checkpoints, outer-lease
    reacquisition, publication reconciliation, publication provenance, CLI
    read-only behavior, and missing-state refusal;
