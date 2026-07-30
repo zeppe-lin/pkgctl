@@ -13,9 +13,12 @@
 #include <string>
 #include <vector>
 
+#include <pkgctl/effect_journal.h>
 #include <pkgctl/progression.h>
 
 namespace pkgctl {
+
+class transaction_run_journal_record;
 
 inline constexpr std::size_t transaction_dispatch_nonce_size = 32U;
 
@@ -65,6 +68,14 @@ public:
   [[nodiscard]] const session_identity& identity() const noexcept;
 
 private:
+  friend class transaction_run_journal_record;
+
+  [[nodiscard]] static transaction_dispatch_policy restore(
+      std::size_t construction_capacity,
+      std::size_t check_capacity,
+      transaction_failure_containment failure_containment,
+      const session_identity& expected_identity);
+
   transaction_dispatch_policy(
       std::size_t construction_capacity,
       std::size_t check_capacity,
@@ -92,6 +103,12 @@ public:
 
 private:
   friend struct detail_dispatch_access;
+  friend class transaction_run_journal_record;
+
+  [[nodiscard]] static transaction_dispatch_dependency restore(
+      pkgtransaction::transaction_node_identity node,
+      session_identity evidence,
+      const session_identity& expected_identity);
 
   transaction_dispatch_dependency(
       pkgtransaction::transaction_node_identity node,
@@ -117,6 +134,15 @@ public:
 
 private:
   friend struct detail_dispatch_access;
+  friend class transaction_run_journal_record;
+
+  [[nodiscard]] static transaction_dispatch restore(
+      ready_transaction_unit unit,
+      transaction_dispatch_nonce nonce,
+      session_identity reserved_from_progress,
+      pkgstate::installed_state_snapshot_identity reserved_state,
+      std::vector<transaction_dispatch_dependency> dependencies,
+      const session_identity& expected_identity);
 
   transaction_dispatch(
       ready_transaction_unit unit,
@@ -150,6 +176,9 @@ public:
   [[nodiscard]] bool active() const noexcept;
   [[nodiscard]] const std::optional<session_identity>&
   attempt_session() const noexcept;
+  /*! \brief Exact durable effect-attempt history for an operation. */
+  [[nodiscard]] const std::optional<session_identity>&
+  effect_attempt() const noexcept;
   [[nodiscard]] const std::vector<session_identity>&
   observations() const noexcept;
   [[nodiscard]] const std::optional<session_identity>&
@@ -158,11 +187,22 @@ public:
 
 private:
   friend struct detail_dispatch_access;
+  friend class transaction_run_journal_record;
+
+  [[nodiscard]] static transaction_dispatch_record restore(
+      transaction_dispatch dispatch,
+      transaction_dispatch_state state,
+      std::optional<session_identity> attempt_session,
+      std::optional<session_identity> effect_attempt,
+      std::vector<session_identity> observations,
+      std::optional<session_identity> terminal_evidence,
+      const session_identity& expected_identity);
 
   transaction_dispatch_record(
       transaction_dispatch dispatch,
       transaction_dispatch_state state,
       std::optional<session_identity> attempt_session,
+      std::optional<session_identity> effect_attempt,
       std::vector<session_identity> observations,
       std::optional<session_identity> terminal_evidence,
       session_identity identity);
@@ -170,6 +210,7 @@ private:
   transaction_dispatch dispatch_;
   transaction_dispatch_state state_;
   std::optional<session_identity> attempt_session_;
+  std::optional<session_identity> effect_attempt_;
   std::vector<session_identity> observations_;
   std::optional<session_identity> terminal_evidence_;
   session_identity identity_;
@@ -194,6 +235,13 @@ public:
 
 private:
   friend struct detail_dispatch_access;
+  friend class transaction_run_journal_record;
+
+  [[nodiscard]] static transaction_run restore(
+      transaction_progress progress,
+      transaction_dispatch_policy policy,
+      std::vector<transaction_dispatch_record> records,
+      const session_identity& expected_identity);
 
   transaction_run(
       transaction_progress progress,
@@ -213,6 +261,12 @@ struct transaction_dispatch_result final {
   std::optional<transaction_dispatch> dispatch;
 };
 
+/*! \brief Pure durable-operation start authority before either append. */
+struct operation_dispatch_start_result final {
+  transaction_run run;
+  effect_attempt_record effect_attempt;
+};
+
 /*! \brief Reserve the first canonical ready unit allowed by policy. */
 [[nodiscard]] transaction_dispatch_result reserve_next(
     transaction_run run,
@@ -230,11 +284,16 @@ struct transaction_dispatch_result final {
     const transaction_dispatch& dispatch,
     const transaction_check_session& session);
 
-/*! \brief Bind one reserved operation dispatch to its admitted session. */
-[[nodiscard]] transaction_run start_operation_dispatch(
+/*! \brief Bind an operation and derive its exact durable effect attempt.
+ *
+ * The returned effect-attempt admission must be committed first, followed by
+ * the successor run snapshot, before any effect driver is invoked.
+ */
+[[nodiscard]] operation_dispatch_start_result start_operation_dispatch(
     transaction_run run,
     const transaction_dispatch& dispatch,
-    const effectful_operation_session& session);
+    const effectful_operation_session& session,
+    effect_attempt_nonce nonce);
 
 /*! \brief Release a reservation that has not acquired execution authority. */
 [[nodiscard]] transaction_run release_unstarted_dispatch(

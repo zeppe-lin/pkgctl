@@ -15,6 +15,8 @@
 
 namespace pkgctl {
 
+class transaction_run_journal_record;
+
 /*! \brief Controller knowledge for one transaction-program node. */
 enum class transaction_node_status {
   pending,
@@ -43,6 +45,14 @@ public:
 
 private:
   friend class transaction_progress;
+  friend class transaction_run_journal_record;
+  [[nodiscard]] static ready_transaction_unit restore(
+      const session_identity& transaction,
+      transaction_unit_kind kind,
+      pkgtransaction::transaction_node_identity primary_node,
+      std::vector<pkgtransaction::transaction_node_identity> members,
+      const session_identity& expected_identity);
+
   ready_transaction_unit(
       transaction_unit_kind kind,
       pkgtransaction::transaction_node_identity primary_node,
@@ -77,6 +87,10 @@ public:
   nodes(transaction_node_status status) const;
   [[nodiscard]] const std::vector<ready_transaction_unit>&
   ready_units() const noexcept;
+
+  /*! \brief Test exact unit authority independently of current readiness. */
+  [[nodiscard]] bool contains_unit(
+      const ready_transaction_unit& unit) const;
 
   [[nodiscard]] const construction_result* construction(
       const pkgtransaction::transaction_node_identity& build_node) const noexcept;

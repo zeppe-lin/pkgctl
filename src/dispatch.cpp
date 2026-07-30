@@ -194,7 +194,7 @@ void validate_record_shape(const transaction_dispatch_record& record)
   switch (record.state())
   {
     case transaction_dispatch_state::reserved:
-      if (record.attempt_session() ||
+      if (record.attempt_session() || record.effect_attempt() ||
           !record.observations().empty() ||
           record.terminal_evidence())
         throw error(error_code::invalid_transaction_run,
@@ -205,6 +205,10 @@ void validate_record_shape(const transaction_dispatch_record& record)
       if (!record.attempt_session() || record.terminal_evidence())
         throw error(error_code::invalid_transaction_run,
                     "started dispatch record has an invalid evidence shape");
+      if ((record.dispatch().unit().kind() == transaction_unit_kind::operation) !=
+          record.effect_attempt().has_value())
+        throw error(error_code::invalid_transaction_run,
+                    "started dispatch has invalid effect-attempt authority");
       if (!record.observations().empty() &&
           record.dispatch().unit().kind() != transaction_unit_kind::operation)
         throw error(error_code::invalid_transaction_run,
@@ -215,6 +219,10 @@ void validate_record_shape(const transaction_dispatch_record& record)
       if (!record.attempt_session() || !record.terminal_evidence())
         throw error(error_code::invalid_transaction_run,
                     "completed dispatch record lacks terminal evidence");
+      if ((record.dispatch().unit().kind() == transaction_unit_kind::operation) !=
+          record.effect_attempt().has_value())
+        throw error(error_code::invalid_transaction_run,
+                    "completed dispatch has invalid effect-attempt authority");
       if (!record.observations().empty() &&
           record.dispatch().unit().kind() != transaction_unit_kind::operation)
         throw error(error_code::invalid_transaction_run,
@@ -222,7 +230,7 @@ void validate_record_shape(const transaction_dispatch_record& record)
       return;
 
     case transaction_dispatch_state::released_unstarted:
-      if (record.attempt_session() ||
+      if (record.attempt_session() || record.effect_attempt() ||
           !record.observations().empty() ||
           record.terminal_evidence())
         throw error(error_code::invalid_transaction_run,
@@ -250,8 +258,31 @@ void validate_run_records(
     if (!dispatches.insert(dispatch.identity().hex()).second)
       throw error(error_code::invalid_transaction_run,
                   "transaction run duplicates a dispatch record");
+
+    std::set<std::string> observations;
+    for (const auto& observation : record.observations())
+    {
+      if (!observations.insert(observation.hex()).second)
+        throw error(error_code::invalid_transaction_run,
+                    "transaction run repeats an uncertainty observation");
+    }
+
     if (active_state(record.state()))
+    {
+      if (!progress.contains_unit(dispatch.unit()))
+        throw error(error_code::invalid_transaction_run,
+                    "active transaction run contains a foreign graph unit");
+      const auto current_dependencies =
+          capture_dependencies(progress, dispatch.unit());
+      if (current_dependencies != dispatch.dependencies())
+        throw error(error_code::invalid_transaction_run,
+                    "active dispatch contains forged predecessor evidence");
+      if (dispatch.unit().kind() == transaction_unit_kind::operation &&
+          dispatch.reserved_state() != progress.current_state().identity())
+        throw error(error_code::invalid_transaction_run,
+                    "active operation dispatch retains a stale state epoch");
       active.push_back(&record);
+    }
   }
 
   for (std::size_t left = 0; left < active.size(); ++left)
@@ -285,6 +316,72 @@ void validate_run_records(
     if (find_ready_unit(progress, dispatch.unit()) == nullptr)
       throw error(error_code::invalid_transaction_run,
                   "active dispatch unit is no longer graph-ready");
+  }
+}
+
+void validate_rehydrated_run_history(
+    const transaction_progress& progress,
+    const std::vector<transaction_dispatch_record>& records)
+{
+  for (const auto& record : records)
+  {
+    const auto& dispatch = record.dispatch();
+    if (!progress.contains_unit(dispatch.unit()))
+      throw error(error_code::invalid_transaction_run,
+                  "durable transaction run contains a foreign graph unit");
+
+    const auto current_dependencies =
+        capture_dependencies(progress, dispatch.unit());
+    if (current_dependencies != dispatch.dependencies())
+      throw error(error_code::invalid_transaction_run,
+                  "durable transaction run contains forged predecessor evidence");
+
+    if (record.state() != transaction_dispatch_state::completed)
+      continue;
+
+    const auto primary = dispatch.unit().primary_node();
+    const auto expected = terminal_evidence_for_node(progress, primary);
+    if (!expected || !record.terminal_evidence() ||
+        *expected != *record.terminal_evidence())
+      throw error(error_code::invalid_transaction_run,
+                  "completed dispatch contradicts progression evidence");
+
+    switch (dispatch.unit().kind())
+    {
+      case transaction_unit_kind::construction:
+      {
+        const auto* result = progress.construction(primary);
+        if (result == nullptr || !record.attempt_session() ||
+            *record.attempt_session() != result->session().identity())
+          throw error(error_code::invalid_transaction_run,
+                      "completed construction dispatch has forged attempt authority");
+        break;
+      }
+
+      case transaction_unit_kind::check:
+      {
+        const auto* result = progress.check(primary);
+        if (result == nullptr || !record.attempt_session() ||
+            *record.attempt_session() != result->session().identity())
+          throw error(error_code::invalid_transaction_run,
+                      "completed check dispatch has forged attempt authority");
+        break;
+      }
+
+      case transaction_unit_kind::operation:
+      {
+        const auto* result = progress.effect(primary);
+        if (result == nullptr || !record.attempt_session() ||
+            *record.attempt_session() != result->session().identity())
+          throw error(error_code::invalid_transaction_run,
+                      "completed operation dispatch has forged attempt authority");
+        if (dispatch.reserved_state() !=
+            result->session().request().expected_state().identity())
+          throw error(error_code::invalid_transaction_run,
+                      "completed operation dispatch has forged state authority");
+        break;
+      }
+    }
   }
 }
 
@@ -349,6 +446,7 @@ std::vector<std::string> record_identity_fields(
     const transaction_dispatch& dispatch,
     transaction_dispatch_state state,
     const std::optional<session_identity>& attempt,
+    const std::optional<session_identity>& effect_attempt,
     const std::vector<session_identity>& observations,
     const std::optional<session_identity>& terminal)
 {
@@ -356,6 +454,7 @@ std::vector<std::string> record_identity_fields(
       dispatch.identity().hex(),
       std::string(dispatch_state_name(state)),
       attempt ? attempt->hex() : std::string{},
+      effect_attempt ? effect_attempt->hex() : std::string{},
       std::to_string(observations.size())};
   for (const auto& observation : observations)
     fields.push_back(observation.hex());
@@ -400,16 +499,18 @@ struct detail_dispatch_access final {
       transaction_dispatch dispatch,
       transaction_dispatch_state state,
       std::optional<session_identity> attempt,
+      std::optional<session_identity> effect_attempt,
       std::vector<session_identity> observations,
       std::optional<session_identity> terminal)
   {
     auto identity = make_session_identity(
-        "pkgctl/transaction-dispatch-record/1",
+        "pkgctl/transaction-dispatch-record/2",
         record_identity_fields(
-            dispatch, state, attempt, observations, terminal));
+            dispatch, state, attempt, effect_attempt, observations, terminal));
     return transaction_dispatch_record(
         std::move(dispatch), state, std::move(attempt),
-        std::move(observations), std::move(terminal), std::move(identity));
+        std::move(effect_attempt), std::move(observations),
+        std::move(terminal), std::move(identity));
   }
 
   static transaction_run run(
@@ -500,11 +601,12 @@ bool capacity_available(
 
 transaction_dispatch_record started_record(
     const transaction_dispatch_record& current,
-    const session_identity& session)
+    const session_identity& session,
+    std::optional<session_identity> effect_attempt = std::nullopt)
 {
   return detail_dispatch_access::record(
       current.dispatch(), transaction_dispatch_state::started,
-      session, {}, std::nullopt);
+      session, std::move(effect_attempt), {}, std::nullopt);
 }
 
 transaction_dispatch_record completed_record(
@@ -513,7 +615,8 @@ transaction_dispatch_record completed_record(
 {
   return detail_dispatch_access::record(
       current.dispatch(), transaction_dispatch_state::completed,
-      current.attempt_session(), current.observations(), evidence);
+      current.attempt_session(), current.effect_attempt(),
+      current.observations(), evidence);
 }
 
 transaction_dispatch_record observed_record(
@@ -528,7 +631,8 @@ transaction_dispatch_record observed_record(
   observations.push_back(observation);
   return detail_dispatch_access::record(
       current.dispatch(), transaction_dispatch_state::started,
-      current.attempt_session(), std::move(observations), std::nullopt);
+      current.attempt_session(), current.effect_attempt(),
+      std::move(observations), std::nullopt);
 }
 
 transaction_dispatch_record released_record(
@@ -536,7 +640,7 @@ transaction_dispatch_record released_record(
 {
   return detail_dispatch_access::record(
       current.dispatch(), transaction_dispatch_state::released_unstarted,
-      std::nullopt, {}, std::nullopt);
+      std::nullopt, std::nullopt, {}, std::nullopt);
 }
 
 transaction_run replace_record(
@@ -935,6 +1039,20 @@ transaction_dispatch_policy transaction_dispatch_policy::make(
       failure_containment, std::move(identity));
 }
 
+transaction_dispatch_policy transaction_dispatch_policy::restore(
+    std::size_t construction_capacity,
+    std::size_t check_capacity,
+    transaction_failure_containment failure_containment,
+    const session_identity& expected_identity)
+{
+  auto policy = make(
+      construction_capacity, check_capacity, failure_containment);
+  if (policy.identity() != expected_identity)
+    throw error(error_code::invalid_transaction_run,
+                "durable dispatch policy identity does not match its fields");
+  return policy;
+}
+
 std::size_t transaction_dispatch_policy::construction_capacity() const noexcept
 {
   return construction_capacity_;
@@ -968,6 +1086,19 @@ transaction_dispatch_dependency::transaction_dispatch_dependency(
     : node_(std::move(node)), evidence_(std::move(evidence)),
       identity_(std::move(identity))
 {
+}
+
+transaction_dispatch_dependency transaction_dispatch_dependency::restore(
+    node_identity node,
+    session_identity evidence,
+    const session_identity& expected_identity)
+{
+  auto dependency = detail_dispatch_access::dependency(
+      std::move(node), std::move(evidence));
+  if (dependency.identity() != expected_identity)
+    throw error(error_code::invalid_transaction_run,
+                "durable dispatch dependency identity does not match its fields");
+  return dependency;
 }
 
 const node_identity& transaction_dispatch_dependency::node() const noexcept
@@ -1015,6 +1146,24 @@ transaction_dispatch::transaction_dispatch(
 {
 }
 
+transaction_dispatch transaction_dispatch::restore(
+    ready_transaction_unit unit,
+    transaction_dispatch_nonce nonce,
+    session_identity reserved_from_progress,
+    pkgstate::installed_state_snapshot_identity reserved_state,
+    std::vector<transaction_dispatch_dependency> dependencies,
+    const session_identity& expected_identity)
+{
+  auto dispatch = detail_dispatch_access::dispatch(
+      std::move(unit), std::move(nonce),
+      std::move(reserved_from_progress), std::move(reserved_state),
+      std::move(dependencies));
+  if (dispatch.identity() != expected_identity)
+    throw error(error_code::invalid_transaction_run,
+                "durable dispatch identity does not match its fields");
+  return dispatch;
+}
+
 const ready_transaction_unit& transaction_dispatch::unit() const noexcept
 {
   return unit_;
@@ -1052,15 +1201,37 @@ transaction_dispatch_record::transaction_dispatch_record(
     transaction_dispatch dispatch,
     transaction_dispatch_state state,
     std::optional<session_identity> attempt_session,
+    std::optional<session_identity> effect_attempt,
     std::vector<session_identity> observations,
     std::optional<session_identity> terminal_evidence,
     session_identity identity)
     : dispatch_(std::move(dispatch)), state_(state),
       attempt_session_(std::move(attempt_session)),
+      effect_attempt_(std::move(effect_attempt)),
       observations_(std::move(observations)),
       terminal_evidence_(std::move(terminal_evidence)),
       identity_(std::move(identity))
 {
+}
+
+transaction_dispatch_record transaction_dispatch_record::restore(
+    transaction_dispatch dispatch,
+    transaction_dispatch_state state,
+    std::optional<session_identity> attempt_session,
+    std::optional<session_identity> effect_attempt,
+    std::vector<session_identity> observations,
+    std::optional<session_identity> terminal_evidence,
+    const session_identity& expected_identity)
+{
+  auto record = detail_dispatch_access::record(
+      std::move(dispatch), state, std::move(attempt_session),
+      std::move(effect_attempt), std::move(observations),
+      std::move(terminal_evidence));
+  validate_record_shape(record);
+  if (record.identity() != expected_identity)
+    throw error(error_code::invalid_transaction_run,
+                "durable dispatch-record identity does not match its fields");
+  return record;
 }
 
 const transaction_dispatch&
@@ -1084,6 +1255,12 @@ const std::optional<session_identity>&
 transaction_dispatch_record::attempt_session() const noexcept
 {
   return attempt_session_;
+}
+
+const std::optional<session_identity>&
+transaction_dispatch_record::effect_attempt() const noexcept
+{
+  return effect_attempt_;
 }
 
 const std::vector<session_identity>&
@@ -1112,6 +1289,21 @@ transaction_run::transaction_run(
     : progress_(std::move(progress)), policy_(std::move(policy)),
       records_(std::move(records)), identity_(std::move(identity))
 {
+}
+
+transaction_run transaction_run::restore(
+    transaction_progress progress,
+    transaction_dispatch_policy policy,
+    std::vector<transaction_dispatch_record> records,
+    const session_identity& expected_identity)
+{
+  validate_rehydrated_run_history(progress, records);
+  auto run = detail_dispatch_access::run(
+      std::move(progress), std::move(policy), std::move(records));
+  if (run.identity() != expected_identity)
+    throw error(error_code::invalid_transaction_run,
+                "durable transaction-run identity does not match its fields");
+  return run;
 }
 
 transaction_run transaction_run::begin(
@@ -1201,7 +1393,7 @@ transaction_dispatch_result reserve_next(
   auto records = run.records();
   records.push_back(detail_dispatch_access::record(
       dispatch, transaction_dispatch_state::reserved,
-      std::nullopt, {}, std::nullopt));
+      std::nullopt, std::nullopt, {}, std::nullopt));
   auto next = detail_dispatch_access::run(
       run.progress(), run.policy(), std::move(records));
   return {std::move(next), std::move(dispatch)};
@@ -1239,10 +1431,11 @@ transaction_run start_check_dispatch(
       std::move(run), index, std::move(replacement));
 }
 
-transaction_run start_operation_dispatch(
+operation_dispatch_start_result start_operation_dispatch(
     transaction_run run,
     const transaction_dispatch& dispatch,
-    const effectful_operation_session& session)
+    const effectful_operation_session& session,
+    effect_attempt_nonce nonce)
 {
   validate_dispatch_may_start(run);
   const auto index = record_index(run, dispatch);
@@ -1250,9 +1443,16 @@ transaction_run start_operation_dispatch(
       run, dispatch, transaction_dispatch_state::reserved);
   validate_dispatch_is_current(run, dispatch);
   validate_operation_binding(run, dispatch, session);
-  auto replacement = started_record(record, session.identity());
-  return replace_record(
+
+  auto attempt = effect_attempt_record::admit(
+      session.identity(), session.before().size(), session.after().size(),
+      std::move(nonce));
+  auto replacement = started_record(
+      record, session.identity(), attempt.attempt());
+  auto started = replace_record(
       std::move(run), index, std::move(replacement));
+  return operation_dispatch_start_result{
+      std::move(started), std::move(attempt)};
 }
 
 transaction_run release_unstarted_dispatch(

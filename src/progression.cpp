@@ -264,11 +264,11 @@ std::map<std::string, transaction_node_status> derive_statuses(
 }
 
 session_identity ready_unit_identity(
-    const transaction_session& transaction,
+    const session_identity& transaction,
     const unit_spec& unit)
 {
   std::vector<std::string> fields{
-      transaction.identity().hex(),
+      transaction.hex(),
       std::to_string(static_cast<unsigned int>(unit.kind)),
       unit.primary.hex(), std::to_string(unit.members.size())};
   for (const auto& member : unit.members)
@@ -350,7 +350,7 @@ transaction_progress transaction_progress::rebuild(
       continue;
     ready.push_back(ready_transaction_unit(
         unit.kind, unit.primary, unit.members,
-        ready_unit_identity(transaction, unit)));
+        ready_unit_identity(transaction.identity(), unit)));
   }
 
   std::vector<std::string> identity_fields{
@@ -390,6 +390,38 @@ transaction_progress transaction_progress::rebuild(
       std::move(transaction), std::move(current_state),
       std::move(constructions), std::move(checks), std::move(effects),
       std::move(nodes), std::move(ready), std::move(identity));
+}
+
+ready_transaction_unit ready_transaction_unit::restore(
+    const session_identity& transaction,
+    transaction_unit_kind kind,
+    pkgtransaction::transaction_node_identity primary_node,
+    std::vector<pkgtransaction::transaction_node_identity> members,
+    const session_identity& expected_identity)
+{
+  if (members.empty() ||
+      !std::binary_search(members.begin(), members.end(), primary_node) ||
+      !std::is_sorted(members.begin(), members.end()) ||
+      std::adjacent_find(members.begin(), members.end()) != members.end())
+    throw error(error_code::invalid_transaction_run,
+                "durable ready unit has invalid canonical members");
+  if ((kind == transaction_unit_kind::construction ||
+       kind == transaction_unit_kind::check) &&
+      (members.size() != 1U || members.front() != primary_node))
+    throw error(error_code::invalid_transaction_run,
+                "durable non-operation unit does not contain one exact node");
+
+  unit_spec specification{
+      kind,
+      primary_node,
+      members,
+  };
+  const auto identity = ready_unit_identity(transaction, specification);
+  if (identity != expected_identity)
+    throw error(error_code::invalid_transaction_run,
+                "durable ready-unit identity does not match its fields");
+  return ready_transaction_unit(
+      kind, std::move(primary_node), std::move(members), identity);
 }
 
 ready_transaction_unit::ready_transaction_unit(
@@ -470,6 +502,20 @@ std::vector<node_id> transaction_progress::nodes(
 
 const std::vector<ready_transaction_unit>&
 transaction_progress::ready_units() const noexcept { return ready_units_; }
+
+bool transaction_progress::contains_unit(
+    const ready_transaction_unit& unit) const
+{
+  const auto unit_specs = units(transaction_);
+  const auto found = std::find_if(
+      unit_specs.begin(), unit_specs.end(), [&](const auto& candidate) {
+        return candidate.kind == unit.kind() &&
+            candidate.primary == unit.primary_node() &&
+            candidate.members == unit.members();
+      });
+  return found != unit_specs.end() &&
+      ready_unit_identity(transaction_.identity(), *found) == unit.identity();
+}
 
 const construction_result* transaction_progress::construction(
     const node_id& node) const noexcept
