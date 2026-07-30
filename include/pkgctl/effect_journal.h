@@ -153,6 +153,9 @@ public:
       std::optional<pkgstate::installed_state_snapshot_identity>
           reconciled_state = std::nullopt) const;
 
+  /*! \brief Verify that this snapshot is the exact legal successor. */
+  void validate_successor_of(const effect_attempt_record& previous) const;
+
   [[nodiscard]] std::uint16_t schema_version() const noexcept;
   [[nodiscard]] const session_identity& identity() const noexcept;
   [[nodiscard]] const session_identity& attempt() const noexcept;

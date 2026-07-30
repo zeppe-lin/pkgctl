@@ -125,6 +125,79 @@ std::vector<std::string> identity_fields(
   return fields;
 }
 
+std::uint64_t retained_transition_count(
+    std::size_t before_total,
+    std::size_t after_total,
+    effect_attempt_stage stage,
+    const std::vector<effect_lifecycle_fact>& before,
+    const std::optional<effect_application_fact>& application,
+    const std::vector<effect_lifecycle_fact>& after,
+    const std::optional<std::string>& transaction_evidence,
+    const std::optional<effect_publication_fact>& publication,
+    const std::optional<effectful_operation_outcome>& terminal_outcome)
+{
+  const auto before_count = static_cast<std::uint64_t>(before.size());
+  const auto after_count = static_cast<std::uint64_t>(after.size());
+  const auto application_base =
+      static_cast<std::uint64_t>(before_total) * 2U;
+  const auto after_base = application_base + 2U;
+  const auto publication_base =
+      after_base + static_cast<std::uint64_t>(after_total) * 2U;
+
+  switch (stage)
+  {
+    case effect_attempt_stage::admitted:
+      return 0U;
+    case effect_attempt_stage::before_lifecycle_intent:
+      return before_count * 2U + 1U;
+    case effect_attempt_stage::before_lifecycle_terminal:
+      return before_count * 2U;
+    case effect_attempt_stage::application_intent:
+      return application_base + 1U;
+    case effect_attempt_stage::application_terminal:
+      return application_base + 2U;
+    case effect_attempt_stage::after_lifecycle_intent:
+      return after_base + after_count * 2U + 1U;
+    case effect_attempt_stage::after_lifecycle_terminal:
+      return after_base + after_count * 2U;
+    case effect_attempt_stage::publication_intent:
+      return publication_base + 1U;
+    case effect_attempt_stage::publication_terminal:
+      return publication_base + 2U;
+    case effect_attempt_stage::terminal:
+      break;
+  }
+
+  switch (*terminal_outcome)
+  {
+    case effectful_operation_outcome::lifecycle_failed_before_application:
+      return before_count * 2U + 1U;
+    case effectful_operation_outcome::application_not_completed:
+      return application_base + 3U;
+    case effectful_operation_outcome::lifecycle_failed_after_application:
+      return after_base + after_count * 2U + 1U;
+    case effectful_operation_outcome::state_publication_not_completed:
+    case effectful_operation_outcome::state_publication_indeterminate:
+      return publication_base + 3U;
+    case effectful_operation_outcome::completed:
+      return publication_base + (publication ? 3U : 2U);
+    case effectful_operation_outcome::outer_lease_lost:
+      if (publication)
+        return publication_base + 3U;
+      if (transaction_evidence)
+        invalid_record(
+            "lease-loss terminal record follows unresolved publication intent");
+      if (!after.empty())
+        return after_base + after_count * 2U + 1U;
+      if (application)
+        return application_base + 3U;
+      if (!before.empty())
+        return before_count * 2U + 1U;
+      return 1U;
+  }
+  invalid_record("effect-attempt journal has an invalid terminal outcome");
+}
+
 void validate_record_shape(
     const session_identity& identity,
     const session_identity& attempt,
@@ -149,7 +222,7 @@ void validate_record_shape(
     invalid_record("lifecycle evidence exceeds the admitted session shape");
   if ((sequence == 0U) != !previous.has_value())
     invalid_record("journal sequence and predecessor presence disagree");
-  if (stage == effect_attempt_stage::admitted && sequence != 0U)
+  if ((sequence == 0U) != (stage == effect_attempt_stage::admitted))
     invalid_record("only sequence zero may represent attempt admission");
   if (stage != effect_attempt_stage::terminal && terminal_outcome)
     invalid_record("nonterminal journal snapshot carries a terminal outcome");
@@ -361,6 +434,12 @@ void validate_record_shape(
       break;
   }
 
+  if (sequence != retained_transition_count(
+          before_total, after_total, stage, before, application, after,
+          transaction_evidence, publication, terminal_outcome))
+    invalid_record(
+        "effect-attempt journal sequence disagrees with retained history");
+
   const session_identity expected = make_session_identity(
       "pkgctl/effect-attempt-record/1",
       identity_fields(attempt, session, nonce, sequence, previous,
@@ -370,6 +449,245 @@ void validate_record_shape(
                       reconciled_state));
   if (identity != expected)
     invalid_record("journal record identity does not match its content");
+}
+
+bool same_lifecycle_fact(
+    const effect_lifecycle_fact& lhs,
+    const effect_lifecycle_fact& rhs) noexcept
+{
+  return lhs.result() == rhs.result() && lhs.succeeded() == rhs.succeeded();
+}
+
+bool same_lifecycle_facts(
+    const std::vector<effect_lifecycle_fact>& lhs,
+    const std::vector<effect_lifecycle_fact>& rhs) noexcept
+{
+  return lhs.size() == rhs.size() &&
+      std::equal(lhs.begin(), lhs.end(), rhs.begin(), same_lifecycle_fact);
+}
+
+bool appended_lifecycle_fact(
+    const std::vector<effect_lifecycle_fact>& previous,
+    const std::vector<effect_lifecycle_fact>& next) noexcept
+{
+  return next.size() == previous.size() + 1U &&
+      std::equal(previous.begin(), previous.end(), next.begin(),
+                 same_lifecycle_fact);
+}
+
+bool same_application_fact(
+    const std::optional<effect_application_fact>& lhs,
+    const std::optional<effect_application_fact>& rhs) noexcept
+{
+  if (lhs.has_value() != rhs.has_value())
+    return false;
+  return !lhs ||
+      (lhs->receipt() == rhs->receipt() &&
+       lhs->outcome() == rhs->outcome() &&
+       lhs->journal() == rhs->journal() &&
+       lhs->completed_evidence() == rhs->completed_evidence());
+}
+
+bool same_publication_fact(
+    const std::optional<effect_publication_fact>& lhs,
+    const std::optional<effect_publication_fact>& rhs) noexcept
+{
+  if (lhs.has_value() != rhs.has_value())
+    return false;
+  return !lhs ||
+      (lhs->receipt() == rhs->receipt() &&
+       lhs->outcome() == rhs->outcome() &&
+       lhs->resulting_snapshot() == rhs->resulting_snapshot());
+}
+
+bool same_effect_evidence(
+    const effect_attempt_record& lhs,
+    const effect_attempt_record& rhs) noexcept
+{
+  return same_lifecycle_facts(lhs.before(), rhs.before()) &&
+      same_application_fact(lhs.application(), rhs.application()) &&
+      same_lifecycle_facts(lhs.after(), rhs.after()) &&
+      lhs.transaction_evidence() == rhs.transaction_evidence() &&
+      lhs.publication_request() == rhs.publication_request() &&
+      same_publication_fact(lhs.publication(), rhs.publication());
+}
+
+void require_same_effect_evidence(
+    const effect_attempt_record& previous,
+    const effect_attempt_record& next,
+    const char* message)
+{
+  if (!same_effect_evidence(previous, next))
+    invalid_transition(message);
+}
+
+void validate_effect_successor(
+    const effect_attempt_record& previous,
+    const effect_attempt_record& next)
+{
+  if (previous.stage() == effect_attempt_stage::terminal)
+    invalid_transition("terminal controller attempt cannot advance");
+  if (previous.sequence() == std::numeric_limits<std::uint64_t>::max() ||
+      next.sequence() != previous.sequence() + 1U ||
+      !next.previous() || *next.previous() != previous.identity())
+    invalid_transition("controller journal sequence chain is invalid");
+  if (next.attempt() != previous.attempt() ||
+      next.session() != previous.session() ||
+      next.nonce() != previous.nonce() ||
+      next.before_total() != previous.before_total() ||
+      next.after_total() != previous.after_total())
+    invalid_transition("controller journal successor changes attempt authority");
+
+  switch (next.stage())
+  {
+    case effect_attempt_stage::admitted:
+      invalid_transition("attempt admission cannot be a successor");
+
+    case effect_attempt_stage::before_lifecycle_intent:
+    {
+      const bool allowed =
+          previous.stage() == effect_attempt_stage::admitted ||
+          (previous.stage() == effect_attempt_stage::before_lifecycle_terminal &&
+           !previous.before().empty() && previous.before().back().succeeded());
+      if (!allowed || next.active_index() != previous.before().size())
+        invalid_transition("invalid pre-lifecycle intent successor");
+      require_same_effect_evidence(
+          previous, next, "pre-lifecycle intent rewrites retained evidence");
+      return;
+    }
+
+    case effect_attempt_stage::before_lifecycle_terminal:
+      if (previous.stage() != effect_attempt_stage::before_lifecycle_intent ||
+          !appended_lifecycle_fact(previous.before(), next.before()) ||
+          !same_application_fact(previous.application(), next.application()) ||
+          !same_lifecycle_facts(previous.after(), next.after()) ||
+          previous.transaction_evidence() != next.transaction_evidence() ||
+          previous.publication_request() != next.publication_request() ||
+          !same_publication_fact(previous.publication(), next.publication()))
+        invalid_transition(
+            "pre-lifecycle terminal successor is not one exact evidence append");
+      return;
+
+    case effect_attempt_stage::application_intent:
+    {
+      const bool allowed =
+          (previous.before_total() == 0U &&
+           previous.stage() == effect_attempt_stage::admitted) ||
+          previous.stage() == effect_attempt_stage::before_lifecycle_terminal;
+      if (!allowed)
+        invalid_transition("invalid application intent successor");
+      require_same_effect_evidence(
+          previous, next, "application intent rewrites retained evidence");
+      return;
+    }
+
+    case effect_attempt_stage::application_terminal:
+      if (previous.stage() != effect_attempt_stage::application_intent ||
+          !same_lifecycle_facts(previous.before(), next.before()) ||
+          previous.application() || !next.application() ||
+          !same_lifecycle_facts(previous.after(), next.after()) ||
+          previous.transaction_evidence() != next.transaction_evidence() ||
+          previous.publication_request() != next.publication_request() ||
+          !same_publication_fact(previous.publication(), next.publication()))
+        invalid_transition(
+            "application terminal successor does not add exact evidence");
+      return;
+
+    case effect_attempt_stage::after_lifecycle_intent:
+    {
+      const bool allowed =
+          previous.stage() == effect_attempt_stage::application_terminal ||
+          (previous.stage() == effect_attempt_stage::after_lifecycle_terminal &&
+           !previous.after().empty() && previous.after().back().succeeded());
+      if (!allowed || next.active_index() != previous.after().size())
+        invalid_transition("invalid post-lifecycle intent successor");
+      require_same_effect_evidence(
+          previous, next, "post-lifecycle intent rewrites retained evidence");
+      return;
+    }
+
+    case effect_attempt_stage::after_lifecycle_terminal:
+      if (previous.stage() != effect_attempt_stage::after_lifecycle_intent ||
+          !same_lifecycle_facts(previous.before(), next.before()) ||
+          !same_application_fact(previous.application(), next.application()) ||
+          !appended_lifecycle_fact(previous.after(), next.after()) ||
+          previous.transaction_evidence() != next.transaction_evidence() ||
+          previous.publication_request() != next.publication_request() ||
+          !same_publication_fact(previous.publication(), next.publication()))
+        invalid_transition(
+            "post-lifecycle terminal successor is not one exact evidence append");
+      return;
+
+    case effect_attempt_stage::publication_intent:
+    {
+      const bool allowed =
+          (previous.after_total() == 0U &&
+           previous.stage() == effect_attempt_stage::application_terminal) ||
+          previous.stage() == effect_attempt_stage::after_lifecycle_terminal;
+      if (!allowed || previous.transaction_evidence() ||
+          previous.publication_request() || previous.publication() ||
+          !same_lifecycle_facts(previous.before(), next.before()) ||
+          !same_application_fact(previous.application(), next.application()) ||
+          !same_lifecycle_facts(previous.after(), next.after()) ||
+          next.publication())
+        invalid_transition("publication intent does not add exact authority");
+      return;
+    }
+
+    case effect_attempt_stage::publication_terminal:
+      if (previous.stage() != effect_attempt_stage::publication_intent ||
+          !same_lifecycle_facts(previous.before(), next.before()) ||
+          !same_application_fact(previous.application(), next.application()) ||
+          !same_lifecycle_facts(previous.after(), next.after()) ||
+          previous.transaction_evidence() != next.transaction_evidence() ||
+          previous.publication_request() != next.publication_request() ||
+          previous.publication() || !next.publication())
+        invalid_transition(
+            "publication terminal successor does not add exact evidence");
+      return;
+
+    case effect_attempt_stage::terminal:
+    {
+      require_same_effect_evidence(
+          previous, next, "terminal successor rewrites retained evidence");
+      switch (*next.terminal_outcome())
+      {
+        case effectful_operation_outcome::lifecycle_failed_before_application:
+          if (previous.stage() !=
+              effect_attempt_stage::before_lifecycle_terminal)
+            invalid_transition(
+                "pre-lifecycle failure has the wrong predecessor");
+          return;
+        case effectful_operation_outcome::application_not_completed:
+          if (previous.stage() != effect_attempt_stage::application_terminal)
+            invalid_transition("application failure has the wrong predecessor");
+          return;
+        case effectful_operation_outcome::lifecycle_failed_after_application:
+          if (previous.stage() !=
+              effect_attempt_stage::after_lifecycle_terminal)
+            invalid_transition(
+                "post-lifecycle failure has the wrong predecessor");
+          return;
+        case effectful_operation_outcome::outer_lease_lost:
+          if (previous.stage() == effect_attempt_stage::before_lifecycle_intent ||
+              previous.stage() == effect_attempt_stage::application_intent ||
+              previous.stage() == effect_attempt_stage::after_lifecycle_intent ||
+              previous.stage() == effect_attempt_stage::publication_intent)
+            invalid_transition("lease loss cannot resolve an active intent");
+          return;
+        case effectful_operation_outcome::state_publication_not_completed:
+        case effectful_operation_outcome::state_publication_indeterminate:
+          if (previous.stage() != effect_attempt_stage::publication_terminal)
+            invalid_transition("publication result has the wrong predecessor");
+          return;
+        case effectful_operation_outcome::completed:
+          if (previous.stage() != effect_attempt_stage::publication_intent &&
+              previous.stage() != effect_attempt_stage::publication_terminal)
+            invalid_transition("completed attempt has the wrong predecessor");
+          return;
+      }
+    }
+  }
 }
 
 bool all_succeeded(const std::vector<effect_lifecycle_fact>& facts)
@@ -596,13 +914,15 @@ effect_attempt_record effect_attempt_record::successor(
       before_total_, after_total_, stage, active_index, before, application,
       after, transaction_evidence, publication_request, publication,
       terminal_outcome, reconciled_state);
-  return restore(
+  auto result = restore(
       make_session_identity("pkgctl/effect-attempt-record/1", fields),
       attempt_, session_, nonce_, next_sequence, previous, before_total_,
       after_total_, stage, active_index, std::move(before),
       std::move(application), std::move(after),
       std::move(transaction_evidence), std::move(publication_request),
       std::move(publication), terminal_outcome, std::move(reconciled_state));
+  result.validate_successor_of(*this);
+  return result;
 }
 
 effect_attempt_record effect_attempt_record::begin_before(std::size_t index) const
@@ -803,6 +1123,12 @@ effect_attempt_record effect_attempt_record::seal_terminal(
                    application_, after_, transaction_evidence_,
                    publication_request_, publication_, outcome,
                    std::move(reconciled));
+}
+
+void effect_attempt_record::validate_successor_of(
+    const effect_attempt_record& previous) const
+{
+  validate_effect_successor(previous, *this);
 }
 
 std::uint16_t effect_attempt_record::schema_version() const noexcept

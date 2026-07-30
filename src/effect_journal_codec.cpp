@@ -28,24 +28,36 @@ constexpr std::size_t checksum_size = 32U;
 
 class writer final {
 public:
-  void u8(std::uint8_t value) { bytes_.push_back(value); }
+  void u8(std::uint8_t value)
+  {
+    bytes_.push_back(value);
+    check_size();
+  }
   void u16(std::uint16_t value)
   {
-    bytes_.push_back(static_cast<std::uint8_t>((value >> 8U) & 0xffU));
-    bytes_.push_back(static_cast<std::uint8_t>(value & 0xffU));
+    u8(static_cast<std::uint8_t>((value >> 8U) & 0xffU));
+    u8(static_cast<std::uint8_t>(value & 0xffU));
   }
   void u64(std::uint64_t value)
   {
     for (unsigned int shift = 56U;; shift -= 8U)
     {
-      bytes_.push_back(static_cast<std::uint8_t>((value >> shift) & 0xffU));
+      u8(static_cast<std::uint8_t>((value >> shift) & 0xffU));
       if (shift == 0U)
         break;
     }
   }
   void boolean(bool value) { u8(value ? 1U : 0U); }
   void raw(const std::uint8_t* data, std::size_t size)
-  { bytes_.insert(bytes_.end(), data, data + size); }
+  {
+    if (size == 0U)
+      return;
+    if (size > maximum_effect_attempt_encoding_size - bytes_.size())
+      throw effect_journal_error(
+          effect_journal_error_code::invalid_record,
+          "journal encoding exceeds the maximum size");
+    bytes_.insert(bytes_.end(), data, data + size);
+  }
   void text(const std::string& value)
   {
     if (value.size() > std::numeric_limits<std::uint32_t>::max())
@@ -64,6 +76,14 @@ public:
   [[nodiscard]] effect_attempt_encoding finish() &&
   { return std::move(bytes_); }
 private:
+  void check_size() const
+  {
+    if (bytes_.size() > maximum_effect_attempt_encoding_size)
+      throw effect_journal_error(
+          effect_journal_error_code::invalid_record,
+          "journal encoding exceeds the maximum size");
+  }
+
   effect_attempt_encoding bytes_;
 };
 
@@ -101,6 +121,8 @@ public:
     const auto length = u64();
     if (length > size_ - offset_)
       corrupt("journal string exceeds remaining encoding");
+    if (length == 0U)
+      return {};
     const auto* begin = reinterpret_cast<const char*>(data_ + offset_);
     offset_ += static_cast<std::size_t>(length);
     return std::string(begin, begin + length);
@@ -260,99 +282,119 @@ effect_attempt_encoding encode_effect_attempt_record(
 effect_attempt_record decode_effect_attempt_record(
     const effect_attempt_encoding& encoding)
 {
-  if (encoding.size() < magic.size() + 4U + checksum_size ||
-      encoding.size() > maximum_effect_attempt_encoding_size)
-    corrupt("journal encoding size is invalid");
-  const std::size_t payload_size = encoding.size() - checksum_size;
-  const auto checksum = sha256(encoding.data(), payload_size);
-  if (!std::equal(checksum.begin(), checksum.end(),
-                  encoding.begin() + static_cast<std::ptrdiff_t>(payload_size)))
-    corrupt("journal checksum does not match");
+  try
+  {
+    if (encoding.size() < magic.size() + 4U + checksum_size ||
+        encoding.size() > maximum_effect_attempt_encoding_size)
+      corrupt("journal encoding size is invalid");
+    const std::size_t payload_size = encoding.size() - checksum_size;
+    const auto checksum = sha256(encoding.data(), payload_size);
+    if (!std::equal(checksum.begin(), checksum.end(),
+                    encoding.begin() + static_cast<std::ptrdiff_t>(payload_size)))
+      corrupt("journal checksum does not match");
 
-  reader input(encoding.data(), payload_size);
-  input.expect(magic.data(), magic.size());
-  if (input.u16() != effect_attempt_encoding_version)
+    reader input(encoding.data(), payload_size);
+    input.expect(magic.data(), magic.size());
+    const auto encoding_version = input.u16();
+    if (encoding_version != effect_attempt_legacy_encoding_version &&
+        encoding_version != effect_attempt_encoding_version)
+      throw effect_journal_error(
+          effect_journal_error_code::unsupported_encoding,
+          "journal encoding version is unsupported");
+    if (input.u16() != effect_attempt_record_schema_version)
+      throw effect_journal_error(
+          effect_journal_error_code::unsupported_encoding,
+          "journal record schema is unsupported");
+
+    auto identity = session_identity::from_hex(input.text());
+    auto attempt = session_identity::from_hex(input.text());
+    auto session = session_identity::from_hex(input.text());
+    effect_attempt_nonce::byte_array nonce_bytes{};
+    for (auto& byte : nonce_bytes)
+      byte = input.u8();
+    auto nonce = effect_attempt_nonce::from_bytes(nonce_bytes);
+    const auto sequence = input.u64();
+    std::optional<session_identity> previous;
+    if (input.boolean())
+      previous = session_identity::from_hex(input.text());
+    const auto before_total = count(input);
+    const auto after_total = count(input);
+    const auto current_stage = stage(input.u8());
+    std::optional<std::size_t> active_index;
+    if (input.boolean())
+      active_index = count(input);
+
+    std::vector<effect_lifecycle_fact> before;
+    const auto before_count = count(input);
+    before.reserve(before_count);
+    for (std::size_t index = 0; index < before_count; ++index)
+    {
+      auto result = session_identity::from_hex(input.text());
+      const bool succeeded = input.boolean();
+      before.emplace_back(std::move(result), succeeded);
+    }
+
+    std::optional<effect_application_fact> application;
+    if (input.boolean())
+    {
+      auto receipt = input.text();
+      const auto outcome = application_outcome(input.u8());
+      auto journal = input.optional_text();
+      auto completed = input.optional_text();
+      application.emplace(std::move(receipt), outcome, std::move(journal),
+                          std::move(completed));
+    }
+
+    std::vector<effect_lifecycle_fact> after;
+    const auto after_count = count(input);
+    after.reserve(after_count);
+    for (std::size_t index = 0; index < after_count; ++index)
+    {
+      auto result = session_identity::from_hex(input.text());
+      const bool succeeded = input.boolean();
+      after.emplace_back(std::move(result), succeeded);
+    }
+
+    auto transaction = input.optional_text();
+    auto publication_request = input.optional_text();
+    std::optional<effect_publication_fact> publication;
+    if (input.boolean())
+    {
+      auto receipt = input.text();
+      const auto outcome = publication_outcome(input.u8());
+      auto resulting = input.optional_text();
+      publication.emplace(std::move(receipt), outcome, std::move(resulting));
+    }
+    std::optional<effectful_operation_outcome> terminal;
+    if (input.boolean())
+      terminal = terminal_outcome(input.u8());
+    auto reconciled = input.optional_text();
+    if (!input.empty())
+      corrupt("journal encoding has trailing data");
+
+    return effect_attempt_record::restore(
+        std::move(identity), std::move(attempt), std::move(session),
+        std::move(nonce), sequence, std::move(previous), before_total,
+        after_total, current_stage, active_index, std::move(before),
+        std::move(application), std::move(after), std::move(transaction),
+        std::move(publication_request), std::move(publication), terminal,
+        std::move(reconciled));
+  }
+  catch (const effect_journal_error& problem)
+  {
+    if (problem.code() == effect_journal_error_code::unsupported_encoding ||
+        problem.code() == effect_journal_error_code::corrupt_encoding)
+      throw;
     throw effect_journal_error(
-        effect_journal_error_code::unsupported_encoding,
-        "journal encoding version is unsupported");
-  if (input.u16() != effect_attempt_record_schema_version)
+        effect_journal_error_code::corrupt_encoding,
+        std::string("invalid effect-journal encoding: ") + problem.what());
+  }
+  catch (const std::exception& problem)
+  {
     throw effect_journal_error(
-        effect_journal_error_code::unsupported_encoding,
-        "journal record schema is unsupported");
-
-  auto identity = session_identity::from_hex(input.text());
-  auto attempt = session_identity::from_hex(input.text());
-  auto session = session_identity::from_hex(input.text());
-  effect_attempt_nonce::byte_array nonce_bytes{};
-  for (auto& byte : nonce_bytes)
-    byte = input.u8();
-  auto nonce = effect_attempt_nonce::from_bytes(nonce_bytes);
-  const auto sequence = input.u64();
-  std::optional<session_identity> previous;
-  if (input.boolean())
-    previous = session_identity::from_hex(input.text());
-  const auto before_total = count(input);
-  const auto after_total = count(input);
-  const auto current_stage = stage(input.u8());
-  std::optional<std::size_t> active_index;
-  if (input.boolean())
-    active_index = count(input);
-
-  std::vector<effect_lifecycle_fact> before;
-  const auto before_count = count(input);
-  before.reserve(before_count);
-  for (std::size_t index = 0; index < before_count; ++index)
-  {
-    auto result = session_identity::from_hex(input.text());
-    const bool succeeded = input.boolean();
-    before.emplace_back(std::move(result), succeeded);
+        effect_journal_error_code::corrupt_encoding,
+        std::string("invalid effect-journal encoding: ") + problem.what());
   }
-
-  std::optional<effect_application_fact> application;
-  if (input.boolean())
-  {
-    auto receipt = input.text();
-    const auto outcome = application_outcome(input.u8());
-    auto journal = input.optional_text();
-    auto completed = input.optional_text();
-    application.emplace(std::move(receipt), outcome, std::move(journal),
-                        std::move(completed));
-  }
-
-  std::vector<effect_lifecycle_fact> after;
-  const auto after_count = count(input);
-  after.reserve(after_count);
-  for (std::size_t index = 0; index < after_count; ++index)
-  {
-    auto result = session_identity::from_hex(input.text());
-    const bool succeeded = input.boolean();
-    after.emplace_back(std::move(result), succeeded);
-  }
-
-  auto transaction = input.optional_text();
-  auto publication_request = input.optional_text();
-  std::optional<effect_publication_fact> publication;
-  if (input.boolean())
-  {
-    auto receipt = input.text();
-    const auto outcome = publication_outcome(input.u8());
-    auto resulting = input.optional_text();
-    publication.emplace(std::move(receipt), outcome, std::move(resulting));
-  }
-  std::optional<effectful_operation_outcome> terminal;
-  if (input.boolean())
-    terminal = terminal_outcome(input.u8());
-  auto reconciled = input.optional_text();
-  if (!input.empty())
-    corrupt("journal encoding has trailing data");
-
-  return effect_attempt_record::restore(
-      std::move(identity), std::move(attempt), std::move(session),
-      std::move(nonce), sequence, std::move(previous), before_total,
-      after_total, current_stage, active_index, std::move(before),
-      std::move(application), std::move(after), std::move(transaction),
-      std::move(publication_request), std::move(publication), terminal,
-      std::move(reconciled));
 }
 
 } // namespace pkgctl
