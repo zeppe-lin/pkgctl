@@ -16,6 +16,13 @@ if not get_option('tests').disabled()
   )
   test('construction', construction_test)
 
+  dispatch_test = executable(
+    'dispatch-test',
+    'dispatch_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('dispatch', dispatch_test)
+
   request_test = executable(
     'request-test',
     'request_test.cpp',
@@ -70,6 +77,7 @@ if not get_option('tests').disabled()
   pkgctl_headers = [
     'check.h',
     'construction.h',
+    'dispatch.h',
     'controller.h',
     'effect.h',
     'effect_journal.h',
@@ -107,6 +115,9 @@ if not get_option('tests').disabled()
 
   check_contract = find_program('check_check_contract.sh')
   test('check-contract', check_contract, args: [meson.project_source_root()])
+
+  dispatch_contract = find_program('check_dispatch_contract.sh')
+  test('dispatch-contract', dispatch_contract, args: [meson.project_source_root()])
 
   source_contract = find_program('check_source_contract.sh')
   test('source-contract', source_contract, args: [meson.project_source_root()])

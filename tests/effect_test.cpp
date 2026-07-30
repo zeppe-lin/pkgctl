@@ -8,6 +8,7 @@
 #include <pkgctl/effect_journal_codec.h>
 #include <pkgctl/effect_restart.h>
 #include <pkgctl/effect_store.h>
+#include <pkgctl/dispatch.h>
 #include <pkgctl/error.h>
 #include <pkgctl/preparation.h>
 
@@ -1495,10 +1496,10 @@ struct removal_fixture final {
   std::vector<pkgapply_exec::admitted_lifecycle_session> before;
   std::vector<pkgapply_exec::admitted_lifecycle_session> after;
 
-  removal_fixture()
+  explicit removal_fixture(std::string version = "1.0")
       : store(temp.path() / "state", test_support::binding()),
         source(source_snapshot(
-            "1.0",
+            std::move(version),
             {pkgsource::lifecycle_action::pre_remove,
              pkgsource::lifecycle_action::post_remove})),
         old_package(installed_package(
@@ -2219,6 +2220,219 @@ void check_publication_reconciliation()
   CHECK(value.store.read().size() == 1U);
 }
 
+pkgctl::transaction_dispatch_nonce dispatch_nonce(std::uint8_t marker)
+{
+  pkgctl::transaction_dispatch_nonce::byte_array bytes{};
+  bytes.back() = marker;
+  return pkgctl::transaction_dispatch_nonce::from_bytes(bytes);
+}
+
+void check_operation_dispatch_ledger()
+{
+  {
+    removal_fixture value;
+    auto progress = pkgctl::transaction_progress::begin(value.transaction);
+    auto run = pkgctl::transaction_run::begin(
+        progress, pkgctl::transaction_dispatch_policy::make(2U, 2U));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(31U));
+    CHECK(reservation.dispatch.has_value());
+    CHECK(reservation.dispatch &&
+          reservation.dispatch->unit().kind() ==
+              pkgctl::transaction_unit_kind::operation);
+    CHECK(reservation.run.active_count(
+              pkgctl::transaction_unit_kind::operation) == 1U);
+
+    auto exhausted = pkgctl::reserve_next(
+        reservation.run, dispatch_nonce(32U));
+    CHECK(!exhausted.dispatch.has_value());
+
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    removal_fixture foreign_value("1.1");
+    const auto foreign_session = pkgctl::effectful_operation_session::admit(
+        effect_request(foreign_value), foreign_value.before,
+        foreign_value.after);
+    bool foreign_session_refused = false;
+    try
+    {
+      (void)pkgctl::start_operation_dispatch(
+          reservation.run, *reservation.dispatch, foreign_session);
+    }
+    catch (const pkgctl::error& problem)
+    {
+      foreign_session_refused =
+          problem.code() == pkgctl::error_code::invalid_dispatch;
+    }
+    CHECK(foreign_session_refused);
+
+    auto started = pkgctl::start_operation_dispatch(
+        reservation.run, *reservation.dispatch, session);
+    CHECK(started.records().front().state() ==
+          pkgctl::transaction_dispatch_state::started);
+
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    const auto result = pkgctl::execute_effectful_operation(session, actuator);
+    CHECK(result.succeeded());
+    const auto resulting_state = value.store.read();
+
+    auto completed = pkgctl::submit_operation_dispatch_result(
+        started, *reservation.dispatch, result, resulting_state);
+    CHECK(completed.records().front().state() ==
+          pkgctl::transaction_dispatch_state::completed);
+    CHECK(completed.records().front().terminal_evidence() &&
+          *completed.records().front().terminal_evidence() ==
+              result.identity());
+    CHECK(completed.active_count(pkgctl::transaction_unit_kind::operation) ==
+          0U);
+    CHECK(completed.progress().complete());
+    CHECK(completed.progress().current_state().identity() ==
+          resulting_state.identity());
+
+    bool duplicate_refused = false;
+    try
+    {
+      (void)pkgctl::submit_operation_dispatch_result(
+          completed, *reservation.dispatch, result, resulting_state);
+    }
+    catch (const pkgctl::error& problem)
+    {
+      duplicate_refused =
+          problem.code() == pkgctl::error_code::invalid_dispatch;
+    }
+    CHECK(duplicate_refused);
+  }
+
+  {
+    removal_fixture value;
+    auto run = pkgctl::transaction_run::begin(
+        pkgctl::transaction_progress::begin(value.transaction),
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(41U));
+    CHECK(reservation.dispatch.has_value());
+
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    auto started = pkgctl::start_operation_dispatch(
+        reservation.run, *reservation.dispatch, session);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store,
+        std::nullopt, lease_release_point::never,
+        publication_mode::indeterminate);
+    const auto observation =
+        pkgctl::execute_effectful_operation(session, actuator);
+    CHECK(observation.outcome() ==
+          pkgctl::effectful_operation_outcome::
+              state_publication_indeterminate);
+
+    bool state_on_observation_refused = false;
+    try
+    {
+      (void)pkgctl::submit_operation_dispatch_result(
+          started, *reservation.dispatch, observation, value.store.read());
+    }
+    catch (const pkgctl::error& problem)
+    {
+      state_on_observation_refused =
+          problem.code() == pkgctl::error_code::invalid_dispatch;
+    }
+    CHECK(state_on_observation_refused);
+
+    auto observed = pkgctl::submit_operation_dispatch_result(
+        started, *reservation.dispatch, observation);
+    CHECK(observed.records().front().state() ==
+          pkgctl::transaction_dispatch_state::started);
+    CHECK(observed.records().front().observations().size() == 1U);
+    CHECK(observed.records().front().observations().front() ==
+          observation.identity());
+    CHECK(observed.active_count(pkgctl::transaction_unit_kind::operation) ==
+          1U);
+    CHECK(observed.progress().identity() == started.progress().identity());
+
+    auto no_second_operation = pkgctl::reserve_next(
+        observed, dispatch_nonce(42U));
+    CHECK(!no_second_operation.dispatch.has_value());
+
+    bool duplicate_observation_refused = false;
+    try
+    {
+      (void)pkgctl::submit_operation_dispatch_result(
+          observed, *reservation.dispatch, observation);
+    }
+    catch (const pkgctl::error& problem)
+    {
+      duplicate_observation_refused =
+          problem.code() == pkgctl::error_code::invalid_dispatch;
+    }
+    CHECK(duplicate_observation_refused);
+
+    bool release_refused = false;
+    try
+    {
+      (void)pkgctl::release_unstarted_dispatch(
+          observed, *reservation.dispatch);
+    }
+    catch (const pkgctl::error& problem)
+    {
+      release_refused =
+          problem.code() == pkgctl::error_code::invalid_dispatch;
+    }
+    CHECK(release_refused);
+  }
+
+  {
+    removal_fixture value;
+    auto run = pkgctl::transaction_run::begin(
+        pkgctl::transaction_progress::begin(value.transaction),
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(51U));
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    auto started = pkgctl::start_operation_dispatch(
+        reservation.run, *reservation.dispatch, session);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store,
+        pkgsource::lifecycle_action::pre_remove);
+    const auto failure = pkgctl::execute_effectful_operation(session, actuator);
+    CHECK(failure.outcome() ==
+          pkgctl::effectful_operation_outcome::
+              lifecycle_failed_before_application);
+    auto completed = pkgctl::submit_operation_dispatch_result(
+        started, *reservation.dispatch, failure);
+    CHECK(completed.records().front().state() ==
+          pkgctl::transaction_dispatch_state::completed);
+    CHECK(completed.progress().failed());
+    CHECK(completed.progress().current_state().identity() ==
+          value.expected.identity());
+  }
+
+  {
+    removal_fixture value;
+    auto run = pkgctl::transaction_run::begin(
+        pkgctl::transaction_progress::begin(value.transaction),
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(61U));
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    auto started = pkgctl::start_operation_dispatch(
+        reservation.run, *reservation.dispatch, session);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store,
+        std::nullopt, lease_release_point::after_application);
+    const auto observation =
+        pkgctl::execute_effectful_operation(session, actuator);
+    CHECK(observation.outcome() ==
+          pkgctl::effectful_operation_outcome::outer_lease_lost);
+    auto observed = pkgctl::submit_operation_dispatch_result(
+        started, *reservation.dispatch, observation);
+    CHECK(observed.records().front().state() ==
+          pkgctl::transaction_dispatch_state::started);
+    CHECK(observed.records().front().observations().size() == 1U);
+    CHECK(observed.active_count(pkgctl::transaction_unit_kind::operation) ==
+          1U);
+  }
+}
+
 } // namespace
 
 int main()
@@ -2238,5 +2452,6 @@ int main()
   check_restart_boundaries();
   check_publication_retry();
   check_publication_reconciliation();
+  check_operation_dispatch_ledger();
   return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
