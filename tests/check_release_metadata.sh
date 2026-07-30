@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.8.0
+version=0.9.0
 
 require_line()
 {
@@ -20,15 +20,15 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 8;'
+  'inline constexpr unsigned version_minor = 9;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.8.0";'
+  'inline constexpr const char* version_string = "0.9.0";'
 
-grep -F '## 0.8.0 - 2026-07-30' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.8.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.8.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.9.0 - 2026-07-30' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.9.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.9.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
 for contract in \
   'libpkgsource >= 2.0.0' \
@@ -49,7 +49,7 @@ for contract in \
   'libpkgapply >= 2.0.0' \
   'libpkgapply-exec >= 1.0.0' \
   'libpkgresolve >= 2.0.0' \
-  'libpkgtransaction >= 2.0.0' \
+  'libpkgtransaction >= 2.1.0' \
   'libpkgcheck >= 0.1.0' \
   'libpkgcheck-exec >= 0.1.1'; do
   grep -F "$contract" "$srcdir/CHANGELOG.md" >/dev/null || {

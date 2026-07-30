@@ -13,8 +13,8 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.8.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.8.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.9.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.9.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'The canonical state store is opened with *open_existing*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
@@ -27,6 +27,14 @@ grep -F 'TRANSACTION PROGRESSION' \
 grep -F 'does not choose among' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'TRANSACTION CHECK SESSION' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'TRANSACTION DISPATCH' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'one non-configurable mutation lane' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Already-started independent work' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'released-unstarted' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'independent ready work may advance concurrently' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null

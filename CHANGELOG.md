@@ -1,5 +1,55 @@
 # pkgctl changelog
 
+## 0.9.0 - 2026-07-30
+
+### Transaction dispatch and ownership
+
+- Adds immutable `transaction_run`, `transaction_dispatch`, and lifetime record
+  values over one exact transaction progression.
+- Adds deterministic `reserve_next()` selection in canonical ready-unit order,
+  with explicit construction/check capacities and one invariant operation lane.
+- Binds every physical dispatch attempt to a caller-issued nonzero 32-byte nonce
+  that cannot be reused within the run, including after release or completion.
+- Separates `reserved`, `started`, `completed`, and `released_unstarted` states;
+  only work that never acquired execution authority may be released.
+- Retains exact terminal predecessor evidence at reservation and refuses units
+  whose graph readiness or predecessor authority changes before admission.
+- Validates construction package inputs against exact transaction requirement
+  edges, selected or retained package authority, successful predecessor build
+  results, artifacts, and current installed truth.
+- Requires `libpkgtransaction >= 2.1.0`, which orders check-scoped package inputs
+  before the checked package construction that must seal them.
+- Binds check dispatches to the exact construction retained by progression and
+  operation dispatches to the exact action, effect session, and reserved state
+  epoch.
+- Delegates terminal knowledge to existing `advance_construction()`,
+  `advance_check()`, and `advance_effect()` functions rather than reinterpreting
+  subordinate outcomes.
+- Retains lost-lease and indeterminate-publication operation results as active,
+  ordered uncertainty observations; such observations cannot carry resulting
+  state.
+- Stops new reservations and starting merely reserved work after terminal
+  failure while accepting exact terminal evidence from independent work already
+  started.
+- Adds no automatic execution, backend creation, retry, adaptive scheduler,
+  durable transaction-run store, rollback, or effect-implying CLI command.
+
+### Authority floors
+
+- `libpkgsource >= 2.0.0`, `libpkgsource-yaml >= 2.0.0`, and
+  `libpkgsource-plan >= 2.0.0`;
+- `libpkgcatalog >= 2.0.0` and `libpkgcatalog-acquire >= 2.0.0`;
+- `libpkgstate >= 2.3.0`, `libpkgstate-plan >= 2.3.0`, and
+  `libpkgstate-apply >= 2.3.0`;
+- `libpkgfetch >= 1.0.0`;
+- `libpkgbuild >= 2.0.0`, `libpkgbuild-exec >= 1.0.0`, and
+  `libpkgbuild-plan >= 2.0.0`;
+- `libpkgimage >= 0.3.0` and `libpkgplan >= 0.2.0`;
+- `libpkgexec >= 1.3.0`;
+- `libpkgapply >= 2.0.0` and `libpkgapply-exec >= 1.0.0`;
+- `libpkgresolve >= 2.0.0` and `libpkgtransaction >= 2.1.0`;
+- `libpkgcheck >= 0.1.0` and `libpkgcheck-exec >= 0.1.1`.
+
 ## 0.8.0 - 2026-07-30
 
 - Adds pure `transaction_check_request` admission for one exact ready check node
