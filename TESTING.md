@@ -46,7 +46,8 @@ Every release must establish:
 - explicit non-completed and indeterminate publication outcomes;
 - CLI usage, authority-failure, and deterministic output contracts;
 - durable intent and terminal snapshots around every irreversible handoff;
-- strict codec, predecessor-chain, causal-shape, and POSIX store validation;
+- strict codec, causal-shape, committed-head, legacy-chain, and POSIX store
+  validation;
 - conservative restart at every lifecycle, application, and publication crash
   boundary;
 - exact `libpkgapply` journal required for application continuation;
@@ -59,8 +60,37 @@ Every release must establish:
 - refusal of missing, duplicate, forged, aliased, cross-transaction, cross-node,
   stale-construction, duplicate-completion, and driver-contract evidence;
 - concurrency-safe check completion after unrelated progression advancement;
-- proof that all exposed CLI commands remain read-only in 0.9.0;
+- proof that all exposed CLI commands remain read-only in 0.9.1;
 - release, source, manual, shell, and patch-hygiene contracts.
+
+## Effect-journal storage tests
+
+The effect-journal suite must additionally prove:
+
+
+- deterministic version-two encoding and strict version-one decoding;
+- single-bit record and head corruption, truncation, trailing bytes, unsupported
+  versions, oversized values, invalid enums, booleans, and counts are refused;
+- immutable snapshots and heads are regular, read-only, and never followed
+  through symbolic links;
+- append synchronizes the snapshot, directory, atomically replaced head, and
+  directory again before success;
+- effect snapshots reject sequence values that disagree with retained stage and
+  evidence, including lease-loss terminals that conceal unresolved publication
+  intent;
+- an exact orphan snapshot is recoverable only by the matching append retry;
+- exact retries before and after head publication are idempotent, including
+  concurrent retries in separate processes;
+- a missing, writable, corrupt, or contradictory committed head or selected
+  snapshot fails closed;
+- strict version-one histories require one complete semantic predecessor chain;
+  appending a new version-two successor establishes its durable head, while an
+  exact retry of the latest legacy record rewrites that selected snapshot as
+  version two before publishing the head;
+- old snapshots may be absent once a later self-contained snapshot is committed;
+- storage performs no attempt discovery, effect execution, semantic-evidence
+  reconstruction, retry policy, rollback anchoring, compaction, or cleanup.
+
 
 ## Transaction dispatch tests
 

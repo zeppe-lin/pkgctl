@@ -13,6 +13,54 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.9.1 effect-journal commit point
+
+Release 0.9.1 hardens the existing effect-attempt journal without changing the
+effect-session or restart semantics. The POSIX store now separates immutable
+snapshot publication from commitment:
+
+```text
+write and fsync immutable snapshot
+        |
+        v
+fsync journal directory
+        |
+        v
+atomically replace checksummed read-only head
+        |
+        v
+fsync journal directory
+```
+
+The head is the physical commit point. Operational recovery reads only the exact
+self-contained snapshot named by that head. An orphan snapshot created before
+head replacement is not controller truth; an exact append retry may validate and
+commit it. A missing selected snapshot, corrupt or writable head, writable or
+symlinked snapshot, contradictory authority, or foreign same-name bytes fail
+closed.
+
+Every selected snapshot is self-validating: its sequence must equal the exact
+transition count implied by retained lifecycle, application, publication, and
+terminal evidence. A terminal lease-loss snapshot cannot hide an unresolved
+publication intent.
+
+Encoding version one remains a strict record-only legacy format. A history with
+no head is accepted only when every record is version one and the complete
+semantic predecessor chain is valid. Appending a new version-two successor
+establishes its durable head. An exact retry of the latest legacy snapshot first
+atomically rewrites that selected snapshot in version-two form, synchronizes the
+directory, and only then publishes a head that can name it. Version-two records
+without a head are uncommitted, not an implicit newest-record index.
+
+
+Snapshots are complete values, so recovery does not require older snapshots
+after commitment. Their predecessor identities remain causal and audit evidence.
+The store is crash-consistent but does not prevent an authorized caller from
+rolling back the directory to an older internally valid head. Anti-rollback
+anchoring, journal discovery, compaction, garbage collection, and semantic
+evidence reconstruction remain outside this release.
+
+
 ## Release 0.9.0 transaction-dispatch boundary
 
 Release 0.9.0 adds immutable ownership of selected but unfinished work. It does

@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.9.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.9.1 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -112,6 +112,10 @@ may still submit exact terminal evidence. Dispatch creates no threads, invokes
 no driver, builds no backend, allocates no resource path, persists no run, and
 exposes no effect-implying command.
 
+
+
+
+
 # TRANSACTION CHECK SESSION
 
 A *transaction_check_request* is pure controller authority. It binds one exact
@@ -176,14 +180,29 @@ semantic effect-session identity remains unchanged.
 
 The controller records admission, then an intent before every lifecycle,
 application, and publication handoff, then exact terminal evidence after each
-completed handoff. Every snapshot binds its predecessor, sequence number,
-phase totals, subordinate result identities, and any transaction, publication,
-or terminal evidence.
+completed handoff. Every snapshot binds its predecessor, phase totals,
+subordinate result identities, and any transaction, publication, or terminal
+evidence. Its sequence is not advisory: it must equal the exact transition count
+derivable from that retained stage and evidence. Lease loss cannot conceal an
+unresolved publication intent.
 
 The supplied POSIX store is anchored to an explicit directory or directory
-descriptor. It publishes read-only snapshots without replacement and validates
-record identity, predecessor linkage, and encoded causal shape. It does not use
-an ambient package-manager state path.
+descriptor. Encoding version two publishes immutable read-only snapshots
+without replacement, synchronizes the snapshot and directory, and atomically
+advances a checksummed read-only head followed by another directory
+synchronization. The head is the physical commit point. Operational recovery
+opens only the exact self-contained snapshot named by that head. Exact retries
+before and after head publication are idempotent and require byte-for-byte
+equality.
+
+A missing, corrupt, writable, symlinked, or contradictory head or selected
+snapshot fails closed. Strict version-one record-only histories remain readable
+through complete semantic predecessor-chain validation. Appending a new
+version-two successor establishes its durable head; an exact retry of the latest
+legacy snapshot first atomically rewrites that selected snapshot as version two,
+synchronizes the directory, and only then publishes its head. The store is
+crash-consistent but not an anti-rollback trust anchor. It does not use an
+ambient package-manager state path.
 
 # RESTART
 

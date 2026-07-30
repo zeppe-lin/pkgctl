@@ -6,7 +6,21 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.9.0 establishes immutable transaction dispatch and in-flight
+
+Release 0.9.1 hardens the existing durable effect-attempt store. Encoding
+version two publishes one immutable read-only snapshot and then atomically
+advances a checksummed read-only head, which is the physical commit point.
+Recovery opens only the exact self-contained snapshot selected by that head.
+Each selected snapshot must carry the exact sequence derivable from its retained
+effect evidence, and lease loss cannot conceal unresolved publication intent.
+Exact retries are idempotent across both crash windows. Strict version-one
+record-only histories remain readable through full semantic-chain validation.
+Appending a successor establishes the version-two head; exact retry of the
+latest legacy record rewrites that selected snapshot as version two before head
+publication. The store is crash-consistent, not an anti-rollback anchor.
+
+
+Release 0.9.0 established immutable transaction dispatch and in-flight
 ownership:
 
 ```text
@@ -73,13 +87,13 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.9.0. The command frontend
+There are no effect-implying CLI commands in 0.9.1. The command frontend
 executes no source acquisition, build, check, planner,
 lifecycle, application, publication, or restart authority. The internal check
 controller invokes execution only through an injected driver supplied by a
 library client. Automatic execution, retry policy, adaptive scheduling, durable
-run storage, transaction-wide rollback, and effectful command policy remain outside
-this release.
+run storage, transaction-wide rollback, journal discovery, compaction, garbage
+collection, and effectful command policy remain outside this release.
 
 ## Authority
 

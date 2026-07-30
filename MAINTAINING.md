@@ -41,6 +41,14 @@ construct new transaction edges, or infer success from reservation state.
 Check-scoped package inputs require `libpkgtransaction >= 2.1.0` so exact input
 authority precedes the construction that seals it.
 
+The POSIX effect journal uses two-stage commitment: immutable read-only record
+publication and synchronization first, atomic checksummed head replacement and
+final directory synchronization second. The head is the operational commit
+point. Exact retries must be idempotent, while a foreign same-name record,
+writable or symlinked authority, or a head selecting missing bytes must fail
+closed. Version-one record-only histories remain a strict migration input; do
+not restore operational loading by scanning version-two snapshots.
+
 The effectful controller layer may depend on image, plan, apply, execution,
 and state adapters only through their exact public values. It must not parse
 payloads, derive lifecycle programs, perform target mutation, or serialize
@@ -68,7 +76,8 @@ legacy behavior.
    check request/session/result binding, canonical multi-input projection,
    concurrency-safe check progression, deterministic dispatch reservation,
    exact predecessor and state-epoch binding, operation-lane serialization,
-   failure containment, preparation projection and typed refusal, effect sequencing,
+   failure containment, effect-journal committed-head recovery, exact retry and
+   legacy migration, preparation projection and typed refusal, effect sequencing,
    intent-before-effect persistence, exact restart checkpoints, outer-lease
    reacquisition, publication reconciliation, publication provenance, CLI
    read-only behavior, and missing-state refusal;

@@ -31,7 +31,10 @@ or stale terminal evidence before progression. Dispatch changes must keep
 reservation separate from execution admission, retain exact predecessor and
 attempt identities, forbid duplicate ownership, and never release started work
 as if it were unstarted. Failure containment must stop new work without erasing
-terminal evidence from already-started independent work.
+terminal evidence from already-started independent work. Effect-store changes
+must preserve immutable record publication followed by an atomic checksummed
+head, and exact append retries must be idempotent. Never infer controller truth
+from an uncommitted snapshot or by scanning for the lexically newest filename.
 
 Use SPDX headers:
 
