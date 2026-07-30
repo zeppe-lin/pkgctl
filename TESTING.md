@@ -48,6 +48,14 @@ Every release must establish:
 - durable intent and terminal snapshots around every irreversible handoff;
 - strict codec, causal-shape, committed-head, legacy-chain, and POSIX store
   validation;
+- durable run admission before first reservation and exact one-transition
+  successor snapshots;
+- exact progression rehydration, graph-unit validation, predecessor binding,
+  terminal-evidence binding, and active operation state-epoch validation;
+- write-ahead restart classification for reserved, construction, check, and
+  operation dispatches without outcome inference;
+- effect-attempt admission committed before started operation ownership, with
+  exact retry after either cross-journal crash window;
 - conservative restart at every lifecycle, application, and publication crash
   boundary;
 - exact `libpkgapply` journal required for application continuation;
@@ -60,37 +68,71 @@ Every release must establish:
 - refusal of missing, duplicate, forged, aliased, cross-transaction, cross-node,
   stale-construction, duplicate-completion, and driver-contract evidence;
 - concurrency-safe check completion after unrelated progression advancement;
-- proof that all exposed CLI commands remain read-only in 0.9.1;
+- proof that all exposed CLI commands remain read-only in 0.10.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
-## Effect-journal storage tests
+## Durable transaction-run tests
 
-The effect-journal suite must additionally prove:
+The run-journal suite must prove:
 
-
-- deterministic version-two encoding and strict version-one decoding;
-- single-bit record and head corruption, truncation, trailing bytes, unsupported
-  versions, oversized values, invalid enums, booleans, and counts are refused;
-- immutable snapshots and heads are regular, read-only, and never followed
-  through symbolic links;
-- append synchronizes the snapshot, directory, atomically replaced head, and
-  directory again before success;
+- all-zero, short, and malformed run nonces are refused;
+- identical transaction, policy, nonce, and run values produce identical
+  journal and record identities, while another nonce produces another history;
+- admission after the first reservation, dispatch ownership at sequence zero,
+  positive-sequence histories without a reservation, histories retaining more
+  dispatches than committed transitions, and sequence values that disagree with
+  retained dispatch states or observations are refused;
+- every legal reservation, start, unstarted release, uncertainty observation,
+  and terminal completion produces one exact successor;
+- no-op successors, skipped states, history rewrites, multiple simultaneous
+  record changes, sequence gaps, predecessor forks, and authority changes are
+  refused;
+- binary encoding is deterministic and round-trips byte-for-byte;
+- truncation, trailing bytes, unsupported encoding/schema versions, oversized
+  input, invalid enum/boolean/count values, and single-bit corruption are
+  refused;
+- decoded records recompute policy, unit, dependency, dispatch, record, journal,
+  and top-level identities;
+- reopening requires the exact transaction, progression, current state, terminal
+  flags, graph units, predecessor evidence, completed evidence, and active
+  operation state epoch;
+- durable successor validation rejects sequence gaps, predecessor forks,
+  authority changes, detached reservation progression/state epochs, and
+  non-successor transitions before storage;
+- POSIX storage rejects writable or non-regular heads and head-selected
+  snapshots, missing heads with record entries, corrupt heads, missing selected
+  snapshots, malformed uncommitted histories, and foreign same-name records;
+- a committed head selects one exact self-contained snapshot without requiring
+  historical snapshots to remain present;
+- exact admission and successor retries recover interruption before head
+  publication and remain idempotent after head publication;
+- concurrent exact retries from separate processes converge on one committed
+  record under the directory lock;
+- append performs lock, immutable-record publication, record and directory
+  synchronization, atomic head replacement, and a final directory
+  synchronization before reporting success;
 - effect snapshots reject sequence values that disagree with retained stage and
   evidence, including lease-loss terminals that conceal unresolved publication
   intent;
-- an exact orphan snapshot is recoverable only by the matching append retry;
-- exact retries before and after head publication are idempotent, including
-  concurrent retries in separate processes;
-- a missing, writable, corrupt, or contradictory committed head or selected
-  snapshot fails closed;
-- strict version-one histories require one complete semantic predecessor chain;
-  appending a new version-two successor establishes its durable head, while an
-  exact retry of the latest legacy record rewrites that selected snapshot as
-  version two before publishing the head;
-- old snapshots may be absent once a later self-contained snapshot is committed;
-- storage performs no attempt discovery, effect execution, semantic-evidence
-  reconstruction, retry policy, rollback anchoring, compaction, or cleanup.
-
+- version-one effect histories without a head retain strict full semantic-chain
+  validation, while version-two histories require an exact durable head; an
+  exact retry of the latest legacy record atomically rewrites that selected
+  snapshot as version two before publishing its head;
+- reserved work is classified releasable, started construction/check work
+  requires external recovery evidence, and started operations require exact
+  effect-journal inspection through the retained effect-attempt identity;
+- operation-start commitment calls the effect store before the run store,
+  verifies both returned authorities, and invokes no driver;
+- a committed orphan effect admission leaves the run reservation releasable,
+  while a committed started run with no effect snapshot remains unresolved;
+- equivalent retries produce identical effect-attempt, dispatch-record, run,
+  and run-journal identities, while another effect nonce changes all affected
+  ownership identities;
+- completed and released runs are quiescent, while uncertainty observations
+  remain attached to active operation recovery;
+- journaling performs no driver invocation, resource discovery, subordinate
+  evidence reconstruction, state publication, cleanup, automatic retry,
+  compaction, garbage collection, or CLI action.
 
 ## Transaction dispatch tests
 

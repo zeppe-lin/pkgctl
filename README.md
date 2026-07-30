@@ -6,43 +6,68 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-
-Release 0.9.1 hardens the existing durable effect-attempt store. Encoding
-version two publishes one immutable read-only snapshot and then atomically
-advances a checksummed read-only head, which is the physical commit point.
-Recovery opens only the exact self-contained snapshot selected by that head.
-Each selected snapshot must carry the exact sequence derivable from its retained
-effect evidence, and lease loss cannot conceal unresolved publication intent.
-Exact retries are idempotent across both crash windows. Strict version-one
-record-only histories remain readable through full semantic-chain validation.
-Appending a successor establishes the version-two head; exact retry of the
-latest legacy record rewrites that selected snapshot as version two before head
-publication. The store is crash-consistent, not an anti-rollback anchor.
-
-
-Release 0.9.0 established immutable transaction dispatch and in-flight
-ownership:
+Release 0.10.0 establishes durable transaction-run ownership and
+conservative restart classification:
 
 ```text
-transaction_progress + bounded dispatch policy
+exact transaction_progress + immutable dispatch ledger
         |
         v
-canonical ready-unit reservation
+immutable, single-transition run snapshots
         |
         v
-reserved -> started -> completed
-        |             \
-        |              -> uncertain operation observation
-        \
-         -> released-unstarted
+checksummed committed head
+        |
+        v
+exact progression rehydration
+        |
+        v
+release reserved work | recover build/check | inspect effect journal
 ```
 
-A caller-issued 32-byte nonce distinguishes each physical dispatch attempt.
-`reserve_next()` chooses the first canonical ready unit allowed by explicit
-construction/check capacities, one hard operation lane, graph-member exclusion,
-and stop-after-terminal-failure containment. The returned `transaction_run`
-retains every reservation for the lifetime of the run, so a nonce or graph unit
-cannot be silently dispatched twice.
+A durable run history begins before the first reservation, so sequence zero
+contains no dispatch ownership and every positive sequence retains at least
+one reservation. Its sequence must equal the transition count derivable from
+retained dispatch states and uncertainty observations. Every successor snapshot
+contains exactly one legal ledger transition: one reservation, one start, one
+unstarted release, one uncertainty observation, or one terminal completion. A
+reservation successor must bind the predecessor's exact
+progression identity and state epoch. Records bind the transaction, dispatch
+policy, caller-issued run nonce, sequence, predecessor, current state epoch,
+progression identity, and
+complete immutable dispatch history. The POSIX store publishes immutable record
+files and then atomically advances a checksummed read-only head. Recovery opens
+only the exact self-contained snapshot named by that committed head; exact crash
+retries are idempotent.
+
+The journal does not serialize package truth. After restart, the caller must
+rehydrate the exact `transaction_progress` from authoritative construction,
+check, effect, and state evidence. `reopen()` verifies that authority and then
+restores dispatch ownership. A digest in a journal record is never promoted into
+a build result, check result, effect result, or installed-state snapshot.
+
+Restart classification is conservative. A durably `reserved` dispatch may be
+released because no execution session was admitted. A durably `started`
+construction or check requires external recovery evidence. A started operation
+retains the exact effect-attempt identity whose journal must be inspected.
+`commit_operation_dispatch_start()` commits that effect admission first and the
+started run snapshot second. Only after both commits may an effect driver run.
+An interrupted exact call can be retried; an orphan admission does not promote a
+still-reserved dispatch into started work.
+
+Release 0.9.1 established the committed-head protocol for the effect-attempt
+store. A head-selected snapshot must carry the exact sequence derivable from its
+retained effect evidence and cannot represent lease loss over an unresolved
+publication intent. Release 0.10.0 reuses that lower commit point rather than
+defining a second interpretation of effect durability.
+
+Release 0.9.0 established immutable transaction dispatch and in-flight
+ownership. A caller-issued 32-byte nonce distinguishes each physical dispatch
+attempt. `reserve_next()` chooses the first canonical ready unit allowed by
+explicit construction/check capacities, one hard operation lane,
+graph-member exclusion, and stop-after-terminal-failure containment. The
+returned `transaction_run` retains every reservation for the lifetime of the
+run, so a nonce or graph unit cannot be silently dispatched twice.
 
 Reservation is not execution. A unit becomes `started` only after an exact
 construction, check, or operation session is admitted against the retained
@@ -87,13 +112,14 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.9.1. The command frontend
+There are no effect-implying CLI commands in 0.10.0. The command frontend
 executes no source acquisition, build, check, planner,
 lifecycle, application, publication, or restart authority. The internal check
 controller invokes execution only through an injected driver supplied by a
-library client. Automatic execution, retry policy, adaptive scheduling, durable
-run storage, transaction-wide rollback, journal discovery, compaction, garbage
-collection, and effectful command policy remain outside this release.
+library client. Automatic execution, semantic-evidence persistence, resource
+recovery, retry policy, adaptive scheduling, transaction-wide rollback, journal
+discovery, compaction, garbage collection, and effectful command policy remain
+outside this release.
 
 ## Authority
 

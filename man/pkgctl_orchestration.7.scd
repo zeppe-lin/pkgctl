@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.9.1 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.10.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -112,9 +112,61 @@ may still submit exact terminal evidence. Dispatch creates no threads, invokes
 no driver, builds no backend, allocates no resource path, persists no run, and
 exposes no effect-implying command.
 
+# DURABLE TRANSACTION RUNS
 
+Version 0.10.0 makes dispatch ownership durable without persisting semantic
+package truth. A caller admits sequence zero before the first reservation; that
+record contains no dispatch ownership and every positive sequence retains at
+least one reservation. Sequence must equal the transition count derivable from
+retained dispatch states and uncertainty observations. The caller then seals
+one complete immutable snapshot after each exact ledger transition. A
+reservation successor must bind the predecessor's exact
+progression identity and canonical state epoch. Every record binds its
+transaction, dispatch policy, caller-issued run nonce,
+sequence, predecessor, run and progression identities, canonical state epoch,
+terminal flags, and complete dispatch history.
 
+Reopening requires the caller to rehydrate the exact *transaction_progress*
+from authoritative construction, check, effect, and installed-state evidence.
+The controller revalidates every durable graph unit and predecessor binding,
+every completed dispatch against exact terminal and attempt evidence, and every
+completed operation against the effect request's original expected state. A
+stored identity is never promoted into semantic evidence.
 
+The POSIX store is rooted at an explicit directory or directory descriptor. It
+serializes writers with a local lock, publishes immutable read-only snapshot
+files without replacement, synchronizes them and the directory, and then
+atomically replaces a checksummed read-only head checkpoint followed by another
+directory synchronization. The head is the physical commit point. Recovery
+opens only the exact self-contained snapshot named by that head. Exact retries
+before or after head publication are idempotent and require exact snapshot
+bytes.
+
+A missing, corrupt, writable, symlinked, or contradictory head or selected
+snapshot fails closed. Historical snapshots are causal and audit material, not
+an implicit newest-state index. The store is crash-consistent but not an
+anti-rollback trust anchor. Complete snapshots are bounded to 16 MiB; this
+release adds no compaction or garbage collection.
+
+Restart assessment is conservative. A durable *reserved* dispatch can be
+released. A started construction or check requires external recovery evidence.
+A started operation retains the exact effect-attempt identity whose durable
+journal must be inspected. *commit_operation_dispatch_start()* commits that
+effect-attempt admission first and the started run snapshot second, and verifies
+the exact authority returned by both stores. Only after both commits may an
+effect driver run. An exact interrupted call is retryable. An orphan admission
+does not promote a still-reserved dispatch into started target mutation.
+
+Version 0.9.1 established the same committed-head discipline for effect-attempt
+encoding version two. A selected snapshot's sequence must equal the exact
+transition count implied by its retained stage and evidence; lease loss cannot
+hide an unresolved publication intent. Strict version-one record-only histories
+remain readable through semantic-chain validation. Appending a successor
+establishes a version-two head; exact retry of a legacy latest record first
+atomically rewrites the selected snapshot as version two and only then publishes
+its head. Durable run support
+adds no journal discovery, semantic-evidence serialization, automatic release,
+driver invocation, resource recovery, retry, rollback, or command frontend.
 
 # TRANSACTION CHECK SESSION
 
@@ -183,26 +235,15 @@ application, and publication handoff, then exact terminal evidence after each
 completed handoff. Every snapshot binds its predecessor, phase totals,
 subordinate result identities, and any transaction, publication, or terminal
 evidence. Its sequence is not advisory: it must equal the exact transition count
-derivable from that retained stage and evidence. Lease loss cannot conceal an
-unresolved publication intent.
+derivable from that retained stage and evidence.
 
 The supplied POSIX store is anchored to an explicit directory or directory
-descriptor. Encoding version two publishes immutable read-only snapshots
-without replacement, synchronizes the snapshot and directory, and atomically
-advances a checksummed read-only head followed by another directory
-synchronization. The head is the physical commit point. Operational recovery
-opens only the exact self-contained snapshot named by that head. Exact retries
-before and after head publication are idempotent and require byte-for-byte
-equality.
-
-A missing, corrupt, writable, symlinked, or contradictory head or selected
-snapshot fails closed. Strict version-one record-only histories remain readable
-through complete semantic predecessor-chain validation. Appending a new
-version-two successor establishes its durable head; an exact retry of the latest
-legacy snapshot first atomically rewrites that selected snapshot as version two,
-synchronizes the directory, and only then publishes its head. The store is
-crash-consistent but not an anti-rollback trust anchor. It does not use an
-ambient package-manager state path.
+descriptor. Encoding version two publishes read-only snapshots without
+replacement and atomically advances a checksummed committed head. Operational
+recovery opens only that exact head-selected snapshot. Strict version-one
+record-only histories remain readable by full chain validation and are upgraded
+by the first exact version-two append. The store does not use an ambient
+package-manager state path.
 
 # RESTART
 

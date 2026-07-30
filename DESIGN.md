@@ -13,53 +13,145 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
-## Release 0.9.1 effect-journal commit point
+## Release 0.10.0 durable transaction-run boundary
 
-Release 0.9.1 hardens the existing effect-attempt journal without changing the
-effect-session or restart semantics. The POSIX store now separates immutable
-snapshot publication from commitment:
+Release 0.10.0 makes the immutable dispatch ledger durable without creating a
+second package-state authority. The distinction is strict:
 
 ```text
-write and fsync immutable snapshot
-        |
-        v
-fsync journal directory
-        |
-        v
-atomically replace checksummed read-only head
-        |
-        v
-fsync journal directory
+run journal: durable ownership and causal ledger transitions
+progression: exact semantic package, check, effect, and state evidence
 ```
 
-The head is the physical commit point. Operational recovery reads only the exact
-self-contained snapshot named by that head. An orphan snapshot created before
-head replacement is not controller truth; an exact append retry may validate and
-commit it. A missing selected snapshot, corrupt or writable head, writable or
-symlinked snapshot, contradictory authority, or foreign same-name bytes fail
-closed.
+A `transaction_run_journal_record` is one complete append-only snapshot of a
+run. Sequence zero must be admitted before the first reservation and therefore
+contains no dispatch ownership and every positive sequence contains at least
+one retained reservation. Sequence is exact, not advisory: a reserved dispatch
+accounts for one transition, started for two plus its observations,
+released-unstarted for two, and completed for three plus its observations.
+Every successor has the exact prior record identity and advances by one, and
+only one, ledger transition. A successor may append one reservation, move one
+reservation to started or released-unstarted, append one operation-uncertainty
+observation,
+or complete one started dispatch while progression advances. A newly appended
+reservation must name the predecessor record's exact progression identity and
+canonical state epoch; a self-consistent but detached reservation is not a
+legal successor.
 
-Every selected snapshot is self-validating: its sequence must equal the exact
-transition count implied by retained lifecycle, application, publication, and
-terminal evidence. A terminal lease-loss snapshot cannot hide an unresolved
-publication intent.
+The record identity binds the exact transaction session identity, explicit
+dispatch policy, caller-issued 32-byte run nonce, sequence, predecessor record,
+run and progression identities, canonical state epoch, terminal state flags,
+and every immutable dispatch record. The binary codec is bounded, deterministic,
+versioned, endian-stable, and redundant: subordinate identities are encoded and
+recomputed during decoding.
 
-Encoding version one remains a strict record-only legacy format. A history with
-no head is accepted only when every record is version one and the complete
-semantic predecessor chain is valid. Appending a new version-two successor
-establishes its durable head. An exact retry of the latest legacy snapshot first
-atomically rewrites that selected snapshot in version-two form, synchronizes the
-directory, and only then publishes a head that can name it. Version-two records
-without a head are uncommitted, not an implicit newest-record index.
+### Rehydration, not fabrication
 
+The journal deliberately stores identities rather than subordinate semantic
+objects. Reopening therefore requires the caller to supply the exact
+`transaction_progress` named by the record. The controller revalidates every
+dispatch unit against the supplied transaction graph, every predecessor binding
+against retained terminal evidence, every completed dispatch against progression
+terminal evidence, and every active operation against the current state epoch.
+Only then is the immutable `transaction_run` reconstructed.
 
-Snapshots are complete values, so recovery does not require older snapshots
-after commitment. Their predecessor identities remain causal and audit evidence.
-The store is crash-consistent but does not prevent an authorized caller from
-rolling back the directory to an older internally valid head. Anti-rollback
-anchoring, journal discovery, compaction, garbage collection, and semantic
-evidence reconstruction remain outside this release.
+A stored digest cannot become a `construction_result`, `transaction_check_result`,
+`effectful_operation_result`, or `pkgstate::snapshot`. Those values must be
+rehydrated from their owning authorities before the run can reopen.
 
+### Write-ahead ownership
+
+Construction and check starts use one run-journal barrier:
+
+```text
+admit exact session
+        -> seal started run successor
+        -> commit and synchronize run successor
+        -> invoke admitted driver
+```
+
+Operation starts cross the run and effect journals. Their only safe order is:
+
+```text
+derive exact effect-attempt admission
+        -> commit effect-attempt admission
+        -> seal started run successor retaining attempt identity
+        -> commit started run successor
+        -> invoke effect driver with the same attempt nonce
+```
+
+`commit_operation_dispatch_start()` implements the two-store prefix and verifies
+that both abstract stores return the exact expected authority. Both appends are
+idempotent, so the whole prefix is exactly retryable. If the first append commits
+but the second does not, the effect admission is an inert orphan: the committed
+run still says `reserved`, restart may release it, and no target mutation is
+inferred. If the started run commits but execution has not begun, restart names
+the exact effect-attempt journal and continues conservatively from its admitted
+record.
+
+No driver may run before the applicable started-run commit. If a run append or
+synchronization fails, execution must not begin. This is the controller
+write-ahead barrier that makes a recorded `reserved` dispatch safe to release
+after restart.
+
+### Conservative restart classification
+
+Restart assessment does not execute or infer outcomes:
+
+- a `reserved` dispatch is classified `release_reserved`;
+- a started construction is `recover_construction`;
+- a started check is `recover_check`;
+- a started operation is `inspect_effect_journal` and retains the exact
+  effect-attempt identity to inspect.
+
+Completed and released records are quiescent. Operation uncertainty observations
+remain ordered on the active dispatch and are passed to the caller for exact
+effect-journal reconciliation. `transaction_run_restart_checkpoint` combines
+only an exact reopened run, its durable record, and this conservative assessment.
+
+The supplied POSIX store is rooted at an explicit directory or directory file
+descriptor. It serializes writers with a directory-local lock, uses no-follow
+opens, writes a private temporary snapshot, seals and synchronizes it, publishes
+the immutable record without replacement, synchronizes the directory, and then
+atomically publishes a checksummed read-only head checkpoint followed by another
+directory synchronization. The head is the physical commit point.
+
+Operational recovery does not infer the newest state by scanning filenames. It
+reads the head, opens the one exact self-contained snapshot named by that head,
+and verifies journal, sequence, and record identity. A missing head in the
+presence of record names, a corrupt head, or a missing or corrupt head-selected
+snapshot fails closed. Historical snapshots are inert causal and audit material;
+their deletion does not fabricate another committed state. An exact retry after
+a crash between record publication and head publication verifies the existing
+snapshot and promotes the same authority idempotently. An exact retry after head
+publication is also idempotent.
+
+The store is crash-consistent, not an anti-rollback trust anchor. A privileged
+actor that can replace the head with an older valid checkpoint is outside this
+boundary and requires an external monotonic anchor if rollback detection is a
+system requirement. The store owns no ambient package-manager path.
+
+Every run record is a complete snapshot, bounded to 16 MiB. Release 0.10.0 adds
+no compaction or garbage collection, so historical write volume is intentionally
+not hidden. A delta/checkpoint format may replace this physical representation
+before an automatic whole-transaction executor is admitted; semantic record and
+run identities must remain authoritative across such a storage migration.
+
+Release 0.9.1 established the same head discipline for effect-attempt encoding
+version two. Every selected snapshot is self-validating: its sequence must equal
+the exact transition count implied by retained lifecycle, application,
+publication, and terminal evidence. A terminal lease-loss snapshot cannot hide
+an unresolved publication intent. Version-one record-only histories remain
+readable by strict full semantic-chain validation. Appending a new version-two
+successor establishes its durable head. An exact retry of the latest legacy
+snapshot first atomically rewrites that selected snapshot in version-two form,
+synchronizes the directory, and only then publishes a head that can name it.
+Release 0.10.0 consumes that established commit point; it does not redefine
+effect-journal recovery.
+
+This release adds no journal discovery, semantic-evidence serialization,
+automatic release, driver invocation, resource recovery, cleanup, retry,
+rollback, or command frontend.
 
 ## Release 0.9.0 transaction-dispatch boundary
 

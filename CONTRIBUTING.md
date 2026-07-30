@@ -31,10 +31,15 @@ or stale terminal evidence before progression. Dispatch changes must keep
 reservation separate from execution admission, retain exact predecessor and
 attempt identities, forbid duplicate ownership, and never release started work
 as if it were unstarted. Failure containment must stop new work without erasing
-terminal evidence from already-started independent work. Effect-store changes
-must preserve immutable record publication followed by an atomic checksummed
-head, and exact append retries must be idempotent. Never infer controller truth
-from an uncommitted snapshot or by scanning for the lexically newest filename.
+terminal evidence from already-started independent work. Run-journal changes
+must admit history before the first reservation, persist exactly one ledger
+transition per successor, require exact progression rehydration, and classify
+started work conservatively. Store changes must preserve immutable record
+publication followed by an atomic checksummed head, and exact append retries
+must be idempotent. Never treat a stored identity as reconstructed build, check,
+effect, or installed-state evidence. Starting an operation durably must commit
+its effect-attempt admission before the started run snapshot; do not open-code
+the reverse order or invoke a driver between those commits.
 
 Use SPDX headers:
 
