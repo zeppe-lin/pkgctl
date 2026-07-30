@@ -23,6 +23,13 @@ if not get_option('tests').disabled()
   )
   test('dispatch', dispatch_test)
 
+  run_journal_test = executable(
+    'run-journal-test',
+    'run_journal_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('run-journal', run_journal_test)
+
   request_test = executable(
     'request-test',
     'request_test.cpp',
@@ -91,6 +98,11 @@ if not get_option('tests').disabled()
     'progression.h',
     'report.h',
     'request.h',
+    'run_journal.h',
+    'run_journal_codec.h',
+    'run_commit.h',
+    'run_restart.h',
+    'run_store.h',
     'session.h',
     'version.h',
   ]
@@ -118,6 +130,9 @@ if not get_option('tests').disabled()
 
   dispatch_contract = find_program('check_dispatch_contract.sh')
   test('dispatch-contract', dispatch_contract, args: [meson.project_source_root()])
+
+  run_journal_contract = find_program('check_run_journal_contract.sh')
+  test('run-journal-contract', run_journal_contract, args: [meson.project_source_root()])
 
   source_contract = find_program('check_source_contract.sh')
   test('source-contract', source_contract, args: [meson.project_source_root()])

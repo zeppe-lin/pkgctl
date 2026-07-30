@@ -6,6 +6,8 @@
 #include <pkgctl/check.h>
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
+#include <pkgctl/run_journal.h>
+#include <pkgctl/run_restart.h>
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -33,6 +35,20 @@ char hexadecimal_offset(char seed, std::size_t offset)
   if (position == std::string_view::npos)
     throw std::runtime_error("fixture identity seed is not hexadecimal");
   return digits[(position + offset) % digits.size()];
+}
+
+pkgctl::transaction_run_nonce journal_nonce(std::uint8_t marker)
+{
+  pkgctl::transaction_run_nonce::byte_array bytes{};
+  bytes.back() = marker;
+  return pkgctl::transaction_run_nonce::from_bytes(bytes);
+}
+
+pkgctl::transaction_dispatch_nonce dispatch_nonce(std::uint8_t marker)
+{
+  pkgctl::transaction_dispatch_nonce::byte_array bytes{};
+  bytes.back() = marker;
+  return pkgctl::transaction_dispatch_nonce::from_bytes(bytes);
 }
 
 template<typename Function>
@@ -485,6 +501,32 @@ void check_successful_session_and_progression()
   auto session = admit_check(fixture.progress, fixture.transaction, resources);
   auto repeated = admit_check(fixture.progress, fixture.transaction, resources);
 
+  auto run = pkgctl::transaction_run::begin(
+      fixture.progress,
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto journal = pkgctl::transaction_run_journal_record::admit(
+      run, journal_nonce(1U));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(1U));
+  CHECK(reservation.dispatch.has_value());
+  CHECK(reservation.dispatch &&
+        reservation.dispatch->unit().kind() ==
+            pkgctl::transaction_unit_kind::check);
+  auto reserved_journal = journal.successor(reservation.run);
+  auto started_run = pkgctl::start_check_dispatch(
+      reservation.run, *reservation.dispatch, session);
+  auto started_journal = reserved_journal.successor(started_run);
+  const auto restart =
+      pkgctl::transaction_run_restart_checkpoint::make(
+          started_run.progress(), started_journal).assessment();
+  CHECK(restart.active().size() == 1U);
+  CHECK(restart.external_evidence_required());
+  CHECK(restart.active().front().disposition() ==
+        pkgctl::transaction_dispatch_restart_disposition::recover_check);
+  CHECK(restart.active().front().attempt_session() == session.identity());
+  const auto checkpoint = pkgctl::transaction_run_restart_checkpoint::make(
+      fixture.progress, started_journal);
+  CHECK(checkpoint.run().identity() == started_run.identity());
+
   CHECK(session.identity() == repeated.identity());
   CHECK(session.request().prepared_from_progress() == fixture.progress.identity());
   CHECK(session.request().transaction().identity() == fixture.transaction.identity());
@@ -512,7 +554,12 @@ void check_successful_session_and_progression()
   CHECK(result.execution().check().request().identity() ==
         session.request().check().identity());
 
-  auto progressed = pkgctl::advance_check(fixture.progress, result);
+  auto completed_run = pkgctl::complete_check_dispatch(
+      started_run, *reservation.dispatch, result);
+  auto completed_journal = started_journal.successor(completed_run);
+  CHECK(pkgctl::transaction_run_restart_checkpoint::make(
+            completed_run.progress(), completed_journal).assessment().quiescent());
+  const auto& progressed = completed_run.progress();
   CHECK(progressed.check(check_node(fixture.transaction).identity()) != nullptr);
   CHECK(progressed.check(check_node(fixture.transaction).identity())->identity() ==
         result.identity());
