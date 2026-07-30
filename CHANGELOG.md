@@ -1,5 +1,29 @@
 # pkgctl changelog
 
+## 0.9.1 - 2026-07-30
+
+### Effect-journal commit-point hardening
+
+- Introduces effect-attempt encoding version two and an explicit checksummed
+  read-only head file as the physical commit point for the POSIX store.
+- Publishes immutable read-only snapshots without replacement, synchronizes the
+  snapshot and directory, atomically replaces the head, and synchronizes the
+  directory again before append reports success.
+- Loads only the exact self-contained snapshot selected by the committed head;
+  missing, corrupt, writable, symlinked, or contradictory heads and snapshots
+  fail closed.
+- Makes exact append retries idempotent before and after head publication and
+  requires byte-for-byte equality when a snapshot name already exists.
+- Keeps strict version-one record-only histories readable through full-chain
+  validation and upgrades them on the first exact version-two append.
+- Tightens bounded encoder/decoder failures, no-follow/type/mode checks, I/O
+  error mapping, locking, and directory-descriptor operation.
+- Documents that the store is crash-consistent but is not an anti-rollback trust
+  anchor; historical snapshots remain audit material rather than an implicit
+  newest-record index.
+- Adds no dispatch persistence, semantic-evidence reconstruction, automatic
+  execution, retry policy, rollback, or effect-implying command.
+
 ## 0.9.0 - 2026-07-30
 
 ### Transaction dispatch and ownership
