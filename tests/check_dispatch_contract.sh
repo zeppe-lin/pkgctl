@@ -30,6 +30,10 @@ for required in \
   'start_construction_dispatch' \
   'start_check_dispatch' \
   'start_operation_dispatch' \
+  'operation_dispatch_start_result' \
+  'effect_attempt_record::admit' \
+  'effect_attempt() const noexcept' \
+  'started dispatch has invalid effect-attempt authority' \
   'release_unstarted_dispatch' \
   'complete_construction_dispatch' \
   'complete_check_dispatch' \

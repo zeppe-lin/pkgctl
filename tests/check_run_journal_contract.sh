@@ -37,6 +37,11 @@ for required in \
   'validate_record_transition' \
   'validate_transition_snapshots' \
   'validate_durable_successor' \
+  'transaction-run journal admission contains dispatch ownership' \
+  'positive transaction-run journal sequence has no dispatch history' \
+  'transaction-run journal has more reservations than transitions' \
+  'transaction-run journal sequence disagrees with retained history' \
+  'new dispatch reservation is detached from durable progression' \
   'validate_rehydrated_run_history' \
   'encode_transaction_run_record' \
   'decode_transaction_run_record' \
