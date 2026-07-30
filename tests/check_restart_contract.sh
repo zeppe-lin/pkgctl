@@ -6,12 +6,14 @@ set -eu
 srcdir=${1:-.}
 model="$srcdir/include/pkgctl/effect_journal.h"
 model_source="$srcdir/src/effect_journal.cpp"
+codec_header="$srcdir/include/pkgctl/effect_journal_codec.h"
 restart="$srcdir/src/effect_restart.cpp"
 effect="$srcdir/src/effect.cpp"
 store="$srcdir/src/effect_store.cpp"
 codec="$srcdir/src/effect_journal_codec.cpp"
 
-for file in "$model" "$model_source" "$restart" "$effect" "$store" "$codec"; do
+for file in "$model" "$model_source" "$codec_header" "$restart" \
+            "$effect" "$store" "$codec"; do
   [ -s "$file" ] || {
     echo "missing durable effect authority source: $file" >&2
     exit 1
@@ -24,17 +26,33 @@ for required in \
   'effect_attempt_record::begin_application' \
   'effect_attempt_record::begin_publication' \
   'effect_attempt_record::seal_terminal' \
+  'effect_attempt_record::validate_successor_of' \
   'execute_effectful_operation_durable' \
   'resume_effectful_operation' \
   'driver.resume_application' \
   'driver.read_state' \
   'effect_restart_disposition::external_resolution_required' \
+  'effect_attempt_legacy_encoding_version = 1' \
+  'effect_attempt_encoding_version = 2' \
+  'pkgctl/effect-journal-head/1' \
+  'head_magic' \
+  'record_encoding_version' \
+  'read_head' \
+  'publish_head' \
+  'verify_existing_snapshot' \
+  'upgrade_legacy_snapshot' \
+  'legacy controller journal transition is invalid' \
+  'effect-attempt journal sequence disagrees with retained history' \
+  'lease-loss terminal record follows unresolved publication intent' \
+  'latest->identity() == record.identity()' \
+  'effect-journal head names a missing snapshot' \
   'posix_effect_journal_store::from_directory_fd' \
   '::rewinddir' \
   '::linkat' \
   '::fsync' \
   'O_NOFOLLOW'; do
-  grep -F "$required" "$model" "$model_source" "$restart" "$effect" "$store" "$codec" \
+  grep -F "$required" "$model" "$model_source" "$codec_header" \
+      "$restart" "$effect" "$store" "$codec" \
       >/dev/null || {
     echo "missing durable effect contract: $required" >&2
     exit 1
@@ -80,7 +98,8 @@ for forbidden in \
   '.journal_namespace()' \
   '/var/lib/pkg'; do
   if grep -F "$forbidden" \
-      "$model" "$model_source" "$restart" "$effect" "$store" "$codec" \
+      "$model" "$model_source" "$codec_header" "$restart" \
+      "$effect" "$store" "$codec" \
       >/dev/null 2>&1; then
     echo "forbidden durable-controller authority shortcut: $forbidden" >&2
     exit 1
