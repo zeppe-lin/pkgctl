@@ -6,6 +6,50 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.14.0 composes the durable run, exact authority, execution, and
+reconciliation boundaries into one bounded transaction advancement:
+
+```text
+committed run head
+        |
+        v
+exact progression rehydration
+        |
+        +-- retained ownership --> reconcile one dispatch --> return
+        |
+        `-- quiescent -----------> reserve one dispatch
+                                      |
+                                      v
+                              commit reservation
+                                      |
+                                      v
+                              acquire exact authority
+                                      |
+                                      v
+                              execute and commit --> return
+```
+
+`advance_transaction_run_once()` loads the committed head selected by an exact
+journal identity. It rehydrates semantic progression through the caller-owned
+source and gives the first active dispatch in durable ledger order absolute
+precedence. Reserved ownership is released; started construction or check work
+accepts exact recovered evidence; started operation work inspects the retained
+effect attempt. External-resolution effect state returns without a driver call
+or journal append. No fresh work is reserved in the same call.
+
+Only a quiescent reopened run may reserve the first canonical ready dispatch.
+The selected driver and effect-store requirements are validated before the
+reservation append. The reservation is then committed before fresh execution
+authority is requested, and the existing write-ahead execution functions retain
+start and terminal crash barriers. An authority-source or driver failure therefore
+leaves exact reserved or started ownership rather than an invisible partial step.
+
+The returned result is reconstructed from storage-derived run authority and
+validates its disposition, retained dispatch, and semantic evidence. Release
+0.14.0 adds no loop, scheduler, worker, concurrency, retry or backoff policy,
+resource or evidence discovery, process adoption, rollback, cleanup policy,
+compaction, garbage collection, or effectful CLI command.
+
 Release 0.13.0 closes the authority handoff required before a deterministic
 transaction runner can exist:
 

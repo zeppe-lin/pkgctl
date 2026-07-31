@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.13.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.14.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -137,6 +137,40 @@ the retained effect-attempt identity.
 
 This layer creates no scheduler, loop, thread, backend, resource-discovery rule,
 retry rule, rollback, automatic release, journal discovery, or effectful command.
+
+# ONE-STEP TRANSACTION ADVANCEMENT
+
+Version 0.14.0 composes the durable run, exact authority, execution, and restart
+boundaries into one bounded call. The caller supplies an exact journal identity,
+a dispatch nonce for possible fresh work, caller-owned authority sources,
+explicit drivers, and explicit stores.
+
+The call loads the committed run head from the run store and rehydrates its exact
+semantic progression. If the run retains active ownership, the first active
+dispatch in durable ledger order is reconciled and the call returns. Reserved
+work is released. Started construction and check work require exact recovered
+evidence. Started operation work inspects the exact retained effect attempt. An
+external-resolution disposition returns the unchanged committed run, invokes no
+driver, and appends neither journal. Recovery therefore has precedence over every
+new reservation.
+
+Only a quiescent reopened run may reserve the first canonical ready dispatch.
+The selected driver and any required effect store are validated before the
+reservation append. The reservation is committed before fresh execution
+authority is requested. The admitted authority then passes through the existing
+single-dispatch write-ahead barriers: durable start before driver invocation and
+durable terminal evidence after the ordinary completion transition.
+
+A failed authority source leaves a durable reservation. Driver escape or failed
+terminal commitment leaves durable started ownership. The returned result is
+validated against the storage-derived record and can describe only one exact
+quiescent, released, reconciled, externally blocked, or freshly executed
+outcome.
+
+One call either reconciles retained ownership or executes one newly reserved
+dispatch and then returns. It creates no loop, scheduler, worker, concurrency,
+retry or backoff policy, resource or evidence discovery, process adoption,
+rollback, cleanup policy, compaction, garbage collection, or command action.
 
 # EXACT RUN-AUTHORITY REHYDRATION
 

@@ -1,5 +1,36 @@
 # pkgctl changelog
 
+## 0.14.0 - 2026-07-31
+
+### One-step transaction advancement
+
+- Adds one bounded controller call that loads the committed run head selected by
+  an exact journal identity and rehydrates its semantic progression.
+- Gives the first active dispatch in durable ledger order precedence over every
+  fresh reservation and returns after reconciling that one ownership record.
+- Releases never-started reservations, accepts exact recovered construction or
+  check evidence, and inspects the exact retained operation effect attempt.
+- Returns unchanged durable run authority when operation recovery requires
+  external resolution, with no driver invocation and no journal append.
+- Permits fresh reservation only when the reopened run has no active ownership,
+  using the existing first-canonical-ready dispatch policy.
+- Validates the selected driver and required effect store before committing the
+  reservation, so missing execution dependencies create no ownership.
+- Commits the reservation before requesting fresh execution authority and then
+  delegates start, driver, and terminal barriers to the existing durable
+  single-dispatch execution functions.
+- Leaves exact reserved ownership when authority acquisition fails and exact
+  started ownership when a driver or terminal append fails.
+- Returns a storage-derived, self-validating advancement result that binds the
+  durable record, reopened run, disposition, retained dispatch, and semantic
+  evidence accepted or produced by the step.
+- Executes or reconciles at most one dispatch and never performs both actions in
+  one call.
+- Adds no loop, scheduler, worker, concurrency, retry or backoff policy,
+  resource or evidence discovery, process adoption, rollback, cleanup policy,
+  compaction, garbage collection, or effect-implying CLI command.
+- Retains the complete authority floors published for 0.13.0.
+
 ## 0.13.0 - 2026-07-31
 
 ### Exact run-authority rehydration

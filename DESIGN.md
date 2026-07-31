@@ -13,6 +13,59 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.14.0 one-step transaction-advancement boundary
+
+Release 0.14.0 composes existing durable authorities into one bounded controller
+step without creating a scheduler:
+
+```text
+load committed run head
+        |
+        v
+rehydrate exact progression
+        |
+        +-- active ownership --> reconcile first retained dispatch --> return
+        |
+        `-- no active work ---> reserve first canonical ready dispatch
+                                  |
+                                  v
+                          commit reservation
+                                  |
+                                  v
+                          acquire exact execution authority
+                                  |
+                                  v
+                          execute behind durable barriers --> return
+```
+
+The call accepts a journal identity rather than a caller-provided run snapshot.
+The run store therefore supplies the committed head used for all later
+validation. `rehydrate_transaction_run()` restores semantic progression through
+the caller-owned source before dispatch policy is consulted.
+
+Retained ownership has absolute precedence. The first active dispatch in durable
+ledger order is passed through the exact recovery-authority handoff and one
+existing durable reconciliation function. Reserved work is released; started
+construction and check work require exact result evidence; started operation
+work binds the retained effect attempt and its current restart disposition. An
+external-resolution disposition returns the unchanged committed head, invokes
+no driver, and appends nothing. The call never reserves fresh work after any
+reconciliation attempt.
+
+Only a reopened run with no active ownership may call `reserve_next()`. The
+selected driver and operation effect store are validated before the reservation
+is committed. Fresh execution authority is intentionally acquired only after
+that commit. A source refusal therefore leaves a visible reservation, while the
+existing write-ahead execution layer leaves visible started ownership after a
+driver escape or failed terminal append.
+
+The result constructor reopens the returned run from the storage-derived record
+and validates the exact disposition, retained dispatch, and evidence shape. The
+step executes or reconciles at most one dispatch and then returns. It creates no
+loop, scheduler, worker, concurrency, retry or backoff policy, discovery,
+process adoption, rollback, cleanup policy, compaction, garbage collection, or
+command action.
+
 ## Release 0.13.0 exact run-authority rehydration boundary
 
 Release 0.13.0 separates caller-owned recovery and execution inputs from the

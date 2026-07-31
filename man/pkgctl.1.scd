@@ -19,7 +19,7 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.13.0 acquires explicit native collections, reads one existing canonical
+Version 0.14.0 acquires explicit native collections, reads one existing canonical
 installed-state generation, resolves typed package requirements, composes one
 immutable cross-package transaction program, and prints deterministic reports.
 
@@ -27,13 +27,15 @@ The controller library also defines exact one-candidate construction,
 transaction progression, immutable dispatch ownership, durable transaction-run
 journals, one-dispatch write-ahead execution, exact check
 request/session/result, one-operation preparation, single-operation effect,
-conservative restart, one-dispatch restart reconciliation, and exact
-caller-supplied run-authority handoffs, but no
-effect-implying command is exposed. Progression reports every graph-ready
-construction, check, or operation unit. Library clients may reserve one
-canonical policy-allowed unit and may explicitly realize that one reservation
-through injected drivers and stores. No reservation loop or whole-transaction
-executor is provided. Preparation can inspect exact artifact bytes and seal
+conservative restart, one-dispatch restart reconciliation, exact
+caller-supplied run-authority handoffs, and one bounded transaction-run
+advancement call, but no effect-implying command is exposed. Progression reports
+every graph-ready construction, check, or operation unit. Library clients may
+advance one durable journal by reconciling retained ownership or, only when the
+run is quiescent, reserving and realizing one canonical policy-allowed unit
+through injected authorities, drivers, and stores. No advancement loop,
+scheduler, worker, or whole-transaction executor is provided. Preparation can
+inspect exact artifact bytes and seal
 package-local plan/application handoffs when called by a library client. All
 executable commands remain read-only: they never initialize or publish state,
 materialize sources, build packages, inspect artifacts, plan package changes,

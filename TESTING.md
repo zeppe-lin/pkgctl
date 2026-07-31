@@ -321,6 +321,38 @@ The preparation suite must prove:
 - no preparation path executes lifecycle, application, publication, or CLI
   effects.
 
+## One-step transaction-advancement tests
+
+The construction, check, and effect suites must prove:
+
+- the call loads the committed head selected by the supplied journal identity
+  before invoking any semantic authority source;
+- a missing or foreign committed head is rejected before progression or
+  execution authority is requested;
+- exact progression is rehydrated once from the storage-derived record;
+- the first active dispatch in durable ledger order is reconciled and no fresh
+  reservation or execution-authority request occurs in that call;
+- a retained reservation is released, started construction and check work
+  accepts only exact recovered attempt evidence, and operation recovery binds
+  the exact retained effect attempt;
+- external-resolution operation state returns the unchanged run head, invokes
+  no driver, and appends neither journal;
+- only a quiescent reopened run may reserve the first canonical ready dispatch;
+- a missing selected driver or effect store is rejected before reservation is
+  appended and before execution authority is requested;
+- reservation commitment precedes execution-authority acquisition, durable
+  start precedes driver invocation, and terminal commitment follows accepted
+  evidence;
+- authority-source failure after reservation leaves the exact committed
+  reservation, while driver escape leaves the exact committed started record;
+- definitive terminal failure makes a later call quiescent rather than selecting
+  unrelated new work under the stop-after-failure policy;
+- the returned result reopens exactly from its storage-derived record and its
+  disposition, dispatch, and evidence shape cannot contradict that record;
+- each call reconciles or executes at most one dispatch and performs no loop,
+  scheduler, worker, retry, discovery, rollback, cleanup, compaction, garbage
+  collection, or CLI action.
+
 ## Exact run-authority rehydration tests
 
 The construction, check, and effect suites must prove:

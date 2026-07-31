@@ -58,6 +58,18 @@ exact retained attempt. It must not load or append journals, execute or
 reconcile work, discover paths or evidence, construct a fact from an identity,
 choose retries, reserve work, or loop.
 
+The one-step advancement layer may load one committed run head selected by an
+exact journal identity, rehydrate its progression through a caller source, and
+compose the existing reservation, authority, execution, and reconciliation
+functions. Existing active ownership must be reconciled before fresh work is
+considered, and the call must return after that attempt. A fresh reservation may
+be committed only for a quiescent reopened run and only after the selected
+execution dependencies are validated. Execution authority must be acquired
+after the reservation commit. The layer must not loop, schedule, create workers,
+choose retries or backoff, discover resources or evidence, adopt processes,
+roll back, clean up, compact journals, collect history, or expose a mutating
+command.
+
 The restart-reconciliation layer may consume one exact
 `transaction_run_restart_checkpoint`, one retained dispatch, and explicit
 caller-rehydrated subordinate authority. Reserved release must require the
@@ -115,8 +127,9 @@ legacy behavior.
    exact predecessor and state-epoch binding, operation-lane serialization,
    failure containment, durable run single-transition sealing, exact progression
    rehydration, graph/evidence revalidation, write-ahead start persistence,
-   one-dispatch driver barriers, exact run-authority handoffs, exact reserved
-   release, caller-rehydrated
+   one-dispatch driver barriers, exact run-authority handoffs, one-step
+   recovery-before-reservation ordering, durable reservation-before-authority
+   acquisition, exact reserved release, caller-rehydrated
    build/check recovery, effect-journal continuation, lost-terminal-write
    recovery, preparation projection and typed refusal, effect sequencing,
    intent-before-effect persistence, exact restart checkpoints, outer-lease
