@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.13.0
+version=0.14.0
 
 require_line()
 {
@@ -20,17 +20,17 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 13;'
+  'inline constexpr unsigned version_minor = 14;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.13.0";'
+  'inline constexpr const char* version_string = "0.14.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 13);'
+  'static_assert(pkgctl::version_minor == 14);'
 
-grep -F '## 0.13.0 - 2026-07-31' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.13.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.13.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.14.0 - 2026-07-31' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.14.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.14.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
 for contract in \
   'libpkgsource >= 2.0.0' \
