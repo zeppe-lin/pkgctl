@@ -16,6 +16,7 @@
 #include <pkgctl/run_journal_codec.h>
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_advance.h>
+#include <pkgctl/run_drive.h>
 #include <pkgctl/run_commit.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
@@ -2321,6 +2322,23 @@ public:
   }
 };
 
+class forbidden_dispatch_nonce_source final
+    : public pkgctl::transaction_dispatch_nonce_source {
+public:
+  pkgctl::transaction_dispatch_nonce issue(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_run&) override
+  {
+    ++calls_;
+    throw std::runtime_error("unexpected fresh dispatch nonce request");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  std::size_t calls_ = 0U;
+};
+
 class operation_execution_authority_source final
     : public pkgctl::transaction_dispatch_execution_authority_source {
 public:
@@ -3728,6 +3746,25 @@ void check_single_step_operation_advancement()
     }
     CHECK(recovery_source.calls() == 1U);
     CHECK(execution_source.calls() == 0U);
+    CHECK(trace == trace_before);
+    CHECK(actuator.trace().empty());
+
+    forbidden_dispatch_nonce_source nonces;
+    const auto driven = pkgctl::drive_transaction_run(
+        started.run_record.journal(),
+        pkgctl::transaction_run_drive_policy::make(4U), nonces,
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, &actuator}, {run_store, &effect_store});
+    CHECK(driven.disposition() ==
+          pkgctl::transaction_run_drive_disposition::
+              external_resolution_required);
+    CHECK(driven.external_resolution_required());
+    CHECK(!driven.terminal());
+    CHECK(driven.steps().size() == 1U);
+    CHECK(driven.durable_step_count() == 0U);
+    CHECK(driven.record().identity() == started.run_record.identity());
+    CHECK(nonces.calls() == 0U);
+    CHECK(recovery_source.calls() == 2U);
     CHECK(trace == trace_before);
     CHECK(actuator.trace().empty());
   }
