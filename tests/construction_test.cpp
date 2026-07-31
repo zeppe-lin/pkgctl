@@ -8,6 +8,7 @@
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_advance.h>
 #include <pkgctl/run_drive.h>
+#include <pkgctl/run_launch.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_restart.h>
@@ -158,6 +159,94 @@ private:
   std::size_t fail_on_append_;
   std::optional<pkgctl::transaction_run_journal_record> returned_;
   std::optional<pkgctl::transaction_run_journal_record> latest_;
+  std::size_t append_calls_ = 0U;
+};
+
+class launch_run_store final
+    : public pkgctl::transaction_run_journal_store {
+public:
+  explicit launch_run_store(
+      std::vector<std::string>& trace,
+      std::size_t fail_on_append = 0U)
+      : trace_(trace), fail_on_append_(fail_on_append)
+  {
+  }
+
+  std::optional<pkgctl::transaction_run_journal_record> load_latest(
+      const pkgctl::session_identity& journal) const override
+  {
+    ++load_calls_;
+    trace_.push_back("load");
+    if (!latest_ || latest_->journal() != journal)
+      return std::nullopt;
+    return latest_;
+  }
+
+  pkgctl::transaction_run_journal_record append(
+      const pkgctl::transaction_run_journal_record& record) override
+  {
+    ++append_calls_;
+    trace_.push_back("append-" + std::to_string(append_calls_));
+    if (append_calls_ == fail_on_append_)
+      throw pkgctl::transaction_run_journal_error(
+          pkgctl::transaction_run_journal_error_code::store_write_failed,
+          "injected launch-store failure");
+    if (latest_ && latest_->identity() == record.identity())
+      return *latest_;
+    if (latest_)
+      record.validate_successor_of(*latest_);
+    else if (record.sequence() != 0U || record.previous())
+      throw std::runtime_error("launch store did not begin at sequence zero");
+    latest_ = record;
+    return record;
+  }
+
+  std::size_t load_calls() const noexcept { return load_calls_; }
+  std::size_t append_calls() const noexcept { return append_calls_; }
+  const pkgctl::transaction_run_journal_record& latest() const
+  {
+    if (!latest_)
+      throw std::runtime_error("launch store has no committed record");
+    return *latest_;
+  }
+
+private:
+  std::vector<std::string>& trace_;
+  std::size_t fail_on_append_;
+  mutable std::size_t load_calls_ = 0U;
+  std::size_t append_calls_ = 0U;
+  std::optional<pkgctl::transaction_run_journal_record> latest_;
+};
+
+class foreign_launch_head_store final
+    : public pkgctl::transaction_run_journal_store {
+public:
+  explicit foreign_launch_head_store(
+      pkgctl::transaction_run_journal_record record)
+      : record_(std::move(record))
+  {
+  }
+
+  std::optional<pkgctl::transaction_run_journal_record> load_latest(
+      const pkgctl::session_identity&) const override
+  {
+    ++load_calls_;
+    return record_;
+  }
+
+  pkgctl::transaction_run_journal_record append(
+      const pkgctl::transaction_run_journal_record&) override
+  {
+    ++append_calls_;
+    throw std::runtime_error("foreign launch store reached append");
+  }
+
+  std::size_t load_calls() const noexcept { return load_calls_; }
+  std::size_t append_calls() const noexcept { return append_calls_; }
+
+private:
+  pkgctl::transaction_run_journal_record record_;
+  mutable std::size_t load_calls_ = 0U;
   std::size_t append_calls_ = 0U;
 };
 
@@ -2000,6 +2089,241 @@ make_admitted(96U);
 }
 
 
+void check_restart_safe_transaction_launch()
+{
+  test_support::temporary_directory temporary;
+  test_support::initialize_state(temporary.path() / "state");
+  pkgstate::canonical_generation_store state_store(
+      temporary.path() / "state", test_support::binding());
+  const std::string payload = "restart-safe launch payload\n";
+  auto source = tool_source(sha256_text(payload), "1.0", false);
+  auto transaction = transaction_session(
+      source, dependency_source(), state_store.read(),
+      temporary.path() / "state");
+  const auto initial = pkgctl::transaction_progress::begin(transaction);
+  const auto policy = pkgctl::transaction_dispatch_policy::make(1U, 1U);
+  fixture_backend backend(backend_mode::succeed);
+  pkgctl::native_construction_driver native_driver(backend);
+
+  {
+    auto session = construction_session_without_inputs(
+        transaction, temporary.path() / "launch-construction");
+    test_support::write(
+        session.paths().local_source_root / "payload", payload);
+    std::vector<std::string> trace;
+    replay_run_nonce_source run_nonces(111U, trace);
+    head_derived_nonce_source dispatch_nonces(111U);
+    fixed_progress_source progress_source(initial);
+    construction_execution_authority_source execution_source(session);
+    unreachable_recovery_authority_source recovery_source;
+    launch_run_store run_store(trace);
+    tracing_construction_driver driver(native_driver, trace);
+
+    const auto launched = pkgctl::launch_transaction_run(
+        initial, policy, pkgctl::transaction_run_drive_policy::make(4U),
+        run_nonces, dispatch_nonces,
+        {progress_source, execution_source, recovery_source},
+        {&driver, nullptr, nullptr}, {run_store, nullptr});
+
+    CHECK(launched.origin() ==
+          pkgctl::transaction_run_launch_origin::admitted);
+    CHECK(launched.admission_committed());
+    CHECK(launched.starting_record().sequence() == 0U);
+    CHECK(launched.drive().disposition() ==
+          pkgctl::transaction_run_drive_disposition::completed);
+    CHECK(launched.run().progress().complete());
+    CHECK(launched.record().identity() == run_store.latest().identity());
+    CHECK(run_nonces.calls() == 1U);
+    CHECK(dispatch_nonces.calls() == 1U);
+    CHECK(run_store.append_calls() == 4U);
+
+    fixed_progress_source resumed_progress(launched.run().progress());
+    construction_execution_authority_source resumed_execution(session);
+    unreachable_recovery_authority_source resumed_recovery;
+    const auto append_count = run_store.append_calls();
+    const auto resumed = pkgctl::launch_transaction_run(
+        initial, policy, pkgctl::transaction_run_drive_policy::make(2U),
+        run_nonces, dispatch_nonces,
+        {resumed_progress, resumed_execution, resumed_recovery},
+        {&driver, nullptr, nullptr}, {run_store, nullptr});
+
+    CHECK(resumed.origin() ==
+          pkgctl::transaction_run_launch_origin::resumed);
+    CHECK(!resumed.admission_committed());
+    CHECK(resumed.starting_record().identity() == launched.record().identity());
+    CHECK(resumed.record().identity() == launched.record().identity());
+    CHECK(resumed.drive().disposition() ==
+          pkgctl::transaction_run_drive_disposition::completed);
+    CHECK(resumed.drive().steps().size() == 1U);
+    CHECK(resumed.drive().last().disposition() ==
+          pkgctl::transaction_run_advance_disposition::quiescent);
+    CHECK(run_store.append_calls() == append_count);
+    CHECK(run_nonces.calls() == 2U);
+    CHECK(dispatch_nonces.calls() == 1U);
+  }
+
+  {
+    auto session = construction_session_without_inputs(
+        transaction, temporary.path() / "launch-admission-retry");
+    test_support::write(
+        session.paths().local_source_root / "payload", payload);
+    std::vector<std::string> trace;
+    replay_run_nonce_source run_nonces(112U, trace);
+    head_derived_nonce_source dispatch_nonces(112U);
+    fixed_progress_source progress_source(initial);
+    construction_execution_authority_source execution_source(session);
+    unreachable_recovery_authority_source recovery_source;
+    launch_run_store run_store(trace, 1U);
+    tracing_construction_driver driver(native_driver, trace);
+
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::launch_transaction_run(
+          initial, policy, pkgctl::transaction_run_drive_policy::make(2U),
+          run_nonces, dispatch_nonces,
+          {progress_source, execution_source, recovery_source},
+          {&driver, nullptr, nullptr}, {run_store, nullptr});
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(run_store.append_calls() == 1U);
+    CHECK(progress_source.calls() == 0U);
+    CHECK(dispatch_nonces.calls() == 0U);
+    CHECK(std::find(trace.begin(), trace.end(), "materialize") == trace.end());
+    CHECK(std::find(trace.begin(), trace.end(), "build") == trace.end());
+
+    const auto retried = pkgctl::launch_transaction_run(
+        initial, policy, pkgctl::transaction_run_drive_policy::make(2U),
+        run_nonces, dispatch_nonces,
+        {progress_source, execution_source, recovery_source},
+        {&driver, nullptr, nullptr}, {run_store, nullptr});
+    CHECK(retried.admission_committed());
+    CHECK(retried.run().progress().complete());
+    CHECK(run_nonces.calls() == 2U);
+  }
+
+  {
+    auto session = construction_session_without_inputs(
+        transaction, temporary.path() / "launch-drive-retry");
+    test_support::write(
+        session.paths().local_source_root / "payload", payload);
+    std::vector<std::string> trace;
+    replay_run_nonce_source run_nonces(113U, trace);
+    head_derived_nonce_source dispatch_nonces(113U);
+    fixed_progress_source progress_source(initial);
+    construction_execution_authority_source execution_source(session);
+    unreachable_recovery_authority_source recovery_source;
+    launch_run_store run_store(trace);
+
+    bool refused = false;
+    try
+    {
+      (void)pkgctl::launch_transaction_run(
+          initial, policy, pkgctl::transaction_run_drive_policy::make(1U),
+          run_nonces, dispatch_nonces,
+          {progress_source, execution_source, recovery_source},
+          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      refused = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::invalid_transition;
+    }
+    CHECK(refused);
+    CHECK(run_store.latest().sequence() == 0U);
+    CHECK(run_store.append_calls() == 1U);
+    CHECK(dispatch_nonces.calls() == 1U);
+
+    fixed_progress_source retry_progress(initial);
+    construction_execution_authority_source retry_execution(session);
+    unreachable_recovery_authority_source retry_recovery;
+    const auto retried = pkgctl::launch_transaction_run(
+        initial, policy, pkgctl::transaction_run_drive_policy::make(2U),
+        run_nonces, dispatch_nonces,
+        {retry_progress, retry_execution, retry_recovery},
+        {&native_driver, nullptr, nullptr}, {run_store, nullptr});
+    CHECK(retried.origin() ==
+          pkgctl::transaction_run_launch_origin::resumed);
+    CHECK(retried.starting_record().sequence() == 0U);
+    CHECK(retried.run().progress().complete());
+    CHECK(run_store.append_calls() == 4U);
+  }
+
+  {
+    std::vector<std::string> trace;
+    replay_run_nonce_source refusing(114U, trace, true);
+    head_derived_nonce_source dispatch_nonces(114U);
+    fixed_progress_source progress_source(initial);
+    construction_execution_authority_source execution_source(
+        construction_session_without_inputs(
+            transaction, temporary.path() / "launch-refused"));
+    unreachable_recovery_authority_source recovery_source;
+    launch_run_store run_store(trace);
+
+    bool refused = false;
+    try
+    {
+      (void)pkgctl::launch_transaction_run(
+          initial, policy, pkgctl::transaction_run_drive_policy::make(1U),
+          refusing, dispatch_nonces,
+          {progress_source, execution_source, recovery_source},
+          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+    }
+    catch (const std::runtime_error& problem)
+    {
+      refused = std::string(problem.what()) ==
+          "injected run-nonce refusal";
+    }
+    CHECK(refused);
+    CHECK(run_store.load_calls() == 0U);
+    CHECK(run_store.append_calls() == 0U);
+    CHECK(progress_source.calls() == 0U);
+    CHECK(dispatch_nonces.calls() == 0U);
+  }
+
+  {
+    auto foreign_run = pkgctl::transaction_run::begin(
+        initial, pkgctl::transaction_dispatch_policy::make(2U, 1U));
+    auto foreign_record = pkgctl::transaction_run_journal_record::admit(
+        foreign_run, journal_nonce(115U));
+    foreign_launch_head_store run_store(std::move(foreign_record));
+    std::vector<std::string> trace;
+    replay_run_nonce_source run_nonces(116U, trace);
+    head_derived_nonce_source dispatch_nonces(116U);
+    fixed_progress_source progress_source(initial);
+    construction_execution_authority_source execution_source(
+        construction_session_without_inputs(
+            transaction, temporary.path() / "launch-foreign"));
+    unreachable_recovery_authority_source recovery_source;
+
+    bool rejected = false;
+    try
+    {
+      (void)pkgctl::launch_transaction_run(
+          initial, policy, pkgctl::transaction_run_drive_policy::make(1U),
+          run_nonces, dispatch_nonces,
+          {progress_source, execution_source, recovery_source},
+          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_contract_violation;
+    }
+    CHECK(rejected);
+    CHECK(run_store.load_calls() == 1U);
+    CHECK(run_store.append_calls() == 0U);
+    CHECK(progress_source.calls() == 0U);
+    CHECK(dispatch_nonces.calls() == 0U);
+  }
+}
+
+
 } // namespace
 
 int main()
@@ -2019,6 +2343,7 @@ int main()
     check_single_step_transaction_advancement();
     check_durable_transaction_run_admission();
     check_bounded_serial_transaction_drive();
+    check_restart_safe_transaction_launch();
   }
   catch (const std::exception& value)
   {
