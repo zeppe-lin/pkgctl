@@ -13,6 +13,53 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.15.0 bounded serial transaction-drive boundary
+
+Release 0.15.0 permits bounded repetition only after nonce issuance is tied to
+the committed run head:
+
+```text
+load committed head
+        |
+        +-- active ownership --> reconcile one --> classify
+        |
+        `-- fresh ready work --> issue nonce(head, run)
+                                  |
+                                  v
+                         reserve and execute one
+                                  |
+                                  v
+                              classify
+                                  |
+                  stop or reload committed head
+```
+
+A caller supplies a positive maximum step count and one replay-safe
+`transaction_dispatch_nonce_source`. The source receives the exact
+storage-derived journal record and its rehydrated run only when that head has no
+active ownership, is not stopped, and exposes canonical ready work. It must
+return the same nonce for exact retries against the same head. Once a successor
+record commits, that new head is a distinct issuance domain.
+
+This ordering prevents speculative nonce lists. A failure after nonce issuance
+but before reservation commitment leaves the old head authoritative, so retry
+requests the same nonce. A committed reservation changes the head before any
+execution-authority call. Restart therefore reconciles retained ownership
+without issuing another nonce; only a later fresh reservation against the
+committed release or completion head can request a new one.
+
+`drive_transaction_run()` invokes the one-step controller serially. Each call
+reopens storage and either reconciles one retained dispatch or reserves and
+executes one fresh dispatch. The drive stops on completion, terminal failure
+containment, operation external-resolution authority, incomplete quiescence, or
+its explicit step limit. Its result validates one journal, ordered durable
+heads, and absence of continuation after a stopping outcome.
+
+The bound is policy supplied by the caller and is not an adaptive scheduler.
+The layer creates no worker, concurrency, priority heuristic, unbounded loop,
+retry timing, backoff, discovery, process adoption, rollback, cleanup,
+compaction, garbage collection, or command action.
+
 ## Release 0.14.0 one-step transaction-advancement boundary
 
 Release 0.14.0 composes existing durable authorities into one bounded controller

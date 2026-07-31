@@ -6,6 +6,50 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.15.0 adds an explicitly bounded serial transaction drive without
+turning the control plane into a scheduler:
+
+```text
+committed run head
+        |
+        v
+reconcile retained ownership, if any
+        |
+        `-- otherwise issue nonce for this exact head
+                         |
+                         v
+                 reserve and execute one
+                         |
+                         v
+                 classify durable outcome
+                         |
+            +------------+-------------+
+            |                          |
+        stop condition             bound remains
+            |                          |
+          return                 reload head
+```
+
+`drive_transaction_run()` accepts a positive maximum step count and repeatedly
+invokes the one-step authority. Every iteration reloads the committed head.
+Completion, containment failure, external-resolution authority, incomplete
+quiescence, or exhaustion of the explicit bound stops the call.
+
+Fresh dispatch nonces come from an injected
+`transaction_dispatch_nonce_source` keyed to the storage-derived record and
+rehydrated run. The source is not called while retained ownership is being
+reconciled or when the run is stopped, complete, or otherwise has no ready work.
+Exact retries against an unchanged head must return the same nonce; a committed
+successor head may yield a different nonce. This prevents speculative nonce
+preallocation from consuming attempt identity outside durable ownership.
+
+The returned drive result retains the ordered one-step outcomes and validates
+that continued steps remain in one journal, follow strictly increasing durable
+heads, and never continue after a stopping result. Release 0.15.0 adds no
+worker, concurrency, adaptive priority, unbounded loop, retry timing, backoff,
+resource or evidence discovery, rollback, cleanup policy, compaction, garbage
+collection, or mutating CLI command.
+
 Release 0.14.0 composes the durable run, exact authority, execution, and
 reconciliation boundaries into one bounded transaction advancement:
 

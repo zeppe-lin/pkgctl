@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.14.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.15.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -137,6 +137,37 @@ the retained effect-attempt identity.
 
 This layer creates no scheduler, loop, thread, backend, resource-discovery rule,
 retry rule, rollback, automatic release, journal discovery, or effectful command.
+
+# BOUNDED SERIAL TRANSACTION DRIVE
+
+Version 0.15.0 can drive one durable transaction journal serially for an
+explicit positive maximum number of steps. Every step delegates to the one-step
+advancement boundary and therefore reloads the exact committed run head before
+semantic authority is requested.
+
+Retained ownership has precedence. A reserved or started dispatch is reconciled
+without requesting a fresh dispatch nonce. If the reopened run is stopped or
+has no canonical ready work, the call returns without nonce issuance. Only a
+head that can reserve fresh work is passed to an injected replay-safe
+*transaction_dispatch_nonce_source*. Exact retries against the same record must
+return the same nonce. A committed successor record may define a new nonce.
+
+This head-derived contract prevents caller preallocation from consuming attempt
+identity before durable ownership exists. Failure after nonce issuance but
+before reservation commitment leaves the same head for exact retry. Once
+reservation commits, restart sees retained ownership and reconciles it before
+any later nonce is requested.
+
+The drive stops on transaction completion, terminal failure containment,
+operation external-resolution authority, incomplete quiescence, or exhaustion
+of the explicit bound. The returned ordered outcomes must remain in one journal,
+and every continued outcome must expose a strictly newer committed record. No
+outcome may follow a completed, stopped, externally blocked, or quiescent one.
+
+The drive is bounded serial composition, not scheduling policy. It creates no
+worker, concurrency, adaptive priority, unbounded loop, retry timing, backoff,
+resource or evidence discovery, process adoption, rollback, cleanup,
+compaction, garbage collection, or command action.
 
 # ONE-STEP TRANSACTION ADVANCEMENT
 

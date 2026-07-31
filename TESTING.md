@@ -321,6 +321,31 @@ The preparation suite must prove:
 - no preparation path executes lifecycle, application, publication, or CLI
   effects.
 
+## Bounded serial transaction-drive tests
+
+The construction and effect suites must prove:
+
+- the drive rejects a zero step bound and never exceeds the explicit positive
+  bound;
+- every iteration delegates to the storage-loading one-step authority rather
+  than carrying a caller snapshot between iterations;
+- retained reserved or started ownership is reconciled before any fresh nonce
+  authority is requested;
+- completion and terminal failure stop after the exact producing step;
+- operation external-resolution authority stops immediately, invokes no nonce
+  source or driver, and appends neither journal;
+- incomplete quiescence and explicit step exhaustion remain distinguishable;
+- fresh nonce authority is requested only for storage-derived heads that can
+  reserve canonical ready work;
+- repeated failures before reservation commitment request the same head-derived
+  nonce and leave the committed head unchanged;
+- a committed release or other successor is a new nonce issuance domain;
+- continued outcomes remain in one journal, expose strictly increasing durable
+  heads, and cannot follow a stopping outcome;
+- the drive creates no worker, concurrency, adaptive scheduling, unbounded
+  loop, retry timing, discovery, rollback, cleanup, compaction, garbage
+  collection, or CLI action.
+
 ## One-step transaction-advancement tests
 
 The construction, check, and effect suites must prove:

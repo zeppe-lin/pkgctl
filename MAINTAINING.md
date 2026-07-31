@@ -70,6 +70,17 @@ choose retries or backoff, discover resources or evidence, adopt processes,
 roll back, clean up, compact journals, collect history, or expose a mutating
 command.
 
+The bounded serial transaction-drive layer may repeat the one-step advancement
+function only under an explicit positive caller bound. It must reload the
+committed head on every iteration, reconcile retained ownership before fresh
+work, and obtain dispatch nonces from a caller-owned replay-safe source keyed to
+the exact storage-derived head. The source must not be called for recovery,
+stopped or quiescent runs, or after any stopping outcome. Continued steps must
+remain in one journal and strictly advance durable head sequence. The layer must
+not create workers, concurrency, adaptive priority, unbounded execution, retry
+or backoff timing, discovery, process adoption, rollback, cleanup, compaction,
+garbage collection, or a mutating command.
+
 The restart-reconciliation layer may consume one exact
 `transaction_run_restart_checkpoint`, one retained dispatch, and explicit
 caller-rehydrated subordinate authority. Reserved release must require the
@@ -128,7 +139,9 @@ legacy behavior.
    failure containment, durable run single-transition sealing, exact progression
    rehydration, graph/evidence revalidation, write-ahead start persistence,
    one-dispatch driver barriers, exact run-authority handoffs, one-step
-   recovery-before-reservation ordering, durable reservation-before-authority
+   recovery-before-reservation ordering, head-derived replay-safe dispatch
+   nonce issuance, explicit bounded serial driving, durable
+   reservation-before-authority
    acquisition, exact reserved release, caller-rehydrated
    build/check recovery, effect-journal continuation, lost-terminal-write
    recovery, preparation projection and typed refusal, effect sequencing,
