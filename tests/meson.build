@@ -78,11 +78,22 @@ if not get_option('tests').disabled()
     dependencies: pkgctl_core_dep,
   )
 
+  run_store_fixture = executable(
+    'run-store-fixture',
+    'run_store_fixture.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+
   cli_test = find_program('cli_test.sh')
   test(
     'cli',
     cli_test,
-    args: [pkgctl_exe, state_fixture, meson.project_version()],
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      run_store_fixture,
+      meson.project_version(),
+    ],
   )
 
   pkgctl_headers = [

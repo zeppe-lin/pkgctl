@@ -835,6 +835,13 @@ void check_posix_store_contract()
   CHECK((file_mode(head_path) & 0777) == 0444);
   CHECK((file_mode(directory / journal_record_name(admitted)) & 0777) == 0444);
 
+  const auto lock_path = directory / ".pkgctl-run.lock";
+  CHECK(fs::exists(lock_path));
+  CHECK(::unlink(lock_path.c_str()) == 0);
+  const auto read_only = store.load_latest(admitted.journal());
+  CHECK(read_only && read_only->identity() == admitted.identity());
+  CHECK(!fs::exists(lock_path));
+
   const int directory_fd = ::open(
       directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
   CHECK(directory_fd >= 0);
