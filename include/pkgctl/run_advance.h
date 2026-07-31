@@ -1,0 +1,124 @@
+// SPDX-FileCopyrightText: 2026 Alexandr Savca
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/*! \file run_advance.h
+ *  \brief One deterministic durable transaction-run advancement step.
+ */
+#pragma once
+
+#include <cstdint>
+#include <optional>
+#include <variant>
+
+#include <pkgctl/run_authority.h>
+
+namespace pkgctl {
+
+struct detail_transaction_run_advance_access;
+
+/*! \brief Caller-owned semantic authorities used by one advancement step. */
+struct transaction_run_advance_authorities final {
+  transaction_progress_rehydration_source& progress;
+  transaction_dispatch_execution_authority_source& execution;
+  transaction_dispatch_recovery_authority_source& recovery;
+};
+
+/*! \brief Caller-owned effectors used by one advancement step. */
+struct transaction_run_advance_drivers final {
+  construction_driver* construction;
+  transaction_check_driver* check;
+  transaction_effect_driver* operation;
+};
+
+/*! \brief Caller-owned durable stores used by one advancement step. */
+struct transaction_run_advance_stores final {
+  transaction_run_journal_store& runs;
+  effect_journal_store* effects;
+};
+
+/*! \brief Observable outcome class of one bounded advancement call. */
+enum class transaction_run_advance_disposition : std::uint8_t {
+  quiescent = 1,
+  released_reserved = 2,
+  reconciled_construction = 3,
+  reconciled_check = 4,
+  reconciled_operation = 5,
+  external_resolution_required = 6,
+  executed_construction = 7,
+  executed_check = 8,
+  executed_operation = 9,
+};
+
+/*! \brief Operation evidence returned by fresh execution or restart repair. */
+struct transaction_run_operation_advance_evidence final {
+  effect_attempt_record record;
+  std::optional<effectful_operation_result> result;
+  std::optional<effect_restart_disposition> restart_disposition;
+};
+
+/*! \brief Exact semantic evidence produced or accepted by one step. */
+using transaction_run_advance_evidence = std::variant<
+    std::monostate,
+    construction_result,
+    transaction_check_result,
+    transaction_run_operation_advance_evidence>;
+
+/*! \brief Storage-derived durable authority returned by one bounded step. */
+class transaction_run_advance_result final {
+public:
+  [[nodiscard]] const transaction_run& run() const noexcept;
+  [[nodiscard]] const transaction_run_journal_record& record() const noexcept;
+  [[nodiscard]] transaction_run_advance_disposition disposition() const noexcept;
+  [[nodiscard]] const std::optional<transaction_dispatch>&
+  dispatch() const noexcept;
+  [[nodiscard]] const transaction_run_advance_evidence& evidence() const noexcept;
+  [[nodiscard]] const construction_result* construction() const noexcept;
+  [[nodiscard]] const transaction_check_result* check() const noexcept;
+  [[nodiscard]] const transaction_run_operation_advance_evidence*
+  operation() const noexcept;
+  [[nodiscard]] bool durable_transition_committed() const noexcept;
+  [[nodiscard]] bool external_resolution_required() const noexcept;
+
+private:
+  friend struct detail_transaction_run_advance_access;
+  friend transaction_run_advance_result advance_transaction_run_once(
+      session_identity,
+      transaction_dispatch_nonce,
+      transaction_run_advance_authorities,
+      transaction_run_advance_drivers,
+      transaction_run_advance_stores);
+
+  transaction_run_advance_result(
+      transaction_run run,
+      transaction_run_journal_record record,
+      transaction_run_advance_disposition disposition,
+      std::optional<transaction_dispatch> dispatch,
+      transaction_run_advance_evidence evidence);
+
+  transaction_run run_;
+  transaction_run_journal_record record_;
+  transaction_run_advance_disposition disposition_;
+  std::optional<transaction_dispatch> dispatch_;
+  transaction_run_advance_evidence evidence_;
+};
+
+/*! \brief Reconcile retained ownership or execute one newly reserved dispatch.
+ *
+ * The supplied journal identity selects one committed run-store head.  The
+ * step loads that storage-derived record, rehydrates its semantic progression,
+ * reconciles the first retained active
+ * dispatch in durable ledger order, and returns without reserving new work.
+ * Only a quiescent reopened run may reserve the first canonical ready unit.
+ * That reservation is committed before execution authority is requested and
+ * execution remains behind the existing durable start and terminal barriers.
+ * No loop, retry policy, resource discovery, evidence discovery, or worker
+ * scheduling is performed.
+ */
+[[nodiscard]] transaction_run_advance_result advance_transaction_run_once(
+    session_identity journal,
+    transaction_dispatch_nonce nonce,
+    transaction_run_advance_authorities authorities,
+    transaction_run_advance_drivers drivers,
+    transaction_run_advance_stores stores);
+
+} // namespace pkgctl
