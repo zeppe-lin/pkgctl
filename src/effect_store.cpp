@@ -331,6 +331,35 @@ fd_guard lock_store(int directory_fd)
   return lock;
 }
 
+std::optional<fd_guard> lock_store_read_only(int directory_fd)
+{
+  fd_guard lock(::openat(directory_fd, ".pkgctl-effect.lock",
+                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+  if (lock.get() < 0)
+  {
+    if (errno == ENOENT)
+      return std::nullopt;
+    if (errno == ELOOP)
+      throw effect_journal_error(
+          effect_journal_error_code::store_open_failed,
+          "effect-journal lock is a symbolic link");
+    io_error(effect_journal_error_code::store_open_failed,
+             "cannot open effect-journal lock read-only");
+  }
+  struct stat status{};
+  if (::fstat(lock.get(), &status) != 0)
+    io_error(effect_journal_error_code::store_open_failed,
+             "cannot inspect effect-journal lock");
+  if (!S_ISREG(status.st_mode))
+    throw effect_journal_error(
+        effect_journal_error_code::store_open_failed,
+        "effect-journal lock is not a regular file");
+  if (::flock(lock.get(), LOCK_SH) != 0)
+    io_error(effect_journal_error_code::store_open_failed,
+             "cannot acquire shared effect-journal lock");
+  return std::optional<fd_guard>(std::move(lock));
+}
+
 effect_attempt_encoding read_encoding(int directory_fd, const std::string& name)
 {
   fd_guard file(::openat(directory_fd, name.c_str(),
@@ -833,8 +862,26 @@ std::optional<effect_attempt_record>
 posix_effect_journal_store::load_latest(
     const session_identity& attempt) const
 {
-  auto lock = lock_store(directory_fd_);
-  return load_latest_unlocked(directory_fd_, attempt);
+  // Existing stores are observed under a shared, read-only lock. An empty
+  // caller-created directory has no lock file yet; inspect it once, then retry
+  // under the lock if a writer established the store concurrently. No reader
+  // creates or opens any store object for writing.
+  if (auto lock = lock_store_read_only(directory_fd_))
+    return load_latest_unlocked(directory_fd_, attempt);
+
+  try
+  {
+    auto record = load_latest_unlocked(directory_fd_, attempt);
+    if (auto lock = lock_store_read_only(directory_fd_))
+      return load_latest_unlocked(directory_fd_, attempt);
+    return record;
+  }
+  catch (...)
+  {
+    if (auto lock = lock_store_read_only(directory_fd_))
+      return load_latest_unlocked(directory_fd_, attempt);
+    throw;
+  }
 }
 
 effect_attempt_record posix_effect_journal_store::append(

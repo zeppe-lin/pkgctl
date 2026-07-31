@@ -36,6 +36,7 @@ enum class effect_journal_error_code : std::uint8_t {
   store_sync_failed = 9,
   store_conflict = 10,
   store_corrupt = 11,
+  store_contract_violation = 12,
 };
 
 class effect_journal_error final : public std::runtime_error {

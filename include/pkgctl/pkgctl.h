@@ -11,6 +11,7 @@
 #include <pkgctl/dispatch.h>
 #include <pkgctl/controller.h>
 #include <pkgctl/effect.h>
+#include <pkgctl/effect_inspect.h>
 #include <pkgctl/effect_journal.h>
 #include <pkgctl/effect_journal_codec.h>
 #include <pkgctl/effect_restart.h>

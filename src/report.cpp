@@ -80,6 +80,127 @@ std::string_view inspection_disposition_text(
   return "unknown";
 }
 
+std::string_view effect_stage_text(effect_attempt_stage stage)
+{
+  switch (stage)
+  {
+    case effect_attempt_stage::admitted: return "admitted";
+    case effect_attempt_stage::before_lifecycle_intent:
+      return "before-lifecycle-intent";
+    case effect_attempt_stage::before_lifecycle_terminal:
+      return "before-lifecycle-terminal";
+    case effect_attempt_stage::application_intent:
+      return "application-intent";
+    case effect_attempt_stage::application_terminal:
+      return "application-terminal";
+    case effect_attempt_stage::after_lifecycle_intent:
+      return "after-lifecycle-intent";
+    case effect_attempt_stage::after_lifecycle_terminal:
+      return "after-lifecycle-terminal";
+    case effect_attempt_stage::publication_intent:
+      return "publication-intent";
+    case effect_attempt_stage::publication_terminal:
+      return "publication-terminal";
+    case effect_attempt_stage::terminal: return "terminal";
+  }
+  return "unknown";
+}
+
+std::string_view effect_restart_disposition_text(
+    effect_restart_disposition disposition)
+{
+  switch (disposition)
+  {
+    case effect_restart_disposition::continue_before_lifecycle:
+      return "continue-before-lifecycle";
+    case effect_restart_disposition::start_application:
+      return "start-application";
+    case effect_restart_disposition::resume_application:
+      return "resume-application";
+    case effect_restart_disposition::continue_after_application:
+      return "continue-after-application";
+    case effect_restart_disposition::continue_after_lifecycle:
+      return "continue-after-lifecycle";
+    case effect_restart_disposition::start_publication:
+      return "start-publication";
+    case effect_restart_disposition::reconcile_publication:
+      return "reconcile-publication";
+    case effect_restart_disposition::seal_terminal:
+      return "seal-terminal";
+    case effect_restart_disposition::terminal: return "terminal";
+    case effect_restart_disposition::external_resolution_required:
+      return "external-resolution-required";
+  }
+  return "unknown";
+}
+
+std::string_view application_outcome_text(
+    pkgapply::application_attempt_outcome outcome)
+{
+  switch (outcome)
+  {
+    case pkgapply::application_attempt_outcome::precondition_refused:
+      return "precondition-refused";
+    case pkgapply::application_attempt_outcome::failed_before_target_mutation:
+      return "failed-before-target-mutation";
+    case pkgapply::application_attempt_outcome::completed:
+      return "completed";
+    case pkgapply::application_attempt_outcome::failed_fully_recovered:
+      return "failed-fully-recovered";
+    case pkgapply::application_attempt_outcome::failed_with_partial_effects:
+      return "failed-with-partial-effects";
+    case pkgapply::application_attempt_outcome::
+        effects_visible_durability_unconfirmed:
+      return "effects-visible-durability-unconfirmed";
+    case pkgapply::application_attempt_outcome::indeterminate:
+      return "indeterminate";
+  }
+  return "unknown";
+}
+
+std::string_view publication_outcome_text(
+    pkgstate::state_publication_outcome outcome)
+{
+  switch (outcome)
+  {
+    case pkgstate::state_publication_outcome::published:
+      return "published";
+    case pkgstate::state_publication_outcome::stale_expected_state:
+      return "stale-expected-state";
+    case pkgstate::state_publication_outcome::request_rejected:
+      return "request-rejected";
+    case pkgstate::state_publication_outcome::failed_before_publication:
+      return "failed-before-publication";
+    case pkgstate::state_publication_outcome::
+        published_durability_unconfirmed:
+      return "published-durability-unconfirmed";
+    case pkgstate::state_publication_outcome::indeterminate:
+      return "indeterminate";
+  }
+  return "unknown";
+}
+
+std::string_view effect_outcome_text(effectful_operation_outcome outcome)
+{
+  switch (outcome)
+  {
+    case effectful_operation_outcome::lifecycle_failed_before_application:
+      return "lifecycle-failed-before-application";
+    case effectful_operation_outcome::application_not_completed:
+      return "application-not-completed";
+    case effectful_operation_outcome::lifecycle_failed_after_application:
+      return "lifecycle-failed-after-application";
+    case effectful_operation_outcome::outer_lease_lost:
+      return "outer-lease-lost";
+    case effectful_operation_outcome::state_publication_not_completed:
+      return "state-publication-not-completed";
+    case effectful_operation_outcome::state_publication_indeterminate:
+      return "state-publication-indeterminate";
+    case effectful_operation_outcome::completed: return "completed";
+  }
+  return "unknown";
+}
+
 const char* boolean_text(bool value) noexcept
 {
   return value ? "true" : "false";
@@ -285,6 +406,89 @@ std::string render_report(const transaction_session& session)
         << "runtime-cohort." << index << ".witnesses="
         << value.witnesses().size() << '\n';
   }
+  return out.str();
+}
+
+std::string render_report(const effect_attempt_inspection& inspection)
+{
+  std::ostringstream out;
+  const auto& record = inspection.record();
+  const auto& assessment = inspection.assessment();
+
+  out << "session.kind=effect-attempt\n"
+      << "effect.attempt=" << record.attempt().hex() << '\n'
+      << "effect.record=" << record.identity().hex() << '\n'
+      << "effect.session=" << record.session().hex() << '\n'
+      << "effect.nonce=" << record.nonce().hex() << '\n'
+      << "effect.sequence=" << record.sequence() << '\n';
+  if (record.previous())
+    out << "effect.previous=" << record.previous()->hex() << '\n';
+  out << "effect.stage=" << effect_stage_text(record.stage()) << '\n'
+      << "effect.disposition="
+      << effect_restart_disposition_text(assessment.disposition()) << '\n'
+      << "effect.terminal=" << boolean_text(inspection.terminal()) << '\n'
+      << "effect.automatically-continuable="
+      << boolean_text(inspection.automatically_continuable()) << '\n'
+      << "effect.external-resolution-required="
+      << boolean_text(inspection.external_resolution_required()) << '\n'
+      << "effect.before-total=" << record.before_total() << '\n'
+      << "effect.before-completed=" << record.before().size() << '\n'
+      << "effect.after-total=" << record.after_total() << '\n'
+      << "effect.after-completed=" << record.after().size() << '\n';
+  if (record.active_index())
+    out << "effect.active-index=" << *record.active_index() << '\n';
+
+  for (std::size_t index = 0U; index < record.before().size(); ++index)
+  {
+    const auto prefix = "before." + std::to_string(index) + ".";
+    out << prefix << "result=" << record.before()[index].result().hex() << '\n'
+        << prefix << "succeeded="
+        << boolean_text(record.before()[index].succeeded()) << '\n';
+  }
+
+  if (record.application())
+  {
+    const auto& application = *record.application();
+    out << "effect.application-receipt=" << application.receipt() << '\n'
+        << "effect.application-outcome="
+        << application_outcome_text(application.outcome()) << '\n';
+    if (application.journal())
+      out << "effect.application-journal=" << *application.journal() << '\n';
+    if (application.completed_evidence())
+      out << "effect.application-completed-evidence="
+          << *application.completed_evidence() << '\n';
+  }
+
+  for (std::size_t index = 0U; index < record.after().size(); ++index)
+  {
+    const auto prefix = "after." + std::to_string(index) + ".";
+    out << prefix << "result=" << record.after()[index].result().hex() << '\n'
+        << prefix << "succeeded="
+        << boolean_text(record.after()[index].succeeded()) << '\n';
+  }
+
+  if (record.transaction_evidence())
+    out << "effect.transaction-evidence=" << *record.transaction_evidence()
+        << '\n';
+  if (record.publication_request())
+    out << "effect.publication-request=" << *record.publication_request()
+        << '\n';
+  if (record.publication())
+  {
+    const auto& publication = *record.publication();
+    out << "effect.publication-receipt=" << publication.receipt() << '\n'
+        << "effect.publication-outcome="
+        << publication_outcome_text(publication.outcome()) << '\n';
+    if (publication.resulting_snapshot())
+      out << "effect.publication-resulting-snapshot="
+          << *publication.resulting_snapshot() << '\n';
+  }
+  if (record.terminal_outcome())
+    out << "effect.terminal-outcome="
+        << effect_outcome_text(*record.terminal_outcome()) << '\n';
+  if (record.reconciled_state())
+    out << "effect.reconciled-state=" << *record.reconciled_state() << '\n';
+
   return out.str();
 }
 

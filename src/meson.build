@@ -10,6 +10,7 @@ pkgctl_core = static_library(
     'controller.cpp',
     'core.cpp',
     'effect.cpp',
+    'effect_inspect.cpp',
     'effect_journal.cpp',
     'effect_journal_codec.cpp',
     'effect_restart.cpp',
