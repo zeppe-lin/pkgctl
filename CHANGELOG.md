@@ -1,5 +1,39 @@
 # pkgctl changelog
 
+## 0.17.0 - 2026-07-31
+
+### Restart-safe transaction launch
+
+- Adds `launch_transaction_run()` to compose exact run admission with the
+  existing explicitly bounded serial drive.
+- Derives one expected journal identity from the immutable initial run,
+  dispatch policy, and caller-owned replay-safe run nonce before storage.
+- Loads only that exact journal and appends sequence zero only when no committed
+  head exists.
+- Requires an existing head to retain the exact transaction, run nonce, and
+  dispatch-policy admission universe before it may be resumed.
+- Requires an existing sequence-zero head to match the complete expected
+  admission record.
+- Makes launch retries converge after either admission or later successor
+  commits instead of attempting to republish sequence zero over advanced
+  history.
+- Proves that nonce refusal performs no store access, admission append failure
+  performs no drive action, and a post-admission failure leaves the journal
+  resumable.
+- Proves that retry after completed work performs no admission append, dispatch
+  nonce issuance, run append, or driver invocation.
+- Returns the storage-derived starting record together with the complete bounded
+  drive result and validates that the call remains in one journal, transaction,
+  nonce, and dispatch-policy universe without moving backward.
+- Clarifies that raw `admit_transaction_run()` retry convergence applies while
+  sequence zero remains the committed head; restart-safe launch owns convergence
+  after successor records exist.
+- Adds no journal discovery, unbounded execution, worker, concurrency, adaptive
+  scheduling, retry timing, backoff, resource or evidence discovery, process
+  adoption, rollback, cleanup, compaction, garbage collection, or
+  effect-implying CLI command.
+- Retains the complete authority floors published for 0.16.0.
+
 ## 0.16.0 - 2026-07-31
 
 ### Durable transaction-run admission
