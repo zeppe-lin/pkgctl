@@ -73,8 +73,8 @@ for forbidden in \
 done
 
 if grep -R -n -E \
-    'transaction_run|transaction_dispatch|reserve_next' \
+    'reserve_next|start_(construction|check|operation)_dispatch|release_unstarted_dispatch|complete_(construction|check)_dispatch|submit_operation_dispatch_result' \
     "$srcdir/cli" >/dev/null 2>&1; then
-  echo 'transaction dispatch must not acquire a command frontend' >&2
+  echo 'transaction dispatch mutation must not acquire a command frontend' >&2
   exit 1
 fi

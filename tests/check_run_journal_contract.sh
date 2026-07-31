@@ -108,9 +108,9 @@ for forbidden in \
 done
 
 if grep -R -n -E \
-    'transaction_run_journal|run_journal|run_restart_checkpoint' \
+    'append\(|commit_transaction_run_successor|commit_operation_dispatch_start|transaction_run_restart_checkpoint::make' \
     "$srcdir/cli" >/dev/null 2>&1; then
-  echo 'transaction-run journaling must not acquire a command frontend' >&2
+  echo 'transaction-run journal mutation must not acquire a command frontend' >&2
   exit 1
 fi
 

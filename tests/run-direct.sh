@@ -31,6 +31,9 @@ done
 "$cxx" $flags "$srcdir/tests/state_fixture.cpp" $objects $libs \
   -o "$tmp/state-fixture"
 # shellcheck disable=SC2086
+"$cxx" $flags "$srcdir/tests/run_store_fixture.cpp" $objects $libs \
+  -o "$tmp/run-store-fixture"
+# shellcheck disable=SC2086
 "$cxx" $flags "$srcdir/cli/main.cpp" "$srcdir/cli/options.cpp" \
   $objects $libs -o "$tmp/pkgctl"
 version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";$/\1/p' \
@@ -39,7 +42,8 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
   echo 'cannot determine pkgctl version from version.h' >&2
   exit 1
 }
-"$srcdir/tests/cli_test.sh" "$tmp/pkgctl" "$tmp/state-fixture" "$version"
+"$srcdir/tests/cli_test.sh" "$tmp/pkgctl" "$tmp/state-fixture" \
+  "$tmp/run-store-fixture" "$version"
 
 for header in "$srcdir"/include/pkgctl/*.h; do
   base=$(basename "$header")
@@ -63,6 +67,9 @@ done
 "$srcdir/tests/check_run_authority_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_advance_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_drive_contract.sh" "$srcdir"
+"$srcdir/tests/check_run_launch_contract.sh" "$srcdir"
+"$srcdir/tests/check_run_inspect_contract.sh" "$srcdir"
+"$srcdir/tests/check_run_inspect_cli_contract.sh" "$srcdir"
 "$srcdir/tests/check_source_contract.sh" "$srcdir"
 "$srcdir/tests/check_effect_contract.sh" "$srcdir"
 "$srcdir/tests/check_restart_contract.sh" "$srcdir"

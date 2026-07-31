@@ -101,8 +101,3 @@ for forbidden in \
     exit 1
   fi
 done
-
-if grep -R -n -F 'inspect_transaction_run' "$srcdir/cli" >/dev/null 2>&1; then
-  echo 'durable transaction-run inspection must not acquire a command frontend' >&2
-  exit 1
-fi
