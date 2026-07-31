@@ -1,3 +1,48 @@
+## 0.18.0 - 2026-07-31
+
+### Durable transaction-run inspection
+
+- Adds `inspect_transaction_run()` to load and classify one exact caller-selected
+  durable run head without semantic progression rehydration.
+- Rejects missing heads and storage responses belonging to another journal.
+- Adds `assess_transaction_run_record()` as the shared pure ownership
+  classification used by both read-only inspection and rehydrated restart
+  checkpoints.
+- Classifies completed, stopped-after-failure, active, and quiescent-incomplete
+  durable states while retaining exact active-dispatch restart dispositions.
+- Adds deterministic transaction-run reports containing controller-owned journal,
+  record, run, progression, state, policy, dispatch, attempt, observation, and
+  restart evidence.
+- Proves initial, reserved, started, stopped, missing-head, and foreign-head
+  behavior without any store append.
+- Adds no semantic-evidence reconstruction, journal discovery, effect-journal
+  inspection, reservation, execution, scheduler, worker, retry policy, cleanup,
+  compaction, garbage collection, or command action.
+
+### Dependency contract
+
+- libpkgsource >= 2.0.0
+- libpkgsource-yaml >= 2.0.0
+- libpkgsource-plan >= 2.0.0
+- libpkgcatalog >= 2.0.0
+- libpkgcatalog-acquire >= 2.0.0
+- libpkgstate >= 2.3.0
+- libpkgstate-plan >= 2.3.0
+- libpkgstate-apply >= 2.3.0
+- libpkgfetch >= 1.0.0
+- libpkgbuild >= 2.0.0
+- libpkgbuild-exec >= 1.0.0
+- libpkgbuild-plan >= 2.0.0
+- libpkgimage >= 0.3.0
+- libpkgplan >= 0.2.0
+- libpkgexec >= 1.3.0
+- libpkgapply >= 2.0.0
+- libpkgapply-exec >= 1.0.0
+- libpkgresolve >= 2.0.0
+- libpkgtransaction >= 2.1.0
+- libpkgcheck >= 0.1.0
+- libpkgcheck-exec >= 0.1.1
+
 # pkgctl changelog
 
 ## 0.17.0 - 2026-07-31

@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.17.0
+version=0.18.0
 
 require_line()
 {
@@ -20,21 +20,21 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 17;'
+  'inline constexpr unsigned version_minor = 18;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.17.0";'
+  'inline constexpr const char* version_string = "0.18.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 17);'
+  'static_assert(pkgctl::version_minor == 18);'
 
-grep -F '## 0.17.0 - 2026-07-31' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.17.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.17.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.18.0 - 2026-07-31' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.18.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.18.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
-grep -F 'launch_transaction_run()' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'restart-safe transaction launch' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.17.0 can converge on one exact transaction-run journal' \
+grep -F 'inspect_transaction_run()' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'read-only durable transaction-run inspection' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.18.0 can inspect one exact caller-selected transaction-run journal' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 for contract in \
