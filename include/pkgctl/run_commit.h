@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /*! \file run_commit.h
- *  \brief Ordered durable commitment of operation dispatch ownership.
+ *  \brief Ordered durable commitment of transaction-run successors.
  */
 #pragma once
 
@@ -10,6 +10,23 @@
 #include <pkgctl/run_store.h>
 
 namespace pkgctl {
+
+/*! \brief Exact durable authority after one legal run successor commit. */
+struct transaction_run_commit_checkpoint final {
+  transaction_run run;
+  transaction_run_journal_record record;
+};
+
+/*! \brief Commit and verify one exact legal transaction-run successor.
+ *
+ * The supplied run must be the single-transition successor of current_record.
+ * The store must return that exact committed authority.
+ */
+[[nodiscard]] transaction_run_commit_checkpoint
+commit_transaction_run_successor(
+    const transaction_run_journal_record& current_record,
+    transaction_run run,
+    transaction_run_journal_store& run_store);
 
 /*! \brief Exact durable authorities after committing an operation start. */
 struct operation_dispatch_start_checkpoint final {

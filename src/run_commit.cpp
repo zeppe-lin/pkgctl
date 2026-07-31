@@ -39,11 +39,23 @@ void validate_run_commit(
       committed.sequence() != expected.sequence())
   {
     store_contract_violation(
-        "run store returned foreign operation-start authority");
+        "run store returned foreign committed authority");
   }
 }
 
 } // namespace
+
+transaction_run_commit_checkpoint commit_transaction_run_successor(
+    const transaction_run_journal_record& current_record,
+    transaction_run run,
+    transaction_run_journal_store& run_store)
+{
+  auto next_record = current_record.successor(run);
+  auto committed = run_store.append(next_record);
+  validate_run_commit(next_record, committed);
+  return transaction_run_commit_checkpoint{
+      std::move(run), std::move(committed)};
+}
 
 operation_dispatch_start_checkpoint commit_operation_dispatch_start(
     const transaction_run_journal_record& current_record,
@@ -65,16 +77,15 @@ operation_dispatch_start_checkpoint commit_operation_dispatch_start(
   auto started = start_operation_dispatch(
       std::move(run), dispatch, session, std::move(nonce));
 
-  const auto committed_effect = effect_store.append(started.effect_attempt);
+  auto committed_effect = effect_store.append(started.effect_attempt);
   validate_effect_commit(started.effect_attempt, committed_effect);
 
-  auto next_record = current_record.successor(started.run);
-  const auto committed_run = run_store.append(next_record);
-  validate_run_commit(next_record, committed_run);
+  auto committed_run = commit_transaction_run_successor(
+      current_record, std::move(started.run), run_store);
 
   return operation_dispatch_start_checkpoint{
-      std::move(started.run), std::move(next_record),
-      std::move(started.effect_attempt)};
+      std::move(committed_run.run), std::move(committed_run.record),
+      std::move(committed_effect)};
 }
 
 } // namespace pkgctl

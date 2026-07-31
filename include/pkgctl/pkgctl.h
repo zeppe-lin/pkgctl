@@ -24,6 +24,7 @@
 #include <pkgctl/run_journal.h>
 #include <pkgctl/run_journal_codec.h>
 #include <pkgctl/run_commit.h>
+#include <pkgctl/run_execute.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_store.h>
 #include <pkgctl/session.h>
