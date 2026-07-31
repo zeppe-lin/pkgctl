@@ -163,6 +163,9 @@ if not get_option('tests').disabled()
   run_drive_contract = find_program('check_run_drive_contract.sh')
   test('run-drive-contract', run_drive_contract, args: [meson.project_source_root()])
 
+  run_launch_contract = find_program('check_run_launch_contract.sh')
+  test('run-launch-contract', run_launch_contract, args: [meson.project_source_root()])
+
   source_contract = find_program('check_source_contract.sh')
   test('source-contract', source_contract, args: [meson.project_source_root()])
 
