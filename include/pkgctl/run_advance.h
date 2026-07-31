@@ -16,6 +16,23 @@ namespace pkgctl {
 
 struct detail_transaction_run_advance_access;
 
+/*! \brief Caller-owned replay-safe dispatch nonce authority. */
+class transaction_dispatch_nonce_source {
+public:
+  virtual ~transaction_dispatch_nonce_source() = default;
+
+  /*! \brief Issue the nonce for fresh work at one committed run head.
+   *
+   * The source is called only after the storage-derived run is proven to have
+   * no retained active ownership and at least one canonical ready unit. Exact
+   * retries against the same record must return the same nonce. A successor
+   * record may yield a different nonce.
+   */
+  [[nodiscard]] virtual transaction_dispatch_nonce issue(
+      const transaction_run_journal_record& record,
+      const transaction_run& run) = 0;
+};
+
 /*! \brief Caller-owned semantic authorities used by one advancement step. */
 struct transaction_run_advance_authorities final {
   transaction_progress_rehydration_source& progress;
@@ -81,9 +98,16 @@ public:
 
 private:
   friend struct detail_transaction_run_advance_access;
+
   friend transaction_run_advance_result advance_transaction_run_once(
       session_identity,
       transaction_dispatch_nonce,
+      transaction_run_advance_authorities,
+      transaction_run_advance_drivers,
+      transaction_run_advance_stores);
+  friend transaction_run_advance_result advance_transaction_run_once(
+      session_identity,
+      transaction_dispatch_nonce_source&,
       transaction_run_advance_authorities,
       transaction_run_advance_drivers,
       transaction_run_advance_stores);
@@ -117,6 +141,14 @@ private:
 [[nodiscard]] transaction_run_advance_result advance_transaction_run_once(
     session_identity journal,
     transaction_dispatch_nonce nonce,
+    transaction_run_advance_authorities authorities,
+    transaction_run_advance_drivers drivers,
+    transaction_run_advance_stores stores);
+
+/*! \brief Advance once with a head-derived nonce requested only for fresh work. */
+[[nodiscard]] transaction_run_advance_result advance_transaction_run_once(
+    session_identity journal,
+    transaction_dispatch_nonce_source& nonces,
     transaction_run_advance_authorities authorities,
     transaction_run_advance_drivers drivers,
     transaction_run_advance_stores stores);

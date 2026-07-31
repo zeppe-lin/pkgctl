@@ -27,6 +27,7 @@
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_advance.h>
 #include <pkgctl/run_commit.h>
+#include <pkgctl/run_drive.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_store.h>

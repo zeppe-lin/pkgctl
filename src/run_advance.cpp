@@ -327,6 +327,64 @@ transaction_run_advance_result execute_reserved(
   invalid_advancement("unknown transaction dispatch kind");
 }
 
+transaction_run_advance_result advance_loaded_transaction_run_once(
+    session_identity journal,
+    std::optional<transaction_dispatch_nonce> supplied_nonce,
+    transaction_dispatch_nonce_source* nonce_source,
+    transaction_run_advance_authorities authorities,
+    transaction_run_advance_drivers drivers,
+    transaction_run_advance_stores stores)
+{
+  auto committed = load_committed_head(journal, stores.runs);
+  auto checkpoint = rehydrate_transaction_run(
+      std::move(committed), authorities.progress);
+
+  if (!checkpoint.assessment().active().empty())
+  {
+    const auto dispatch = require_dispatch(
+        checkpoint.run(), checkpoint.assessment().active().front().dispatch());
+    return reconcile_active(
+        std::move(checkpoint), dispatch, authorities, drivers, stores);
+  }
+
+  if (!supplied_nonce &&
+      (checkpoint.run().stopped() ||
+       checkpoint.run().progress().ready_units().empty()))
+  {
+    return detail_transaction_run_advance_access::make(
+        checkpoint.run(), checkpoint.record(),
+        transaction_run_advance_disposition::quiescent,
+        std::nullopt, std::monostate{});
+  }
+
+  if (!supplied_nonce && nonce_source == nullptr)
+    invalid_advancement("fresh advancement has no dispatch nonce authority");
+  transaction_dispatch_nonce nonce = supplied_nonce
+      ? std::move(*supplied_nonce)
+      : nonce_source->issue(checkpoint.record(), checkpoint.run());
+  auto reservation = reserve_next(checkpoint.run(), std::move(nonce));
+  if (!reservation.dispatch)
+  {
+    if (supplied_nonce)
+    {
+      return detail_transaction_run_advance_access::make(
+          std::move(reservation.run), checkpoint.record(),
+          transaction_run_advance_disposition::quiescent,
+          std::nullopt, std::monostate{});
+    }
+    invalid_advancement(
+        "reservable transaction run produced no fresh dispatch");
+  }
+
+  auto dispatch = *reservation.dispatch;
+  require_execution_dependencies(dispatch.unit().kind(), drivers, stores);
+  auto reserved = commit_transaction_run_successor(
+      checkpoint.record(), std::move(reservation.run), stores.runs);
+  return execute_reserved(
+      std::move(reserved), std::move(dispatch),
+      authorities, drivers, stores);
+}
+
 } // namespace
 
 transaction_run_advance_result::transaction_run_advance_result(
@@ -412,33 +470,20 @@ transaction_run_advance_result advance_transaction_run_once(
     transaction_run_advance_drivers drivers,
     transaction_run_advance_stores stores)
 {
-  auto committed = load_committed_head(journal, stores.runs);
-  auto checkpoint = rehydrate_transaction_run(
-      std::move(committed), authorities.progress);
+  return advance_loaded_transaction_run_once(
+      std::move(journal), std::move(nonce), nullptr,
+      authorities, drivers, stores);
+}
 
-  if (!checkpoint.assessment().active().empty())
-  {
-    const auto dispatch = require_dispatch(
-        checkpoint.run(), checkpoint.assessment().active().front().dispatch());
-    return reconcile_active(
-        std::move(checkpoint), dispatch, authorities, drivers, stores);
-  }
-
-  auto reservation = reserve_next(checkpoint.run(), std::move(nonce));
-  if (!reservation.dispatch)
-  {
-    return detail_transaction_run_advance_access::make(
-        std::move(reservation.run), checkpoint.record(),
-        transaction_run_advance_disposition::quiescent,
-        std::nullopt, std::monostate{});
-  }
-
-  auto dispatch = *reservation.dispatch;
-  require_execution_dependencies(dispatch.unit().kind(), drivers, stores);
-  auto reserved = commit_transaction_run_successor(
-      checkpoint.record(), std::move(reservation.run), stores.runs);
-  return execute_reserved(
-      std::move(reserved), std::move(dispatch),
+transaction_run_advance_result advance_transaction_run_once(
+    session_identity journal,
+    transaction_dispatch_nonce_source& nonces,
+    transaction_run_advance_authorities authorities,
+    transaction_run_advance_drivers drivers,
+    transaction_run_advance_stores stores)
+{
+  return advance_loaded_transaction_run_once(
+      std::move(journal), std::nullopt, &nonces,
       authorities, drivers, stores);
 }
 
