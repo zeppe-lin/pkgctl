@@ -1,5 +1,37 @@
 # pkgctl changelog
 
+## 0.15.0 - 2026-07-31
+
+### Bounded serial transaction drive
+
+- Adds a caller-owned replay-safe `transaction_dispatch_nonce_source` whose
+  issuance domain is the exact storage-derived run record and rehydrated run.
+- Requests a fresh dispatch nonce only when the committed head has no retained
+  ownership, is not stopped, and exposes canonical ready work.
+- Requires exact retries against an unchanged head to return the same nonce;
+  committed successor heads may issue distinct attempt authority.
+- Preserves the legacy direct-nonce one-step contract while preventing the
+  serial drive from speculatively consuming nonces for recovery or quiescence.
+- Adds `transaction_run_drive_policy` with an explicit positive maximum step
+  count and no implicit or unbounded default.
+- Adds `drive_transaction_run()` as serial composition of the existing
+  storage-loading one-step boundary; every iteration reloads committed state.
+- Gives retained reservation or started ownership absolute precedence over
+  every fresh nonce request and reservation.
+- Stops distinctly on completion, terminal failure containment, operation
+  external-resolution authority, incomplete quiescence, or step-limit
+  exhaustion.
+- Returns the exact ordered one-step outcomes and validates that continued
+  outcomes remain in one journal, follow strictly increasing durable heads,
+  and never follow a stopping outcome.
+- Proves exact retry when failure occurs after nonce issuance but before
+  reservation commitment: the store head remains unchanged and the same
+  head-derived nonce is requested again.
+- Adds no worker, concurrency, adaptive priority, unbounded loop, retry timing,
+  backoff, resource or evidence discovery, process adoption, rollback, cleanup
+  policy, compaction, garbage collection, or effect-implying CLI command.
+- Retains the complete authority floors published for 0.14.0.
+
 ## 0.14.0 - 2026-07-31
 
 ### One-step transaction advancement
