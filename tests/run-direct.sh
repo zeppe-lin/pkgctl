@@ -33,7 +33,13 @@ done
 # shellcheck disable=SC2086
 "$cxx" $flags "$srcdir/cli/main.cpp" "$srcdir/cli/options.cpp" \
   $objects $libs -o "$tmp/pkgctl"
-"$srcdir/tests/cli_test.sh" "$tmp/pkgctl" "$tmp/state-fixture"
+version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";$/\1/p' \
+  "$srcdir/include/pkgctl/version.h")
+[ -n "$version" ] || {
+  echo 'cannot determine pkgctl version from version.h' >&2
+  exit 1
+}
+"$srcdir/tests/cli_test.sh" "$tmp/pkgctl" "$tmp/state-fixture" "$version"
 
 for header in "$srcdir"/include/pkgctl/*.h; do
   base=$(basename "$header")

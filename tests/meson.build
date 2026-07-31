@@ -79,7 +79,11 @@ if not get_option('tests').disabled()
   )
 
   cli_test = find_program('cli_test.sh')
-  test('cli', cli_test, args: [pkgctl_exe, state_fixture])
+  test(
+    'cli',
+    cli_test,
+    args: [pkgctl_exe, state_fixture, meson.project_version()],
+  )
 
   pkgctl_headers = [
     'check.h',

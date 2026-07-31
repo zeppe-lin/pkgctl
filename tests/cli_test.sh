@@ -5,6 +5,7 @@ set -eu
 
 pkgctl=$1
 state_fixture=$2
+expected_release=$3
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli.XXXXXX")
 cleanup()
 {
@@ -65,7 +66,12 @@ recipe libfoo '  {}' >"$collection/libfoo/recipe.yml"
 recipe tool '  {}' >"$collection/tool/recipe.yml"
 
 binding=$($state_fixture "$state")
-[ "$($pkgctl --version)" = 'pkgctl 0.9.1' ]
+actual_version=$($pkgctl --version)
+expected_version="pkgctl $expected_release"
+[ "$actual_version" = "$expected_version" ] || {
+  echo "unexpected pkgctl version: got '$actual_version', expected '$expected_version'" >&2
+  exit 1
+}
 $pkgctl --help | grep -F 'The commands are read-only.' >/dev/null
 
 catalog=$($pkgctl catalog --collection "core=$collection")
