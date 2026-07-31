@@ -1,5 +1,32 @@
 # pkgctl changelog
 
+## 0.13.0 - 2026-07-31
+
+### Exact run-authority rehydration
+
+- Adds an injected source for the exact semantic `transaction_progress` required
+  to reopen one durable transaction-run record.
+- Adds caller-owned fresh execution-authority sources for construction, check,
+  and operation dispatches, including an explicit caller-issued effect nonce.
+- Validates every fresh authority against the exact reserved dispatch through
+  the existing pure start transition, without storing or executing it.
+- Adds caller-owned recovery-authority sources for exact construction results,
+  check results, and effect restart checkpoints.
+- Requires recovered construction and check evidence to retain the exact started
+  attempt session and operation evidence to retain both the exact effect session
+  and effect-attempt identity.
+- Obtains no subordinate evidence for a reservation classified as never started.
+- Seals deterministic call-scoped handoff identities over the durable record,
+  reopened run or restart assessment, selected dispatch, and supplied authority.
+- Distinguishes valid fresh resource variation from restart evidence, which is
+  never substitutable for the exact durable attempt.
+- Rejects malformed durable context before invoking a caller authority source and
+  rejects foreign returned authority before any store or driver can be touched.
+- Adds no journal discovery or access, reservation, execution, reconciliation,
+  evidence serialization, scheduler, loop, retry policy, rollback, compaction,
+  garbage collection, or effect-implying CLI command.
+- Retains the complete authority floors established by Version 0.10.0.
+
 ## 0.12.0 - 2026-07-31
 
 ### Durable one-dispatch restart reconciliation

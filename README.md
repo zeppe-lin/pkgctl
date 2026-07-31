@@ -6,6 +6,41 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.13.0 closes the authority handoff required before a deterministic
+transaction runner can exist:
+
+```text
+durable run identity
+        |
+        v
+caller-owned progression/resource/recovery source
+        |
+        v
+exact pkgctl validation
+        |
+        v
+sealed execution or recovery handoff
+```
+
+`rehydrate_transaction_run()` obtains one complete semantic progression from an
+injected source and reopens only the exact run named by the durable record.
+`acquire_transaction_dispatch_execution_authority()` obtains fresh concrete
+construction, check, or operation resources for one exact reserved dispatch and
+validates them through the existing pure start transition. It stores nothing and
+invokes no driver.
+
+`acquire_transaction_dispatch_recovery_authority()` obtains exact subordinate
+evidence for one restart-classified active dispatch. Started construction and
+check evidence must retain the exact admitted session already named by the run.
+Operation recovery must retain both the exact effect session and effect-attempt
+identity. A never-started reservation requires no evidence source call.
+
+Fresh resources may vary where their owning admission contract declares paths or
+other coordinates non-semantic. Restart evidence may not vary: it must identify
+the exact durable attempt. Release 0.13.0 adds no journal access, reservation,
+execution, reconciliation, evidence discovery, scheduler, loop, retry policy,
+rollback, compaction, garbage collection, or effectful CLI command.
+
 Release 0.12.0 closes the durable restart actuator for one exact dispatch:
 
 ```text
@@ -186,7 +221,7 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.12.0. The command frontend
+There are no effect-implying CLI commands in 0.13.0. The command frontend
 executes no source acquisition, build, check, planner, lifecycle, application,
 publication, or restart authority. The library can execute or reconcile one
 caller-selected dispatch only through injected drivers, exact checkpoints, and
@@ -201,7 +236,8 @@ collection, and effectful command policy remain outside this release.
 binding, deterministic dispatch reservation, in-flight ownership,
 evidence-driven transaction progression, current-state epoch binding,
 durable controller-attempt snapshots, one-dispatch write-ahead execution,
-exact one-dispatch restart reconciliation, conservative restart classification,
+exact one-dispatch restart reconciliation, exact run-authority rehydration,
+conservative restart classification,
 outer-lease observation, transaction-evidence composition, deterministic
 diagnostics, and presentation.
 

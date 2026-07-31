@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.12.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.13.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -137,6 +137,33 @@ the retained effect-attempt identity.
 
 This layer creates no scheduler, loop, thread, backend, resource-discovery rule,
 retry rule, rollback, automatic release, journal discovery, or effectful command.
+
+# EXACT RUN-AUTHORITY REHYDRATION
+
+Version 0.13.0 accepts caller-owned sources for the exact authorities needed to
+resume or execute one durable dispatch. It does not search for those authorities.
+
+*rehydrate_transaction_run()* obtains one complete *transaction_progress* from
+an injected source and reopens the durable record through the ordinary restart
+checkpoint validator. A stored identity is never promoted into semantic
+evidence.
+
+For fresh execution, the source returns one admitted construction session,
+check session, or operation session plus caller-issued effect nonce. The
+controller validates that authority against the exact reserved dispatch using
+the existing pure start transition and seals a call-scoped handoff. No journal
+is appended and no driver is invoked. Fresh concrete resources may differ when
+their owning session contract excludes them from semantic identity.
+
+For restart recovery, construction and check results must belong to the exact
+attempt session retained by started ownership. An operation checkpoint must
+belong to both the retained effect session and exact effect attempt. Reserved
+work needs no subordinate evidence. Restart evidence is therefore exact and not
+substitutable even where fresh resource coordinates are flexible.
+
+This boundary performs no journal loading, storage, reservation, execution,
+reconciliation, discovery, scheduling, looping, retry selection, rollback,
+compaction, garbage collection, or command action.
 
 # DURABLE RESTART RECONCILIATION
 

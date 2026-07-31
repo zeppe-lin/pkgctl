@@ -49,6 +49,15 @@ commit failure leaves started ownership durable. This layer must not reserve
 work, loop, discover resources, create backends, choose retries, or release work
 automatically.
 
+The run-authority rehydration layer may ask injected caller-owned sources for
+one complete semantic progression, one fresh admitted execution authority, or
+one exact restart-recovery authority. It must validate the durable record and
+selected dispatch before calling a fresh source, delegate subordinate admission
+to existing pure start transitions, and require restart evidence to match the
+exact retained attempt. It must not load or append journals, execute or
+reconcile work, discover paths or evidence, construct a fact from an identity,
+choose retries, reserve work, or loop.
+
 The restart-reconciliation layer may consume one exact
 `transaction_run_restart_checkpoint`, one retained dispatch, and explicit
 caller-rehydrated subordinate authority. Reserved release must require the
@@ -106,7 +115,8 @@ legacy behavior.
    exact predecessor and state-epoch binding, operation-lane serialization,
    failure containment, durable run single-transition sealing, exact progression
    rehydration, graph/evidence revalidation, write-ahead start persistence,
-   one-dispatch driver barriers, exact reserved release, caller-rehydrated
+   one-dispatch driver barriers, exact run-authority handoffs, exact reserved
+   release, caller-rehydrated
    build/check recovery, effect-journal continuation, lost-terminal-write
    recovery, preparation projection and typed refusal, effect sequencing,
    intent-before-effect persistence, exact restart checkpoints, outer-lease

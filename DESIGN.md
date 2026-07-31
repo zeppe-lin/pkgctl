@@ -13,6 +13,52 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.13.0 exact run-authority rehydration boundary
+
+Release 0.13.0 separates caller-owned recovery and execution inputs from the
+controller actions that consume them:
+
+```text
+durable record or restart checkpoint
+        |
+        v
+caller-owned progression, resource, or recovery source
+        |
+        v
+pkgctl exact binding validation
+        |
+        v
+sealed call-scoped handoff
+```
+
+`rehydrate_transaction_run()` asks one injected source for the semantic
+`transaction_progress` named by a durable run record and delegates reopening to
+`transaction_run_restart_checkpoint::make()`. The source owns loading or
+reconstruction. The record remains the authority for the exact progression,
+transaction, state epoch, policy, dispatch history, and run identity.
+
+`acquire_transaction_dispatch_execution_authority()` accepts one exact reserved
+dispatch and asks the caller-owned source for the concrete construction session,
+check session, or operation session plus effect-attempt nonce. It invokes the
+existing pure `start_*_dispatch()` transition as the validator, but commits
+nothing and invokes no driver. Fresh resource choices may differ when their
+subordinate admission contracts define them as non-semantic; the sealed handoff
+identity still binds the concrete admitted authority supplied for this call.
+
+`acquire_transaction_dispatch_recovery_authority()` starts from one exact
+restart checkpoint. A never-started reservation needs no subordinate evidence.
+Started construction and check recovery must return a result whose session is
+the exact session retained by durable ownership. Started operation recovery
+must return the exact effect checkpoint named by both the retained session and
+effect-attempt identity. Unlike fresh resources, restart evidence is not
+substitutable.
+
+The handoff objects are call-scoped values. They do not append or load journals,
+reserve or execute work, reconcile results, discover paths or processes,
+serialize subordinate evidence, choose retry timing, loop, schedule, roll back,
+compact history, or expose a command. They make those authorities explicit so a
+later runner can act without turning identities into facts.
+
 ## Release 0.12.0 durable restart-reconciliation boundary
 
 Release 0.12.0 turns one conservative restart classification into at most one

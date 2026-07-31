@@ -75,7 +75,7 @@ Every release must establish:
 - exact terminal effect-result identity after journal rehydration, independent
   of argument evaluation order;
 - no driver or run append when effect restart requires external resolution;
-- proof that all exposed CLI commands remain read-only in 0.12.0;
+- proof that all exposed CLI commands remain read-only in 0.13.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
 ## Durable transaction-run tests
@@ -320,6 +320,28 @@ The preparation suite must prove:
 - removal never invokes incoming-artifact projection;
 - no preparation path executes lifecycle, application, publication, or CLI
   effects.
+
+## Exact run-authority rehydration tests
+
+The construction, check, and effect suites must prove:
+
+- one caller source invocation returns the complete progression needed to reopen
+  the exact durable run;
+- foreign progression is rejected by the ordinary durable-record validator;
+- malformed record/run or non-reserved fresh context is rejected before the
+  execution-authority source is called;
+- fresh construction, check, and operation handoffs bind the exact record, run,
+  dispatch, admitted session, and operation nonce;
+- repeated equivalent authority produces the same handoff identity;
+- semantically valid alternate fresh resources remain admissible and produce an
+  identity reflecting the concrete admitted authority;
+- reserved restart recovery invokes no subordinate evidence source;
+- construction and check recovery rejects results from any session other than
+  the exact durable started attempt;
+- operation recovery rejects any effect checkpoint with a foreign effect session
+  or attempt identity;
+- the layer performs no journal load or append, reservation, execution,
+  reconciliation, discovery, scheduler, loop, retry, or CLI action.
 
 ## Durable dispatch-reconciliation tests
 
