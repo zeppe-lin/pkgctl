@@ -20,7 +20,7 @@ for source in "$srcdir"/src/*.cpp; do
   objects="$objects $object"
 done
 
-for test_source in check_test construction_test dispatch_test run_journal_test request_test session_test effect_journal_test effect_test report_test version_test; do
+for test_source in check_test construction_test dispatch_test run_journal_test request_test session_test effect_journal_test effect_inspect_test effect_test report_test version_test; do
   # shellcheck disable=SC2086
   "$cxx" $flags "$srcdir/tests/$test_source.cpp" $objects $libs \
     -o "$tmp/$test_source"

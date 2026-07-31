@@ -352,11 +352,18 @@ void check_store()
   const auto terminal = admitted.seal_terminal(
       pkgctl::effectful_operation_outcome::outer_lease_lost);
 
+  const auto lock_path = directory.path() / ".pkgctl-effect.lock";
+  CHECK(!store.load_latest(admitted.attempt()));
+  CHECK(!std::filesystem::exists(lock_path));
+
   CHECK(store.append(admitted).identity() == admitted.identity());
+  CHECK(std::filesystem::exists(lock_path));
   CHECK(store.append(terminal).identity() == terminal.identity());
   CHECK(store.append(terminal).identity() == terminal.identity());
+  CHECK(::unlink(lock_path.c_str()) == 0);
   const auto latest = store.load_latest(admitted.attempt());
   CHECK(latest && latest->identity() == terminal.identity());
+  CHECK(!std::filesystem::exists(lock_path));
   const auto head = directory.path() / head_name(admitted);
   CHECK(std::filesystem::is_regular_file(head));
   CHECK((std::filesystem::status(head).permissions() &
@@ -595,6 +602,17 @@ void check_store()
           pkgctl::effect_journal_error_code::store_corrupt;
     }
     CHECK(corrupt);
+  }
+
+  {
+    test_support::temporary_directory invalid_lock_directory;
+    std::filesystem::create_directory(
+        invalid_lock_directory.path() / ".pkgctl-effect.lock");
+    auto invalid_lock_store = pkgctl::posix_effect_journal_store::open(
+        invalid_lock_directory.path().string());
+    CHECK(rejects(
+        pkgctl::effect_journal_error_code::store_open_failed,
+        [&] { (void)invalid_lock_store.load_latest(admitted.attempt()); }));
   }
 }
 

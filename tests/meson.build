@@ -51,6 +51,13 @@ if not get_option('tests').disabled()
   )
   test('effect-journal', effect_journal_test)
 
+  effect_inspect_test = executable(
+    'effect-inspect-test',
+    'effect_inspect_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('effect-inspect', effect_inspect_test)
+
   effect_test = executable(
     'effect-test',
     'effect_test.cpp',
@@ -102,6 +109,7 @@ if not get_option('tests').disabled()
     'dispatch.h',
     'controller.h',
     'effect.h',
+    'effect_inspect.h',
     'effect_journal.h',
     'effect_journal_codec.h',
     'effect_restart.h',
