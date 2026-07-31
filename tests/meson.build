@@ -104,6 +104,7 @@ if not get_option('tests').disabled()
     'request.h',
     'run_authority.h',
     'run_advance.h',
+    'run_drive.h',
     'run_journal.h',
     'run_journal_codec.h',
     'run_reconcile.h',
@@ -153,6 +154,9 @@ if not get_option('tests').disabled()
 
   run_advance_contract = find_program('check_run_advance_contract.sh')
   test('run-advance-contract', run_advance_contract, args: [meson.project_source_root()])
+
+  run_drive_contract = find_program('check_run_drive_contract.sh')
+  test('run-drive-contract', run_drive_contract, args: [meson.project_source_root()])
 
   source_contract = find_program('check_source_contract.sh')
   test('source-contract', source_contract, args: [meson.project_source_root()])

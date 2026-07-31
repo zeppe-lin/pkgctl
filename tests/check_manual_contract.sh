@@ -13,8 +13,8 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.14.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.14.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.15.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.15.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'The canonical state store is opened with *open_existing*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
@@ -31,6 +31,12 @@ grep -F 'TRANSACTION CHECK SESSION' \
 grep -F 'TRANSACTION DISPATCH' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'SINGLE-DISPATCH EXECUTION' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'BOUNDED SERIAL TRANSACTION DRIVE' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Exact retries against the same record must' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'outcome may follow a completed, stopped, externally blocked, or quiescent one.' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'ONE-STEP TRANSACTION ADVANCEMENT' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null

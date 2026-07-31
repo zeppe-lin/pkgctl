@@ -19,6 +19,7 @@ for file in "$header" "$source" "$construction_test" "$check_test" \
 done
 
 for required in \
+  'transaction_dispatch_nonce_source' \
   'transaction_run_advance_authorities' \
   'transaction_run_advance_drivers' \
   'transaction_run_advance_stores' \
@@ -68,7 +69,8 @@ ordered_tokens()
   done
 }
 
-advance_body=$(sed -n '/^transaction_run_advance_result advance_transaction_run_once(/,$p' \
+advance_body=$(sed -n \
+  '/^transaction_run_advance_result advance_loaded_transaction_run_once(/,/^} \/\/ namespace$/p' \
   "$source")
 ordered_tokens "$advance_body" \
   'load_committed_head' \
@@ -76,6 +78,7 @@ ordered_tokens "$advance_body" \
   'assessment().active().empty()' \
   'assessment().active().front()' \
   'reconcile_active' \
+  'ready_units().empty()' \
   'reserve_next' \
   'require_execution_dependencies' \
   'commit_transaction_run_successor' \
