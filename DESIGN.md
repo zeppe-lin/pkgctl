@@ -13,6 +13,42 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.18.0 durable transaction-run inspection boundary
+
+Release 0.18.0 adds the read-only sensor paired with the durable run actuator:
+
+```text
+caller-selected journal identity
+        |
+        v
+storage-derived committed head
+        |
+        v
+controller-owned restart assessment
+        |
+        v
+deterministic report
+```
+
+The inspection boundary loads exactly one journal head and rejects a missing head
+or a store response naming another journal. It classifies the durable record as
+completed, stopped after terminal failure, active, or quiescent incomplete. The
+active assessment is derived only from retained dispatch state, attempt identity,
+effect-attempt identity, and uncertainty observations.
+
+The pure `assess_transaction_run_record()` function is shared with semantic
+restart checkpoints so the read-only view and executable recovery path cannot
+drift into different ownership classifications. Rehydrated progression remains
+required before a run may be executed; inspection never fabricates that
+progression from journal identities.
+
+The report is deterministic and line-oriented. It exposes the exact journal,
+record, sequence, transaction, run, progress, current-state and dispatch-policy
+identities, every retained dispatch, and every active restart disposition. This
+layer does not scan for journals, append records, reserve or execute work, inspect
+subordinate effect journals, discover semantic evidence, or expose a command
+action.
+
 ## Release 0.17.0 restart-safe transaction-launch boundary
 
 Release 0.17.0 composes durable admission with bounded serial driving while

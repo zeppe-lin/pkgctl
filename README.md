@@ -6,6 +6,37 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.18.0 establishes read-only durable transaction-run inspection:
+
+```text
+exact journal identity
+        |
+        v
+load committed head
+        |
+        v
+classify controller-owned ledger evidence
+        |
+        +-- terminal
+        +-- active ownership
+        `-- quiescent incomplete
+        |
+        v
+deterministic line-oriented report
+```
+
+`inspect_transaction_run()` loads only the caller-selected journal head and
+validates that storage returned authority for that same journal. It classifies
+completion, stopped failure containment, active ownership, or incomplete
+quiescence from the durable record alone. Active dispatches retain their exact
+restart disposition and whether external evidence is required.
+
+Inspection deliberately does not rehydrate semantic progression or convert
+identities into package evidence. It performs no append, reservation, execution,
+effect-journal access, journal discovery, scheduling, cleanup, or command action.
+`render_report()` exposes the storage-derived ledger and restart assessment in a
+deterministic line-oriented form without changing the read-only CLI surface.
+
 Release 0.17.0 establishes restart-safe transaction launch:
 
 ```text

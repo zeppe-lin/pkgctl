@@ -70,6 +70,14 @@ choose retries or backoff, discover resources or evidence, adopt processes,
 roll back, clean up, compact journals, collect history, or expose a mutating
 command.
 
+The durable transaction-run inspection layer may load one committed head
+selected by an exact journal identity, validate the storage-returned journal,
+classify controller-owned retained ownership, and render a deterministic report.
+It may share pure record assessment with restart checkpoints, but it must not
+rehydrate semantic progression, infer package facts from identities, append a
+record, inspect an effect journal, reserve or execute work, scan directories,
+discover journals, or expose a mutating command.
+
 The restart-safe transaction-launch layer may derive one exact journal from an
 immutable initial run and caller-owned replay-safe run nonce, load only that
 journal's committed head, append sequence zero only when no head exists, and

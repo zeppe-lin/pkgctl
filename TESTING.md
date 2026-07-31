@@ -78,6 +78,25 @@ Every release must establish:
 - proof that all exposed CLI commands remain read-only in 0.13.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
+## Durable transaction-run inspection tests
+
+The inspection boundary must prove:
+
+- a caller-selected journal identity causes exactly one head load and no append;
+- a missing head is refused and a foreign returned journal is a store-contract
+  violation;
+- sequence-zero quiescence is reported as incomplete without semantic
+  rehydration;
+- reserved ownership is active but requires no external evidence and names the
+  `release_reserved` disposition;
+- started construction names exact recovery authority and requires external
+  evidence;
+- terminal failure is classified as stopped and no longer active;
+- deterministic reports retain exact durable identities and restart
+  dispositions;
+- inspection performs no journal discovery, progression rehydration, append,
+  reservation, execution, effect-journal access, scheduling, or command action.
+
 ## Restart-safe transaction-launch tests
 
 The launch boundary must prove:

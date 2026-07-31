@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.17.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.18.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -22,6 +22,24 @@ Version 0.17.0 retains the read-only command pipeline introduced in 0.2.0:
 
 The canonical state store is opened with *open_existing* for these commands.
 The command frontend does not initialize or publish state.
+
+# DURABLE TRANSACTION-RUN INSPECTION
+
+Version 0.18.0 can inspect one exact caller-selected transaction-run journal
+without changing it. The controller loads the committed head, validates that the
+store returned the same journal authority, and classifies the record as
+*completed*, *stopped-after-failure*, *active*, or *quiescent-incomplete*.
+
+Active dispatches retain their exact restart disposition: release an unstarted
+reservation, recover construction, recover a check, or inspect the exact effect
+journal. The report states whether external evidence is required and prints the
+controller-owned journal, record, sequence, transaction, run, progression, state,
+policy, dispatch, attempt, effect-attempt, observation, and terminal identities.
+
+Inspection does not rehydrate package semantics or promote an identity into
+evidence. It performs no append, reservation, execution, subordinate journal
+inspection, journal discovery, scheduling, cleanup, or command action. The
+executable therefore still exposes no effect-implying command.
 
 # CANDIDATE CONSTRUCTION
 
