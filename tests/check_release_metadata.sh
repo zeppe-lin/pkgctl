@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.19.0
+version=0.20.0
 
 require_line()
 {
@@ -20,26 +20,26 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 19;'
+  'inline constexpr unsigned version_minor = 20;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.19.0";'
+  'inline constexpr const char* version_string = "0.20.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 19);'
+  'static_assert(pkgctl::version_minor == 20);'
 
-grep -F '## 0.19.0 - 2026-07-31' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.19.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.19.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.20.0 - 2026-08-01' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.20.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.20.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
-grep -F 'pkgctl inspect-run --run-store PATH --journal SHA256' \
-  "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'exact durable transaction-run inspection' \
+grep -F 'inspect_effect_attempt()' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'read-only inspection of one exact durable' \
   "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.19.0 exposes the durable inspection sensor as *pkgctl inspect-run*.' \
+grep -F 'Version 0.20.0 can inspect one exact caller-selected durable effect attempt' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'shared read-only descriptor instead of creating or opening the writer lock' \
   "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Adds no CLI' "$srcdir/CHANGELOG.md" >/dev/null
 
 for contract in \
   'libpkgsource >= 2.0.0' \

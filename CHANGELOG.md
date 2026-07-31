@@ -1,3 +1,56 @@
+## 0.20.0 - 2026-08-01
+
+### Durable effect-attempt inspection
+
+- Adds `inspect_effect_attempt()` to load and classify one exact
+  caller-selected durable effect-attempt head without semantic rehydration.
+- Returns the storage-derived `effect_attempt_record` together with the existing
+  pure `effect_restart_assessment` used by executable restart.
+- Rejects missing heads and storage responses belonging to another attempt with
+  typed store-conflict and store-contract diagnostics.
+- Exposes terminal, automatically-continuable, and
+  external-resolution-required as separate inspection predicates.
+- Adds deterministic effect-attempt reports containing controller-owned attempt,
+  record, session, nonce, predecessor, stage, lifecycle-result, application,
+  transaction, publication, terminal, and reconciled-state identities.
+- Keeps optional evidence absent until durably retained and never promotes an
+  identity into lifecycle, application, transaction, publication, or state
+  semantics.
+- Changes the POSIX effect-store load path to acquire an existing lock through a
+  shared read-only descriptor instead of creating or opening the writer lock.
+- Leaves empty and committed effect stores unchanged when inspected, including
+  when the writer lock is absent, and rechecks under a lock established by a
+  concurrent writer.
+- Leaves append as the sole `O_RDWR | O_CREAT` and `LOCK_EX` path.
+- Adds no CLI, attempt enumeration, latest-attempt discovery, run-journal
+  traversal, restart checkpoint construction, driver invocation, append,
+  reconciliation, repair, scheduling, cleanup, compaction, garbage collection,
+  or mutation.
+
+### Dependency contract
+
+- libpkgsource >= 2.0.0
+- libpkgsource-yaml >= 2.0.0
+- libpkgsource-plan >= 2.0.0
+- libpkgcatalog >= 2.0.0
+- libpkgcatalog-acquire >= 2.0.0
+- libpkgstate >= 2.3.0
+- libpkgstate-plan >= 2.3.0
+- libpkgstate-apply >= 2.3.0
+- libpkgfetch >= 1.0.0
+- libpkgbuild >= 2.0.0
+- libpkgbuild-exec >= 1.0.0
+- libpkgbuild-plan >= 2.0.0
+- libpkgimage >= 0.3.0
+- libpkgplan >= 0.2.0
+- libpkgexec >= 1.3.0
+- libpkgapply >= 2.0.0
+- libpkgapply-exec >= 1.0.0
+- libpkgresolve >= 2.0.0
+- libpkgtransaction >= 2.1.0
+- libpkgcheck >= 0.1.0
+- libpkgcheck-exec >= 0.1.1
+
 ## 0.19.0 - 2026-07-31
 
 ### Exact transaction-run inspection command
