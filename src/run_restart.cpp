@@ -143,17 +143,9 @@ bool transaction_run_restart_assessment::external_evidence_required()
       });
 }
 
-transaction_run_restart_assessment assess_reopened_run(
-    const transaction_run& run,
+transaction_run_restart_assessment assess_transaction_run_record(
     const transaction_run_journal_record& record)
 {
-  if (run.identity() != record.run() ||
-      run.progress().identity() != record.progress() ||
-      run.progress().transaction().identity() != record.transaction() ||
-      run.policy().identity() != record.policy().identity())
-    throw transaction_run_journal_error(
-        transaction_run_journal_error_code::invalid_record,
-        "restart assessment contradicts reopened transaction run");
   std::vector<transaction_dispatch_restart_assessment> active;
   for (const auto& dispatch : record.dispatches())
   {
@@ -187,7 +179,14 @@ transaction_run_restart_checkpoint transaction_run_restart_checkpoint::make(
     transaction_run_journal_record record)
 {
   auto run = record.reopen(std::move(progress));
-  auto assessment = assess_reopened_run(run, record);
+  if (run.identity() != record.run() ||
+      run.progress().identity() != record.progress() ||
+      run.progress().transaction().identity() != record.transaction() ||
+      run.policy().identity() != record.policy().identity())
+    throw transaction_run_journal_error(
+        transaction_run_journal_error_code::invalid_record,
+        "restart assessment contradicts reopened transaction run");
+  auto assessment = assess_transaction_run_record(record);
   return transaction_run_restart_checkpoint(
       std::move(run), std::move(record), std::move(assessment));
 }

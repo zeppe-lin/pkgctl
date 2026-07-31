@@ -79,6 +79,10 @@ private:
   std::vector<transaction_dispatch_restart_assessment> active_;
 };
 
+/*! \brief Classify retained ownership using durable controller evidence only. */
+[[nodiscard]] transaction_run_restart_assessment assess_transaction_run_record(
+    const transaction_run_journal_record& record);
+
 /*! \brief Exact rehydrated progression plus reopened durable dispatch ledger. */
 class transaction_run_restart_checkpoint final {
 public:

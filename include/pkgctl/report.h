@@ -8,6 +8,7 @@
 
 #include <string>
 
+#include <pkgctl/run_inspect.h>
 #include <pkgctl/session.h>
 
 namespace pkgctl {
@@ -15,5 +16,7 @@ namespace pkgctl {
 [[nodiscard]] std::string render_report(const catalog_session& session);
 [[nodiscard]] std::string render_report(const resolution_session& session);
 [[nodiscard]] std::string render_report(const transaction_session& session);
+[[nodiscard]] std::string render_report(
+    const transaction_run_inspection& inspection);
 
 } // namespace pkgctl
