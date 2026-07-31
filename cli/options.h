@@ -6,13 +6,20 @@
 #include <string>
 #include <variant>
 
+#include <pkgctl/identity.h>
 #include <pkgctl/request.h>
 
 namespace pkgctl::cli {
 
+struct run_inspection_command final {
+  std::string store;
+  session_identity journal;
+};
+
 using command = std::variant<catalog_request,
                              resolution_request,
-                             transaction_request>;
+                             transaction_request,
+                             run_inspection_command>;
 
 class usage_error final : public std::invalid_argument {
 public:

@@ -13,10 +13,12 @@
 
 #include <libpkgstate/digest.h>
 
+#include <pkgctl/error.h>
+
 namespace pkgctl::cli {
 namespace {
 
-enum class command_kind { catalog, resolve, transaction };
+enum class command_kind { catalog, resolve, transaction, inspect_run };
 
 struct raw_collection final {
   std::string name;
@@ -134,6 +136,7 @@ command_kind parse_kind(std::string_view value)
   if (value == "catalog") return command_kind::catalog;
   if (value == "resolve") return command_kind::resolve;
   if (value == "transaction") return command_kind::transaction;
+  if (value == "inspect-run") return command_kind::inspect_run;
   fail("unknown command: " + std::string(value));
 }
 
@@ -143,6 +146,42 @@ void set_once(Optional& target, std::string value, const std::string& option)
   if (target)
     fail(option + " specified more than once");
   target = std::move(value);
+}
+
+run_inspection_command parse_run_inspection(int argc, char** argv)
+{
+  std::optional<std::string> store;
+  std::optional<std::string> journal;
+  for (int index = 2; index < argc; ++index)
+  {
+    const std::string argument(argv[index]);
+    if (argument == "--run-store")
+    {
+      set_once(store, require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    if (argument == "--journal")
+    {
+      set_once(journal, require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    fail("unknown inspect-run option: " + argument);
+  }
+
+  if (!store || store->empty())
+    fail("--run-store is required and must not be empty");
+  if (!journal)
+    fail("--journal is required");
+
+  try
+  {
+    return run_inspection_command{
+        std::move(*store), session_identity::from_hex(std::move(*journal))};
+  }
+  catch (const pkgctl::error& problem)
+  {
+    fail(std::string("invalid --journal: ") + problem.what());
+  }
 }
 
 raw_options parse_raw(command_kind kind, int argc, char** argv)
@@ -348,6 +387,8 @@ command parse_command(int argc, char** argv)
   if (argc < 2)
     fail("a command is required");
   const command_kind kind = parse_kind(argv[1]);
+  if (kind == command_kind::inspect_run)
+    return parse_run_inspection(argc, argv);
   raw_options parsed = parse_raw(kind, argc, argv);
   if (kind == command_kind::catalog)
     return catalog_from(parsed);
@@ -367,6 +408,7 @@ std::string help_text()
   pkgctl catalog OPTIONS
   pkgctl resolve OPTIONS --goal SCOPE=SUBJECT [--goal ...]
   pkgctl transaction OPTIONS --goal SCOPE=SUBJECT [--goal ...]
+  pkgctl inspect-run --run-store PATH --journal SHA256
 
 Read and compose native package authorities without mutation.
 
@@ -397,13 +439,17 @@ Transaction options:
   --converge-exact                remove installed packages outside the exact
                                   selected target closure; never the default
 
+Run inspection options:
+  --run-store PATH                existing POSIX transaction-run store
+  --journal SHA256                exact lowercase journal identity
+
 Global options:
   -h, --help
   -V, --version
 
-The commands are read-only. pkgctl does not initialize state, build packages,
-open artifacts, plan filesystem changes, execute lifecycle programs, apply
-mutations, or publish installed state in this release.
+The commands are read-only. pkgctl does not initialize state or run stores,
+build packages, open artifacts, plan filesystem changes, execute lifecycle
+programs, apply mutations, or publish installed state in this release.
 )";
 }
 
