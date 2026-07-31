@@ -150,6 +150,9 @@ if not get_option('tests').disabled()
   run_reconcile_contract = find_program('check_run_reconcile_contract.sh')
   test('run-reconcile-contract', run_reconcile_contract, args: [meson.project_source_root()])
 
+  run_admit_contract = find_program('check_run_admit_contract.sh')
+  test('run-admit-contract', run_admit_contract, args: [meson.project_source_root()])
+
   run_authority_contract = find_program('check_run_authority_contract.sh')
   test('run-authority-contract', run_authority_contract, args: [meson.project_source_root()])
 
