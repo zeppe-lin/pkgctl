@@ -1,3 +1,52 @@
+## 0.19.0 - 2026-07-31
+
+### Exact transaction-run inspection command
+
+- Adds `pkgctl inspect-run --run-store PATH --journal SHA256` to expose the
+  existing durable transaction-run inspection sensor on the read-only command
+  surface.
+- Requires one explicitly named existing POSIX store and one exact lowercase
+  SHA-256 journal identity; the command performs no store or journal discovery.
+- Delegates durable classification to `inspect_transaction_run()` and output to
+  the existing deterministic `render_report()` implementation.
+- Preserves typed usage, missing-store, missing-head, corruption, conflict, and
+  storage-contract diagnostics without translating them into mutation policy.
+- Changes the POSIX run-store load path to acquire an existing lock through a
+  shared read-only descriptor instead of creating or opening the writer lock.
+- Leaves an empty caller-created store directory and an inspected committed store
+  byte-for-byte unchanged, including when the writer lock is absent.
+- Rechecks under the shared lock when a first writer establishes the lock during
+  an initially unlocked read.
+- Proves valid, invalid-identity, missing-store, missing-head, corrupt-store, and
+  immutable-inspection command behavior against the real POSIX store.
+- Adds no semantic progression rehydration, effect-journal inspection, append,
+  reservation, execution, reconciliation, repair, scheduling, cleanup,
+  compaction, garbage collection, or mutating command.
+
+### Dependency contract
+
+- libpkgsource >= 2.0.0
+- libpkgsource-yaml >= 2.0.0
+- libpkgsource-plan >= 2.0.0
+- libpkgcatalog >= 2.0.0
+- libpkgcatalog-acquire >= 2.0.0
+- libpkgstate >= 2.3.0
+- libpkgstate-plan >= 2.3.0
+- libpkgstate-apply >= 2.3.0
+- libpkgfetch >= 1.0.0
+- libpkgbuild >= 2.0.0
+- libpkgbuild-exec >= 1.0.0
+- libpkgbuild-plan >= 2.0.0
+- libpkgimage >= 0.3.0
+- libpkgplan >= 0.2.0
+- libpkgexec >= 1.3.0
+- libpkgapply >= 2.0.0
+- libpkgapply-exec >= 1.0.0
+- libpkgresolve >= 2.0.0
+- libpkgtransaction >= 2.1.0
+- libpkgcheck >= 0.1.0
+- libpkgcheck-exec >= 0.1.1
+
 ## 0.18.0 - 2026-07-31
 
 ### Durable transaction-run inspection
