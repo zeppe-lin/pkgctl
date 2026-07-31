@@ -103,6 +103,7 @@ if not get_option('tests').disabled()
     'report.h',
     'request.h',
     'run_authority.h',
+    'run_advance.h',
     'run_journal.h',
     'run_journal_codec.h',
     'run_reconcile.h',

@@ -5,6 +5,7 @@
 #include "run_execute_support.h"
 
 #include <pkgctl/run_authority.h>
+#include <pkgctl/run_advance.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_restart.h>
@@ -113,6 +114,41 @@ private:
   std::optional<pkgctl::session_identity> record_;
   std::optional<pkgctl::session_identity> run_;
   std::optional<pkgctl::session_identity> dispatch_;
+};
+
+
+class throwing_construction_execution_authority_source final
+    : public pkgctl::transaction_dispatch_execution_authority_source {
+public:
+  pkgctl::construction_session construction(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_run&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    ++calls_;
+    throw std::runtime_error("injected execution-authority failure");
+  }
+
+  pkgctl::transaction_check_session check(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_run&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected check execution authority request");
+  }
+
+  pkgctl::operation_dispatch_execution_authority operation(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_run&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation execution authority request");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  std::size_t calls_ = 0U;
 };
 
 class construction_recovery_authority_source final
@@ -1208,6 +1244,287 @@ void check_run_authority_rehydration()
 }
 
 
+void check_single_step_transaction_advancement()
+{
+  test_support::temporary_directory temporary;
+  test_support::initialize_state(temporary.path() / "state");
+  pkgstate::canonical_generation_store state_store(
+      temporary.path() / "state", test_support::binding());
+  const std::string payload = "single-step construction payload\n";
+  auto source = tool_source(sha256_text(payload), "1.0", false);
+  auto transaction = transaction_session(
+      source, dependency_source(), state_store.read(),
+      temporary.path() / "state");
+  auto session = construction_session_without_inputs(
+      transaction, temporary.path() / "construction-step");
+  test_support::write(
+      session.paths().local_source_root / "payload", payload);
+
+  const auto make_admitted = [&](std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        pkgctl::transaction_progress::begin(transaction),
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto record = pkgctl::transaction_run_journal_record::admit(
+        run, journal_nonce(marker));
+    return std::make_pair(std::move(run), std::move(record));
+  };
+
+  fixture_backend backend(backend_mode::succeed);
+  pkgctl::native_construction_driver native_driver(backend);
+
+  {
+    auto [run, admitted] = make_admitted(71U);
+    fixed_progress_source progress_source(run.progress());
+    construction_execution_authority_source execution_source(session);
+    unreachable_recovery_authority_source recovery_source;
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(admitted, trace);
+    tracing_construction_driver driver(native_driver, trace);
+
+    const auto advanced = pkgctl::advance_transaction_run_once(
+        admitted.journal(), dispatch_nonce(71U),
+        {progress_source, execution_source, recovery_source},
+        {&driver, nullptr, nullptr}, {run_store, nullptr});
+
+    CHECK(advanced.disposition() ==
+          pkgctl::transaction_run_advance_disposition::
+              executed_construction);
+    CHECK(advanced.durable_transition_committed());
+    CHECK(!advanced.external_resolution_required());
+    CHECK(advanced.dispatch().has_value());
+    CHECK(advanced.construction() != nullptr);
+    CHECK(advanced.check() == nullptr);
+    CHECK(advanced.operation() == nullptr);
+    CHECK(advanced.record().sequence() == 3U);
+    CHECK(advanced.record().identity() == run_store.latest().identity());
+    CHECK(progress_source.calls() == 1U);
+    CHECK(execution_source.calls() == 1U);
+    CHECK(trace == std::vector<std::string>({
+        "run-1", "run-2", "materialize", "build", "run-3"}));
+  }
+
+  {
+    auto [run, admitted] = make_admitted(72U);
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(72U));
+    CHECK(reservation.dispatch.has_value());
+    if (!reservation.dispatch)
+      throw std::runtime_error("construction step fixture did not reserve");
+    auto reserved = admitted.successor(reservation.run);
+    fixed_progress_source progress_source(reservation.run.progress());
+    construction_execution_authority_source execution_source(session);
+    unreachable_recovery_authority_source recovery_source;
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+
+    const auto released = pkgctl::advance_transaction_run_once(
+        reserved.journal(), dispatch_nonce(73U),
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, nullptr}, {run_store, nullptr});
+
+    CHECK(released.disposition() ==
+          pkgctl::transaction_run_advance_disposition::released_reserved);
+    CHECK(released.record().sequence() == 2U);
+    CHECK(released.dispatch().has_value());
+    CHECK(released.construction() == nullptr);
+    CHECK(execution_source.calls() == 0U);
+    CHECK(trace == std::vector<std::string>({"run-1"}));
+  }
+
+  {
+    auto [run, admitted] = make_admitted(74U);
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(74U));
+    CHECK(reservation.dispatch.has_value());
+    if (!reservation.dispatch)
+      throw std::runtime_error("construction recovery fixture did not reserve");
+    auto reserved = admitted.successor(reservation.run);
+    auto started_run = pkgctl::start_construction_dispatch(
+        reservation.run, *reservation.dispatch, session);
+    auto started = reserved.successor(started_run);
+    auto recovered_result = pkgctl::execute_construction(session, native_driver);
+
+    fixed_progress_source progress_source(started_run.progress());
+    construction_execution_authority_source execution_source(session);
+    construction_recovery_authority_source recovery_source(recovered_result);
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(started, trace);
+
+    const auto reconciled = pkgctl::advance_transaction_run_once(
+        started.journal(), dispatch_nonce(75U),
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, nullptr}, {run_store, nullptr});
+
+    CHECK(reconciled.disposition() ==
+          pkgctl::transaction_run_advance_disposition::
+              reconciled_construction);
+    CHECK(reconciled.construction() != nullptr);
+    CHECK(reconciled.construction() &&
+          reconciled.construction()->identity() == recovered_result.identity());
+    CHECK(recovery_source.calls() == 1U);
+    CHECK(execution_source.calls() == 0U);
+    CHECK(trace == std::vector<std::string>({"run-1"}));
+  }
+
+  {
+    auto [run, admitted] = make_admitted(76U);
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(76U));
+    CHECK(reservation.dispatch.has_value());
+    if (!reservation.dispatch)
+      throw std::runtime_error("stale-head fixture did not reserve");
+    auto reserved = admitted.successor(reservation.run);
+    auto [foreign_run, foreign_admitted] = make_admitted(77U);
+    fixed_progress_source progress_source(foreign_run.progress());
+    construction_execution_authority_source execution_source(session);
+    unreachable_recovery_authority_source recovery_source;
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+
+    bool refused = false;
+    try
+    {
+      (void)pkgctl::advance_transaction_run_once(
+          foreign_admitted.journal(), dispatch_nonce(77U),
+          {progress_source, execution_source, recovery_source},
+          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      refused = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_conflict;
+    }
+    CHECK(refused);
+    CHECK(progress_source.calls() == 0U);
+    CHECK(execution_source.calls() == 0U);
+    CHECK(trace.empty());
+  }
+
+
+  {
+    auto [run, admitted] = make_admitted(78U);
+    fixed_progress_source progress_source(run.progress());
+    construction_execution_authority_source execution_source(session);
+    unreachable_recovery_authority_source recovery_source;
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(admitted, trace);
+
+    bool refused = false;
+    try
+    {
+      (void)pkgctl::advance_transaction_run_once(
+          admitted.journal(), dispatch_nonce(78U),
+          {progress_source, execution_source, recovery_source},
+          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      refused = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::invalid_transition;
+    }
+    CHECK(refused);
+    CHECK(progress_source.calls() == 1U);
+    CHECK(execution_source.calls() == 0U);
+    CHECK(run_store.latest().identity() == admitted.identity());
+    CHECK(trace.empty());
+  }
+
+  {
+    auto [run, admitted] = make_admitted(79U);
+    fixed_progress_source progress_source(run.progress());
+    throwing_construction_execution_authority_source execution_source;
+    unreachable_recovery_authority_source recovery_source;
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(admitted, trace);
+
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::advance_transaction_run_once(
+          admitted.journal(), dispatch_nonce(79U),
+          {progress_source, execution_source, recovery_source},
+          {&native_driver, nullptr, nullptr}, {run_store, nullptr});
+    }
+    catch (const std::runtime_error& problem)
+    {
+      failed = std::string(problem.what()) ==
+          "injected execution-authority failure";
+    }
+    CHECK(failed);
+    CHECK(execution_source.calls() == 1U);
+    CHECK(run_store.latest().sequence() == 1U);
+    CHECK(run_store.latest().dispatches().size() == 1U);
+    CHECK(run_store.latest().dispatches().front().state() ==
+          pkgctl::transaction_dispatch_state::reserved);
+    CHECK(trace == std::vector<std::string>({"run-1"}));
+  }
+
+  {
+    auto [run, admitted] = make_admitted(80U);
+    fixed_progress_source progress_source(run.progress());
+    construction_execution_authority_source execution_source(session);
+    unreachable_recovery_authority_source recovery_source;
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(admitted, trace);
+    fixture_backend failing_backend(backend_mode::fail);
+    pkgctl::native_construction_driver failing_driver(failing_backend);
+
+    const auto failed = pkgctl::advance_transaction_run_once(
+        admitted.journal(), dispatch_nonce(80U),
+        {progress_source, execution_source, recovery_source},
+        {&failing_driver, nullptr, nullptr}, {run_store, nullptr});
+    CHECK(failed.disposition() ==
+          pkgctl::transaction_run_advance_disposition::
+              executed_construction);
+    CHECK(failed.construction() != nullptr);
+    CHECK(failed.construction() && !failed.construction()->succeeded());
+    CHECK(failed.run().stopped());
+
+    fixed_progress_source stopped_progress(failed.run().progress());
+    construction_execution_authority_source unused_execution(session);
+    const auto trace_before = trace;
+    const auto quiescent = pkgctl::advance_transaction_run_once(
+        failed.record().journal(), dispatch_nonce(81U),
+        {stopped_progress, unused_execution, recovery_source},
+        {nullptr, nullptr, nullptr}, {run_store, nullptr});
+    CHECK(quiescent.disposition() ==
+          pkgctl::transaction_run_advance_disposition::quiescent);
+    CHECK(!quiescent.durable_transition_committed());
+    CHECK(!quiescent.dispatch().has_value());
+    CHECK(quiescent.record().identity() == failed.record().identity());
+    CHECK(unused_execution.calls() == 0U);
+    CHECK(trace == trace_before);
+  }
+
+  {
+    auto [run, admitted] = make_admitted(82U);
+    fixed_progress_source progress_source(run.progress());
+    construction_execution_authority_source execution_source(session);
+    unreachable_recovery_authority_source recovery_source;
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(admitted, trace);
+    throwing_construction_driver driver;
+
+    bool escaped = false;
+    try
+    {
+      (void)pkgctl::advance_transaction_run_once(
+          admitted.journal(), dispatch_nonce(82U),
+          {progress_source, execution_source, recovery_source},
+          {&driver, nullptr, nullptr}, {run_store, nullptr});
+    }
+    catch (const std::runtime_error& problem)
+    {
+      escaped = std::string(problem.what()) ==
+          "driver escaped without materialization evidence";
+    }
+    CHECK(escaped);
+    CHECK(run_store.latest().sequence() == 2U);
+    CHECK(run_store.latest().dispatches().size() == 1U);
+    CHECK(run_store.latest().dispatches().front().state() ==
+          pkgctl::transaction_dispatch_state::started);
+    CHECK(trace == std::vector<std::string>({"run-1", "run-2"}));
+  }
+}
+
+
 } // namespace
 
 int main()
@@ -1224,6 +1541,7 @@ int main()
     check_durable_dispatch_execution();
     check_durable_restart_reconciliation();
     check_run_authority_rehydration();
+    check_single_step_transaction_advancement();
   }
   catch (const std::exception& value)
   {

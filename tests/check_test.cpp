@@ -8,6 +8,7 @@
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
 #include <pkgctl/run_authority.h>
+#include <pkgctl/run_advance.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_journal.h>
@@ -66,6 +67,61 @@ bool rejects(pkgctl::error_code expected, Function&& function)
   }
   return false;
 }
+
+
+class fixed_check_progress_source final
+    : public pkgctl::transaction_progress_rehydration_source {
+public:
+  explicit fixed_check_progress_source(pkgctl::transaction_progress progress)
+      : progress_(std::move(progress))
+  {
+  }
+
+  pkgctl::transaction_progress rehydrate_progress(
+      const pkgctl::transaction_run_journal_record& record) override
+  {
+    ++calls_;
+    record_ = record.identity();
+    return progress_;
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgctl::session_identity>& record() const noexcept
+  { return record_; }
+
+private:
+  pkgctl::transaction_progress progress_;
+  std::size_t calls_ = 0U;
+  std::optional<pkgctl::session_identity> record_;
+};
+
+class unreachable_check_recovery_source final
+    : public pkgctl::transaction_dispatch_recovery_authority_source {
+public:
+  pkgctl::construction_result construction(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected construction recovery request");
+  }
+
+  pkgctl::transaction_check_result check(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected check recovery request");
+  }
+
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation recovery request");
+  }
+};
 
 class tracing_check_driver final : public pkgctl::transaction_check_driver {
 public:
@@ -1376,6 +1432,89 @@ void check_run_authority_rehydration()
 }
 
 
+void check_single_step_check_advancement()
+{
+  test_support::temporary_directory temporary;
+  auto fixture = make_ready_check(temporary.path());
+  auto session = admit_check(
+      fixture.progress, fixture.transaction,
+      resources_for(fixture.construction, temporary.path() / "check-step"));
+  check_backend backend(check_backend_mode::pass);
+  pkgctl::native_transaction_check_driver native_driver(backend);
+
+  const auto make_admitted = [&](std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        fixture.progress,
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto record = pkgctl::transaction_run_journal_record::admit(
+        run, journal_nonce(marker));
+    return std::make_pair(std::move(run), std::move(record));
+  };
+
+  {
+    auto [run, admitted] = make_admitted(71U);
+    fixed_check_progress_source progress_source(run.progress());
+    check_execution_authority_source execution_source(session);
+    unreachable_check_recovery_source recovery_source;
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(admitted, trace);
+    tracing_check_driver driver(native_driver, trace);
+
+    const auto advanced = pkgctl::advance_transaction_run_once(
+        admitted.journal(), dispatch_nonce(71U),
+        {progress_source, execution_source, recovery_source},
+        {nullptr, &driver, nullptr}, {run_store, nullptr});
+
+    CHECK(advanced.disposition() ==
+          pkgctl::transaction_run_advance_disposition::executed_check);
+    CHECK(advanced.durable_transition_committed());
+    CHECK(advanced.dispatch().has_value());
+    CHECK(advanced.construction() == nullptr);
+    CHECK(advanced.check() != nullptr);
+    CHECK(advanced.operation() == nullptr);
+    CHECK(advanced.record().sequence() == 3U);
+    CHECK(advanced.record().identity() == run_store.latest().identity());
+    CHECK(progress_source.calls() == 1U);
+    CHECK(execution_source.calls() == 1U);
+    CHECK(trace == std::vector<std::string>({
+        "run-1", "run-2", "check", "run-3"}));
+  }
+
+  {
+    auto [run, admitted] = make_admitted(72U);
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(72U));
+    CHECK(reservation.dispatch.has_value());
+    if (!reservation.dispatch)
+      throw std::runtime_error("check recovery fixture did not reserve");
+    auto reserved = admitted.successor(reservation.run);
+    auto started_run = pkgctl::start_check_dispatch(
+        reservation.run, *reservation.dispatch, session);
+    auto started = reserved.successor(started_run);
+    auto result = pkgctl::execute_transaction_check(session, native_driver);
+
+    fixed_check_progress_source progress_source(started_run.progress());
+    check_execution_authority_source execution_source(session);
+    check_recovery_authority_source recovery_source(result);
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(started, trace);
+
+    const auto reconciled = pkgctl::advance_transaction_run_once(
+        started.journal(), dispatch_nonce(73U),
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, nullptr}, {run_store, nullptr});
+
+    CHECK(reconciled.disposition() ==
+          pkgctl::transaction_run_advance_disposition::reconciled_check);
+    CHECK(reconciled.check() != nullptr);
+    CHECK(reconciled.check() &&
+          reconciled.check()->identity() == result.identity());
+    CHECK(recovery_source.calls() == 1U);
+    CHECK(execution_source.calls() == 0U);
+    CHECK(trace == std::vector<std::string>({"run-1"}));
+  }
+}
+
+
 int main()
 {
   try {
@@ -1393,6 +1532,7 @@ int main()
     check_durable_dispatch_execution();
     check_durable_restart_reconciliation();
     check_run_authority_rehydration();
+    check_single_step_check_advancement();
   } catch (const std::exception& problem) {
     std::cerr << "unexpected exception: " << problem.what() << '\n';
     return 1;

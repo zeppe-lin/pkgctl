@@ -15,6 +15,7 @@
 #include <pkgctl/run_journal.h>
 #include <pkgctl/run_journal_codec.h>
 #include <pkgctl/run_authority.h>
+#include <pkgctl/run_advance.h>
 #include <pkgctl/run_commit.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
@@ -2265,6 +2266,61 @@ pkgctl::transaction_run_nonce dispatch_journal_nonce(
 
 
 
+
+class fixed_effect_progress_source final
+    : public pkgctl::transaction_progress_rehydration_source {
+public:
+  explicit fixed_effect_progress_source(pkgctl::transaction_progress progress)
+      : progress_(std::move(progress))
+  {
+  }
+
+  pkgctl::transaction_progress rehydrate_progress(
+      const pkgctl::transaction_run_journal_record& record) override
+  {
+    ++calls_;
+    record_ = record.identity();
+    return progress_;
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgctl::session_identity>& record() const noexcept
+  { return record_; }
+
+private:
+  pkgctl::transaction_progress progress_;
+  std::size_t calls_ = 0U;
+  std::optional<pkgctl::session_identity> record_;
+};
+
+class unreachable_effect_recovery_source final
+    : public pkgctl::transaction_dispatch_recovery_authority_source {
+public:
+  pkgctl::construction_result construction(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected construction recovery request");
+  }
+
+  pkgctl::transaction_check_result check(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected check recovery request");
+  }
+
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation recovery request");
+  }
+};
+
 class operation_execution_authority_source final
     : public pkgctl::transaction_dispatch_execution_authority_source {
 public:
@@ -3482,6 +3538,202 @@ void check_durable_operation_reconciliation()
 }
 
 
+void check_single_step_operation_advancement()
+{
+  const auto make_admitted = [](const removal_fixture& value,
+                                std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        pkgctl::transaction_progress::begin(value.transaction),
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto record = pkgctl::transaction_run_journal_record::admit(
+        run, dispatch_journal_nonce(marker));
+    return std::make_pair(std::move(run), std::move(record));
+  };
+
+  const auto restart_checkpoint = [](
+      const pkgctl::effectful_operation_session& session,
+      const pkgctl::effect_attempt_record& record,
+      const pkgctl::effectful_operation_result& result) {
+    return pkgctl::effect_restart_checkpoint::make(
+        session, record, result.before(), result.application(),
+        result.after(), result.publication_request(),
+        result.publication_receipt());
+  };
+
+  {
+    removal_fixture value;
+    auto [run, admitted] = make_admitted(value, 101U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    fixed_effect_progress_source progress_source(run.progress());
+    operation_execution_authority_source execution_source(
+        session, effect_nonce(101U));
+    unreachable_effect_recovery_source recovery_source;
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(admitted, trace);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    tracing_effect_driver traced_driver(actuator, trace);
+
+    const auto advanced = pkgctl::advance_transaction_run_once(
+        admitted.journal(), dispatch_nonce(101U),
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, &traced_driver}, {run_store, &effect_store});
+
+    CHECK(advanced.disposition() ==
+          pkgctl::transaction_run_advance_disposition::executed_operation);
+    CHECK(advanced.durable_transition_committed());
+    CHECK(!advanced.external_resolution_required());
+    CHECK(advanced.dispatch().has_value());
+    CHECK(advanced.construction() == nullptr);
+    CHECK(advanced.check() == nullptr);
+    CHECK(advanced.operation() != nullptr);
+    if (advanced.operation())
+    {
+      CHECK(advanced.operation()->result.has_value());
+      CHECK(advanced.operation()->result &&
+            advanced.operation()->result->succeeded());
+      CHECK(!advanced.operation()->restart_disposition.has_value());
+      CHECK(advanced.operation()->record.stage() ==
+            pkgctl::effect_attempt_stage::admitted);
+    }
+    CHECK(advanced.record().sequence() == 3U);
+    CHECK(advanced.record().identity() == run_store.latest().identity());
+    CHECK(progress_source.calls() == 1U);
+    CHECK(execution_source.calls() == 1U);
+    CHECK(!trace.empty());
+    CHECK(trace.front() == "run-1");
+    const auto effect_admission = std::find(
+        trace.begin(), trace.end(), "effect-1");
+    const auto started_run = std::find(trace.begin(), trace.end(), "run-2");
+    const auto driver_call = std::find(trace.begin(), trace.end(), "driver");
+    CHECK(effect_admission != trace.end());
+    CHECK(started_run != trace.end());
+    CHECK(driver_call != trace.end());
+    if (effect_admission != trace.end() && started_run != trace.end() &&
+        driver_call != trace.end())
+    {
+      CHECK(effect_admission < started_run);
+      CHECK(started_run < driver_call);
+    }
+    CHECK(trace.back() == "run-3");
+  }
+
+  {
+    removal_fixture value;
+    auto [run, admitted] = make_admitted(value, 102U);
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(102U));
+    CHECK(reservation.dispatch.has_value());
+    if (!reservation.dispatch)
+      throw std::runtime_error("operation recovery fixture did not reserve");
+    auto reserved = admitted.successor(reservation.run);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    const auto started = pkgctl::commit_operation_dispatch_start(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(102U), effect_store, run_store);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    const auto result = pkgctl::execute_effectful_operation_durable(
+        session, effect_nonce(102U), actuator, effect_store);
+    const auto driver_trace = actuator.trace();
+    const auto trace_before = trace;
+
+    fixed_effect_progress_source progress_source(started.run.progress());
+    operation_execution_authority_source execution_source(
+        session, effect_nonce(103U));
+    operation_recovery_authority_source recovery_source(
+        restart_checkpoint(session, effect_store.latest(), result));
+
+    const auto reconciled = pkgctl::advance_transaction_run_once(
+        started.run_record.journal(), dispatch_nonce(103U),
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, &actuator}, {run_store, &effect_store});
+
+    CHECK(reconciled.disposition() ==
+          pkgctl::transaction_run_advance_disposition::reconciled_operation);
+    CHECK(reconciled.operation() != nullptr);
+    if (reconciled.operation())
+    {
+      CHECK(reconciled.operation()->result.has_value());
+      CHECK(reconciled.operation()->result &&
+            reconciled.operation()->result->identity() == result.identity());
+      CHECK(reconciled.operation()->restart_disposition ==
+            std::optional<pkgctl::effect_restart_disposition>(
+                pkgctl::effect_restart_disposition::terminal));
+      CHECK(reconciled.operation()->record.identity() ==
+            effect_store.latest().identity());
+    }
+    CHECK(recovery_source.calls() == 1U);
+    CHECK(execution_source.calls() == 0U);
+    CHECK(actuator.trace() == driver_trace);
+    CHECK(trace.size() == trace_before.size() + 1U);
+    CHECK(trace.back() == "run-2");
+  }
+
+  {
+    removal_fixture value;
+    auto [run, admitted] = make_admitted(value, 104U);
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(104U));
+    CHECK(reservation.dispatch.has_value());
+    if (!reservation.dispatch)
+      throw std::runtime_error("operation external fixture did not reserve");
+    auto reserved = admitted.successor(reservation.run);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    const auto started = pkgctl::commit_operation_dispatch_start(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(104U), effect_store, run_store);
+    const auto intent = effect_store.append(
+        effect_store.latest().begin_before(0U));
+    const auto trace_before = trace;
+
+    fixed_effect_progress_source progress_source(started.run.progress());
+    operation_execution_authority_source execution_source(
+        session, effect_nonce(105U));
+    operation_recovery_authority_source recovery_source(
+        pkgctl::effect_restart_checkpoint::make(
+            session, intent, {}, std::nullopt, {},
+            std::nullopt, std::nullopt));
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+
+    const auto unresolved = pkgctl::advance_transaction_run_once(
+        started.run_record.journal(), dispatch_nonce(105U),
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, &actuator}, {run_store, &effect_store});
+
+    CHECK(unresolved.disposition() ==
+          pkgctl::transaction_run_advance_disposition::
+              external_resolution_required);
+    CHECK(!unresolved.durable_transition_committed());
+    CHECK(unresolved.external_resolution_required());
+    CHECK(unresolved.record().identity() == started.run_record.identity());
+    CHECK(unresolved.operation() != nullptr);
+    if (unresolved.operation())
+    {
+      CHECK(!unresolved.operation()->result.has_value());
+      CHECK(unresolved.operation()->restart_disposition ==
+            std::optional<pkgctl::effect_restart_disposition>(
+                pkgctl::effect_restart_disposition::
+                    external_resolution_required));
+      CHECK(unresolved.operation()->record.identity() == intent.identity());
+    }
+    CHECK(recovery_source.calls() == 1U);
+    CHECK(execution_source.calls() == 0U);
+    CHECK(trace == trace_before);
+    CHECK(actuator.trace().empty());
+  }
+}
+
+
 void check_run_authority_rehydration()
 {
   const auto reserve_operation = [](const removal_fixture& value,
@@ -3621,5 +3873,6 @@ int main()
   check_durable_operation_execution();
   check_durable_operation_reconciliation();
   check_run_authority_rehydration();
+  check_single_step_operation_advancement();
   return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
