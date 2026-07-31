@@ -13,8 +13,8 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.17.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.17.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.18.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.18.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'The canonical state store is opened with *open_existing*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
@@ -33,6 +33,12 @@ grep -F 'TRANSACTION DISPATCH' \
 grep -F 'DURABLE RUN ADMISSION' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Nonce-source refusal performs no store write' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'DURABLE TRANSACTION-RUN INSPECTION' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'quiescent-incomplete' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Inspection does not rehydrate package semantics' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'RESTART-SAFE TRANSACTION LAUNCH' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
