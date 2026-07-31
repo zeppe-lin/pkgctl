@@ -13,8 +13,8 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.10.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.10.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.11.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.11.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'The canonical state store is opened with *open_existing*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
@@ -29,6 +29,10 @@ grep -F 'does not choose among' \
 grep -F 'TRANSACTION CHECK SESSION' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'TRANSACTION DISPATCH' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'SINGLE-DISPATCH EXECUTION' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'A failed start append invokes no driver' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'DURABLE TRANSACTION RUNS' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null

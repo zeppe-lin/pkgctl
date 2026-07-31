@@ -46,6 +46,8 @@ for required in \
   'encode_transaction_run_record' \
   'decode_transaction_run_record' \
   'class posix_transaction_run_journal_store final' \
+  'transaction_run_commit_checkpoint' \
+  'commit_transaction_run_successor' \
   'operation_dispatch_start_checkpoint' \
   'commit_operation_dispatch_start' \
   'store_contract_violation' \
@@ -116,12 +118,17 @@ effect_line=$(awk '
   /commit_operation_dispatch_start\(/ { active = 1 }
   active && /effect_store\.append/ { print NR; exit }
 ' "$commit")
-run_line=$(awk '
+run_commit_line=$(awk '
   /commit_operation_dispatch_start\(/ { active = 1 }
+  active && /commit_transaction_run_successor/ { print NR; exit }
+' "$commit")
+run_append_line=$(awk '
+  /commit_transaction_run_successor\(/ { active = 1 }
   active && /run_store\.append/ { print NR; exit }
 ' "$commit")
-[ -n "$effect_line" ] && [ -n "$run_line" ] && \
-    [ "$effect_line" -lt "$run_line" ] || {
+[ -n "$effect_line" ] && [ -n "$run_commit_line" ] && \
+    [ "$effect_line" -lt "$run_commit_line" ] && \
+    [ -n "$run_append_line" ] || {
   echo 'operation start does not commit effect admission before run ownership' >&2
   exit 1
 }
