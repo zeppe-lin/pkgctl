@@ -102,6 +102,7 @@ if not get_option('tests').disabled()
     'progression.h',
     'report.h',
     'request.h',
+    'run_authority.h',
     'run_journal.h',
     'run_journal_codec.h',
     'run_reconcile.h',

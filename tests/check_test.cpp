@@ -7,6 +7,7 @@
 #include <pkgctl/check.h>
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
+#include <pkgctl/run_authority.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_journal.h>
@@ -85,6 +86,112 @@ public:
 private:
   pkgctl::transaction_check_driver& driver_;
   std::vector<std::string>& trace_;
+};
+
+
+class check_execution_authority_source final
+    : public pkgctl::transaction_dispatch_execution_authority_source {
+public:
+  explicit check_execution_authority_source(
+      pkgctl::transaction_check_session session)
+      : session_(std::move(session))
+  {
+  }
+
+  pkgctl::construction_session construction(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_run&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected construction execution authority request");
+  }
+
+  pkgctl::transaction_check_session check(
+      const pkgctl::transaction_run_journal_record& record,
+      const pkgctl::transaction_run& run,
+      const pkgctl::transaction_dispatch& dispatch) override
+  {
+    ++calls_;
+    record_ = record.identity();
+    run_ = run.identity();
+    dispatch_ = dispatch.identity();
+    return session_;
+  }
+
+  pkgctl::operation_dispatch_execution_authority operation(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_run&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation execution authority request");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgctl::session_identity>& record() const noexcept
+  { return record_; }
+  const std::optional<pkgctl::session_identity>& run() const noexcept
+  { return run_; }
+  const std::optional<pkgctl::session_identity>& dispatch() const noexcept
+  { return dispatch_; }
+
+private:
+  pkgctl::transaction_check_session session_;
+  std::size_t calls_ = 0U;
+  std::optional<pkgctl::session_identity> record_;
+  std::optional<pkgctl::session_identity> run_;
+  std::optional<pkgctl::session_identity> dispatch_;
+};
+
+class check_recovery_authority_source final
+    : public pkgctl::transaction_dispatch_recovery_authority_source {
+public:
+  explicit check_recovery_authority_source(pkgctl::transaction_check_result result)
+      : result_(std::move(result))
+  {
+  }
+
+  pkgctl::construction_result construction(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected construction recovery authority request");
+  }
+
+  pkgctl::transaction_check_result check(
+      const pkgctl::transaction_run_restart_checkpoint& checkpoint,
+      const pkgctl::transaction_dispatch_restart_assessment& assessment,
+      const pkgctl::transaction_dispatch& dispatch) override
+  {
+    ++calls_;
+    record_ = checkpoint.record().identity();
+    assessment_ = assessment.dispatch();
+    dispatch_ = dispatch.identity();
+    return result_;
+  }
+
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation recovery authority request");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgctl::session_identity>& record() const noexcept
+  { return record_; }
+  const std::optional<pkgctl::session_identity>& assessment() const noexcept
+  { return assessment_; }
+  const std::optional<pkgctl::session_identity>& dispatch() const noexcept
+  { return dispatch_; }
+
+private:
+  pkgctl::transaction_check_result result_;
+  std::size_t calls_ = 0U;
+  std::optional<pkgctl::session_identity> record_;
+  std::optional<pkgctl::session_identity> assessment_;
+  std::optional<pkgctl::session_identity> dispatch_;
 };
 
 std::vector<pkgexec::execution_guarantee> check_guarantees()
@@ -1157,6 +1264,118 @@ void check_durable_restart_reconciliation()
 
 } // namespace
 
+
+void check_run_authority_rehydration()
+{
+  const auto reserve_check = [](const ready_check_fixture& fixture,
+                                std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        fixture.progress,
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto admitted = pkgctl::transaction_run_journal_record::admit(
+        run, journal_nonce(marker));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(marker));
+    if (!reservation.dispatch || reservation.dispatch->unit().kind() !=
+        pkgctl::transaction_unit_kind::check)
+      throw std::runtime_error("fixture did not reserve a check dispatch");
+    auto reserved = admitted.successor(reservation.run);
+    return std::make_tuple(std::move(reservation), std::move(reserved));
+  };
+
+  test_support::temporary_directory temporary;
+  auto fixture = make_ready_check(temporary.path());
+  auto session = admit_check(
+      fixture.progress, fixture.transaction,
+      resources_for(fixture.construction, temporary.path() / "check"));
+  auto [reservation, reserved] = reserve_check(fixture, 61U);
+
+  check_execution_authority_source execution_source(session);
+  const auto execution =
+      pkgctl::acquire_transaction_dispatch_execution_authority(
+          reserved, reservation.run, *reservation.dispatch,
+          execution_source);
+  CHECK(execution_source.calls() == 1U);
+  CHECK(execution_source.record() ==
+        std::optional<pkgctl::session_identity>(reserved.identity()));
+  CHECK(execution_source.run() ==
+        std::optional<pkgctl::session_identity>(reservation.run.identity()));
+  CHECK(execution_source.dispatch() ==
+        std::optional<pkgctl::session_identity>(
+            reservation.dispatch->identity()));
+  CHECK(execution.kind() == pkgctl::transaction_unit_kind::check);
+  CHECK(execution.construction() == nullptr);
+  CHECK(execution.check() != nullptr);
+  CHECK(execution.operation() == nullptr);
+  if (execution.check())
+    CHECK(execution.check()->identity() == session.identity());
+
+  auto started_run = pkgctl::start_check_dispatch(
+      reservation.run, *reservation.dispatch, session);
+  auto started = reserved.successor(started_run);
+  check_backend backend(check_backend_mode::pass);
+  pkgctl::native_transaction_check_driver driver(backend);
+  auto result = pkgctl::execute_transaction_check(session, driver);
+
+  check_recovery_authority_source recovery_source(result);
+  const auto recovery =
+      pkgctl::acquire_transaction_dispatch_recovery_authority(
+          pkgctl::transaction_run_restart_checkpoint::make(
+              started_run.progress(), started),
+          *reservation.dispatch, recovery_source);
+  CHECK(recovery_source.calls() == 1U);
+  CHECK(recovery_source.record() ==
+        std::optional<pkgctl::session_identity>(started.identity()));
+  CHECK(recovery_source.assessment() ==
+        std::optional<pkgctl::session_identity>(
+            reservation.dispatch->identity()));
+  CHECK(recovery_source.dispatch() ==
+        std::optional<pkgctl::session_identity>(
+            reservation.dispatch->identity()));
+  CHECK(recovery.disposition() ==
+        pkgctl::transaction_dispatch_restart_disposition::recover_check);
+  CHECK(!recovery.releases_reserved());
+  CHECK(recovery.construction() == nullptr);
+  CHECK(recovery.check() != nullptr);
+  CHECK(recovery.operation() == nullptr);
+  if (recovery.check())
+    CHECK(recovery.check()->identity() == result.identity());
+
+  auto foreign_session = admit_check(
+      fixture.progress, fixture.transaction,
+      resources_for(fixture.construction, temporary.path() / "foreign", 'a'));
+  check_execution_authority_source alternate_execution(foreign_session);
+  const auto alternate =
+      pkgctl::acquire_transaction_dispatch_execution_authority(
+          reserved, reservation.run, *reservation.dispatch,
+          alternate_execution);
+  CHECK(alternate.check() != nullptr);
+  if (alternate.check())
+  {
+    CHECK(alternate.check()->identity() == foreign_session.identity());
+    CHECK(alternate.check()->identity() != session.identity());
+  }
+  CHECK(alternate.identity() != execution.identity());
+
+  auto foreign_result = pkgctl::execute_transaction_check(
+      foreign_session, driver);
+  check_recovery_authority_source foreign_recovery(foreign_result);
+  bool refused = false;
+  try
+  {
+    (void)pkgctl::acquire_transaction_dispatch_recovery_authority(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started_run.progress(), started),
+        *reservation.dispatch, foreign_recovery);
+  }
+  catch (const pkgctl::transaction_run_journal_error& problem)
+  {
+    refused = problem.code() ==
+        pkgctl::transaction_run_journal_error_code::invalid_transition;
+  }
+  CHECK(refused);
+}
+
+
 int main()
 {
   try {
@@ -1173,6 +1392,7 @@ int main()
     check_concrete_paths_participate_in_session_identity();
     check_durable_dispatch_execution();
     check_durable_restart_reconciliation();
+    check_run_authority_rehydration();
   } catch (const std::exception& problem) {
     std::cerr << "unexpected exception: " << problem.what() << '\n';
     return 1;
