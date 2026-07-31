@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "test_support.h"
+#include "run_execute_support.h"
 
 #include <pkgctl/effect.h>
 #include <pkgctl/effect_journal.h>
@@ -14,6 +15,7 @@
 #include <pkgctl/run_journal.h>
 #include <pkgctl/run_journal_codec.h>
 #include <pkgctl/run_commit.h>
+#include <pkgctl/run_execute.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_store.h>
 
@@ -2329,6 +2331,123 @@ private:
   bool fail_once_;
 };
 
+
+class sequenced_effect_store final : public pkgctl::effect_journal_store {
+public:
+  sequenced_effect_store(
+      std::vector<std::string>& trace, std::size_t fail_on_append = 0U)
+      : trace_(trace), fail_on_append_(fail_on_append)
+  {
+  }
+
+  std::optional<pkgctl::effect_attempt_record> load_latest(
+      const pkgctl::session_identity& attempt) const override
+  {
+    if (!latest_ || latest_->attempt() != attempt)
+      return std::nullopt;
+    return latest_;
+  }
+
+  pkgctl::effect_attempt_record append(
+      const pkgctl::effect_attempt_record& record) override
+  {
+    ++append_count_;
+    trace_.push_back("effect-" + std::to_string(append_count_));
+    if (append_count_ == fail_on_append_)
+      throw pkgctl::effect_journal_error(
+          pkgctl::effect_journal_error_code::store_write_failed,
+          "injected effect-store failure");
+    if (latest_ && latest_->identity() == record.identity())
+      return *latest_;
+    if (latest_)
+      record.validate_successor_of(*latest_);
+    latest_ = record;
+    return record;
+  }
+
+  const pkgctl::effect_attempt_record& latest() const
+  {
+    if (!latest_)
+      throw std::runtime_error("effect store has no latest record");
+    return *latest_;
+  }
+
+private:
+  std::vector<std::string>& trace_;
+  std::size_t fail_on_append_;
+  std::size_t append_count_ = 0U;
+  std::optional<pkgctl::effect_attempt_record> latest_;
+};
+
+class tracing_effect_driver final : public pkgctl::transaction_effect_driver {
+public:
+  tracing_effect_driver(
+      pkgctl::transaction_effect_driver& driver,
+      std::vector<std::string>& trace)
+      : driver_(driver), trace_(trace)
+  {
+  }
+
+  pkgapply::target_mutation_lease& lease() noexcept override
+  {
+    return driver_.lease();
+  }
+
+  const pkgapply::lease_bound_state_projection&
+  state_projection() const noexcept override
+  {
+    return driver_.state_projection();
+  }
+
+  pkgapply_exec::lifecycle_execution_result execute_lifecycle(
+      const pkgapply_exec::admitted_lifecycle_session& session) override
+  {
+    mark_driver();
+    return driver_.execute_lifecycle(session);
+  }
+
+  pkgapply::application_receipt apply_application(
+      const pkgapply::package_application_request& request) override
+  {
+    mark_driver();
+    return driver_.apply_application(request);
+  }
+
+  pkgstate::state_publication_receipt publish_state(
+      const pkgstate::state_publication_request& request) override
+  {
+    mark_driver();
+    return driver_.publish_state(request);
+  }
+
+  pkgapply::application_receipt resume_application(
+      const pkgapply::package_application_request& request,
+      const pkgapply::application_journal_record& journal) override
+  {
+    mark_driver();
+    return driver_.resume_application(request, journal);
+  }
+
+  pkgstate::snapshot read_state() const override
+  {
+    return driver_.read_state();
+  }
+
+private:
+  void mark_driver()
+  {
+    if (!driver_seen_)
+    {
+      trace_.push_back("driver");
+      driver_seen_ = true;
+    }
+  }
+
+  pkgctl::transaction_effect_driver& driver_;
+  std::vector<std::string>& trace_;
+  bool driver_seen_ = false;
+};
+
 void check_operation_start_commit_protocol()
 {
   removal_fixture value;
@@ -2806,6 +2925,264 @@ void check_operation_dispatch_ledger()
   }
 }
 
+
+void check_durable_operation_execution()
+{
+  const auto reserve_operation = [](const removal_fixture& value,
+                                    std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        pkgctl::transaction_progress::begin(value.transaction),
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto admitted = pkgctl::transaction_run_journal_record::admit(
+        run, dispatch_journal_nonce(marker));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(marker));
+    if (!reservation.dispatch || reservation.dispatch->unit().kind() !=
+        pkgctl::transaction_unit_kind::operation)
+      throw std::runtime_error("fixture did not reserve an operation dispatch");
+    auto reserved = admitted.successor(reservation.run);
+    return std::make_pair(std::move(reservation), std::move(reserved));
+  };
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 71U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    tracing_effect_driver traced_driver(actuator, trace);
+
+    const auto completed = pkgctl::execute_operation_dispatch_durable(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(71U), traced_driver, effect_store, run_store);
+
+    CHECK(trace.size() >= 4U);
+    if (trace.size() >= 4U)
+    {
+      CHECK(trace[0] == "effect-1");
+      CHECK(trace[1] == "run-1");
+      const auto driver_position = std::find(
+          trace.begin(), trace.end(), "driver");
+      CHECK(driver_position != trace.end());
+      if (driver_position != trace.end())
+        CHECK(driver_position > trace.begin() + 1);
+      CHECK(trace.back() == "run-2");
+    }
+    CHECK(completed.result.succeeded());
+    CHECK(completed.record.sequence() == reserved.sequence() + 2U);
+    CHECK(completed.run.records().size() == 1U);
+    if (completed.run.records().size() == 1U)
+    {
+      CHECK(completed.run.records().front().state() ==
+            pkgctl::transaction_dispatch_state::completed);
+      CHECK(completed.run.records().front().effect_attempt() ==
+            std::optional<pkgctl::session_identity>(
+                completed.admission.attempt()));
+    }
+    CHECK(effect_store.latest().stage() == pkgctl::effect_attempt_stage::terminal);
+  }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 75U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace, 1U);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    tracing_effect_driver traced_driver(actuator, trace);
+
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_operation_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch, session,
+          effect_nonce(75U), traced_driver, effect_store, run_store);
+    }
+    catch (const pkgctl::effect_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::effect_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>({"effect-1"}));
+    CHECK(actuator.trace().empty());
+    CHECK(run_store.latest().identity() == reserved.identity());
+  }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 72U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 1U);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    tracing_effect_driver traced_driver(actuator, trace);
+
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_operation_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch, session,
+          effect_nonce(72U), traced_driver, effect_store, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>({"effect-1", "run-1"}));
+    CHECK(actuator.trace().empty());
+    CHECK(run_store.latest().identity() == reserved.identity());
+    CHECK(effect_store.latest().stage() ==
+          pkgctl::effect_attempt_stage::admitted);
+  }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 73U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 2U);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    tracing_effect_driver traced_driver(actuator, trace);
+
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_operation_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch, session,
+          effect_nonce(73U), traced_driver, effect_store, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace.size() >= 3U);
+    if (trace.size() >= 3U)
+    {
+      CHECK(trace[0] == "effect-1");
+      CHECK(trace[1] == "run-1");
+      CHECK(trace.back() == "run-2");
+    }
+    CHECK(!actuator.trace().empty());
+    CHECK(effect_store.latest().stage() == pkgctl::effect_attempt_stage::terminal);
+    CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
+    const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
+        reservation.run.progress(), run_store.latest()).assessment();
+    CHECK(assessment.active().size() == 1U);
+    if (assessment.active().size() == 1U)
+    {
+      CHECK(assessment.active().front().disposition() ==
+            pkgctl::transaction_dispatch_restart_disposition::
+                inspect_effect_journal);
+    }
+  }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 76U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store,
+        std::nullopt, lease_release_point::never, publication_mode::native,
+        crash_point::application);
+    tracing_effect_driver traced_driver(actuator, trace);
+
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_operation_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch, session,
+          effect_nonce(76U), traced_driver, effect_store, run_store);
+    }
+    catch (const std::runtime_error&)
+    {
+      failed = true;
+    }
+    CHECK(failed);
+    CHECK(trace.size() >= 3U);
+    if (trace.size() >= 3U)
+    {
+      CHECK(trace[0] == "effect-1");
+      CHECK(trace[1] == "run-1");
+      const auto driver_position = std::find(
+          trace.begin(), trace.end(), "driver");
+      CHECK(driver_position != trace.end());
+      if (driver_position != trace.end())
+        CHECK(driver_position > trace.begin() + 1);
+    }
+    CHECK(std::find(trace.begin(), trace.end(), "run-2") == trace.end());
+    CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
+    CHECK(effect_store.latest().stage() ==
+          pkgctl::effect_attempt_stage::application_intent);
+    const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
+        reservation.run.progress(), run_store.latest()).assessment();
+    CHECK(assessment.active().size() == 1U);
+    if (assessment.active().size() == 1U)
+    {
+      CHECK(assessment.active().front().disposition() ==
+            pkgctl::transaction_dispatch_restart_disposition::
+                inspect_effect_journal);
+    }
+  }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 74U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store,
+        std::nullopt, lease_release_point::after_application);
+    tracing_effect_driver traced_driver(actuator, trace);
+
+    const auto observed = pkgctl::execute_operation_dispatch_durable(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(74U), traced_driver, effect_store, run_store);
+    CHECK(observed.result.outcome() ==
+          pkgctl::effectful_operation_outcome::outer_lease_lost);
+    CHECK(observed.run.records().size() == 1U);
+    if (observed.run.records().size() == 1U)
+    {
+      CHECK(observed.run.records().front().state() ==
+            pkgctl::transaction_dispatch_state::started);
+      CHECK(observed.run.records().front().observations().size() == 1U);
+    }
+    CHECK(observed.record.sequence() == reserved.sequence() + 2U);
+    const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
+        observed.run.progress(), observed.record).assessment();
+    CHECK(assessment.active().size() == 1U);
+    if (assessment.active().size() == 1U)
+    {
+      CHECK(assessment.active().front().disposition() ==
+            pkgctl::transaction_dispatch_restart_disposition::
+                inspect_effect_journal);
+    }
+  }
+}
+
 } // namespace
 
 int main()
@@ -2827,5 +3204,6 @@ int main()
   check_publication_reconciliation();
   check_operation_start_commit_protocol();
   check_operation_dispatch_ledger();
+  check_durable_operation_execution();
   return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

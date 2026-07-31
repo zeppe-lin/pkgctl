@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "construction_fixture.h"
+#include "run_execute_support.h"
 
 #include <pkgctl/check.h>
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
+#include <pkgctl/run_execute.h>
 #include <pkgctl/run_journal.h>
 #include <pkgctl/run_restart.h>
 
@@ -17,6 +19,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -62,7 +65,26 @@ bool rejects(pkgctl::error_code expected, Function&& function)
   return false;
 }
 
+class tracing_check_driver final : public pkgctl::transaction_check_driver {
+public:
+  tracing_check_driver(
+      pkgctl::transaction_check_driver& driver,
+      std::vector<std::string>& trace)
+      : driver_(driver), trace_(trace)
+  {
+  }
 
+  pkgcheck_exec::check_execution_result execute_check(
+      const pkgcheck_exec::admitted_check_session& session) override
+  {
+    trace_.push_back("check");
+    return driver_.execute_check(session);
+  }
+
+private:
+  pkgctl::transaction_check_driver& driver_;
+  std::vector<std::string>& trace_;
+};
 
 std::vector<pkgexec::execution_guarantee> check_guarantees()
 {
@@ -874,6 +896,168 @@ void check_concrete_paths_participate_in_session_identity()
   CHECK(first.identity() != second.identity());
 }
 
+
+void check_durable_dispatch_execution()
+{
+  const auto reserve_check = [](const ready_check_fixture& fixture,
+                                std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        fixture.progress,
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto admitted = pkgctl::transaction_run_journal_record::admit(
+        run, journal_nonce(marker));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(marker));
+    if (!reservation.dispatch || reservation.dispatch->unit().kind() !=
+        pkgctl::transaction_unit_kind::check)
+      throw std::runtime_error("fixture did not reserve a check dispatch");
+    auto reserved = admitted.successor(reservation.run);
+    return std::make_tuple(
+        std::move(reservation), std::move(reserved));
+  };
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_ready_check(temporary.path());
+    auto resources = resources_for(
+        fixture.construction, temporary.path() / "check");
+    auto session = admit_check(
+        fixture.progress, fixture.transaction, std::move(resources));
+    auto [reservation, reserved] = reserve_check(fixture, 41U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    check_backend backend(check_backend_mode::pass);
+    pkgctl::native_transaction_check_driver native_driver(backend);
+    tracing_check_driver driver(native_driver, trace);
+    const auto completed = pkgctl::execute_check_dispatch_durable(
+        reserved, reservation.run, *reservation.dispatch,
+        session, driver, run_store);
+
+    CHECK(trace == std::vector<std::string>(
+        {"run-1", "check", "run-2"}));
+    CHECK(completed.result.succeeded());
+    CHECK(completed.record.sequence() == reserved.sequence() + 2U);
+    CHECK(completed.run.records().size() == 1U);
+    if (completed.run.records().size() == 1U)
+    {
+      CHECK(completed.run.records().front().state() ==
+            pkgctl::transaction_dispatch_state::completed);
+      CHECK(completed.run.records().front().terminal_evidence() ==
+            std::optional<pkgctl::session_identity>(
+                completed.result.identity()));
+    }
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_ready_check(temporary.path());
+    auto resources = resources_for(
+        fixture.construction, temporary.path() / "check");
+    auto session = admit_check(
+        fixture.progress, fixture.transaction, std::move(resources));
+    auto [reservation, reserved] = reserve_check(fixture, 42U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 1U);
+    check_backend backend(check_backend_mode::pass);
+    pkgctl::native_transaction_check_driver native_driver(backend);
+    tracing_check_driver driver(native_driver, trace);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_check_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch,
+          session, driver, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>({"run-1"}));
+    CHECK(run_store.latest().identity() == reserved.identity());
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_ready_check(temporary.path());
+    auto resources = resources_for(
+        fixture.construction, temporary.path() / "check");
+    auto session = admit_check(
+        fixture.progress, fixture.transaction, std::move(resources));
+    auto [reservation, reserved] = reserve_check(fixture, 43U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 2U);
+    check_backend backend(check_backend_mode::pass);
+    pkgctl::native_transaction_check_driver native_driver(backend);
+    tracing_check_driver driver(native_driver, trace);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_check_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch,
+          session, driver, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>(
+        {"run-1", "check", "run-2"}));
+    CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
+    const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
+        reservation.run.progress(), run_store.latest()).assessment();
+    CHECK(assessment.active().size() == 1U);
+    if (assessment.active().size() == 1U)
+    {
+      CHECK(assessment.active().front().disposition() ==
+            pkgctl::transaction_dispatch_restart_disposition::recover_check);
+    }
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_ready_check(temporary.path());
+    auto resources = resources_for(
+        fixture.construction, temporary.path() / "check");
+    auto session = admit_check(
+        fixture.progress, fixture.transaction, std::move(resources));
+    auto [reservation, reserved] = reserve_check(fixture, 44U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    throwing_driver escaped;
+    tracing_check_driver driver(escaped, trace);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_check_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch,
+          session, driver, run_store);
+    }
+    catch (const pkgctl::error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::error_code::check_driver_contract_violation;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>({"run-1", "check"}));
+    CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
+    const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
+        reservation.run.progress(), run_store.latest()).assessment();
+    CHECK(assessment.active().size() == 1U);
+    if (assessment.active().size() == 1U)
+    {
+      CHECK(assessment.active().front().disposition() ==
+            pkgctl::transaction_dispatch_restart_disposition::recover_check);
+    }
+  }
+}
+
 } // namespace
 
 int main()
@@ -890,6 +1074,7 @@ int main()
     check_unrelated_progress_does_not_stale_session();
     check_exact_input_resource_projection();
     check_concrete_paths_participate_in_session_identity();
+    check_durable_dispatch_execution();
   } catch (const std::exception& problem) {
     std::cerr << "unexpected exception: " << problem.what() << '\n';
     return 1;

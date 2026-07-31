@@ -105,6 +105,7 @@ if not get_option('tests').disabled()
     'run_journal.h',
     'run_journal_codec.h',
     'run_commit.h',
+    'run_execute.h',
     'run_restart.h',
     'run_store.h',
     'session.h',

@@ -2,8 +2,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "construction_fixture.h"
+#include "run_execute_support.h"
 
+#include <pkgctl/run_execute.h>
+#include <pkgctl/run_restart.h>
+
+#include <cstdint>
 #include <iostream>
+#include <optional>
+#include <vector>
 
 namespace {
 
@@ -11,6 +18,62 @@ using namespace construction_fixture;
 
 int failures = 0;
 #define CHECK(value) do { if (!(value)) { std::cerr << "CHECK failed: " #value "\n"; ++failures; } } while (false)
+
+pkgctl::transaction_run_nonce journal_nonce(std::uint8_t marker)
+{
+  pkgctl::transaction_run_nonce::byte_array bytes{};
+  bytes.back() = marker;
+  return pkgctl::transaction_run_nonce::from_bytes(bytes);
+}
+
+pkgctl::transaction_dispatch_nonce dispatch_nonce(std::uint8_t marker)
+{
+  pkgctl::transaction_dispatch_nonce::byte_array bytes{};
+  bytes.back() = marker;
+  return pkgctl::transaction_dispatch_nonce::from_bytes(bytes);
+}
+
+class throwing_construction_driver final : public pkgctl::construction_driver {
+public:
+  pkgfetch::source_materialization materialize_source(
+      const pkgfetch::materialization_request&) override
+  {
+    throw std::runtime_error("driver escaped without materialization evidence");
+  }
+
+  pkgbuild_exec::build_execution_result execute_build(
+      const pkgbuild_exec::admitted_build_session&) override
+  {
+    throw std::runtime_error("unreachable build execution");
+  }
+};
+
+class tracing_construction_driver final : public pkgctl::construction_driver {
+public:
+  tracing_construction_driver(
+      pkgctl::construction_driver& driver, std::vector<std::string>& trace)
+      : driver_(driver), trace_(trace)
+  {
+  }
+
+  pkgfetch::source_materialization materialize_source(
+      const pkgfetch::materialization_request& request) override
+  {
+    trace_.push_back("materialize");
+    return driver_.materialize_source(request);
+  }
+
+  pkgbuild_exec::build_execution_result execute_build(
+      const pkgbuild_exec::admitted_build_session& session) override
+  {
+    trace_.push_back("build");
+    return driver_.execute_build(session);
+  }
+
+private:
+  pkgctl::construction_driver& driver_;
+  std::vector<std::string>& trace_;
+};
 
 void check_success()
 {
@@ -429,6 +492,179 @@ void check_identity_and_driver_contract()
   CHECK(build_rejected);
 }
 
+
+void check_durable_dispatch_execution()
+{
+  const auto reserve_construction = [](
+      const pkgctl::transaction_session& transaction, std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        pkgctl::transaction_progress::begin(transaction),
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto admitted = pkgctl::transaction_run_journal_record::admit(
+        run, journal_nonce(marker));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(marker));
+    if (!reservation.dispatch || reservation.dispatch->unit().kind() !=
+        pkgctl::transaction_unit_kind::construction)
+      throw std::runtime_error(
+          "fixture did not reserve a construction dispatch");
+    auto reserved = admitted.successor(reservation.run);
+    return std::make_pair(std::move(reservation), std::move(reserved));
+  };
+
+  const auto make_fixture = [](const std::filesystem::path& root) {
+    test_support::initialize_state(root / "state");
+    pkgstate::canonical_generation_store store(
+        root / "state", test_support::binding());
+    const std::string payload = "durable construction payload\n";
+    auto source = tool_source(sha256_text(payload), "1.0", false);
+    auto transaction = transaction_session(
+        source, dependency_source(), store.read(), root / "state");
+    auto session = construction_session_without_inputs(
+        transaction, root / "construction");
+    test_support::write(
+        session.paths().local_source_root / "payload", payload);
+    return std::make_pair(std::move(transaction), std::move(session));
+  };
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 41U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    fixture_backend backend(backend_mode::succeed);
+    pkgctl::native_construction_driver native_driver(backend);
+    tracing_construction_driver driver(native_driver, trace);
+    const auto completed = pkgctl::execute_construction_dispatch_durable(
+        reserved, reservation.run, *reservation.dispatch,
+        fixture.second, driver, run_store);
+
+    CHECK(trace == std::vector<std::string>(
+        {"run-1", "materialize", "build", "run-2"}));
+    CHECK(completed.result.succeeded());
+    CHECK(completed.record.sequence() == reserved.sequence() + 2U);
+    CHECK(completed.run.records().size() == 1U);
+    if (completed.run.records().size() == 1U)
+    {
+      CHECK(completed.run.records().front().state() ==
+            pkgctl::transaction_dispatch_state::completed);
+      CHECK(completed.run.records().front().terminal_evidence() ==
+            std::optional<pkgctl::session_identity>(
+                completed.result.identity()));
+    }
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 42U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 1U);
+    fixture_backend backend(backend_mode::succeed);
+    pkgctl::native_construction_driver native_driver(backend);
+    tracing_construction_driver driver(native_driver, trace);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_construction_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch,
+          fixture.second, driver, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>({"run-1"}));
+    CHECK(run_store.latest().identity() == reserved.identity());
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 43U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 2U);
+    fixture_backend backend(backend_mode::succeed);
+    pkgctl::native_construction_driver native_driver(backend);
+    tracing_construction_driver driver(native_driver, trace);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_construction_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch,
+          fixture.second, driver, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>(
+        {"run-1", "materialize", "build", "run-2"}));
+    CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
+    const auto reopened = run_store.latest().reopen(reservation.run.progress());
+    CHECK(reopened.records().size() == 1U);
+    if (reopened.records().size() == 1U)
+    {
+      CHECK(reopened.records().front().state() ==
+            pkgctl::transaction_dispatch_state::started);
+    }
+    const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
+        reservation.run.progress(), run_store.latest()).assessment();
+    CHECK(assessment.active().size() == 1U);
+    if (assessment.active().size() == 1U)
+    {
+      CHECK(assessment.active().front().disposition() ==
+            pkgctl::transaction_dispatch_restart_disposition::
+                recover_construction);
+    }
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 44U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    throwing_construction_driver escaped;
+    tracing_construction_driver driver(escaped, trace);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_construction_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch,
+          fixture.second, driver, run_store);
+    }
+    catch (const std::runtime_error&)
+    {
+      failed = true;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>({"run-1", "materialize"}));
+    CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
+    const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
+        reservation.run.progress(), run_store.latest()).assessment();
+    CHECK(assessment.active().size() == 1U);
+    if (assessment.active().size() == 1U)
+    {
+      CHECK(assessment.active().front().disposition() ==
+            pkgctl::transaction_dispatch_restart_disposition::
+                recover_construction);
+    }
+  }
+}
+
 } // namespace
 
 int main()
@@ -442,6 +678,7 @@ int main()
     check_failed_build();
     check_admission();
     check_identity_and_driver_contract();
+    check_durable_dispatch_execution();
   }
   catch (const std::exception& value)
   {
