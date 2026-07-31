@@ -4,6 +4,8 @@
 #include "construction_fixture.h"
 
 #include <pkgctl/run_journal.h>
+#include <pkgctl/report.h>
+#include <pkgctl/run_inspect.h>
 #include <pkgctl/run_journal_codec.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_store.h>
@@ -277,6 +279,37 @@ pkgctl::construction_result execute_build(
   return pkgctl::execute_construction(session, driver);
 }
 
+class inspection_store final : public pkgctl::transaction_run_journal_store {
+public:
+  explicit inspection_store(
+      std::optional<pkgctl::transaction_run_journal_record> record)
+      : record_(std::move(record))
+  {
+  }
+
+  [[nodiscard]] std::optional<pkgctl::transaction_run_journal_record>
+  load_latest(const pkgctl::session_identity&) const override
+  {
+    ++load_calls_;
+    return record_;
+  }
+
+  [[nodiscard]] pkgctl::transaction_run_journal_record append(
+      const pkgctl::transaction_run_journal_record&) override
+  {
+    ++append_calls_;
+    throw std::runtime_error("inspection store append must not be called");
+  }
+
+  [[nodiscard]] std::size_t load_calls() const noexcept { return load_calls_; }
+  [[nodiscard]] std::size_t append_calls() const noexcept { return append_calls_; }
+
+private:
+  std::optional<pkgctl::transaction_run_journal_record> record_;
+  mutable std::size_t load_calls_ = 0U;
+  std::size_t append_calls_ = 0U;
+};
+
 struct fixture final {
   test_support::temporary_directory temporary;
   pkgstate::canonical_generation_store store;
@@ -300,6 +333,125 @@ struct fixture final {
   {
   }
 };
+
+void check_read_only_run_inspection()
+{
+  fixture value;
+  auto run = pkgctl::transaction_run::begin(
+      value.progress,
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, run_nonce(41U));
+
+  inspection_store missing(std::nullopt);
+  CHECK(rejects(
+      pkgctl::transaction_run_journal_error_code::store_conflict,
+      [&] {
+        (void)pkgctl::inspect_transaction_run(admitted.journal(), missing);
+      }));
+  CHECK(missing.load_calls() == 1U);
+  CHECK(missing.append_calls() == 0U);
+
+  inspection_store initial(admitted);
+  const auto initial_view =
+      pkgctl::inspect_transaction_run(admitted.journal(), initial);
+  CHECK(initial_view.disposition() ==
+        pkgctl::transaction_run_inspection_disposition::quiescent_incomplete);
+  CHECK(initial_view.record().identity() == admitted.identity());
+  CHECK(initial_view.assessment().quiescent());
+  CHECK(!initial_view.terminal());
+  CHECK(!initial_view.active());
+  CHECK(!initial_view.external_evidence_required());
+  CHECK(initial.load_calls() == 1U);
+  CHECK(initial.append_calls() == 0U);
+  const auto initial_report = pkgctl::render_report(initial_view);
+  CHECK(initial_report.find("session.kind=transaction-run\n") !=
+        std::string::npos);
+  CHECK(initial_report.find(
+            "run.journal=" + admitted.journal().hex() + "\n") !=
+        std::string::npos);
+  CHECK(initial_report.find("run.disposition=quiescent-incomplete\n") !=
+        std::string::npos);
+  CHECK(initial_report.find("run.active=0\n") != std::string::npos);
+
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(42U));
+  CHECK(reservation.dispatch.has_value());
+  auto reserved = admitted.successor(reservation.run);
+  inspection_store reserved_store(reserved);
+  const auto reserved_view =
+      pkgctl::inspect_transaction_run(reserved.journal(), reserved_store);
+  CHECK(reserved_view.disposition() ==
+        pkgctl::transaction_run_inspection_disposition::active);
+  CHECK(reserved_view.active());
+  CHECK(!reserved_view.terminal());
+  CHECK(!reserved_view.external_evidence_required());
+  CHECK(reserved_view.assessment().active().size() == 1U);
+  CHECK(reserved_view.assessment().active().front().disposition() ==
+        pkgctl::transaction_dispatch_restart_disposition::release_reserved);
+  const auto reserved_report = pkgctl::render_report(reserved_view);
+  CHECK(reserved_report.find("run.disposition=active\n") !=
+        std::string::npos);
+  CHECK(reserved_report.find("active.0.disposition=release-reserved\n") !=
+        std::string::npos);
+
+  const auto package =
+      reservation.dispatch->unit().primary_node() ==
+              build_node_for(value.transaction, "tool").identity()
+          ? std::string("tool")
+          : std::string("dep");
+  auto session = construction_session_for(
+      value.transaction, value.temporary.path() / "inspection-start", package);
+  auto started_run = pkgctl::start_construction_dispatch(
+      reservation.run, *reservation.dispatch, session);
+  auto started = reserved.successor(started_run);
+  inspection_store started_store(started);
+  const auto started_view =
+      pkgctl::inspect_transaction_run(started.journal(), started_store);
+  CHECK(started_view.active());
+  CHECK(started_view.external_evidence_required());
+  CHECK(started_view.assessment().active().front().disposition() ==
+        pkgctl::transaction_dispatch_restart_disposition::
+            recover_construction);
+  const auto started_report = pkgctl::render_report(started_view);
+  CHECK(started_report.find(
+            "active.0.disposition=recover-construction\n") !=
+        std::string::npos);
+  CHECK(started_report.find("run.external-evidence-required=true\n") !=
+        std::string::npos);
+
+  fixture_backend failed_backend(backend_mode::fail);
+  pkgctl::native_construction_driver failed_driver(failed_backend);
+  const auto failed_result = pkgctl::execute_construction(session, failed_driver);
+  auto stopped_run = pkgctl::complete_construction_dispatch(
+      started_run, *reservation.dispatch, failed_result);
+  auto stopped = started.successor(stopped_run);
+  inspection_store stopped_store(stopped);
+  const auto stopped_view =
+      pkgctl::inspect_transaction_run(stopped.journal(), stopped_store);
+  CHECK(stopped_view.disposition() ==
+        pkgctl::transaction_run_inspection_disposition::
+            stopped_after_failure);
+  CHECK(stopped_view.terminal());
+  CHECK(!stopped_view.active());
+  CHECK(!stopped_view.external_evidence_required());
+  CHECK(pkgctl::render_report(stopped_view).find(
+            "run.disposition=stopped-after-failure\n") !=
+        std::string::npos);
+
+  auto foreign_run = pkgctl::transaction_run::begin(
+      value.progress,
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto foreign = pkgctl::transaction_run_journal_record::admit(
+      foreign_run, run_nonce(43U));
+  inspection_store foreign_store(foreign);
+  CHECK(rejects(
+      pkgctl::transaction_run_journal_error_code::store_contract_violation,
+      [&] {
+        (void)pkgctl::inspect_transaction_run(
+            admitted.journal(), foreign_store);
+      }));
+  CHECK(foreign_store.append_calls() == 0U);
+}
 
 void check_nonce_contract()
 {
@@ -927,6 +1079,7 @@ void check_posix_store_contract()
 
 int main()
 {
+  check_read_only_run_inspection();
   check_nonce_contract();
   check_journal_transition_and_reopen();
   check_parallel_restart_rehydration();
