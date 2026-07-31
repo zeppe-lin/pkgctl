@@ -70,6 +70,18 @@ choose retries or backoff, discover resources or evidence, adopt processes,
 roll back, clean up, compact journals, collect history, or expose a mutating
 command.
 
+The restart-safe transaction-launch layer may derive one exact journal from an
+immutable initial run and caller-owned replay-safe run nonce, load only that
+journal's committed head, append sequence zero only when no head exists, and
+then delegate to the bounded serial drive. An existing head must match the exact
+transaction, nonce, and dispatch-policy admission universe. Failure before the
+admission append must perform no drive action; failure afterward must leave the
+durable head resumable. Exact retries after successor records exist must resume
+the current head rather than republish sequence zero. The layer must not scan
+for journals, run without an explicit bound, create workers or concurrency,
+choose retry timing or adaptive priority, discover resources or evidence, roll
+back, clean up, compact history, collect garbage, or expose a mutating command.
+
 The durable transaction-run admission layer may construct one immutable initial
 run from exact progression and dispatch policy, obtain one nonce from a
 caller-owned replay-safe source keyed to that run, append sequence zero, and

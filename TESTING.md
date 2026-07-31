@@ -78,6 +78,30 @@ Every release must establish:
 - proof that all exposed CLI commands remain read-only in 0.13.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
+## Restart-safe transaction-launch tests
+
+The launch boundary must prove:
+
+- the run nonce is issued for the exact immutable initial run before any store
+  access;
+- nonce refusal performs no load, append, progression rehydration, dispatch
+  nonce issuance, or driver call;
+- a missing exact journal head commits sequence zero before bounded driving;
+- admission append failure performs no drive action and remains exactly
+  retryable;
+- a failure after admission leaves the committed head resumable;
+- an existing exact sequence-zero or successor head is resumed without another
+  admission append;
+- retry after completed work returns completed through quiescence without a
+  dispatch nonce, run append, or driver invocation;
+- a foreign store head is rejected before progression or execution authority is
+  requested;
+- the returned starting and final records remain in one transaction, nonce,
+  dispatch-policy, and journal universe and never move backward;
+- launch performs no journal discovery, unbounded execution, worker creation,
+  concurrency, adaptive scheduling, retry timing, cleanup, rollback,
+  compaction, garbage collection, or command action.
+
 ## Durable transaction-run admission tests
 
 The admission boundary must prove:

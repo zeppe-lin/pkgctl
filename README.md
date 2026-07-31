@@ -6,6 +6,47 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.17.0 establishes restart-safe transaction launch:
+
+```text
+exact initial progress + policy
+              |
+              v
+   replay-safe run nonce
+              |
+              v
+ derive exact journal identity
+              |
+      +-------+--------+
+      |                |
+ no committed head   existing exact head
+      |                |
+ append sequence zero  resume it
+      +-------+--------+
+              |
+              v
+      bounded serial drive
+```
+
+`launch_transaction_run()` composes admission and bounded driving without
+replaying admission over an advanced journal. It derives the exact journal from
+the immutable initial run and caller-owned run nonce, loads that journal head,
+and appends sequence zero only when no committed head exists. An existing head
+must retain the same transaction, run nonce, and dispatch policy before it may
+be resumed.
+
+A failure before the admission append performs no drive action. A failure after
+admission leaves sequence zero or a later ownership record durable for an exact
+retry. Retrying after partial or completed work loads the current head and does
+not republish sequence zero, consume fresh dispatch authority for terminal work,
+or invoke a completed driver again. The launch remains explicitly bounded by
+`transaction_run_drive_policy`.
+
+Release 0.17.0 adds no journal discovery, unbounded execution, worker,
+concurrency, adaptive scheduling, retry timing, backoff, resource or evidence
+discovery, process adoption, rollback, cleanup, compaction, garbage collection,
+or mutating CLI command.
+
 Release 0.16.0 establishes the durable origin of one transaction-run history:
 
 ```text

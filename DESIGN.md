@@ -13,6 +13,54 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.17.0 restart-safe transaction-launch boundary
+
+Release 0.17.0 composes durable admission with bounded serial driving while
+remaining exactly retryable after the journal has advanced:
+
+```text
+immutable initial run
+        |
+        v
+replay-safe run nonce
+        |
+        v
+expected journal identity
+        |
+        +-- no head --> commit sequence zero
+        |
+        `-- head ----> validate exact admission universe
+                         |
+                         v
+                 bounded serial drive
+```
+
+The run nonce is requested before storage so the expected journal identity is
+known without scanning. The controller loads only that exact journal. No head
+permits one sequence-zero append through the existing admission commit helper.
+A returned head is accepted only when its journal, transaction, nonce, and
+dispatch-policy authority match the expected initial admission universe. A
+sequence-zero head must be byte-semantically identical to the expected
+admission record.
+
+This distinction is required because raw admission is not a rewind operation.
+Once successor records exist, republishing sequence zero would violate append
+order. An exact launch retry instead resumes the storage-derived current head and
+lets the bounded drive reconcile retained ownership before fresh work. A
+completed head returns through the drive's quiescent completion path without a
+new append or driver invocation.
+
+The launch result retains the storage-derived starting record, whether this call
+committed admission, and the complete bounded-drive result. It validates that
+the drive remains in the same journal, transaction, nonce, and dispatch-policy
+universe and never moves behind its starting record.
+
+This layer does not discover journals, derive nonces, create stores or drivers,
+run without an explicit bound, create workers or concurrency, choose retry
+timing or adaptive priority, discover resources or evidence, adopt processes,
+roll back, clean up, compact history, collect garbage, or expose a mutating
+command.
+
 ## Release 0.16.0 durable transaction-run admission boundary
 
 Release 0.16.0 gives one transaction-run history an explicit durable origin:

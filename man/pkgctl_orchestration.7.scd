@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.16.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.17.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -129,6 +129,31 @@ and no dispatch ownership. It does not reserve or execute work, access an effect
 journal, discover resources, schedule, loop, choose retry timing, roll back,
 clean up, compact history, collect garbage, or expose an effect-implying
 command.
+
+# RESTART-SAFE TRANSACTION LAUNCH
+
+Version 0.17.0 can converge on one exact transaction-run journal and drive it
+under an explicit positive bound. The caller supplies initial progression,
+dispatch policy, replay-safe run and dispatch nonce sources, semantic authority
+sources, drivers, and explicit stores.
+
+The controller constructs the immutable initial run and requests its run nonce
+before storage. That pair derives one exact journal identity. If the store has no
+committed head for the journal, sequence zero is appended and validated before
+the drive begins. If a head already exists, its transaction, nonce, and
+dispatch policy must match the expected admission universe; no sequence-zero
+append is attempted.
+
+This makes launch retryable after interruption on either side of admission. A
+failed admission append performs no drive action. A later failure leaves the
+committed journal for exact restart. Retrying after successor records exist
+resumes the current head; retrying after completion returns completed through
+quiescence without invoking a driver again.
+
+The call performs no journal scan, unbounded execution, worker creation,
+concurrency, adaptive scheduling, retry timing, resource or evidence discovery,
+process adoption, rollback, cleanup, compaction, garbage collection, or
+effect-implying command.
 
 # SINGLE-DISPATCH EXECUTION
 
