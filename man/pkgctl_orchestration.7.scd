@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.11.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.12.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -108,8 +108,9 @@ them.
 
 The only containment policy in this release stops new reservations and starting
 merely reserved work after terminal failure. Already-started independent work
-may still submit exact terminal evidence. The pure dispatch model creates no threads, invokes no driver, builds no
-backend, allocates no resource path, persists no run, and exposes no
+may still submit exact terminal evidence. The pure dispatch model creates no
+threads, invokes no driver, builds no backend,
+allocates no resource path, persists no run, and exposes no
 effect-implying command.
 
 # SINGLE-DISPATCH EXECUTION
@@ -136,6 +137,32 @@ the retained effect-attempt identity.
 
 This layer creates no scheduler, loop, thread, backend, resource-discovery rule,
 retry rule, rollback, automatic release, journal discovery, or effectful command.
+
+# DURABLE RESTART RECONCILIATION
+
+Version 0.12.0 can reconcile one exact dispatch selected by a
+*transaction_run_restart_checkpoint*. It does not discover recovery evidence or
+select another unit.
+
+A restart-classified reserved dispatch can be durably released as unstarted. A
+started construction or check dispatch requires the exact caller-rehydrated
+terminal result whose admitted session matches the session retained by the run.
+The ordinary completion transition validates that evidence before one run
+successor is committed.
+
+A started operation requires an exact *effect_restart_checkpoint* whose attempt
+is the effect attempt retained by the run and whose record is the latest record
+in the supplied effect store. Automatically continuable stages are delegated to
+*resume_effectful_operation*. A terminal effect record can therefore repair a
+lost run completion without re-executing target mutation. A stage requiring
+external resolution invokes no driver and commits no run successor.
+
+The controller never fabricates a result from a journal identity. Construction
+and check results, lifecycle and application evidence, publication evidence,
+state snapshots, stores, drivers, leases, and resources remain explicit caller
+authority. The reconciliation layer creates no scheduler, loop, evidence
+discovery, process adoption, retry timing, rollback, compaction, garbage
+collection, or effectful command.
 
 # DURABLE TRANSACTION RUNS
 

@@ -68,7 +68,14 @@ Every release must establish:
 - refusal of missing, duplicate, forged, aliased, cross-transaction, cross-node,
   stale-construction, duplicate-completion, and driver-contract evidence;
 - concurrency-safe check completion after unrelated progression advancement;
-- proof that all exposed CLI commands remain read-only in 0.11.0;
+- durable release of never-started reservations and exact recovery of started
+  construction, check, and operation dispatches;
+- refusal of foreign recovery sessions and stale effect-journal checkpoints
+  before run storage;
+- exact terminal effect-result identity after journal rehydration, independent
+  of argument evaluation order;
+- no driver or run append when effect restart requires external resolution;
+- proof that all exposed CLI commands remain read-only in 0.12.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
 ## Durable transaction-run tests
@@ -313,6 +320,27 @@ The preparation suite must prove:
 - removal never invokes incoming-artifact projection;
 - no preparation path executes lifecycle, application, publication, or CLI
   effects.
+
+## Durable dispatch-reconciliation tests
+
+The construction, check, and effect suites must prove:
+
+- a restart-classified reserved dispatch is released through one durable
+  successor and an exact retry returns the same committed authority;
+- recovered construction and check results must bind the exact started attempt
+  session before any store append;
+- completion uses the ordinary dispatch transition and a lost final append
+  leaves the prior started record retryable;
+- an operation checkpoint must bind both the run-retained effect attempt and the
+  latest exact effect-journal record;
+- a terminal effect journal repairs a lost run completion without invoking the
+  mutation driver again;
+- automatically continuable effect stages resume through the existing effect
+  restart path and then commit one run successor;
+- external-resolution stages invoke no driver, append no effect record, and
+  append no run record;
+- reconstructed terminal effect evidence has the same complete semantic fields
+  and identity as the original terminal result.
 
 ## Durable restart tests
 

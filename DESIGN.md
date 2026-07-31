@@ -13,6 +13,54 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.12.0 durable restart-reconciliation boundary
+
+Release 0.12.0 turns one conservative restart classification into at most one
+durable reconciliation transition. It is the recovery actuator paired with the
+0.11.0 fresh-execution actuator:
+
+```text
+exact reopened run + committed record + restart assessment
+        |
+        v
+caller-rehydrated subordinate authority
+        |
+        v
+existing pure release/completion/effect-restart transition
+        |
+        v
+exact committed run successor or explicit external-resolution stop
+```
+
+A reserved dispatch may be released only when restart classified it
+`release_reserved`; no driver or subordinate result is consulted. Started
+construction and check dispatches require exact caller-rehydrated terminal
+results. The retained attempt-session identity must equal the result session,
+and the ordinary `complete_*_dispatch()` function must accept the result before
+the successor can commit. Stored result identities are never promoted into
+result objects.
+
+A started operation must retain the exact effect attempt named by the supplied
+latest effect restart checkpoint. `assess_effect_restart()` remains the policy
+for whether that attempt is automatically continuable. Safe stages continue
+through `resume_effectful_operation()`. A terminal effect journal repairs a lost
+run completion without a second target mutation. A stage requiring external
+resolution returns the unchanged committed run record, invokes no effect driver,
+and appends nothing. Successful effect completion is paired with a fresh
+authoritative state read before progression advances.
+
+Every successful reconciliation uses `commit_transaction_run_successor()`, so a
+failed terminal append leaves the previous committed restart authority intact
+and an exact retry converges on the same successor. The API accepts one selected
+dispatch and one complete recovery checkpoint. It does not discover evidence,
+resources, journals, paths, processes, or leases; choose retries; reserve more
+work; loop; schedule; roll back; compact history; or expose an effectful command.
+
+The effect terminal-rehydration path also snapshots transaction evidence before
+moving the retained publication request. This makes reconstructed terminal
+result identity independent of C++ function-argument evaluation order and
+therefore exactly equal to the fresh terminal result.
+
 ## Release 0.11.0 single-dispatch execution boundary
 
 Release 0.11.0 turns one caller-selected durable reservation into one driver
@@ -430,8 +478,9 @@ timing, and caller choice among ready units remain outside the identity.
 ### Deliberate boundary
 
 Progression is pure controller-state derivation. It does not materialize
-sources, execute builds or checks, prepare check resources or operations, execute lifecycle or
-application effects, publish state, resume journals, or call a platform
+sources, execute builds or checks, prepare check resources or operations,
+execute lifecycle or application effects, publish state, resume journals, or
+call a platform
 backend. Check units may become ready but there is deliberately no
 `advance_check()` API: no supplied authority currently defines a sealed check
 request and terminal check result.

@@ -49,6 +49,17 @@ commit failure leaves started ownership durable. This layer must not reserve
 work, loop, discover resources, create backends, choose retries, or release work
 automatically.
 
+The restart-reconciliation layer may consume one exact
+`transaction_run_restart_checkpoint`, one retained dispatch, and explicit
+caller-rehydrated subordinate authority. Reserved release must require the
+`release_reserved` disposition. Construction and check recovery must validate
+the exact retained attempt session before storage. Operation recovery must bind
+the run-retained effect attempt to the latest supplied effect-journal record and
+delegate continuation to `resume_effectful_operation()`. External-resolution
+stages invoke no driver and append no run successor. This layer must not scan for
+evidence, construct a result from an identity, discover resources or journals,
+adopt processes, choose retry timing, reserve work, or loop.
+
 The durable run-journal layer may serialize only controller-owned dispatch
 ownership, exact identities, causal sequence, and terminal flags. Reopening must
 consume an exact rehydrated `transaction_progress` and revalidate graph units,
@@ -94,8 +105,10 @@ legacy behavior.
    concurrency-safe check progression, deterministic dispatch reservation,
    exact predecessor and state-epoch binding, operation-lane serialization,
    failure containment, durable run single-transition sealing, exact progression
-   rehydration, graph/evidence revalidation, write-ahead start persistence, one-dispatch driver barriers,
-   lost-terminal-write recovery, preparation projection and typed refusal, effect sequencing,
+   rehydration, graph/evidence revalidation, write-ahead start persistence,
+   one-dispatch driver barriers, exact reserved release, caller-rehydrated
+   build/check recovery, effect-journal continuation, lost-terminal-write
+   recovery, preparation projection and typed refusal, effect sequencing,
    intent-before-effect persistence, exact restart checkpoints, outer-lease
    reacquisition, publication reconciliation, publication provenance, CLI
    read-only behavior, and missing-state refusal;

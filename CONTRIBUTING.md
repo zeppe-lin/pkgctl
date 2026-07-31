@@ -43,7 +43,12 @@ the reverse order or invoke a driver between those commits. Single-dispatch
 execution changes must prove that start-store failure invokes no driver and that
 driver or final-store failure leaves exact started ownership for restart. They
 must not smuggle reservation loops, resource discovery, backend construction,
-automatic release, or retry policy into the execution kernel.
+automatic release, or retry policy into the execution kernel. Restart
+reconciliation changes must consume exact caller-rehydrated evidence, validate
+the retained attempt before storage, delegate operation continuation to the
+effect restart authority, and leave the committed run unchanged when external
+resolution is required. Never turn a journal identity into semantic evidence or
+rerun a terminal effect merely because its final run append was lost.
 
 Use SPDX headers:
 

@@ -6,6 +6,43 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.12.0 closes the durable restart actuator for one exact dispatch:
+
+```text
+committed run restart checkpoint
+        |
+        v
+validate caller-rehydrated recovery authority
+        |
+        v
+release reserved work | accept build/check evidence | continue effect journal
+        |
+        v
+commit one exact run successor or stop for external resolution
+```
+
+`reconcile_reserved_dispatch_durable()` durably releases only a dispatch that
+restart classified as reserved and never started.
+`reconcile_construction_dispatch_durable()` and
+`reconcile_check_dispatch_durable()` accept caller-rehydrated terminal evidence
+only when its admitted session is the exact session retained by started
+ownership. They submit through the existing completion functions and commit one
+validated run successor. A lost final append is exactly retryable.
+
+`reconcile_operation_dispatch_durable()` verifies the run-retained effect
+attempt against the latest exact effect-journal record. Automatically
+continuable stages resume through the existing effect restart authority. A
+terminal effect journal can repair a lost run completion without invoking the
+mutation driver again. Stages requiring external resolution advance neither
+journal nor run and invoke no driver. Successful continuation rereads canonical
+installed state before progression accepts the result.
+
+The journal still does not reconstruct semantic evidence. Construction and check
+results, effect restart checkpoints, drivers, leases, resources, and stores are
+caller-supplied exact authorities. Release 0.12.0 adds no work selection,
+scheduler, execution loop, evidence discovery, retry timing, process adoption,
+rollback, compaction, garbage collection, or effectful CLI command.
+
 Release 0.11.0 closes one explicitly selected dispatch behind the durable
 transaction-run barrier:
 
@@ -39,7 +76,7 @@ results remain ordered observations on an active dispatch. If the effect journal
 reaches terminal state but the final run append is lost, restart still names the
 exact effect journal to inspect.
 
-This release does not select or reserve work. It creates no loop, thread,
+Release 0.11.0 does not select or reserve work. It creates no loop, thread,
 backend, resource-discovery policy, retry policy, scheduler, transaction-wide
 cancellation, rollback, or effectful CLI command. The caller supplies one exact
 reservation, admitted session, driver, and both stores.
@@ -149,10 +186,11 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.11.0. The command frontend
-executes no source acquisition, build, check, planner,
-lifecycle, application, publication, or restart authority. The library can execute one caller-selected dispatch only through an injected
-driver and explicit stores. Automatic reservation, execution loops,
+There are no effect-implying CLI commands in 0.12.0. The command frontend
+executes no source acquisition, build, check, planner, lifecycle, application,
+publication, or restart authority. The library can execute or reconcile one
+caller-selected dispatch only through injected drivers, exact checkpoints, and
+explicit stores. Automatic reservation, execution loops,
 semantic-evidence discovery, resource recovery, retry policy, adaptive
 scheduling, transaction-wide rollback, journal discovery, compaction, garbage
 collection, and effectful command policy remain outside this release.
@@ -163,7 +201,7 @@ collection, and effectful command policy remain outside this release.
 binding, deterministic dispatch reservation, in-flight ownership,
 evidence-driven transaction progression, current-state epoch binding,
 durable controller-attempt snapshots, one-dispatch write-ahead execution,
-conservative restart classification,
+exact one-dispatch restart reconciliation, conservative restart classification,
 outer-lease observation, transaction-evidence composition, deterministic
 diagnostics, and presentation.
 
