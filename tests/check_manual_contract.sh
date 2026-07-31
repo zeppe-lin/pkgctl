@@ -13,8 +13,8 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.13.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.13.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.14.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.14.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'The canonical state store is opened with *open_existing*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
@@ -31,6 +31,14 @@ grep -F 'TRANSACTION CHECK SESSION' \
 grep -F 'TRANSACTION DISPATCH' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'SINGLE-DISPATCH EXECUTION' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'ONE-STEP TRANSACTION ADVANCEMENT' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Recovery therefore has precedence over every' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'reservation is committed before fresh execution' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'One call either reconciles retained ownership or executes one newly' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'EXACT RUN-AUTHORITY REHYDRATION' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
