@@ -102,6 +102,7 @@ if not get_option('tests').disabled()
     'progression.h',
     'report.h',
     'request.h',
+    'run_admit.h',
     'run_authority.h',
     'run_advance.h',
     'run_drive.h',
