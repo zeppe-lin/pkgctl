@@ -58,6 +58,7 @@ done
 "$srcdir/tests/check_dispatch_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_journal_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_execute_contract.sh" "$srcdir"
+"$srcdir/tests/check_run_reconcile_contract.sh" "$srcdir"
 "$srcdir/tests/check_source_contract.sh" "$srcdir"
 "$srcdir/tests/check_effect_contract.sh" "$srcdir"
 "$srcdir/tests/check_restart_contract.sh" "$srcdir"
