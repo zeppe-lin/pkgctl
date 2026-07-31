@@ -1,5 +1,35 @@
 # pkgctl changelog
 
+## 0.12.0 - 2026-07-31
+
+### Durable one-dispatch restart reconciliation
+
+- Adds explicit durable reconciliation for one dispatch selected by an exact
+  `transaction_run_restart_checkpoint`; it does not select or reserve work.
+- Durably releases only a reservation classified as never started.
+- Accepts caller-rehydrated construction and check results only when their
+  admitted sessions equal the attempt session retained by started ownership.
+- Commits recovered build and check completion through the existing pure
+  dispatch transitions and the common exact run-successor commit boundary.
+- Binds operation recovery to both the effect attempt retained by the run and
+  the latest exact record supplied by the effect journal store.
+- Delegates automatically continuable operation stages to the existing effect
+  restart authority and repairs a terminal effect journal whose final run append
+  was lost without invoking target mutation again.
+- Leaves the committed run unchanged, invokes no driver, and appends no journal
+  record when effect restart requires external resolution.
+- Requires a fresh canonical installed-state read before a resumed successful
+  operation can advance transaction progression.
+- Makes every failed terminal run append exactly retryable from the previous
+  committed restart checkpoint.
+- Fixes terminal effect-result rehydration to snapshot transaction evidence
+  before moving the retained publication request, eliminating dependence on C++
+  function-argument evaluation order and preserving exact result identity.
+- Adds no scheduler, execution loop, evidence or resource discovery, process
+  adoption, retry timing, rollback, compaction, garbage collection, or
+  effect-implying CLI command.
+- Retains the complete authority floors established by Version 0.10.0.
+
 ## 0.11.0 - 2026-07-31
 
 ### Durable single-dispatch execution
