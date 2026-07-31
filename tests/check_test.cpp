@@ -8,6 +8,7 @@
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
 #include <pkgctl/run_execute.h>
+#include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_journal.h>
 #include <pkgctl/run_restart.h>
 
@@ -1058,6 +1059,102 @@ void check_durable_dispatch_execution()
   }
 }
 
+
+void check_durable_restart_reconciliation()
+{
+  const auto reserve_check = [](const ready_check_fixture& fixture,
+                                std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        fixture.progress,
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto admitted = pkgctl::transaction_run_journal_record::admit(
+        run, journal_nonce(marker));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(marker));
+    if (!reservation.dispatch || reservation.dispatch->unit().kind() !=
+        pkgctl::transaction_unit_kind::check)
+      throw std::runtime_error("fixture did not reserve a check dispatch");
+    auto reserved = admitted.successor(reservation.run);
+    return std::make_tuple(
+        std::move(reservation), std::move(reserved));
+  };
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_ready_check(temporary.path());
+    auto resources = resources_for(
+        fixture.construction, temporary.path() / "check");
+    auto session = admit_check(
+        fixture.progress, fixture.transaction, std::move(resources));
+    auto [reservation, reserved] = reserve_check(fixture, 51U);
+    auto started_run = pkgctl::start_check_dispatch(
+        reservation.run, *reservation.dispatch, session);
+    auto started = reserved.successor(started_run);
+
+    check_backend backend(check_backend_mode::pass);
+    pkgctl::native_transaction_check_driver driver(backend);
+    auto result = pkgctl::execute_transaction_check(session, driver);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(started, trace);
+    const auto completed = pkgctl::reconcile_check_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started_run.progress(), started),
+        *reservation.dispatch, result, run_store);
+
+    CHECK(trace == std::vector<std::string>({"run-1"}));
+    CHECK(completed.result.identity() == result.identity());
+    CHECK(completed.record.sequence() == started.sequence() + 1U);
+    CHECK(completed.run.records().size() == 1U);
+    if (completed.run.records().size() == 1U)
+    {
+      CHECK(completed.run.records().front().state() ==
+            pkgctl::transaction_dispatch_state::completed);
+      CHECK(completed.run.records().front().terminal_evidence() ==
+            std::optional<pkgctl::session_identity>(result.identity()));
+    }
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_ready_check(temporary.path());
+    auto resources = resources_for(
+        fixture.construction, temporary.path() / "check");
+    auto session = admit_check(
+        fixture.progress, fixture.transaction, std::move(resources));
+    auto [reservation, reserved] = reserve_check(fixture, 52U);
+    auto started_run = pkgctl::start_check_dispatch(
+        reservation.run, *reservation.dispatch, session);
+    auto started = reserved.successor(started_run);
+
+    auto foreign_resources = resources_for(
+        fixture.construction, temporary.path() / "foreign-check", '9');
+    auto foreign_session = admit_check(
+        fixture.progress, fixture.transaction, std::move(foreign_resources));
+    check_backend backend(check_backend_mode::pass);
+    pkgctl::native_transaction_check_driver driver(backend);
+    auto foreign_result = pkgctl::execute_transaction_check(
+        foreign_session, driver);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(started, trace);
+    bool refused = false;
+    try
+    {
+      (void)pkgctl::reconcile_check_dispatch_durable(
+          pkgctl::transaction_run_restart_checkpoint::make(
+              started_run.progress(), started),
+          *reservation.dispatch, foreign_result, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      refused = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::invalid_transition;
+    }
+    CHECK(refused);
+    CHECK(trace.empty());
+  }
+}
+
 } // namespace
 
 int main()
@@ -1075,6 +1172,7 @@ int main()
     check_exact_input_resource_projection();
     check_concrete_paths_participate_in_session_identity();
     check_durable_dispatch_execution();
+    check_durable_restart_reconciliation();
   } catch (const std::exception& problem) {
     std::cerr << "unexpected exception: " << problem.what() << '\n';
     return 1;

@@ -5,6 +5,7 @@
 #include "run_execute_support.h"
 
 #include <pkgctl/run_execute.h>
+#include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_restart.h>
 
 #include <cstdint>
@@ -665,6 +666,183 @@ void check_durable_dispatch_execution()
   }
 }
 
+
+void check_durable_restart_reconciliation()
+{
+  const auto reserve_construction = [](
+      const pkgctl::transaction_session& transaction,
+      std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        pkgctl::transaction_progress::begin(transaction),
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto admitted = pkgctl::transaction_run_journal_record::admit(
+        run, journal_nonce(marker));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(marker));
+    if (!reservation.dispatch || reservation.dispatch->unit().kind() !=
+        pkgctl::transaction_unit_kind::construction)
+      throw std::runtime_error(
+          "fixture did not reserve a construction dispatch");
+    auto reserved = admitted.successor(reservation.run);
+    return std::make_pair(std::move(reservation), std::move(reserved));
+  };
+
+  const auto make_fixture = [](const std::filesystem::path& root) {
+    test_support::initialize_state(root / "state");
+    pkgstate::canonical_generation_store store(
+        root / "state", test_support::binding());
+    const std::string payload = "restart construction payload\n";
+    auto source = tool_source(sha256_text(payload), "1.0", false);
+    auto transaction = transaction_session(
+        source, dependency_source(), store.read(), root / "state");
+    auto session = construction_session_without_inputs(
+        transaction, root / "construction");
+    test_support::write(
+        session.paths().local_source_root / "payload", payload);
+    return std::make_pair(std::move(transaction), std::move(session));
+  };
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 51U);
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+
+    const auto released = pkgctl::reconcile_reserved_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            reservation.run.progress(), reserved),
+        *reservation.dispatch, run_store);
+    CHECK(trace == std::vector<std::string>({"run-1"}));
+    CHECK(released.record.sequence() == reserved.sequence() + 1U);
+    CHECK(released.run.records().size() == 1U);
+    if (released.run.records().size() == 1U)
+      CHECK(released.run.records().front().state() ==
+            pkgctl::transaction_dispatch_state::released_unstarted);
+
+    const auto repeated = pkgctl::reconcile_reserved_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            reservation.run.progress(), reserved),
+        *reservation.dispatch, run_store);
+    CHECK(repeated.record.identity() == released.record.identity());
+    CHECK(run_store.latest().identity() == released.record.identity());
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 52U);
+    auto started_run = pkgctl::start_construction_dispatch(
+        reservation.run, *reservation.dispatch, fixture.second);
+    auto started = reserved.successor(started_run);
+
+    fixture_backend backend(backend_mode::succeed);
+    pkgctl::native_construction_driver driver(backend);
+    auto result = pkgctl::execute_construction(fixture.second, driver);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(started, trace);
+    const auto completed = pkgctl::reconcile_construction_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started_run.progress(), started),
+        *reservation.dispatch, result, run_store);
+
+    CHECK(trace == std::vector<std::string>({"run-1"}));
+    CHECK(completed.result.identity() == result.identity());
+    CHECK(completed.record.sequence() == started.sequence() + 1U);
+    CHECK(completed.run.records().size() == 1U);
+    if (completed.run.records().size() == 1U)
+    {
+      CHECK(completed.run.records().front().state() ==
+            pkgctl::transaction_dispatch_state::completed);
+      CHECK(completed.run.records().front().terminal_evidence() ==
+            std::optional<pkgctl::session_identity>(result.identity()));
+    }
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 53U);
+    auto started_run = pkgctl::start_construction_dispatch(
+        reservation.run, *reservation.dispatch, fixture.second);
+    auto started = reserved.successor(started_run);
+
+    fixture_backend backend(backend_mode::succeed);
+    pkgctl::native_construction_driver driver(backend);
+    auto result = pkgctl::execute_construction(fixture.second, driver);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(started, trace, 1U);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::reconcile_construction_dispatch_durable(
+          pkgctl::transaction_run_restart_checkpoint::make(
+              started_run.progress(), started),
+          *reservation.dispatch, result, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(run_store.latest().identity() == started.identity());
+
+    const auto completed = pkgctl::reconcile_construction_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started_run.progress(), started),
+        *reservation.dispatch, result, run_store);
+    CHECK(completed.record.sequence() == started.sequence() + 1U);
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 54U);
+    auto started_run = pkgctl::start_construction_dispatch(
+        reservation.run, *reservation.dispatch, fixture.second);
+    auto started = reserved.successor(started_run);
+
+    const std::string payload = "restart construction payload\n";
+    pkgstate::canonical_generation_store state_store(
+        temporary.path() / "state", test_support::binding());
+    auto foreign_transaction = transaction_session(
+        tool_source(sha256_text(payload), "2.0", false),
+        dependency_source(), state_store.read(), temporary.path() / "state");
+    auto foreign_session = construction_session_without_inputs(
+        foreign_transaction, temporary.path() / "foreign-construction");
+    test_support::write(
+        foreign_session.paths().local_source_root / "payload", payload);
+    fixture_backend backend(backend_mode::succeed);
+    pkgctl::native_construction_driver driver(backend);
+    auto foreign_result = pkgctl::execute_construction(
+        foreign_session, driver);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(started, trace);
+    bool refused = false;
+    try
+    {
+      (void)pkgctl::reconcile_construction_dispatch_durable(
+          pkgctl::transaction_run_restart_checkpoint::make(
+              started_run.progress(), started),
+          *reservation.dispatch, foreign_result, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      refused = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::invalid_transition;
+    }
+    CHECK(refused);
+    CHECK(trace.empty());
+  }
+}
+
 } // namespace
 
 int main()
@@ -679,6 +857,7 @@ int main()
     check_admission();
     check_identity_and_driver_contract();
     check_durable_dispatch_execution();
+    check_durable_restart_reconciliation();
   }
   catch (const std::exception& value)
   {

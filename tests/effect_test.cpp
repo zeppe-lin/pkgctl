@@ -16,6 +16,7 @@
 #include <pkgctl/run_journal_codec.h>
 #include <pkgctl/run_commit.h>
 #include <pkgctl/run_execute.h>
+#include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_store.h>
 
@@ -3183,6 +3184,192 @@ void check_durable_operation_execution()
   }
 }
 
+
+void check_durable_operation_reconciliation()
+{
+  const auto reserve_operation = [](const removal_fixture& value,
+                                    std::uint8_t marker) {
+    auto run = pkgctl::transaction_run::begin(
+        pkgctl::transaction_progress::begin(value.transaction),
+        pkgctl::transaction_dispatch_policy::make(1U, 1U));
+    auto admitted = pkgctl::transaction_run_journal_record::admit(
+        run, dispatch_journal_nonce(marker));
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(marker));
+    if (!reservation.dispatch || reservation.dispatch->unit().kind() !=
+        pkgctl::transaction_unit_kind::operation)
+      throw std::runtime_error("fixture did not reserve an operation dispatch");
+    auto reserved = admitted.successor(reservation.run);
+    return std::make_pair(std::move(reservation), std::move(reserved));
+  };
+
+  const auto restart_checkpoint = [](
+      const pkgctl::effectful_operation_session& session,
+      const pkgctl::effect_attempt_record& record,
+      const pkgctl::effectful_operation_result& result) {
+    return pkgctl::effect_restart_checkpoint::make(
+        session, record, result.before(), result.application(),
+        result.after(), result.publication_request(),
+        result.publication_receipt());
+  };
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 81U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    const auto started = pkgctl::commit_operation_dispatch_start(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(81U), effect_store, run_store);
+
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    const auto result = pkgctl::execute_effectful_operation_durable(
+        session, effect_nonce(81U), actuator, effect_store);
+    CHECK(result.succeeded());
+    const auto driver_trace = actuator.trace();
+    const auto publication_calls = actuator.publication_calls();
+
+    const auto reconciled = pkgctl::reconcile_operation_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started.run.progress(), started.run_record),
+        *reservation.dispatch,
+        restart_checkpoint(session, effect_store.latest(), result),
+        actuator, effect_store, run_store);
+
+    CHECK(reconciled.run_advanced);
+    CHECK(reconciled.disposition ==
+          pkgctl::effect_restart_disposition::terminal);
+    CHECK(reconciled.result.has_value());
+    CHECK(reconciled.result && reconciled.result->identity() == result.identity());
+    CHECK(reconciled.effect_record.identity() == effect_store.latest().identity());
+    CHECK(reconciled.record.sequence() == started.run_record.sequence() + 1U);
+    CHECK(reconciled.run.records().size() == 1U);
+    if (reconciled.run.records().size() == 1U)
+      CHECK(reconciled.run.records().front().state() ==
+            pkgctl::transaction_dispatch_state::completed);
+    CHECK(actuator.trace() == driver_trace);
+    CHECK(actuator.publication_calls() == publication_calls);
+  }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 82U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 2U);
+    const auto started = pkgctl::commit_operation_dispatch_start(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(82U), effect_store, run_store);
+
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    const auto result = pkgctl::execute_effectful_operation_durable(
+        session, effect_nonce(82U), actuator, effect_store);
+    const auto driver_trace = actuator.trace();
+    const auto effect_checkpoint = restart_checkpoint(
+        session, effect_store.latest(), result);
+
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::reconcile_operation_dispatch_durable(
+          pkgctl::transaction_run_restart_checkpoint::make(
+              started.run.progress(), started.run_record),
+          *reservation.dispatch, effect_checkpoint,
+          actuator, effect_store, run_store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(run_store.latest().identity() == started.run_record.identity());
+    CHECK(actuator.trace() == driver_trace);
+
+    const auto reconciled = pkgctl::reconcile_operation_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started.run.progress(), started.run_record),
+        *reservation.dispatch, effect_checkpoint,
+        actuator, effect_store, run_store);
+    CHECK(reconciled.run_advanced);
+    CHECK(reconciled.record.sequence() == started.run_record.sequence() + 1U);
+    CHECK(actuator.trace() == driver_trace);
+  }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 83U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    const auto started = pkgctl::commit_operation_dispatch_start(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(83U), effect_store, run_store);
+
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    const auto reconciled = pkgctl::reconcile_operation_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started.run.progress(), started.run_record),
+        *reservation.dispatch,
+        pkgctl::effect_restart_checkpoint::make(
+            session, effect_store.latest(), {}, std::nullopt, {},
+            std::nullopt, std::nullopt),
+        actuator, effect_store, run_store);
+
+    CHECK(reconciled.run_advanced);
+    CHECK(reconciled.result && reconciled.result->succeeded());
+    CHECK(reconciled.effect_record.stage() ==
+          pkgctl::effect_attempt_stage::terminal);
+    CHECK(!actuator.trace().empty());
+    CHECK(reconciled.record.sequence() == started.run_record.sequence() + 1U);
+  }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 84U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    const auto started = pkgctl::commit_operation_dispatch_start(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(84U), effect_store, run_store);
+    const auto intent = effect_store.append(
+        effect_store.latest().begin_before(0U));
+    const auto trace_before = trace;
+
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store);
+    const auto unresolved = pkgctl::reconcile_operation_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started.run.progress(), started.run_record),
+        *reservation.dispatch,
+        pkgctl::effect_restart_checkpoint::make(
+            session, intent, {}, std::nullopt, {},
+            std::nullopt, std::nullopt),
+        actuator, effect_store, run_store);
+
+    CHECK(!unresolved.run_advanced);
+    CHECK(unresolved.disposition ==
+          pkgctl::effect_restart_disposition::external_resolution_required);
+    CHECK(!unresolved.result);
+    CHECK(unresolved.record.identity() == started.run_record.identity());
+    CHECK(unresolved.effect_record.identity() == intent.identity());
+    CHECK(trace == trace_before);
+    CHECK(actuator.trace().empty());
+  }
+}
+
 } // namespace
 
 int main()
@@ -3205,5 +3392,6 @@ int main()
   check_operation_start_commit_protocol();
   check_operation_dispatch_ledger();
   check_durable_operation_execution();
+  check_durable_operation_reconciliation();
   return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
