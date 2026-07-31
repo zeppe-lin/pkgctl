@@ -13,6 +13,54 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.20.0 durable effect-attempt inspection boundary
+
+Release 0.20.0 adds the read-only sensor paired with the durable effect
+actuator:
+
+```text
+caller-selected effect-attempt identity
+                  |
+                  v
+      storage-derived committed head
+                  |
+                  v
+        pure effect restart assessment
+                  |
+                  v
+       deterministic evidence report
+```
+
+`inspect_effect_attempt()` loads exactly one committed head and rejects absence
+or a store response naming another attempt. It returns the storage-derived
+`effect_attempt_record` together with `assess_effect_restart()` output. The
+classifier therefore remains the same pure authority used before executable
+restart; inspection cannot drift into an alternative stage or continuation
+policy. Terminal and automatically continuable are separate facts: a terminal
+effect journal is automatically consumable by run reconciliation even though no
+more subordinate effect should execute.
+
+The report is deterministic and line-oriented. It exposes the exact attempt,
+record, session, nonce, predecessor, sequence, stage, restart disposition,
+lifecycle completion identities, application receipt and journal identities,
+transaction evidence, publication request and receipt identities, terminal
+outcome, and reconciled state retained by the controller. Optional fields remain
+absent when the record does not retain them. These strings remain identities;
+inspection does not reconstruct lifecycle results, application receipts or
+journals, transaction semantics, publication values, or installed-state
+snapshots.
+
+The POSIX effect store now separates reader and writer lock authority. Existing
+locks are opened read-only and acquired shared. When no lock exists, the reader
+performs one unlocked observation and rechecks for a concurrently established
+writer lock before accepting or propagating that observation. Only append may
+create the lock, open it read-write, or acquire it exclusively. Empty-store and
+inspection reads therefore create and modify nothing.
+
+This release adds no CLI, attempt enumeration, latest-attempt selection,
+run-journal traversal, semantic rehydration, restart checkpoint construction,
+driver invocation, append, reconciliation, repair, scheduling, or mutation.
+
 ## Release 0.19.0 exact run-inspection command boundary
 
 Release 0.19.0 exposes the existing durable sensor through one exact read-only

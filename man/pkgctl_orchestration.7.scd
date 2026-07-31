@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.19.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.20.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -24,6 +24,30 @@ The canonical state store is opened with *open_existing* for these commands.
 The command frontend does not initialize or publish state. Version 0.19.0 also
 opens one explicitly named existing POSIX transaction-run store for
 *inspect-run*; it never creates the store or writer lock.
+
+# DURABLE EFFECT-ATTEMPT INSPECTION
+
+Version 0.20.0 can inspect one exact caller-selected durable effect attempt
+without changing it. The controller loads the committed head, validates that
+the store returned the same attempt authority, and pairs the exact retained
+*effect_attempt_record* with the existing pure *effect_restart_assessment*.
+
+The report prints the controller-owned attempt, record, session, nonce,
+predecessor, sequence, stage, lifecycle-result, application, transaction,
+publication, terminal, and reconciled-state identities. Optional facts are
+omitted until retained. An identity remains an identity: inspection does not
+reconstruct lifecycle results, application receipts or journals, semantic
+transaction evidence, publication requests or receipts, or state snapshots.
+
+An existing POSIX effect-store lock is opened read-only and acquired shared. If
+the lock is absent, the reader creates nothing and rechecks after its unlocked
+observation in case a writer established the lock concurrently. Append remains
+the only read-write, lock-creating, exclusive path.
+
+The sensor performs no attempt enumeration, latest-attempt discovery, run-journal
+traversal, semantic restart rehydration, driver invocation, append,
+reconciliation, repair, scheduling, or mutation. Version 0.20.0 adds no CLI for
+this sensor.
 
 # EXACT RUN-INSPECTION COMMAND
 

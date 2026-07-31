@@ -78,6 +78,32 @@ Every release must establish:
 - proof that all exposed CLI commands remain read-only, including exact run inspection;
 - release, source, manual, shell, and patch-hygiene contracts.
 
+## Durable effect-attempt inspection tests
+
+The effect inspection boundary must prove:
+
+- one exact caller-supplied attempt identity selects one committed head;
+- a missing head is refused as a store conflict and a foreign returned attempt
+  is refused as a store-contract violation;
+- the result retains the storage-derived record and the exact pure restart
+  assessment for that record;
+- terminal, automatically continuable, and external-resolution-required remain
+  distinct predicates, including terminal records that are automatically
+  consumable by run reconciliation;
+- the report is deterministic and exposes every retained controller-owned
+  identity, stage, disposition, outcome, lifecycle count, and completion fact;
+- optional predecessor, active-index, application, publication, terminal, and
+  reconciled-state fields remain absent until durably retained;
+- identities are printed but never rehydrated into lifecycle, application,
+  transaction, publication, or state values;
+- an empty POSIX store read creates no lock, an existing lock is acquired through
+  a read-only shared descriptor, and removing a lock before inspection does not
+  recreate it;
+- append still establishes the writer lock and retains exclusive writer
+  authority;
+- inspection performs exactly one store load and no append, driver call, run
+  traversal, discovery, reconciliation, repair, scheduling, or command action.
+
 ## Exact run-inspection command tests
 
 The command boundary must prove:

@@ -70,6 +70,22 @@ choose retries or backoff, discover resources or evidence, adopt processes,
 roll back, clean up, compact journals, collect history, or expose a mutating
 command.
 
+The durable effect-attempt inspection layer may load one committed head
+selected by an exact attempt identity, validate the storage-returned attempt,
+classify the controller-owned record through `assess_effect_restart()`, and
+render only durable controller evidence. It may expose retained subordinate
+identities but must not rehydrate lifecycle results, application receipts or
+journals, transaction evidence, publication values, or installed-state
+snapshots. It must not enumerate attempts, traverse run journals, construct a
+restart checkpoint, append, reconcile, invoke a driver, repair storage, or
+expose an effect-implying command.
+
+Read-only POSIX effect-store loading must mirror run-store loading: open an
+existing lock with `O_RDONLY`, acquire `LOCK_SH`, and create nothing when the
+lock is absent. An unlocked observation must be repeated under the lock if a
+writer establishes it concurrently, including after an initially failing read.
+Only append may use `O_RDWR | O_CREAT` and `LOCK_EX`.
+
 The durable transaction-run inspection layer may load one committed head
 selected by an exact journal identity, validate the storage-returned journal,
 classify controller-owned retained ownership, and render a deterministic report.

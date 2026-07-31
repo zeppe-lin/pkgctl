@@ -21,9 +21,9 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.19.0 retains the native catalog, resolution, and transaction
-inspection pipeline and adds one exact read-only durable transaction-run
-inspection command.
+Version 0.20.0 retains the native catalog, resolution, transaction, and exact
+durable transaction-run inspection commands. The controller library adds one
+read-only durable effect-attempt sensor, but no effect-inspection command.
 
 The controller library also defines exact one-candidate construction,
 transaction progression, immutable dispatch ownership, durable transaction-run
@@ -31,14 +31,16 @@ journals, one-dispatch write-ahead execution, exact check
 request/session/result, one-operation preparation, single-operation effect,
 conservative restart, one-dispatch restart reconciliation, exact
 caller-supplied run-authority handoffs, durable initial run admission,
-restart-safe bounded transaction launch, read-only durable run inspection, one bounded transaction-run
-advancement call, and bounded serial driving. The *inspect-run* command exposes
-only the existing durable sensor; no effect-implying command is exposed. Progression reports
-every graph-ready construction, check, or operation unit. Library clients may
-advance one durable journal by reconciling retained ownership or, only when the
-run is quiescent, reserving and realizing one canonical policy-allowed unit
-through injected authorities, drivers, and stores. No scheduler, worker, unbounded executor, or mutating command is provided. Preparation can
-inspect exact artifact bytes and seal
+restart-safe bounded transaction launch, read-only durable run and
+effect-attempt inspection, one bounded transaction-run advancement call, and
+bounded serial driving. The *inspect-run* command exposes
+only the existing durable run sensor; no effect-implying command is exposed.
+Progression reports every graph-ready construction, check, or operation unit.
+Library clients may advance one durable journal by reconciling retained ownership
+or, only when the run is quiescent, reserving and realizing one canonical
+policy-allowed unit through injected authorities, drivers, and stores. No
+scheduler, worker, unbounded executor, or mutating command is provided.
+Preparation can inspect exact artifact bytes and seal
 package-local plan/application handoffs when called by a library client. All
 executable commands remain read-only: they never initialize or publish state,
 materialize sources, build packages, inspect artifacts, plan package changes,
