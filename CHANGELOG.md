@@ -1,5 +1,28 @@
 # pkgctl changelog
 
+## 0.16.0 - 2026-07-31
+
+### Durable transaction-run admission
+
+- Adds a caller-owned replay-safe `transaction_run_nonce_source` keyed to one
+  exact immutable initial transaction run.
+- Requires exact retries for the same initial run identity to return the same
+  run-history nonce.
+- Adds `admit_transaction_run()` to construct the initial run, derive sequence
+  zero, append it durably, validate the complete authority returned by storage,
+  and reopen the run from that committed record.
+- Makes the sequence-zero store append the sole admission commit point; local
+  run and record construction grants no durable authority.
+- Requires every admitted record to retain no predecessor and no dispatch
+  ownership.
+- Proves nonce-source refusal before storage, append failure without claimed
+  authority, exact retry convergence, and rejection of foreign store returns.
+- Adds no journal advancement, reservation, execution or recovery authority,
+  driver invocation, effect-journal access, scheduler, drive loop, retry timing,
+  discovery, rollback, cleanup, compaction, garbage collection, or
+  effect-implying CLI command.
+- Retains the complete authority floors published for 0.15.0.
+
 ## 0.15.0 - 2026-07-31
 
 ### Bounded serial transaction drive
