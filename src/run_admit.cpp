@@ -3,6 +3,8 @@
 
 #include <pkgctl/run_admit.h>
 
+#include "run_admit_internal.h"
+
 #include <string>
 #include <utility>
 
@@ -16,7 +18,7 @@ namespace {
       message);
 }
 
-void validate_committed_admission(
+void validate_exact_committed_admission(
     const transaction_run_journal_record& expected,
     const transaction_run_journal_record& committed)
 {
@@ -41,20 +43,60 @@ void validate_committed_admission(
 
 } // namespace
 
+namespace detail {
+
+prepared_transaction_run_admission prepare_transaction_run_admission(
+    transaction_progress progress,
+    transaction_dispatch_policy policy,
+    transaction_run_nonce_source& nonces)
+{
+  auto initial = transaction_run::begin(
+      std::move(progress), std::move(policy));
+  auto nonce = nonces.issue(initial);
+  auto expected = transaction_run_journal_record::admit(
+      initial, std::move(nonce));
+  return prepared_transaction_run_admission{
+      std::move(initial), std::move(expected)};
+}
+
+transaction_run_admission_checkpoint commit_transaction_run_admission(
+    const prepared_transaction_run_admission& prepared,
+    transaction_run_journal_store& store)
+{
+  auto committed = store.append(prepared.record);
+  validate_exact_committed_admission(prepared.record, committed);
+  auto reopened = committed.reopen(prepared.run.progress());
+  return transaction_run_admission_checkpoint{
+      std::move(reopened), std::move(committed)};
+}
+
+void validate_existing_transaction_run_admission(
+    const transaction_run_journal_record& expected,
+    const transaction_run_journal_record& committed)
+{
+  if (committed.journal() != expected.journal() ||
+      committed.transaction() != expected.transaction() ||
+      committed.nonce() != expected.nonce() ||
+      committed.policy().identity() != expected.policy().identity())
+  {
+    store_contract_violation(
+        "run store returned foreign transaction-run launch authority");
+  }
+  if (committed.sequence() == 0U)
+    validate_exact_committed_admission(expected, committed);
+}
+
+} // namespace detail
+
 transaction_run_admission_checkpoint admit_transaction_run(
     transaction_progress progress,
     transaction_dispatch_policy policy,
     transaction_run_nonce_source& nonces,
     transaction_run_journal_store& store)
 {
-  auto initial = transaction_run::begin(progress, std::move(policy));
-  auto nonce = nonces.issue(initial);
-  auto expected = transaction_run_journal_record::admit(initial, std::move(nonce));
-  auto committed = store.append(expected);
-  validate_committed_admission(expected, committed);
-  auto reopened = committed.reopen(std::move(progress));
-  return transaction_run_admission_checkpoint{
-      std::move(reopened), std::move(committed)};
+  auto prepared = detail::prepare_transaction_run_admission(
+      std::move(progress), std::move(policy), nonces);
+  return detail::commit_transaction_run_admission(prepared, store);
 }
 
 } // namespace pkgctl

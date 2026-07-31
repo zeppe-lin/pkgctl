@@ -35,8 +35,9 @@ struct transaction_run_admission_checkpoint final {
  *
  * The controller first constructs the exact immutable initial run, then asks
  * the caller-owned source for replay-safe nonce authority, derives sequence
- * zero, and appends that record. Exact retries are idempotent when the source
- * returns the same nonce. The returned run is reopened from the record returned
+ * zero, and appends that record. Exact retries are idempotent while sequence zero remains the
+ * committed head and the source returns the same nonce. Use the restart-safe
+ * launch boundary to converge after successor records exist. The returned run is reopened from the record returned
  * by storage. No reservation, execution authority, driver, effect store,
  * scheduler, loop, retry timing, discovery, rollback, cleanup, or command
  * action occurs here.

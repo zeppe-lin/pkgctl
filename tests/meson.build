@@ -108,6 +108,7 @@ if not get_option('tests').disabled()
     'run_drive.h',
     'run_journal.h',
     'run_journal_codec.h',
+    'run_launch.h',
     'run_reconcile.h',
     'run_commit.h',
     'run_execute.h',

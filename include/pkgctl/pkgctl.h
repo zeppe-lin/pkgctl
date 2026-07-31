@@ -23,6 +23,7 @@
 #include <pkgctl/request.h>
 #include <pkgctl/run_journal.h>
 #include <pkgctl/run_journal_codec.h>
+#include <pkgctl/run_launch.h>
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_admit.h>
