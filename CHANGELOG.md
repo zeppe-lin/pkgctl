@@ -1,5 +1,33 @@
 # pkgctl changelog
 
+## 0.11.0 - 2026-07-31
+
+### Durable single-dispatch execution
+
+- Adds `commit_transaction_run_successor()` as the common exact append and
+  returned-authority verification boundary for legal run transitions.
+- Adds explicit one-dispatch construction, check, and operation execution APIs;
+  callers supply the selected reservation, admitted session, injected driver,
+  and exact stores.
+- Commits construction and check started ownership before driver invocation,
+  then commits only terminal evidence accepted by the existing dispatch and
+  progression authorities.
+- Preserves the operation write-ahead order: effect-attempt admission, started
+  run ownership, durable effect execution, authoritative state reread after
+  successful publication, and final run successor.
+- Leaves lost-lease and indeterminate-publication results as retained
+  observations on active operation ownership.
+- Makes start-store failure a hard no-driver boundary and leaves exact started
+  ownership durable after driver escape or final-store failure.
+- Keeps a terminal effect journal reconcilable when the corresponding final run
+  append is lost.
+- Adds failure-injection tests for effect admission, run start, driver escape,
+  terminal commitment, uncertainty retention, and restart classification.
+- Adds no reservation loop, scheduler, thread creation, backend construction,
+  resource discovery, automatic retry, automatic release, rollback, or
+  effect-implying CLI command.
+- Retains the complete authority floors established by Version 0.10.0.
+
 ## 0.10.0 - 2026-07-30
 
 ### Durable transaction-run ownership
