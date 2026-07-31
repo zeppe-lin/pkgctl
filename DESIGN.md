@@ -13,6 +13,48 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.16.0 durable transaction-run admission boundary
+
+Release 0.16.0 gives one transaction-run history an explicit durable origin:
+
+```text
+exact transaction progress + dispatch policy
+                    |
+                    v
+          immutable initial run
+                    |
+                    v
+ caller-owned replay-safe run nonce
+                    |
+                    v
+          sequence-zero record
+                    |
+                    v
+             store append
+                    |
+                    v
+       storage-derived reopened run
+```
+
+`admit_transaction_run()` first constructs the exact initial `transaction_run`.
+Only then may the injected `transaction_run_nonce_source` issue the nonce for
+that run identity. Exact retries for the same initial run must issue the same
+nonce. The nonce distinguishes durable histories; it does not alter transaction
+semantics, dispatch policy, current state, or progression evidence.
+
+The resulting sequence-zero record must contain no predecessor and no dispatch
+ownership. The store append is the commit point. The controller validates the
+complete authority returned by storage and reopens the run through that record,
+so the returned checkpoint is storage-derived rather than a local claim. A
+source refusal causes no append. A failed append yields no admitted authority;
+an exact retry may converge only through the same nonce and same record.
+
+This layer does not load or advance an existing journal, reserve work, acquire
+execution or recovery authority, invoke a driver, access an effect journal, or
+compose the bounded drive. It creates no scheduler, worker, concurrency, retry
+timing, discovery, rollback, cleanup, compaction, garbage collection, or
+command action.
+
 ## Release 0.15.0 bounded serial transaction-drive boundary
 
 Release 0.15.0 permits bounded repetition only after nonce issuance is tied to

@@ -78,6 +78,22 @@ Every release must establish:
 - proof that all exposed CLI commands remain read-only in 0.13.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
+## Durable transaction-run admission tests
+
+The admission boundary must prove:
+
+- the nonce source receives the exact immutable initial run before storage;
+- source refusal performs no append and creates no journal authority;
+- sequence zero retains no predecessor or dispatch ownership;
+- the returned run is reopened from the exact record returned by storage;
+- exact retries for the same initial run reissue the same nonce and converge on
+  the same record;
+- an append failure leaves no claimed admission and remains exactly retryable;
+- a store returning foreign admission authority is rejected;
+- admission performs no reservation, execution, effect-journal access,
+  discovery, scheduling, drive loop, retry timing, rollback, cleanup,
+  compaction, garbage collection, or command action.
+
 ## Durable transaction-run tests
 
 The run-journal suite must prove:

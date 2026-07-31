@@ -6,6 +6,39 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.16.0 establishes the durable origin of one transaction-run history:
+
+```text
+exact initial progress + dispatch policy
+                |
+                v
+       immutable initial run
+                |
+                v
+ replay-safe caller nonce authority
+                |
+                v
+      sequence-zero record
+                |
+                v
+       durable store append
+                |
+                v
+ storage-derived reopened run
+```
+
+`admit_transaction_run()` constructs one exact initial run, obtains a run nonce
+from an injected `transaction_run_nonce_source`, commits sequence zero, validates
+the authority returned by storage, and reopens the run from that committed
+record. Exact retries for the same initial run must receive the same nonce and
+converge on the same record. A nonce-source refusal performs no store write; a
+store failure grants no controller authority.
+
+Admission reserves no unit, acquires no execution resources, invokes no driver,
+and performs no effect-journal operation. It adds no scheduler, drive loop,
+retry timing, discovery, rollback, cleanup, compaction, garbage collection, or
+mutating CLI command.
+
 Release 0.15.0 adds an explicitly bounded serial transaction drive without
 turning the control plane into a scheduler:
 

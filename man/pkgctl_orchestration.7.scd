@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.15.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.16.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -112,6 +112,23 @@ may still submit exact terminal evidence. The pure dispatch model creates no
 threads, invokes no driver, builds no backend,
 allocates no resource path, persists no run, and exposes no
 effect-implying command.
+
+# DURABLE RUN ADMISSION
+
+Version 0.16.0 can commit sequence zero of one transaction-run history. A
+library caller supplies exact initial progression, explicit dispatch policy, an
+injected replay-safe run-nonce source, and one run store. The controller
+constructs the immutable initial run before requesting the nonce, appends the
+sequence-zero record, validates the complete authority returned by storage, and
+reopens the run from that committed record.
+
+Exact retries for the same initial run must receive the same nonce and converge
+on the same record. Nonce-source refusal performs no store write. Store failure
+grants no admitted controller authority. The admission contains no predecessor
+and no dispatch ownership. It does not reserve or execute work, access an effect
+journal, discover resources, schedule, loop, choose retry timing, roll back,
+clean up, compact history, collect garbage, or expose an effect-implying
+command.
 
 # SINGLE-DISPATCH EXECUTION
 

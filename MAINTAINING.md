@@ -70,6 +70,17 @@ choose retries or backoff, discover resources or evidence, adopt processes,
 roll back, clean up, compact journals, collect history, or expose a mutating
 command.
 
+The durable transaction-run admission layer may construct one immutable initial
+run from exact progression and dispatch policy, obtain one nonce from a
+caller-owned replay-safe source keyed to that run, append sequence zero, and
+return only the authority supplied and validated by storage. Exact retries must
+reuse the same nonce for the same initial run. Source refusal must precede every
+store write, and store failure must not escape as admitted authority. The layer
+must not reserve or execute work, load or advance another head, access effect
+storage, discover resources, create backends, schedule, loop, choose retry
+timing, roll back, clean up, compact history, collect garbage, or expose a
+mutating command.
+
 The bounded serial transaction-drive layer may repeat the one-step advancement
 function only under an explicit positive caller bound. It must reload the
 committed head on every iteration, reconcile retained ownership before fresh
