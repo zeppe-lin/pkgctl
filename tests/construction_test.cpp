@@ -4,6 +4,7 @@
 #include "construction_fixture.h"
 #include "run_execute_support.h"
 
+#include <pkgctl/run_admit.h>
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_advance.h>
 #include <pkgctl/run_drive.h>
@@ -64,6 +65,101 @@ private:
   std::optional<pkgctl::session_identity> requested_record_;
 };
 
+
+
+
+class replay_run_nonce_source final
+    : public pkgctl::transaction_run_nonce_source {
+public:
+  replay_run_nonce_source(
+      std::uint8_t marker,
+      std::vector<std::string>& trace,
+      bool refuse = false)
+      : marker_(marker), trace_(trace), refuse_(refuse)
+  {
+  }
+
+  pkgctl::transaction_run_nonce issue(
+      const pkgctl::transaction_run& run) override
+  {
+    ++calls_;
+    runs_.push_back(run.identity());
+    trace_.push_back("nonce");
+    if (refuse_)
+      throw std::runtime_error("injected run-nonce refusal");
+    return journal_nonce(marker_);
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::vector<pkgctl::session_identity>& runs() const noexcept
+  { return runs_; }
+
+private:
+  std::uint8_t marker_;
+  std::vector<std::string>& trace_;
+  bool refuse_;
+  std::size_t calls_ = 0U;
+  std::vector<pkgctl::session_identity> runs_;
+};
+
+class admission_run_store final
+    : public pkgctl::transaction_run_journal_store {
+public:
+  explicit admission_run_store(
+      std::vector<std::string>& trace,
+      std::size_t fail_on_append = 0U,
+      std::optional<pkgctl::transaction_run_journal_record> returned =
+          std::nullopt)
+      : trace_(trace), fail_on_append_(fail_on_append),
+        returned_(std::move(returned))
+  {
+  }
+
+  std::optional<pkgctl::transaction_run_journal_record> load_latest(
+      const pkgctl::session_identity& journal) const override
+  {
+    if (!latest_ || latest_->journal() != journal)
+      return std::nullopt;
+    return latest_;
+  }
+
+  pkgctl::transaction_run_journal_record append(
+      const pkgctl::transaction_run_journal_record& record) override
+  {
+    ++append_calls_;
+    trace_.push_back("append");
+    if (append_calls_ == fail_on_append_)
+      throw pkgctl::transaction_run_journal_error(
+          pkgctl::transaction_run_journal_error_code::store_write_failed,
+          "injected admission-store failure");
+    if (latest_)
+    {
+      if (latest_->identity() != record.identity())
+        throw pkgctl::transaction_run_journal_error(
+            pkgctl::transaction_run_journal_error_code::store_conflict,
+            "foreign sequence-zero admission");
+    }
+    else
+    {
+      if (record.sequence() != 0U || record.previous())
+        throw std::runtime_error("invalid admission-store input");
+      latest_ = record;
+    }
+    return returned_ ? *returned_ : *latest_;
+  }
+
+  std::size_t append_calls() const noexcept { return append_calls_; }
+  const std::optional<pkgctl::transaction_run_journal_record>& latest()
+      const noexcept
+  { return latest_; }
+
+private:
+  std::vector<std::string>& trace_;
+  std::size_t fail_on_append_;
+  std::optional<pkgctl::transaction_run_journal_record> returned_;
+  std::optional<pkgctl::transaction_run_journal_record> latest_;
+  std::size_t append_calls_ = 0U;
+};
 
 class head_derived_nonce_source final
     : public pkgctl::transaction_dispatch_nonce_source {
@@ -1564,6 +1660,125 @@ void check_single_step_transaction_advancement()
 }
 
 
+
+void check_durable_transaction_run_admission()
+{
+  test_support::temporary_directory temporary;
+  test_support::initialize_state(temporary.path() / "state");
+  pkgstate::canonical_generation_store state_store(
+      temporary.path() / "state", test_support::binding());
+  auto transaction = transaction_session(
+      tool_source(sha256_text("admission payload\n"), "1.0", false),
+      dependency_source(), state_store.read(), temporary.path() / "state");
+  auto progress = pkgctl::transaction_progress::begin(transaction);
+  auto policy = pkgctl::transaction_dispatch_policy::make(1U, 1U);
+  const auto expected_run = pkgctl::transaction_run::begin(progress, policy);
+
+  {
+    std::vector<std::string> trace;
+    replay_run_nonce_source nonces(101U, trace);
+    admission_run_store store(trace);
+
+    const auto admitted = pkgctl::admit_transaction_run(
+        progress, policy, nonces, store);
+    CHECK(trace == std::vector<std::string>({"nonce", "append"}));
+    CHECK(nonces.calls() == 1U);
+    CHECK(nonces.runs() ==
+          std::vector<pkgctl::session_identity>({expected_run.identity()}));
+    CHECK(store.append_calls() == 1U);
+    CHECK(store.latest().has_value());
+    CHECK(admitted.record.sequence() == 0U);
+    CHECK(!admitted.record.previous().has_value());
+    CHECK(admitted.record.dispatches().empty());
+    CHECK(admitted.record.run() == admitted.run.identity());
+    CHECK(admitted.record.progress() == admitted.run.progress().identity());
+    CHECK(admitted.run.identity() == expected_run.identity());
+    CHECK(store.latest() &&
+          admitted.record.identity() == store.latest()->identity());
+
+    const auto repeated = pkgctl::admit_transaction_run(
+        progress, policy, nonces, store);
+    CHECK(repeated.record.identity() == admitted.record.identity());
+    CHECK(repeated.run.identity() == admitted.run.identity());
+    CHECK(nonces.calls() == 2U);
+    CHECK(nonces.runs() == std::vector<pkgctl::session_identity>(
+          2U, expected_run.identity()));
+    CHECK(store.append_calls() == 2U);
+  }
+
+  {
+    std::vector<std::string> trace;
+    replay_run_nonce_source refusing(102U, trace, true);
+    admission_run_store store(trace);
+    bool refused = false;
+    try
+    {
+      (void)pkgctl::admit_transaction_run(
+          progress, policy, refusing, store);
+    }
+    catch (const std::runtime_error& problem)
+    {
+      refused = std::string(problem.what()) ==
+          "injected run-nonce refusal";
+    }
+    CHECK(refused);
+    CHECK(trace == std::vector<std::string>({"nonce"}));
+    CHECK(store.append_calls() == 0U);
+    CHECK(!store.latest().has_value());
+  }
+
+  {
+    std::vector<std::string> trace;
+    replay_run_nonce_source nonces(103U, trace);
+    admission_run_store store(trace, 1U);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::admit_transaction_run(
+          progress, policy, nonces, store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>({"nonce", "append"}));
+    CHECK(!store.latest().has_value());
+
+    const auto retried = pkgctl::admit_transaction_run(
+        progress, policy, nonces, store);
+    CHECK(retried.record.sequence() == 0U);
+    CHECK(nonces.calls() == 2U);
+    CHECK(nonces.runs() == std::vector<pkgctl::session_identity>(
+          2U, expected_run.identity()));
+    CHECK(store.append_calls() == 2U);
+  }
+
+  {
+    auto foreign_run = pkgctl::transaction_run::begin(
+        progress, pkgctl::transaction_dispatch_policy::make(2U, 1U));
+    auto foreign_record = pkgctl::transaction_run_journal_record::admit(
+        foreign_run, journal_nonce(104U));
+    std::vector<std::string> trace;
+    replay_run_nonce_source nonces(105U, trace);
+    admission_run_store store(trace, 0U, foreign_record);
+    bool rejected = false;
+    try
+    {
+      (void)pkgctl::admit_transaction_run(
+          progress, policy, nonces, store);
+    }
+    catch (const pkgctl::transaction_run_journal_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::transaction_run_journal_error_code::store_contract_violation;
+    }
+    CHECK(rejected);
+    CHECK(trace == std::vector<std::string>({"nonce", "append"}));
+  }
+}
+
 void check_bounded_serial_transaction_drive()
 {
   test_support::temporary_directory temporary;
@@ -1802,6 +2017,7 @@ int main()
     check_durable_restart_reconciliation();
     check_run_authority_rehydration();
     check_single_step_transaction_advancement();
+    check_durable_transaction_run_admission();
     check_bounded_serial_transaction_drive();
   }
   catch (const std::exception& value)
