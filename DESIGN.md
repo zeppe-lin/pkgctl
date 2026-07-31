@@ -13,6 +13,42 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.19.0 exact run-inspection command boundary
+
+Release 0.19.0 exposes the existing durable sensor through one exact read-only
+command:
+
+```text
+explicit run-store path + exact journal identity
+                    |
+                    v
+      open existing POSIX run store
+                    |
+                    v
+          inspect one committed head
+                    |
+                    v
+       deterministic inspection report
+```
+
+`pkgctl inspect-run` accepts both coordinates explicitly. It neither scans the
+store nor selects a latest or convenient run. The command opens an existing
+caller-owned POSIX store, calls `inspect_transaction_run()`, and emits the
+already-defined deterministic report. Invalid command identities are usage
+errors; store access, missing-head, corruption, and store-authority failures
+retain typed journal diagnostics.
+
+Read-only POSIX loads acquire the existing writer lock only through a shared
+read-only descriptor. An empty caller-created store is inspected without
+creating a lock file, and a concurrent writer is detected and retried under the
+newly established lock. The command therefore does not require store write
+permission and does not initialize or alter the store.
+
+The command performs no semantic progression rehydration, journal enumeration,
+effect-journal access, append, reservation, execution, repair, scheduling, or
+mutation. It is a frontend for the existing sensor, not a second inspection
+implementation.
+
 ## Release 0.18.0 durable transaction-run inspection boundary
 
 Release 0.18.0 adds the read-only sensor paired with the durable run actuator:

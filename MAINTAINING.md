@@ -78,6 +78,13 @@ rehydrate semantic progression, infer package facts from identities, append a
 record, inspect an effect journal, reserve or execute work, scan directories,
 discover journals, or expose a mutating command.
 
+The exact run-inspection command may parse one explicit existing store path and
+one lowercase SHA-256 journal identity, open the POSIX run store, delegate to
+`inspect_transaction_run()`, and render the existing report. It must not scan or
+select journals, reconstruct progression, inspect effect stores, append, reserve,
+execute, reconcile, or repair work. Read-only POSIX loads must not create the
+writer lock or require a writable store.
+
 The restart-safe transaction-launch layer may derive one exact journal from an
 immutable initial run and caller-owned replay-safe run nonce, load only that
 journal's committed head, append sequence zero only when no head exists, and

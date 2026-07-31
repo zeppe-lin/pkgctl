@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.18.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.19.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -21,7 +21,29 @@ Version 0.18.0 retains the read-only command pipeline introduced in 0.2.0:
 . one *libpkgtransaction* request and program.
 
 The canonical state store is opened with *open_existing* for these commands.
-The command frontend does not initialize or publish state.
+The command frontend does not initialize or publish state. Version 0.19.0 also
+opens one explicitly named existing POSIX transaction-run store for
+*inspect-run*; it never creates the store or writer lock.
+
+# EXACT RUN-INSPECTION COMMAND
+
+Version 0.19.0 exposes the durable inspection sensor as *pkgctl inspect-run*.
+The caller supplies an existing POSIX run-store path and one exact lowercase
+SHA-256 journal identity. The frontend opens only that store, loads only that
+journal, delegates to *inspect_transaction_run*, and renders the existing
+deterministic report.
+
+The POSIX read path acquires an existing lock through a shared read-only
+descriptor. If an empty caller-created directory has no lock, the reader creates
+nothing; if a writer establishes the lock concurrently, the read is repeated
+under that lock. Inspection therefore does not require write access and cannot
+initialize the store.
+
+The command does not enumerate journals, select a latest run, rehydrate semantic
+progression, inspect effect journals, append, reserve, execute, reconcile, repair,
+schedule, or mutate. Invalid identity syntax is a usage error. Missing stores,
+missing heads, corrupt stores, and storage-authority violations retain typed
+run-journal diagnostics.
 
 # DURABLE TRANSACTION-RUN INSPECTION
 
@@ -38,8 +60,9 @@ policy, dispatch, attempt, effect-attempt, observation, and terminal identities.
 
 Inspection does not rehydrate package semantics or promote an identity into
 evidence. It performs no append, reservation, execution, subordinate journal
-inspection, journal discovery, scheduling, cleanup, or command action. The
-executable therefore still exposes no effect-implying command.
+inspection, journal discovery, scheduling, or cleanup. Version 0.19.0 exposes
+this sensor through a read-only command, but still exposes no effect-implying
+command.
 
 # CANDIDATE CONSTRUCTION
 

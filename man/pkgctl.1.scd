@@ -13,15 +13,17 @@ pkgctl - inspect native package resolution and transaction authority
 *pkgctl* *transaction* _catalog-options_ _state-options_
 _resolution-options_ [*--converge-exact*]
 
+*pkgctl* *inspect-run* *--run-store* _path_ *--journal* _identity_
+
 *pkgctl* {*-V* | *-h*}
 
 # DESCRIPTION
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.18.0 acquires explicit native collections, reads one existing canonical
-installed-state generation, resolves typed package requirements, composes one
-immutable cross-package transaction program, and prints deterministic reports.
+Version 0.19.0 retains the native catalog, resolution, and transaction
+inspection pipeline and adds one exact read-only durable transaction-run
+inspection command.
 
 The controller library also defines exact one-candidate construction,
 transaction progression, immutable dispatch ownership, durable transaction-run
@@ -30,8 +32,8 @@ request/session/result, one-operation preparation, single-operation effect,
 conservative restart, one-dispatch restart reconciliation, exact
 caller-supplied run-authority handoffs, durable initial run admission,
 restart-safe bounded transaction launch, read-only durable run inspection, one bounded transaction-run
-advancement call, and bounded serial driving, but no
-effect-implying command is exposed. Progression reports
+advancement call, and bounded serial driving. The *inspect-run* command exposes
+only the existing durable sensor; no effect-implying command is exposed. Progression reports
 every graph-ready construction, check, or operation unit. Library clients may
 advance one durable journal by reconciling retained ownership or, only when the
 run is quiescent, reserving and realizing one canonical policy-allowed unit
@@ -56,6 +58,11 @@ execute lifecycle programs, or apply mutations.
 	Perform the resolve pipeline and compose the resulting immutable transaction
 	program. The default convergence policy preserves all unselected installed
 	packages.
+
+*inspect-run*
+	Open one explicitly named existing POSIX transaction-run store, inspect one
+	exact journal head, and print the deterministic durable-run report. The
+	command neither enumerates journals nor rehydrates package semantics.
 
 # CATALOG OPTIONS
 
@@ -116,6 +123,15 @@ The following options are all required by *resolve* and *transaction*:
 	Treat the selected target closure as complete and compose removals for other
 	installed packages. This destructive policy is never enabled by default.
 
+# RUN INSPECTION OPTIONS
+
+*--run-store* _path_
+	Open the existing caller-owned POSIX transaction-run store at _path_. The
+	command never creates the directory or writer lock.
+
+*--journal* _identity_
+	Select one exact lowercase SHA-256 transaction-run journal identity.
+
 # OUTPUT
 
 The output is a deterministic line-oriented diagnostic report containing exact
@@ -128,8 +144,8 @@ summaries. It is not a persistent state format or a versioned IPC protocol.
 	The requested read-only authority composition completed.
 
 *1*
-	An acquisition, source, catalog, state, resolution, transaction, or
-	controller authority refused or failed.
+	An acquisition, source, catalog, state, resolution, transaction, run-journal,
+	or controller authority refused or failed.
 
 *2*
 	The command line is invalid or incomplete.
