@@ -1248,9 +1248,10 @@ effect_restart_result resume_effectful_operation(
     std::optional<pkgstate::installed_state_snapshot_identity> reconciled;
     if (journal.reconciled_state())
       reconciled = state_identity_from_string(*journal.reconciled_state());
+    auto transaction = current_transaction();
     auto operation = effectful_operation_result::seal(
         std::move(session), *journal.terminal_outcome(), std::move(before),
-        std::move(application), std::move(after), current_transaction(),
+        std::move(application), std::move(after), std::move(transaction),
         std::move(publication_request), std::move(publication_receipt),
         std::move(reconciled));
     return effect_restart_result(
