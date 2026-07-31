@@ -39,7 +39,11 @@ publication followed by an atomic checksummed head, and exact append retries
 must be idempotent. Never treat a stored identity as reconstructed build, check,
 effect, or installed-state evidence. Starting an operation durably must commit
 its effect-attempt admission before the started run snapshot; do not open-code
-the reverse order or invoke a driver between those commits.
+the reverse order or invoke a driver between those commits. Single-dispatch
+execution changes must prove that start-store failure invokes no driver and that
+driver or final-store failure leaves exact started ownership for restart. They
+must not smuggle reservation loops, resource discovery, backend construction,
+automatic release, or retry policy into the execution kernel.
 
 Use SPDX headers:
 

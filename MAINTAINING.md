@@ -33,13 +33,21 @@ and limits belong only to the admitted check session. The controller must not
 reimplement input-tree matching, resource-layout construction, process-status
 classification, or backend execution.
 
-The dispatch layer may depend on transaction progression and exact admitted
+The pure dispatch layer may depend on transaction progression and exact admitted
 construction, check, and effect sessions. It owns deterministic reservation,
 bounded in-flight capacity, caller attempt nonces, and immutable ownership
 records. It must not execute a driver, create a backend, allocate resource paths,
 construct new transaction edges, or infer success from reservation state.
 Check-scoped package inputs require `libpkgtransaction >= 2.1.0` so exact input
 authority precedes the construction that seals it.
+
+The single-dispatch execution layer may compose the pure dispatch functions with
+explicit run/effect stores and an injected driver. It must commit started
+ownership before driver invocation and commit only evidence accepted by the
+existing completion functions. Start failure invokes no driver. Driver or final
+commit failure leaves started ownership durable. This layer must not reserve
+work, loop, discover resources, create backends, choose retries, or release work
+automatically.
 
 The durable run-journal layer may serialize only controller-owned dispatch
 ownership, exact identities, causal sequence, and terminal flags. Reopening must
@@ -86,8 +94,8 @@ legacy behavior.
    concurrency-safe check progression, deterministic dispatch reservation,
    exact predecessor and state-epoch binding, operation-lane serialization,
    failure containment, durable run single-transition sealing, exact progression
-   rehydration, graph/evidence revalidation, write-ahead start persistence,
-   preparation projection and typed refusal, effect sequencing,
+   rehydration, graph/evidence revalidation, write-ahead start persistence, one-dispatch driver barriers,
+   lost-terminal-write recovery, preparation projection and typed refusal, effect sequencing,
    intent-before-effect persistence, exact restart checkpoints, outer-lease
    reacquisition, publication reconciliation, publication provenance, CLI
    read-only behavior, and missing-state refusal;

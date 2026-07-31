@@ -6,8 +6,46 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.10.0 establishes durable transaction-run ownership and
-conservative restart classification:
+Release 0.11.0 closes one explicitly selected dispatch behind the durable
+transaction-run barrier:
+
+```text
+reserved run snapshot
+        |
+        v
+commit started ownership
+        |
+        v
+invoke one injected driver
+        |
+        v
+commit terminal evidence or retained uncertainty
+```
+
+`execute_construction_dispatch_durable()` and
+`execute_check_dispatch_durable()` commit the exact started-run successor before
+their driver is invoked. They then submit the existing terminal controller
+evidence through the ordinary dispatch completion functions and commit that one
+successor. A failed start append invokes no driver. Driver escape or failed
+terminal commitment fabricates no completion: the committed started dispatch
+remains the restart authority.
+
+`execute_operation_dispatch_durable()` preserves the stricter cross-journal
+order. It commits effect-attempt admission, commits the started run retaining
+that attempt, executes through the existing durable effect journal, and only
+then commits the resulting run successor. Successful publication is paired with
+a fresh authoritative state read. Lost-lease and indeterminate-publication
+results remain ordered observations on an active dispatch. If the effect journal
+reaches terminal state but the final run append is lost, restart still names the
+exact effect journal to inspect.
+
+This release does not select or reserve work. It creates no loop, thread,
+backend, resource-discovery policy, retry policy, scheduler, transaction-wide
+cancellation, rollback, or effectful CLI command. The caller supplies one exact
+reservation, admitted session, driver, and both stores.
+
+Release 0.10.0 established durable transaction-run ownership and conservative
+restart classification:
 
 ```text
 exact transaction_progress + immutable dispatch ledger
@@ -31,10 +69,9 @@ one reservation. Its sequence must equal the transition count derivable from
 retained dispatch states and uncertainty observations. Every successor snapshot
 contains exactly one legal ledger transition: one reservation, one start, one
 unstarted release, one uncertainty observation, or one terminal completion. A
-reservation successor must bind the predecessor's exact
-progression identity and state epoch. Records bind the transaction, dispatch
-policy, caller-issued run nonce, sequence, predecessor, current state epoch,
-progression identity, and
+reservation successor must bind the predecessor's exact progression identity
+and state epoch. Records bind the transaction, dispatch policy, caller-issued
+run nonce, sequence, predecessor, current state epoch, progression identity, and
 complete immutable dispatch history. The POSIX store publishes immutable record
 files and then atomically advances a checksummed read-only head. Recovery opens
 only the exact self-contained snapshot named by that committed head; exact crash
@@ -112,21 +149,21 @@ Every collection root, target-state binding identity, architecture, goal scope,
 and destructive convergence choice is explicit. `transaction` defaults to
 `preserve-unselected`; exact convergence requires `--converge-exact`.
 
-There are no effect-implying CLI commands in 0.10.0. The command frontend
+There are no effect-implying CLI commands in 0.11.0. The command frontend
 executes no source acquisition, build, check, planner,
-lifecycle, application, publication, or restart authority. The internal check
-controller invokes execution only through an injected driver supplied by a
-library client. Automatic execution, semantic-evidence persistence, resource
-recovery, retry policy, adaptive scheduling, transaction-wide rollback, journal
-discovery, compaction, garbage collection, and effectful command policy remain
-outside this release.
+lifecycle, application, publication, or restart authority. The library can execute one caller-selected dispatch only through an injected
+driver and explicit stores. Automatic reservation, execution loops,
+semantic-evidence discovery, resource recovery, retry policy, adaptive
+scheduling, transaction-wide rollback, journal discovery, compaction, garbage
+collection, and effectful command policy remain outside this release.
 
 ## Authority
 
 `pkgctl` owns command policy, authority-call sequencing, controller session
 binding, deterministic dispatch reservation, in-flight ownership,
 evidence-driven transaction progression, current-state epoch binding,
-durable controller-attempt snapshots, conservative restart classification,
+durable controller-attempt snapshots, one-dispatch write-ahead execution,
+conservative restart classification,
 outer-lease observation, transaction-evidence composition, deterministic
 diagnostics, and presentation.
 

@@ -13,6 +13,56 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.11.0 single-dispatch execution boundary
+
+Release 0.11.0 turns one caller-selected durable reservation into one driver
+invocation. It is an execution kernel, not a scheduler:
+
+```text
+selection and resources: caller authority
+started ownership:       pkgctl run journal
+physical realization:    injected subordinate driver
+semantic result:          existing controller evidence
+terminal ownership:       pkgctl run journal
+```
+
+`commit_transaction_run_successor()` is the common commitment primitive. It
+derives the only legal successor from the current journal record, appends it,
+and refuses a store that returns another record identity, journal, or sequence.
+It does not infer completion and it does not reload semantic evidence.
+
+Construction and check execution follow one write-ahead sequence:
+
+1. validate the supplied reservation and exact admitted session;
+2. derive and durably commit the `started` run successor;
+3. invoke the injected construction or check driver;
+4. submit the returned evidence through `complete_*_dispatch()`;
+5. durably commit the resulting run successor.
+
+Failure before step 2 completes grants no execution authority. Failure in steps
+3 through 5 leaves the started record committed. The caller must recover exact
+construction or check evidence; the controller does not retry a driver or infer
+that work did or did not occur.
+
+Operation execution preserves two journals and their distinct meanings:
+
+1. commit the exact effect-attempt admission;
+2. commit the started run retaining that attempt identity;
+3. execute through the durable effect journal;
+4. for completed publication, reread authoritative installed state;
+5. submit the effect result and commit one run successor.
+
+An admission without step 2 is audit evidence only and the run remains reserved.
+A started run without later effect evidence requires effect-journal inspection.
+A terminal effect journal with a lost step-5 run append still leaves the run
+started, so restart is conservative and can reconcile from the retained attempt.
+Uncertainty results append observations and do not retire ownership.
+
+The API accepts one exact dispatch. It does not call `reserve_next()`, discover
+sessions or paths, construct backends, create threads, loop over readiness,
+choose retry timing, release work automatically, or expose an effectful command.
+Whole-transaction execution remains a later policy layer.
+
 ## Release 0.10.0 durable transaction-run boundary
 
 Release 0.10.0 makes the immutable dispatch ledger durable without creating a
@@ -239,9 +289,11 @@ accounted for.
 
 ### Deliberate boundary
 
-Dispatch performs no source acquisition, build, check, lifecycle, application,
-publication, backend construction, retry, or rollback. It creates no threads,
-wait loop, resource paths, durable run journal, or effectful CLI command.
+The 0.9.0 dispatch model itself performs no source acquisition, build, check,
+lifecycle, application, publication, backend construction, retry, or rollback.
+It creates no threads, wait loop, resource paths, durable run journal, or
+effectful CLI command. Release 0.11.0 composes that pure model in a separate,
+explicit one-dispatch execution layer.
 Adaptive priorities, work stealing, critical-path scoring, fairness, and
 transaction-wide continuation after failure remain outside this release.
 

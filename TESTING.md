@@ -68,7 +68,7 @@ Every release must establish:
 - refusal of missing, duplicate, forged, aliased, cross-transaction, cross-node,
   stale-construction, duplicate-completion, and driver-contract evidence;
 - concurrency-safe check completion after unrelated progression advancement;
-- proof that all exposed CLI commands remain read-only in 0.10.0;
+- proof that all exposed CLI commands remain read-only in 0.11.0;
 - release, source, manual, shell, and patch-hygiene contracts.
 
 ## Durable transaction-run tests
@@ -133,6 +133,33 @@ The run-journal suite must prove:
 - journaling performs no driver invocation, resource discovery, subordinate
   evidence reconstruction, state publication, cleanup, automatic retry,
   compaction, garbage collection, or CLI action.
+
+## Single-dispatch execution tests
+
+The durable execution suite must prove:
+
+- construction and check drivers are invoked only after the started run
+  successor is accepted by the run store;
+- effect admission is accepted before operation started ownership, and both are
+  accepted before the first lifecycle, application, or publication call;
+- a start-store failure invokes no driver and leaves the prior reserved record
+  selected;
+- an effect-admission failure invokes no operation driver and appends no run
+  successor;
+- driver escape after durable start leaves the exact started construction,
+  check, or operation dispatch restartable;
+- a failed terminal run append never fabricates completion and leaves the
+  started record selected;
+- a terminal effect journal paired with a lost run completion is classified for
+  exact effect-journal inspection;
+- successful construction, check, and operation execution commits exactly two
+  run successors after reservation: start and result;
+- successful operation publication advances from a fresh authoritative state
+  read, while uncertainty carries no resulting state;
+- lost-lease and indeterminate-publication results remain active observations;
+- exact store retries are accepted but foreign returned authority is refused;
+- the layer performs no reservation, loop, thread creation, backend discovery,
+  automatic retry, automatic release, or CLI action.
 
 ## Transaction dispatch tests
 

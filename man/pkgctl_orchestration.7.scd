@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.10.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.11.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -108,9 +108,34 @@ them.
 
 The only containment policy in this release stops new reservations and starting
 merely reserved work after terminal failure. Already-started independent work
-may still submit exact terminal evidence. Dispatch creates no threads, invokes
-no driver, builds no backend, allocates no resource path, persists no run, and
-exposes no effect-implying command.
+may still submit exact terminal evidence. The pure dispatch model creates no threads, invokes no driver, builds no
+backend, allocates no resource path, persists no run, and exposes no
+effect-implying command.
+
+# SINGLE-DISPATCH EXECUTION
+
+Version 0.11.0 can realize one exact caller-selected dispatch. It does not select
+or reserve work. The caller supplies the current committed run record, its exact
+rehydrated run, the retained dispatch, one admitted session, an injected driver,
+and explicit stores.
+
+Construction and check start by appending the exact *started* run successor.
+Only after that append returns the same committed authority may the driver run.
+Returned evidence is submitted through the ordinary completion function and the
+resulting successor is appended. A failed start append invokes no driver. Driver
+escape or a failed final append leaves the started dispatch selected for exact
+recovery.
+
+Operation start first appends effect-attempt admission, then appends the started
+run retaining that attempt identity. Both commits precede every physical effect.
+Execution continues through the durable effect journal. Successful publication
+is paired with a fresh installed-state read before run completion. Lost lease or
+indeterminate publication remains an observation on active ownership. A terminal
+effect journal whose run completion was not committed is recovered by inspecting
+the retained effect-attempt identity.
+
+This layer creates no scheduler, loop, thread, backend, resource-discovery rule,
+retry rule, rollback, automatic release, journal discovery, or effectful command.
 
 # DURABLE TRANSACTION RUNS
 
