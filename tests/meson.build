@@ -206,6 +206,13 @@ if not get_option('tests').disabled()
     args: [meson.project_source_root()],
   )
 
+  run_nonce_contract = find_program('check_run_nonce_contract.sh')
+  test(
+    'run-nonce-contract',
+    run_nonce_contract,
+    args: [meson.project_source_root()],
+  )
+
   run_runtime_contract = find_program('check_run_runtime_contract.sh')
   test(
     'run-runtime-contract',

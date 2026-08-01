@@ -22,8 +22,8 @@ done
 
 for required in \
   'struct transaction_run_runtime_authorities final' \
-  'transaction_run_nonce_source& run_nonces' \
-  'transaction_dispatch_nonce_source& dispatch_nonces' \
+  'transaction_run_nonce run_nonce' \
+  'canonical_transaction_dispatch_nonce_source dispatch_nonces_' \
   'transaction_progress_rehydration_source& progress' \
   'transaction_dispatch_execution_authority_source& execution' \
   'transaction_dispatch_recovery_authority_source& recovery' \
@@ -32,6 +32,7 @@ for required in \
   'class posix_transaction_run_runtime final' \
   'from_directory_fds(' \
   'transaction_run_launch_result launch(' \
+  'explicit_run_nonce_source' \
   'transaction_run_drive_result drive(' \
   'posix_transaction_run_journal_store::from_directory_fd' \
   'posix_effect_journal_store::from_directory_fd' \
@@ -44,6 +45,15 @@ for required in \
     echo "missing POSIX transaction-run runtime contract: $required" >&2
     exit 1
   }
+done
+
+for forbidden_authority in \
+  'transaction_run_nonce_source& run_nonces' \
+  'transaction_dispatch_nonce_source& dispatch_nonces'; do
+  if grep -F "$forbidden_authority" "$header" >/dev/null 2>&1; then
+    echo "runtime must not borrow nonce service: $forbidden_authority" >&2
+    exit 1
+  fi
 done
 
 body=$(sed -n '/implementation(/,/^  }/p' "$source")
@@ -66,6 +76,8 @@ for required_test in \
   'posix_transaction_run_runtime::from_directory_fds' \
   'std::filesystem::rename(run_path, selected_run_path)' \
   'runtime->launch(' \
+  'journal_nonce(211U)' \
+  'result.record().nonce() == journal_nonce(211U)' \
   'runtime->drive(' \
   'transaction_run_launch_origin::admitted' \
   'transaction_run_drive_disposition::completed' \

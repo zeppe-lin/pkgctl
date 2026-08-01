@@ -72,6 +72,7 @@ done
 "$srcdir/tests/check_run_driver_source_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_native_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_runtime_contract.sh" "$srcdir"
+"$srcdir/tests/check_run_nonce_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_drive_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_launch_contract.sh" "$srcdir"
 "$srcdir/tests/check_effect_inspect_contract.sh" "$srcdir"
