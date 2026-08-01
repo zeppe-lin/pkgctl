@@ -48,13 +48,12 @@ executable commands remain read-only: they never initialize or publish state,
 materialize sources, build packages, inspect artifacts, plan package changes,
 execute lifecycle programs, or apply mutations.
 
-Version 0.25.0 changes no command syntax. The controller library now provides
-a caller-configured POSIX transaction-run runtime that retains exact run,
-effect, and target-lock directory authorities and composes the existing native
-construction, check, and per-dispatch effect mechanisms. It borrows all nonce,
-semantic, archive, backend, and canonical-state authority, performs no resource
-or policy discovery, and executes only caller-bounded launch or exact-journal
-drive calls. The read-only command surface remains unchanged.
+Version 0.26.0 changes no command syntax. The caller-configured POSIX
+transaction-run runtime now receives one explicit run nonce on each launch and
+owns stateless canonical dispatch-nonce derivation from the exact committed
+head. It retains no random generator, nonce database, or hidden nonce cache.
+Semantic, archive, backend, and canonical-state authority remain caller-owned,
+and the read-only command surface is unchanged.
 
 # COMMANDS
 
