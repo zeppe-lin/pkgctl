@@ -4,7 +4,7 @@
 project(
   'pkgctl',
   'cpp',
-  version: '0.22.0',
+  version: '0.23.0',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.2.0',
   default_options: [
@@ -110,7 +110,7 @@ libpkgexec_dep = dependency(
 )
 libpkgapply_dep = dependency(
   'libpkgapply',
-  version: '>=2.0.0',
+  version: '>=2.2.0',
   required: true,
   static: want_static,
 )
