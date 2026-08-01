@@ -1,3 +1,50 @@
+## 0.21.0 - 2026-08-01
+
+### Exact effect-attempt inspection command
+
+- Adds `pkgctl inspect-effect --effect-store PATH --attempt SHA256` to expose
+  the existing durable effect-attempt inspection sensor on the read-only command
+  surface.
+- Requires one explicitly named existing POSIX store and one exact lowercase
+  SHA-256 attempt identity; the command performs no store or attempt discovery.
+- Delegates durable classification to `inspect_effect_attempt()` and output to
+  the existing deterministic `render_report()` implementation.
+- Preserves typed usage, missing-store, missing-head, corruption, conflict, and
+  storage-contract diagnostics under the `effect journal` diagnostic class.
+- Leaves committed effect stores byte-for-byte unchanged, including when the
+  writer lock is absent, and never recreates that lock during inspection.
+- Keeps optional controller evidence absent until durably retained and never
+  promotes lifecycle, application, transaction, publication, or state
+  identities into semantic objects.
+- Adds no attempt enumeration, latest-attempt selection, run-journal traversal,
+  semantic recovery, restart checkpoint construction, driver invocation,
+  append, reconciliation, repair, scheduling, cleanup, compaction, garbage
+  collection, or mutation.
+
+### Dependency contract
+
+- libpkgsource >= 2.0.0
+- libpkgsource-yaml >= 2.0.0
+- libpkgsource-plan >= 2.0.0
+- libpkgcatalog >= 2.0.0
+- libpkgcatalog-acquire >= 2.0.0
+- libpkgstate >= 2.3.0
+- libpkgstate-plan >= 2.3.0
+- libpkgstate-apply >= 2.3.0
+- libpkgfetch >= 1.0.0
+- libpkgbuild >= 2.0.0
+- libpkgbuild-exec >= 1.0.0
+- libpkgbuild-plan >= 2.0.0
+- libpkgimage >= 0.3.0
+- libpkgplan >= 0.2.0
+- libpkgexec >= 1.3.0
+- libpkgapply >= 2.0.0
+- libpkgapply-exec >= 1.0.0
+- libpkgresolve >= 2.0.0
+- libpkgtransaction >= 2.1.0
+- libpkgcheck >= 0.1.0
+- libpkgcheck-exec >= 0.1.1
+
 ## 0.20.0 - 2026-08-01
 
 ### Durable effect-attempt inspection
