@@ -114,6 +114,12 @@ libpkgapply_dep = dependency(
   required: true,
   static: want_static,
 )
+libpkgapply_posix_dep = dependency(
+  'libpkgapply-posix',
+  version: '>=2.2.0',
+  required: true,
+  static: want_static,
+)
 libpkgapply_exec_dep = dependency(
   'libpkgapply-exec',
   version: '>=1.0.0',
@@ -122,7 +128,7 @@ libpkgapply_exec_dep = dependency(
 )
 libpkgstate_apply_dep = dependency(
   'libpkgstate-apply',
-  version: '>=2.3.0',
+  version: '>=2.4.0',
   required: true,
   static: want_static,
 )
@@ -163,6 +169,7 @@ pkgctl_authority_deps = [
   libpkgplan_dep,
   libpkgexec_dep,
   libpkgapply_dep,
+  libpkgapply_posix_dep,
   libpkgapply_exec_dep,
   libpkgresolve_dep,
   libpkgtransaction_dep,

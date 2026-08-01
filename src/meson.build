@@ -24,6 +24,7 @@ pkgctl_core = static_library(
     'run_journal_codec.cpp',
     'run_inspect.cpp',
     'run_launch.cpp',
+    'run_native.cpp',
     'run_admit.cpp',
     'run_authority.cpp',
     'run_advance.cpp',
