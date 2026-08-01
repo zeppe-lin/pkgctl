@@ -70,6 +70,17 @@ choose retries or backoff, discover resources or evidence, adopt processes,
 roll back, clean up, compact journals, collect history, or expose a mutating
 command.
 
+The POSIX transaction-run runtime layer may own only mechanical lifetime and
+wiring authority. It may retain caller-opened run-store, effect-store, and
+target-lock directory descriptors; construct the corresponding stores and
+native driver adapters; and delegate one bounded launch or exact-journal drive.
+It must continue to borrow nonce sources, semantic rehydration, execution and
+recovery sources, archive lookup, backends, and canonical state. It may not
+discover paths or journals, initialize stores, issue policy-bearing evidence,
+select credentials or backends, retry, wait, schedule, clean up, or add a
+frontend command. Descriptor-anchored authority must remain valid if the
+original pathname is renamed or replaced.
+
 The operation-driver source layer must acquire one call-scoped physical driver
 only from an exact validated execution or recovery handoff. Fresh acquisition
 must occur after the reservation successor is committed and before effect

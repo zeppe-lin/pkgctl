@@ -6,6 +6,22 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.25.0 assembles the existing durable run controller into one
+caller-configured POSIX transaction runtime.
+`posix_transaction_run_runtime` retains three caller-opened directory
+authorities for the transaction-run journal, effect-attempt journal, and target
+mutation locks. It owns the two POSIX journal stores, native construction and
+check drivers, and the concrete per-dispatch effect source.
+
+The runtime still borrows all policy-bearing authorities: replay-safe run and
+dispatch nonce sources, semantic progression and execution/recovery sources,
+archive lookup, physical execution backends, and the canonical state store.
+`launch()` admits or resumes one exact caller-supplied progression and drives it
+under one positive bound. `drive()` advances only one exact caller-supplied
+journal identity under one positive bound. Neither method discovers journals,
+initializes stores, loops beyond the bound, schedules workers, retries failures,
+selects backends, or exposes a mutating command.
+
 Release 0.24.0 provides the first concrete native per-dispatch effect source.
 `posix_transaction_effect_driver_source` is deliberately caller-configured: the
 caller chooses the application and lifecycle backends, canonical state store,

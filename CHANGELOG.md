@@ -1,3 +1,57 @@
+## 0.25.0 - 2026-08-01
+
+### Caller-configured POSIX transaction-run runtime
+
+- Adds `posix_transaction_run_runtime`, a caller-configured composition root for
+  the existing durable transaction-run controller.
+- Retains caller-opened transaction-run, effect-attempt, and target-lock
+  directory authorities through the existing descriptor-anchored POSIX stores
+  and effect source.
+- Owns one POSIX run store, one POSIX effect store, native construction and check
+  drivers, and one POSIX per-dispatch effect-driver source.
+- Borrows replay-safe run and dispatch nonce sources, semantic progression and
+  execution/recovery sources, archive authority, physical backends, and the
+  canonical state store; those policy-bearing objects remain caller-owned.
+- Adds `launch()` for one exact caller-supplied progression and dispatch policy
+  under a positive drive bound.
+- Adds `drive()` for one exact caller-supplied journal identity under a positive
+  drive bound, with no journal enumeration or latest-run selection.
+- Preserves the existing durable admission, reservation, per-dispatch authority,
+  execution, effect, publication, and recovery barriers without adding another
+  state machine.
+- Proves descriptor anchoring by completing a native construction run after the
+  original run-store pathname is renamed and replaced; the replacement, effect
+  store, and target-lock store remain untouched.
+- Performs no path or journal discovery, store initialization, nonce policy,
+  semantic evidence construction, backend or archive selection, credential
+  selection, waiting, retry loop, scheduling, cleanup, repair, or compaction.
+- Adds no mutating command.
+
+### Dependency contract
+
+- libpkgsource >= 2.0.0
+- libpkgsource-yaml >= 2.0.0
+- libpkgsource-plan >= 2.0.0
+- libpkgcatalog >= 2.0.0
+- libpkgcatalog-acquire >= 2.0.0
+- libpkgstate >= 2.3.0
+- libpkgstate-plan >= 2.3.0
+- libpkgstate-apply >= 2.4.0
+- libpkgfetch >= 1.0.0
+- libpkgbuild >= 2.0.0
+- libpkgbuild-exec >= 1.0.0
+- libpkgbuild-plan >= 2.0.0
+- libpkgimage >= 0.3.0
+- libpkgplan >= 0.2.0
+- libpkgexec >= 1.3.0
+- libpkgapply >= 2.2.0
+- libpkgapply-posix >= 2.2.0
+- libpkgapply-exec >= 1.0.0
+- libpkgresolve >= 2.0.0
+- libpkgtransaction >= 2.1.0
+- libpkgcheck >= 0.1.0
+- libpkgcheck-exec >= 0.1.1
+
 ## 0.24.0 - 2026-08-01
 
 ### Caller-configured POSIX per-dispatch effect runtime

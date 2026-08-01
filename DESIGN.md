@@ -13,6 +13,57 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.25.0 native transaction-run runtime boundary
+
+Release 0.25.0 composes the already-qualified run and effect mechanisms into
+one caller-configured lifetime boundary:
+
+```text
+caller-opened run, effect, and target-lock directories
+                         +
+caller-owned nonce, semantic, archive, backend, and state authorities
+                         |
+                         v
+          posix_transaction_run_runtime
+                         |
+          +--------------+---------------+
+          |                              |
+ exact progress + policy           exact journal identity
+          |                              |
+       launch()                        drive()
+          |                              |
+          +---------- bounded control ---+
+```
+
+The runtime owns the POSIX transaction-run store, POSIX effect-attempt store,
+native construction driver, native check driver, and one
+`posix_transaction_effect_driver_source`. The three underlying
+descriptor-owning mechanisms duplicate the caller-selected directory
+descriptors.
+Renaming or replacing a pathname after construction cannot redirect the retained
+authority. Destruction closes the retained descriptors and destroys no store
+content.
+
+All policy-bearing authority remains outside. The runtime borrows the replay-safe
+run and dispatch nonce sources, semantic progression rehydration, exact
+execution and recovery authority sources, archive source, construction/check
+execution backends, application and lifecycle backends, and canonical state
+store. These objects must outlive the runtime. It neither derives them from
+durable identities nor stores them in either journal.
+
+`launch()` delegates to `launch_transaction_run()` with one caller-supplied
+progression, dispatch policy, and positive drive bound. `drive()` delegates to
+`drive_transaction_run()` for one exact journal identity and positive bound.
+Both methods preserve the existing write-ahead reservation, per-dispatch
+authority, and subordinate effect barriers. The runtime does not add another
+state machine around them.
+
+This boundary performs no path or journal discovery, store initialization,
+nonce generation policy, semantic rehydration, archive or backend selection,
+credential selection, waiting, retry loop, scheduling, worker creation,
+cleanup, compaction, repair, or frontend action. It is a composition root for
+callers, not yet a package-operation command.
+
 ## Release 0.24.0 native effect-runtime boundary
 
 Release 0.24.0 implements the abstract per-dispatch source without moving

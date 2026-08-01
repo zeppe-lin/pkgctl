@@ -78,6 +78,19 @@ Every release must establish:
 - proof that all exposed CLI commands remain read-only, including exact run and
   effect inspection;
 - release, source, manual, shell, and patch-hygiene contracts.
+- caller-configured POSIX transaction runtimes duplicate and retain exact run,
+  effect, and target-lock directory authorities while borrowing nonce, semantic,
+  archive, backend, and canonical-state authorities;
+- a retained run-store descriptor remains authoritative after the original
+  pathname is renamed and replaced, and the replacement directory remains
+  untouched;
+- bounded runtime launch commits and completes through the native construction
+  path, while exact-journal runtime drive reopens only the selected committed
+  head;
+- construction-only execution does not acquire an archive, create an effect
+  journal, or touch the target-lock directory;
+- invalid directory descriptors fail through the owning store or native effect
+  source before a runtime is returned;
 - caller-configured native effect sources duplicate and retain only the selected
   lock-directory descriptor while borrowing explicit backends and stores;
 - replayable incoming archives must match both the exact package-image and

@@ -27,6 +27,36 @@ opens one explicitly named existing POSIX transaction-run store for
 effect-attempt store for *inspect-effect*. Neither command creates its store or
 writer lock.
 
+# CALLER-CONFIGURED POSIX TRANSACTION-RUN RUNTIME
+
+Version 0.25.0 provides *posix_transaction_run_runtime*, a mechanical
+composition root for the existing durable transaction controller. The caller
+supplies already-open directories for transaction-run journals, effect-attempt
+journals, and target-mutation locks. The runtime retains those directory
+authorities and owns one POSIX run store, one POSIX effect store, native
+construction and check drivers, and one caller-configured POSIX per-dispatch
+effect source.
+
+The runtime borrows replay-safe run and dispatch nonce sources, semantic
+progression rehydration, exact dispatch execution and recovery sources, archive
+lookup, construction and check execution backends, application and lifecycle
+backends, and the canonical state store. The caller must keep every borrowed
+authority alive. No durable identity is used to discover or reconstruct one of
+those authorities.
+
+*launch* accepts exact initial progression, a dispatch policy, and a positive
+drive bound. It delegates restart-safe admission and bounded driving to the
+existing controller. *drive* accepts one exact journal identity and a positive
+bound; it performs no run enumeration or latest-run selection. Both operations
+retain all existing write-ahead reservation, execution, effect, publication,
+and recovery barriers.
+
+The runtime performs no store initialization, path or journal discovery, nonce
+policy, semantic evidence construction, backend or archive selection,
+credential selection, waiting, retry loop, scheduling, worker creation, cleanup,
+repair, or compaction. Version 0.25.0 changes no command syntax and adds no
+mutating command.
+
 # CALLER-CONFIGURED POSIX EFFECT RUNTIME
 
 Version 0.24.0 provides *posix_transaction_effect_driver_source*, a concrete
