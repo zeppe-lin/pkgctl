@@ -13,18 +13,26 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.20.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F 'Version 0.19.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.21.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.21.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *inspect-run* *--run-store* _path_ *--journal* _identity_' \
   "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '*pkgctl* *inspect-effect* *--effect-store* _path_ *--attempt* _identity_' \
+  "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'EXACT EFFECT-INSPECTION COMMAND' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'does not require write access and cannot' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'typed effect-journal diagnostics' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'DURABLE EFFECT-ATTEMPT INSPECTION' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'pairs the exact retained' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Append remains' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
-grep -F 'Version 0.20.0 adds no CLI for' \
+grep -F 'Version 0.21.0 exposes only' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'EXACT RUN-INSPECTION COMMAND' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null

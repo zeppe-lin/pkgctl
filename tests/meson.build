@@ -200,6 +200,15 @@ if not get_option('tests').disabled()
     args: [meson.project_source_root()],
   )
 
+  effect_inspect_cli_contract = find_program(
+    'check_effect_inspect_cli_contract.sh',
+  )
+  test(
+    'effect-inspect-cli-contract',
+    effect_inspect_cli_contract,
+    args: [meson.project_source_root()],
+  )
+
   run_inspect_contract = find_program('check_run_inspect_contract.sh')
   test('run-inspect-contract', run_inspect_contract, args: [meson.project_source_root()])
 

@@ -58,7 +58,9 @@ for token in \
   previous=$line
 done
 
-execute_body=$(sed -n '/^int execute(/,/^}/p' "$main_source")
+execute_body=$(sed -n \
+  '/auto store = pkgctl::posix_transaction_run_journal_store::open/,/std::cout << pkgctl::render_report(inspection);/p' \
+  "$main_source")
 previous=0
 for token in \
   'posix_transaction_run_journal_store::open' \
@@ -137,7 +139,8 @@ for forbidden in \
   'readdir(' \
   'std::thread' \
   'std::async'; do
-  if grep -F "$forbidden" "$main_source" "$options_source" >/dev/null 2>&1; then
+  if printf '%s\n%s\n' "$parse_body" "$execute_body" | \
+      grep -F "$forbidden" >/dev/null 2>&1; then
     echo "forbidden exact run-inspection command policy: $forbidden" >&2
     exit 1
   fi

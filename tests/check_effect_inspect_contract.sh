@@ -163,8 +163,3 @@ for forbidden in \
     exit 1
   fi
 done
-
-if grep -R -F 'inspect-effect' "$srcdir/cli" >/dev/null 2>&1; then
-  echo 'effect-attempt inspection CLI appeared before its release boundary' >&2
-  exit 1
-fi
