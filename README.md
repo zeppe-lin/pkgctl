@@ -6,6 +6,22 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.24.0 provides the first concrete native per-dispatch effect source.
+`posix_transaction_effect_driver_source` is deliberately caller-configured: the
+caller chooses the application and lifecycle backends, canonical state store,
+replayable-archive source, and target lock directory. The source duplicates the
+directory descriptor, acquires one fresh nonblocking POSIX outer lease for the
+exact handoff, and derives the application projection from canonical state
+through `libpkgstate-apply` while that lease is live.
+
+Incoming archives are opened through caller authority and admitted only when
+both package-image and inspection-receipt identities match the sealed incoming
+package authority. Fresh continuation and resulting-state observation share one
+lease lifetime; terminal state observation and publication reconciliation
+receive only their classifier-selected target-scoped authority. The library
+still discovers no paths, credentials, archives, backends, retries, or policy,
+and the executable exposes no mutating command.
+
 Release 0.23.0 separates per-dispatch effect continuation from canonical-state
 observation and publication reconciliation. Fresh operation execution now
 requires a call-scoped continuation driver and a distinct resulting-state

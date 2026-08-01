@@ -78,6 +78,20 @@ Every release must establish:
 - proof that all exposed CLI commands remain read-only, including exact run and
   effect inspection;
 - release, source, manual, shell, and patch-hygiene contracts.
+- caller-configured native effect sources duplicate and retain only the selected
+  lock-directory descriptor while borrowing explicit backends and stores;
+- replayable incoming archives must match both the exact package-image and
+  inspection-receipt identities, while removal never consults archive authority;
+- fresh execution and continuation recovery derive state through the
+  lease-bound canonical-state adapter and share one live POSIX lease across the
+  continuation driver and resulting-state observer;
+- dropping one shared authority does not release the lease while the other
+  remains live, concurrent acquisition fails nonblocking, and full destruction
+  permits a fresh acquisition with a new lease identity;
+- terminal-success recovery acquires only a state observer, publication recovery
+  acquires only publication authority, and neither path opens an archive;
+- invalid lock descriptors, absent archives, foreign images, and foreign
+  inspection receipts fail before executable target authority is returned;
 - continuation, resulting-state observation, and publication reconciliation
   represented as distinct call-scoped authorities;
 - fresh execution requires continuation and observation bound to the same live

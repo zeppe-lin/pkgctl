@@ -13,6 +13,62 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.24.0 native effect-runtime boundary
+
+Release 0.24.0 implements the abstract per-dispatch source without moving
+selection policy into the controller:
+
+```text
+caller-selected backends, canonical store, archive source, lock directory
+                                |
+                                v
+                   exact semantic dispatch handoff
+                                |
+                 archive admission before target lock
+                                |
+                                v
+              fresh nonblocking POSIX outer target lease
+                                |
+              +-----------------+------------------+
+              |                                    |
+ lease-bound canonical projection          target-scoped read
+              |                                    |
+              +----------- exact authority shape--+
+```
+
+The source is one configured target-runtime mechanism, not a global service
+locator. It duplicates the caller-opened lock-directory descriptor but borrows
+the selected application backend, lifecycle execution backend, canonical state
+store, and archive source. Those borrowed authorities must outlive the source
+and every acquisition call. No path, credential, backend, archive, store, or
+policy is inferred from a durable identity.
+
+`acquire_transaction_effect_archive()` validates replay authority before target
+locking. An incoming request must receive one archive whose package-image and
+inspection-receipt identities exactly match the admitted incoming authority. A
+removal request receives no archive and does not call the source. Archive
+selection remains caller authority; pkgctl validates only the returned fact.
+
+For continuation, the source acquires a fresh POSIX outer lease and calls
+`pkgstate::apply_adapter::read_application_state()`. That adapter performs the
+canonical read under the live lease and derives the exact projection evidence.
+The resulting continuation driver and state observer share one owned runtime,
+so destroying either object cannot release the lease while the other still
+exists. Any archive, lease, or state-admission failure unwinds without retaining
+physical authority.
+
+Recovery remains classifier-driven. Continuation checkpoints receive the same
+lease-bound continuation/observer pair. Terminal success receives a new
+lease-bound state observer without an obsolete application projection.
+Publication recovery receives a target-scoped publication driver and no archive
+or lifecycle/application authority. Terminal failure and external-resolution
+checkpoints acquire nothing.
+
+This boundary composes existing mechanisms; it does not initialize stores,
+construct backends, choose credentials, enumerate archives, discover lock
+locations, wait for locks, retry, schedule, append journals, clean up history, or
+expose a mutating frontend command.
+
 ## Release 0.23.0 split effect-authority boundary
 
 Release 0.23.0 separates three physical capabilities that the previous

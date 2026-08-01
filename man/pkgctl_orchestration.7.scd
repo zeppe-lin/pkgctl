@@ -27,6 +27,34 @@ opens one explicitly named existing POSIX transaction-run store for
 effect-attempt store for *inspect-effect*. Neither command creates its store or
 writer lock.
 
+# CALLER-CONFIGURED POSIX EFFECT RUNTIME
+
+Version 0.24.0 provides *posix_transaction_effect_driver_source*, a concrete
+implementation of the per-dispatch source. The caller supplies an already-open
+lock-directory descriptor, one application backend, one lifecycle execution
+backend, one canonical state store, and one replayable-archive source. The
+source duplicates the directory descriptor and borrows the remaining
+mechanisms; it does not derive them from journal identities or discover them
+from the host.
+
+For an incoming package, *acquire_transaction_effect_archive* asks the caller's
+source for one archive and validates its package-image and inspection-receipt
+identities against the exact admitted incoming authority. A removal requests no
+archive. Archive admission occurs before the target lease is acquired.
+
+Fresh execution acquires a nonblocking POSIX outer target lease and derives the
+installed-state projection with the lease-bound *libpkgstate-apply* adapter. The
+continuation driver and resulting-state observer retain one shared lease
+acquisition. Recovery receives the exact classifier-selected shape: the shared
+pair for continuation, a target-scoped observer for terminal success, a
+publication driver for publication reconciliation, or no authority for terminal
+failure and external resolution.
+
+The source performs no path discovery, state-store initialization, backend or
+credential construction, archive enumeration, waiting, retry, scheduling,
+journal I/O, cleanup, or policy selection. Version 0.24.0 changes no command
+syntax and adds no mutating command.
+
 # SPLIT EFFECT CONTINUATION AND STATE AUTHORITY
 
 Version 0.23.0 separates physical continuation from canonical-state observation

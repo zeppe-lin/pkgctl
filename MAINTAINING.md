@@ -81,6 +81,16 @@ not retain or serialize drivers, reuse one driver across dispatches, discover
 leases, stores, archives, credentials, or backend paths, or allow source failure
 to fabricate effect-attempt ownership.
 
+A concrete native effect-driver source may compose only caller-selected
+mechanisms. It may duplicate an already-open lock-directory descriptor, validate
+one caller-returned replayable archive, acquire the POSIX outer lease, and derive
+application state through the lease-bound canonical-state adapter. It must not
+discover paths, stores, archives, credentials, backends, or policy from durable
+identities. Incoming archive validation must precede target locking; removal
+must not query archive authority. Shared continuation and observation objects
+must retain the same lease until both are destroyed. Recovery must acquire only
+the authority shape selected by the durable effect classifier.
+
 The durable effect-attempt inspection layer may load one committed head
 selected by an exact attempt identity, validate the storage-returned attempt,
 classify the controller-owned record through `assess_effect_restart()`, and

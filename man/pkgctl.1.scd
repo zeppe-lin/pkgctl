@@ -48,10 +48,11 @@ executable commands remain read-only: they never initialize or publish state,
 materialize sources, build packages, inspect artifacts, plan package changes,
 execute lifecycle programs, or apply mutations.
 
-Version 0.23.0 changes no command syntax. Bounded transaction-run advancement
-now keeps effect continuation, resulting-state observation, and publication
-reconciliation as separate call-scoped authorities. The read-only command
-surface remains unchanged.
+Version 0.24.0 changes no command syntax. The controller library now provides
+a caller-configured POSIX per-dispatch effect source that composes the existing
+outer lease, lease-bound state projection, replayable archive, lifecycle,
+application, observation, and publication mechanisms. It performs no resource
+or policy discovery. The read-only command surface remains unchanged.
 
 # COMMANDS
 

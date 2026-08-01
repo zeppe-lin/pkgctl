@@ -1,3 +1,57 @@
+## 0.24.0 - 2026-08-01
+
+### Caller-configured POSIX per-dispatch effect runtime
+
+- Adds `posix_transaction_effect_driver_source`, the first concrete native
+  implementation of the per-dispatch effect-authority source.
+- Requires the caller to select and retain the application backend, lifecycle
+  execution backend, canonical state store, replayable-archive source, and one
+  already-open target lock directory.
+- Duplicates and validates the caller's lock-directory descriptor once, then
+  acquires a fresh nonblocking POSIX outer target mutation lease for each exact
+  execution or recovery handoff.
+- Derives continuation state through the lease-bound `libpkgstate-apply 2.4.0`
+  adapter, so current canonical state and projection evidence cannot be supplied
+  independently or fabricated by the caller.
+- Adds `acquire_transaction_effect_archive()` to open and validate one
+  replayable archive against the incoming authority's exact package-image and
+  inspection-receipt identities; removal requests do not consult the source.
+- Returns continuation and resulting-state observation sharing one lease
+  acquisition for fresh execution and continuation recovery.
+- Returns only target-scoped state observation for terminal success and only
+  publication reconciliation authority for retained publication recovery.
+- Keeps the lease alive until every returned authority sharing that acquisition
+  is destroyed and releases it automatically on acquisition failure.
+- Performs no path discovery, backend construction, credential selection,
+  archive selection, waiting, retry, scheduling, journal I/O, cleanup, or
+  frontend mutation policy.
+- Adds no mutating command.
+
+### Dependency contract
+
+- libpkgsource >= 2.0.0
+- libpkgsource-yaml >= 2.0.0
+- libpkgsource-plan >= 2.0.0
+- libpkgcatalog >= 2.0.0
+- libpkgcatalog-acquire >= 2.0.0
+- libpkgstate >= 2.3.0
+- libpkgstate-plan >= 2.3.0
+- libpkgstate-apply >= 2.4.0
+- libpkgfetch >= 1.0.0
+- libpkgbuild >= 2.0.0
+- libpkgbuild-exec >= 1.0.0
+- libpkgbuild-plan >= 2.0.0
+- libpkgimage >= 0.3.0
+- libpkgplan >= 0.2.0
+- libpkgexec >= 1.3.0
+- libpkgapply >= 2.2.0
+- libpkgapply-posix >= 2.2.0
+- libpkgapply-exec >= 1.0.0
+- libpkgresolve >= 2.0.0
+- libpkgtransaction >= 2.1.0
+- libpkgcheck >= 0.1.0
+- libpkgcheck-exec >= 0.1.1
+
 ## 0.23.0 - 2026-08-01
 
 ### Split effect continuation and state authority
