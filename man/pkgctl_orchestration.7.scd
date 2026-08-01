@@ -12,7 +12,7 @@ the resulting control state.
 
 # READ-ONLY PIPELINE
 
-Version 0.20.0 retains the read-only command pipeline introduced in 0.2.0:
+Version 0.21.0 retains the read-only command pipeline introduced in 0.2.0:
 
 . explicit collection specifications through *libpkgcatalog-acquire*;
 . one sealed *libpkgcatalog* snapshot;
@@ -23,7 +23,29 @@ Version 0.20.0 retains the read-only command pipeline introduced in 0.2.0:
 The canonical state store is opened with *open_existing* for these commands.
 The command frontend does not initialize or publish state. Version 0.19.0 also
 opens one explicitly named existing POSIX transaction-run store for
-*inspect-run*; it never creates the store or writer lock.
+*inspect-run*, and version 0.21.0 opens one explicitly named existing POSIX
+effect-attempt store for *inspect-effect*. Neither command creates its store or
+writer lock.
+
+# EXACT EFFECT-INSPECTION COMMAND
+
+Version 0.21.0 exposes the durable effect-attempt sensor as *pkgctl inspect-effect*. The caller supplies an existing POSIX effect-store path and one
+exact lowercase SHA-256 attempt identity. The frontend opens only that store,
+loads only that attempt, delegates to *inspect_effect_attempt*, and renders the
+existing deterministic report.
+
+The POSIX read path acquires an existing lock through a shared read-only
+descriptor. If a caller-created store has no lock, the reader creates nothing;
+if a writer establishes the lock concurrently, the observation is repeated
+under that lock. Inspection therefore does not require write access and cannot
+initialize the store.
+
+The command does not enumerate attempts, select a latest attempt, traverse a
+run journal, rehydrate lifecycle, application, transaction, publication, or
+state semantics, construct restart authority, invoke a driver, append,
+reconcile, repair, schedule, or mutate. Invalid identity syntax is a usage
+error. Missing stores, missing heads, corrupt stores, and storage-authority
+violations retain typed effect-journal diagnostics.
 
 # DURABLE EFFECT-ATTEMPT INSPECTION
 
@@ -46,8 +68,8 @@ the only read-write, lock-creating, exclusive path.
 
 The sensor performs no attempt enumeration, latest-attempt discovery, run-journal
 traversal, semantic restart rehydration, driver invocation, append,
-reconciliation, repair, scheduling, or mutation. Version 0.20.0 adds no CLI for
-this sensor.
+reconciliation, repair, scheduling, or mutation. Version 0.21.0 exposes only
+this exact read-only sensor through the command frontend.
 
 # EXACT RUN-INSPECTION COMMAND
 

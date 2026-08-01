@@ -101,6 +101,15 @@ select journals, reconstruct progression, inspect effect stores, append, reserve
 execute, reconcile, or repair work. Read-only POSIX loads must not create the
 writer lock or require a writable store.
 
+The exact effect-inspection command may parse one explicit existing store path
+and one lowercase SHA-256 attempt identity, open the POSIX effect store,
+delegate to `inspect_effect_attempt()`, and render the existing report. It must
+not scan or select attempts, derive an attempt from a run journal, rehydrate
+subordinate evidence, construct restart authority, append, reconcile, invoke a
+driver, repair storage, or mutate the target. Typed effect-journal diagnostics
+must remain distinct. Read-only POSIX loads must not create the writer lock or
+require a writable store.
+
 The restart-safe transaction-launch layer may derive one exact journal from an
 immutable initial run and caller-owned replay-safe run nonce, load only that
 journal's committed head, append sequence zero only when no head exists, and

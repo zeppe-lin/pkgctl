@@ -75,8 +75,26 @@ Every release must establish:
 - exact terminal effect-result identity after journal rehydration, independent
   of argument evaluation order;
 - no driver or run append when effect restart requires external resolution;
-- proof that all exposed CLI commands remain read-only, including exact run inspection;
+- proof that all exposed CLI commands remain read-only, including exact run and
+  effect inspection;
 - release, source, manual, shell, and patch-hygiene contracts.
+
+## Exact effect-inspection command tests
+
+The command boundary must prove:
+
+- both the existing store path and exact lowercase attempt identity are required;
+- invalid identity syntax is a usage failure before store access;
+- one valid command emits the existing deterministic effect-attempt report;
+- repeated inspection is deterministic and leaves optional evidence absent;
+- the store contents are byte-identical before and after inspection;
+- inspection succeeds without a writer-lock file and does not recreate it;
+- a missing store is refused without initialization;
+- a missing head and a corrupt head retain distinct typed effect-journal
+  diagnostics;
+- no attempt enumeration, run traversal, semantic rehydration, restart
+  construction, driver invocation, append, reconciliation, repair, or mutating
+  command path is introduced.
 
 ## Durable effect-attempt inspection tests
 

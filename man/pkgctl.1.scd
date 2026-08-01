@@ -15,15 +15,17 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* *inspect-run* *--run-store* _path_ *--journal* _identity_
 
+*pkgctl* *inspect-effect* *--effect-store* _path_ *--attempt* _identity_
+
 *pkgctl* {*-V* | *-h*}
 
 # DESCRIPTION
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.20.0 retains the native catalog, resolution, transaction, and exact
-durable transaction-run inspection commands. The controller library adds one
-read-only durable effect-attempt sensor, but no effect-inspection command.
+Version 0.21.0 retains the native catalog, resolution, transaction, and exact
+durable transaction-run inspection commands and exposes the existing durable
+effect-attempt sensor through one exact read-only command.
 
 The controller library also defines exact one-candidate construction,
 transaction progression, immutable dispatch ownership, durable transaction-run
@@ -33,8 +35,8 @@ conservative restart, one-dispatch restart reconciliation, exact
 caller-supplied run-authority handoffs, durable initial run admission,
 restart-safe bounded transaction launch, read-only durable run and
 effect-attempt inspection, one bounded transaction-run advancement call, and
-bounded serial driving. The *inspect-run* command exposes
-only the existing durable run sensor; no effect-implying command is exposed.
+bounded serial driving. The *inspect-run* and *inspect-effect* commands expose
+only the existing durable sensors; no effect-implying command is exposed.
 Progression reports every graph-ready construction, check, or operation unit.
 Library clients may advance one durable journal by reconciling retained ownership
 or, only when the run is quiescent, reserving and realizing one canonical
@@ -65,6 +67,11 @@ execute lifecycle programs, or apply mutations.
 	Open one explicitly named existing POSIX transaction-run store, inspect one
 	exact journal head, and print the deterministic durable-run report. The
 	command neither enumerates journals nor rehydrates package semantics.
+
+*inspect-effect*
+	Open one explicitly named existing POSIX effect-attempt store, inspect one
+	exact attempt head, and print the deterministic durable-effect report. The
+	command neither enumerates attempts nor traverses a transaction-run journal.
 
 # CATALOG OPTIONS
 
@@ -134,6 +141,15 @@ The following options are all required by *resolve* and *transaction*:
 *--journal* _identity_
 	Select one exact lowercase SHA-256 transaction-run journal identity.
 
+# EFFECT INSPECTION OPTIONS
+
+*--effect-store* _path_
+	Open the existing caller-owned POSIX effect-attempt store at _path_. The
+	command never creates the directory or writer lock.
+
+*--attempt* _identity_
+	Select one exact lowercase SHA-256 effect-attempt identity.
+
 # OUTPUT
 
 The output is a deterministic line-oriented diagnostic report containing exact
@@ -147,7 +163,7 @@ summaries. It is not a persistent state format or a versioned IPC protocol.
 
 *1*
 	An acquisition, source, catalog, state, resolution, transaction, run-journal,
-	or controller authority refused or failed.
+	effect-journal, or controller authority refused or failed.
 
 *2*
 	The command line is invalid or incomplete.

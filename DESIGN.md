@@ -13,6 +13,43 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.21.0 exact effect-inspection command boundary
+
+Release 0.21.0 exposes the existing durable effect sensor through one exact
+read-only command:
+
+```text
+explicit effect-store path + exact attempt identity
+                       |
+                       v
+         open existing POSIX effect store
+                       |
+                       v
+             inspect one committed head
+                       |
+                       v
+          deterministic inspection report
+```
+
+`pkgctl inspect-effect` accepts both coordinates explicitly. It neither scans
+the store nor derives an attempt from a transaction-run journal. The command
+opens an existing caller-owned POSIX store, calls `inspect_effect_attempt()`,
+and emits the already-defined deterministic report. Invalid attempt syntax is a
+usage error; store access, missing-head, corruption, and storage-authority
+failures retain typed effect-journal diagnostics.
+
+The command inherits the sensor's non-mutating POSIX reader protocol. An
+existing writer lock is opened read-only and acquired shared; an absent lock is
+not created, and a concurrent writer establishment is detected and rechecked.
+The frontend therefore requires no write authority and performs no store
+initialization.
+
+The command performs no attempt enumeration, latest-attempt selection,
+run-journal traversal, semantic evidence rehydration, restart checkpoint
+construction, driver invocation, append, reconciliation, repair, scheduling, or
+mutation. It is a frontend for the qualified sensor, not a second effect
+controller.
+
 ## Release 0.20.0 durable effect-attempt inspection boundary
 
 Release 0.20.0 adds the read-only sensor paired with the durable effect

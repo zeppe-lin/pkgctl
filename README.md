@@ -6,21 +6,26 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.20.0 establishes read-only inspection of one exact durable
-effect-attempt journal. `inspect_effect_attempt()` loads only the caller-selected
-committed head, validates the store-returned attempt authority, and pairs the
-storage-derived `effect_attempt_record` with the existing pure
-`effect_restart_assessment`. The deterministic report exposes controller-owned
-record, predecessor, lifecycle-result, application, transaction, publication,
-terminal, and reconciled-state identities without rehydrating any of them.
+Release 0.21.0 exposes exact durable effect-attempt inspection on the read-only
+command surface:
 
-The POSIX effect store now mirrors the run store's non-mutating reader protocol:
-an existing lock is opened `O_RDONLY` and held with `LOCK_SH`; an absent lock
-permits one unlocked read followed by a recheck if a writer establishes it. A
-read creates and modifies nothing. Append remains the sole `O_RDWR | O_CREAT`
-and `LOCK_EX` path. This release adds no effect-inspection command, attempt
-enumeration, run-journal traversal, semantic recovery, driver invocation,
-append, reconciliation, repair, or mutation.
+```sh
+pkgctl inspect-effect --effect-store /path/to/effect-store --attempt SHA256
+```
+
+The command opens only the explicitly named existing POSIX store and loads only
+the explicitly named attempt. It delegates classification to
+`inspect_effect_attempt()` and output to `render_report()`; it does not scan for
+attempts, traverse run journals, rehydrate subordinate semantics, construct
+restart authority, invoke a driver, append, reconcile, repair, or mutate
+anything. Effect-journal failures retain their typed diagnostics, and read-only
+store access does not create or open the writer lock for writing.
+
+Release 0.20.0 established the underlying durable sensor. It pairs one
+storage-derived `effect_attempt_record` with the existing pure
+`effect_restart_assessment` and reports controller-owned record, predecessor,
+lifecycle, application, transaction, publication, terminal, and reconciled
+state identities without promoting any identity into semantic evidence.
 
 Release 0.19.0 exposes exact durable transaction-run inspection on the
 read-only command surface:
