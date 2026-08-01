@@ -20,6 +20,9 @@ for required in \
   'class effectful_operation_request final' \
   'class effectful_operation_session final' \
   'class transaction_effect_driver' \
+  'class transaction_effect_state_observer' \
+  'class transaction_effect_publication_driver' \
+  'class native_transaction_effect_publication_driver final' \
   'pkgapply::validate_target_mutation_lease' \
   'pkgstate::apply_adapter::project_completed_application' \
   'driver.execute_lifecycle' \

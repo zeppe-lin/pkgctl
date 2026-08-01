@@ -28,7 +28,9 @@ for required in \
   'reconcile_construction_dispatch_durable' \
   'reconcile_check_dispatch_durable' \
   'reconcile_operation_dispatch_durable' \
-  'operation_reconciliation_requires_driver' \
+  'operation_reconciliation_requires_continuation_driver' \
+  'operation_reconciliation_requires_state_observer' \
+  'operation_reconciliation_requires_publication_driver' \
   'transaction_dispatch_restart_disposition::release_reserved' \
   'transaction_dispatch_restart_disposition::recover_construction' \
   'transaction_dispatch_restart_disposition::recover_check' \
@@ -100,7 +102,8 @@ ordered_tokens "$operation_body" \
   'assess_effect_restart' \
   'automatically_continuable' \
   'resume_effectful_operation' \
-  'driver->read_state()' \
+  'validate_target_mutation_lease_scope' \
+  'observer->read_state()' \
   'submit_operation_dispatch_result' \
   'commit_transaction_run_successor'
 

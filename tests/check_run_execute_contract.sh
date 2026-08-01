@@ -35,7 +35,9 @@ for required in \
   'complete_construction_dispatch' \
   'complete_check_dispatch' \
   'submit_operation_dispatch_result' \
-  'driver.read_state()' \
+  'transaction_effect_state_observer& resulting_state' \
+  'validate_target_mutation_lease_scope' \
+  'resulting_state.read_state()' \
   'run store returned foreign committed authority'; do
   grep -F "$required" "$header" "$source" "$commit_header" "$commit_source" \
     >/dev/null || {
@@ -80,8 +82,9 @@ operation_body=$(sed -n \
   '/^execute_operation_dispatch_durable(/,/^}/p' "$source")
 ordered_tokens "$operation_body" \
   'commit_operation_dispatch_start' \
+  'validate_target_mutation_lease_scope' \
   'execute_effectful_operation_durable' \
-  'driver.read_state()' \
+  'resulting_state.read_state()' \
   'submit_operation_dispatch_result' \
   'commit_transaction_run_successor'
 
