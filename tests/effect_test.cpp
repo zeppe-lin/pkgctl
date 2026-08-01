@@ -13,6 +13,7 @@
 #include <pkgctl/error.h>
 #include <pkgctl/preparation.h>
 #include <pkgctl/run_journal.h>
+#include <pkgctl/run_native.h>
 #include <pkgctl/run_journal_codec.h>
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_advance.h>
@@ -28,6 +29,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <fcntl.h>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -38,6 +40,7 @@
 
 #include <unistd.h>
 
+#include <libpkgapply-posix/mutation_lease.h>
 #include <libpkgbuild/libpkgbuild.h>
 #include <libpkgcatalog/collection.h>
 #include <libpkgimage/inspection_receipt.h>
@@ -1122,6 +1125,181 @@ private:
   std::optional<pkgsource::lifecycle_action> fail_;
   pkgexec::backend_capability_profile capabilities_;
   std::vector<pkgsource::lifecycle_action> actions_;
+};
+
+class unreachable_application_backend final
+    : public pkgapply::application_backend {
+public:
+  unreachable_application_backend()
+      : mutation_(apply_identity<pkgapply::mutation_backend_identity>(121)),
+        observation_(
+            apply_identity<pkgapply::observation_backend_identity>(122)),
+        capabilities_(
+            apply_identity<pkgapply::execution_capability_profile_identity>(
+                123))
+  {
+  }
+
+  const pkgapply::mutation_backend_identity& identity() const noexcept override
+  {
+    return mutation_;
+  }
+
+  const pkgapply::observation_backend_identity&
+  observation_identity() const noexcept override
+  {
+    return observation_;
+  }
+
+  const pkgapply::execution_capability_profile_identity&
+  capabilities() const noexcept override
+  {
+    return capabilities_;
+  }
+
+  std::unique_ptr<pkgapply::application_backend_transaction>
+  begin_with_incoming_image(
+      const pkgapply::package_application_request&,
+      pkgapply::target_mutation_lease&,
+      const pkgimage::package_image&) override
+  {
+    throw std::runtime_error("unexpected native application execution");
+  }
+
+  std::unique_ptr<pkgapply::application_backend_transaction>
+  begin_without_incoming_image(
+      const pkgapply::package_application_request&,
+      pkgapply::target_mutation_lease&) override
+  {
+    throw std::runtime_error("unexpected native removal execution");
+  }
+
+private:
+  pkgapply::mutation_backend_identity mutation_;
+  pkgapply::observation_backend_identity observation_;
+  pkgapply::execution_capability_profile_identity capabilities_;
+};
+
+class fixed_package_archive final : public pkgimage::package_archive {
+public:
+  explicit fixed_package_archive(
+      const pkgimage::inspected_package_image& inspected)
+      : image_(inspected.image()), receipt_(inspected.receipt())
+  {
+  }
+
+  fixed_package_archive(
+      pkgimage::package_image image,
+      pkgimage::archive_inspection_receipt receipt)
+      : image_(std::move(image)), receipt_(std::move(receipt))
+  {
+  }
+
+  const pkgimage::package_image& image() const noexcept override
+  {
+    return image_;
+  }
+
+  const pkgimage::archive_inspection_receipt&
+  inspection_receipt() const noexcept override
+  {
+    return receipt_;
+  }
+
+  void replay(
+      const pkgimage::entry_selection&,
+      pkgimage::payload_sink&) const override
+  {
+    throw std::runtime_error("unexpected native archive replay");
+  }
+
+private:
+  pkgimage::package_image image_;
+  pkgimage::archive_inspection_receipt receipt_;
+};
+
+class fixed_effect_archive_source final
+    : public pkgctl::transaction_effect_archive_source {
+public:
+  explicit fixed_effect_archive_source(
+      pkgimage::inspected_package_image inspected)
+      : inspected_(std::move(inspected))
+  {
+  }
+
+  std::unique_ptr<pkgimage::package_archive> open_archive(
+      const pkgapply::incoming_package_authority& incoming) override
+  {
+    ++calls_;
+    requested_ = incoming.identity();
+    return std::make_unique<fixed_package_archive>(inspected_);
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgapply::incoming_package_authority_identity>&
+  requested() const noexcept { return requested_; }
+
+private:
+  pkgimage::inspected_package_image inspected_;
+  std::size_t calls_ = 0U;
+  std::optional<pkgapply::incoming_package_authority_identity> requested_;
+};
+
+class forbidden_effect_archive_source final
+    : public pkgctl::transaction_effect_archive_source {
+public:
+  std::unique_ptr<pkgimage::package_archive> open_archive(
+      const pkgapply::incoming_package_authority&) override
+  {
+    ++calls_;
+    throw std::runtime_error("unexpected removal archive acquisition");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  std::size_t calls_ = 0U;
+};
+
+class missing_effect_archive_source final
+    : public pkgctl::transaction_effect_archive_source {
+public:
+  std::unique_ptr<pkgimage::package_archive> open_archive(
+      const pkgapply::incoming_package_authority&) override
+  {
+    ++calls_;
+    return nullptr;
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  std::size_t calls_ = 0U;
+};
+
+class mismatched_receipt_archive_source final
+    : public pkgctl::transaction_effect_archive_source {
+public:
+  mismatched_receipt_archive_source(
+      pkgimage::package_image image,
+      pkgimage::archive_inspection_receipt receipt)
+      : image_(std::move(image)), receipt_(std::move(receipt))
+  {
+  }
+
+  std::unique_ptr<pkgimage::package_archive> open_archive(
+      const pkgapply::incoming_package_authority&) override
+  {
+    ++calls_;
+    return std::make_unique<fixed_package_archive>(image_, receipt_);
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  pkgimage::package_image image_;
+  pkgimage::archive_inspection_receipt receipt_;
+  std::size_t calls_ = 0U;
 };
 
 class mutation_lease final : public pkgapply::target_mutation_lease {
@@ -2794,6 +2972,347 @@ private:
   std::size_t recovery_calls_ = 0U;
 };
 
+pkgctl::transaction_dispatch_execution_handoff
+make_operation_execution_handoff(
+    const pkgctl::effectful_operation_session& session,
+    std::uint8_t marker)
+{
+  auto run = pkgctl::transaction_run::begin(
+      pkgctl::transaction_progress::begin(session.request().transaction()),
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, dispatch_journal_nonce(marker));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(marker));
+  if (!reservation.dispatch || reservation.dispatch->unit().kind() !=
+          pkgctl::transaction_unit_kind::operation)
+    throw std::runtime_error("native source fixture did not reserve operation");
+  auto reserved = admitted.successor(reservation.run);
+  operation_execution_authority_source source(
+      session, effect_nonce(marker));
+  return pkgctl::acquire_transaction_dispatch_execution_authority(
+      std::move(reserved), std::move(reservation.run),
+      *reservation.dispatch, source);
+}
+
+pkgctl::transaction_dispatch_recovery_handoff
+make_operation_recovery_handoff(
+    const pkgctl::effect_restart_checkpoint& effect,
+    std::uint8_t marker)
+{
+  auto run = pkgctl::transaction_run::begin(
+      pkgctl::transaction_progress::begin(
+          effect.session().request().transaction()),
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, dispatch_journal_nonce(marker));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(marker));
+  if (!reservation.dispatch || reservation.dispatch->unit().kind() !=
+          pkgctl::transaction_unit_kind::operation)
+    throw std::runtime_error("native recovery fixture did not reserve operation");
+  auto reserved = admitted.successor(reservation.run);
+  auto started = pkgctl::start_operation_dispatch(
+      reservation.run, *reservation.dispatch, effect.session(),
+      effect.record().nonce());
+  auto started_record = reserved.successor(started.run);
+  operation_recovery_authority_source source(effect);
+  return pkgctl::acquire_transaction_dispatch_recovery_authority(
+      pkgctl::transaction_run_restart_checkpoint::make(
+          started.run.progress(), std::move(started_record)),
+      *reservation.dispatch, source);
+}
+
+int open_directory(const std::filesystem::path& path)
+{
+  const int fd = ::open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+  if (fd < 0)
+    throw std::runtime_error("cannot open native source lock directory");
+  return fd;
+}
+
+void check_native_effect_archive_source()
+{
+  fixture value;
+  fixed_effect_archive_source exact(value.incoming.image());
+  auto archive = pkgctl::acquire_transaction_effect_archive(
+      exact, pkgapply::package_application_request(value.application));
+  CHECK(archive != nullptr);
+  CHECK(exact.calls() == 1U);
+  CHECK(exact.requested() ==
+        std::optional<pkgapply::incoming_package_authority_identity>(
+            value.incoming.identity()));
+  CHECK(archive &&
+        archive->image().identity() == value.incoming.image().image().identity());
+  CHECK(archive && archive->inspection_receipt().identity() ==
+        value.incoming.image().receipt().identity());
+
+  fixed_effect_archive_source foreign(incoming_image(9U));
+  bool foreign_refused = false;
+  try
+  {
+    (void)pkgctl::acquire_transaction_effect_archive(
+        foreign, pkgapply::package_application_request(value.application));
+  }
+  catch (const pkgctl::native_effect_source_error& problem)
+  {
+    foreign_refused = problem.code() ==
+        pkgctl::native_effect_source_error_code::archive_image_mismatch;
+  }
+  CHECK(foreign_refused);
+
+  missing_effect_archive_source missing;
+  bool missing_refused = false;
+  try
+  {
+    (void)pkgctl::acquire_transaction_effect_archive(
+        missing, pkgapply::package_application_request(value.application));
+  }
+  catch (const pkgctl::native_effect_source_error& problem)
+  {
+    missing_refused = problem.code() ==
+        pkgctl::native_effect_source_error_code::archive_missing;
+  }
+  CHECK(missing_refused);
+  CHECK(missing.calls() == 1U);
+
+  const auto alternate = incoming_image(8U);
+  mismatched_receipt_archive_source mismatched_receipt(
+      value.incoming.image().image(), alternate.receipt());
+  bool receipt_refused = false;
+  try
+  {
+    (void)pkgctl::acquire_transaction_effect_archive(
+        mismatched_receipt,
+        pkgapply::package_application_request(value.application));
+  }
+  catch (const pkgctl::native_effect_source_error& problem)
+  {
+    receipt_refused = problem.code() ==
+        pkgctl::native_effect_source_error_code::archive_receipt_mismatch;
+  }
+  CHECK(receipt_refused);
+  CHECK(mismatched_receipt.calls() == 1U);
+
+  removal_fixture removal;
+  forbidden_effect_archive_source unused;
+  auto absent = pkgctl::acquire_transaction_effect_archive(
+      unused, pkgapply::package_application_request(removal.application));
+  CHECK(absent == nullptr);
+  CHECK(unused.calls() == 0U);
+}
+
+void check_native_effect_driver_source()
+{
+  removal_fixture value;
+  const auto session = pkgctl::effectful_operation_session::admit(
+      effect_request(value), value.before, value.after);
+  const auto handoff = make_operation_execution_handoff(session, 101U);
+
+  const auto locks = value.temp.path() / "native-effect-locks";
+  std::filesystem::create_directory(locks);
+  const int lock_fd = open_directory(locks);
+  unreachable_application_backend application_backend;
+  scripted_execution_backend lifecycle_backend;
+  forbidden_effect_archive_source archives;
+  auto source =
+      pkgctl::posix_transaction_effect_driver_source::from_lock_directory_fd(
+          lock_fd, application_backend, lifecycle_backend,
+          value.store, archives);
+  CHECK(::close(lock_fd) == 0);
+
+  auto drivers = source->acquire_execution_drivers(handoff);
+  CHECK(drivers.continuation != nullptr);
+  CHECK(drivers.resulting_state != nullptr);
+  CHECK(archives.calls() == 0U);
+  CHECK(drivers.continuation &&
+        drivers.continuation->lease().held());
+  CHECK(drivers.continuation && drivers.resulting_state &&
+        drivers.continuation->lease().identity() ==
+            drivers.resulting_state->lease().identity());
+  CHECK(drivers.continuation &&
+        drivers.continuation->state_projection().snapshot().string() ==
+            value.expected.identity().string());
+  CHECK(drivers.continuation &&
+        drivers.continuation->state_projection().ownership_inventory().string() ==
+            value.expected.ownership_identity().string());
+  CHECK(drivers.resulting_state &&
+        drivers.resulting_state->read_state().identity() ==
+            value.expected.identity());
+
+  bool busy = false;
+  try
+  {
+    (void)source->acquire_execution_drivers(handoff);
+  }
+  catch (const pkgapply::posix::target_mutation_lease_error& problem)
+  {
+    busy = problem.code() ==
+        pkgapply::posix::target_mutation_lease_error_code::lock_busy;
+  }
+  CHECK(busy);
+
+  const auto first_lease = drivers.continuation->lease().identity();
+  drivers.continuation.reset();
+  busy = false;
+  try
+  {
+    (void)source->acquire_execution_drivers(handoff);
+  }
+  catch (const pkgapply::posix::target_mutation_lease_error& problem)
+  {
+    busy = problem.code() ==
+        pkgapply::posix::target_mutation_lease_error_code::lock_busy;
+  }
+  CHECK(busy);
+  drivers.resulting_state.reset();
+  auto repeated = source->acquire_execution_drivers(handoff);
+  CHECK(repeated.continuation != nullptr);
+  CHECK(repeated.resulting_state != nullptr);
+  CHECK(repeated.continuation && repeated.resulting_state &&
+        repeated.continuation->lease().identity() ==
+            repeated.resulting_state->lease().identity());
+  CHECK(repeated.continuation &&
+        repeated.continuation->lease().identity() != first_lease);
+
+  bool invalid_descriptor = false;
+  try
+  {
+    (void)pkgctl::posix_transaction_effect_driver_source::
+        from_lock_directory_fd(
+            -1, application_backend, lifecycle_backend,
+            value.store, archives);
+  }
+  catch (const pkgctl::native_effect_source_error& problem)
+  {
+    invalid_descriptor = problem.code() ==
+        pkgctl::native_effect_source_error_code::lock_directory_invalid;
+  }
+  CHECK(invalid_descriptor);
+}
+
+void check_native_effect_recovery_source()
+{
+  removal_fixture value;
+  const auto session = pkgctl::effectful_operation_session::admit(
+      effect_request(value), value.before, value.after);
+  unreachable_application_backend application_backend;
+  scripted_execution_backend lifecycle_backend;
+  forbidden_effect_archive_source archives;
+  const auto locks = value.temp.path() / "native-recovery-locks";
+  std::filesystem::create_directory(locks);
+  const int lock_fd = open_directory(locks);
+  auto source =
+      pkgctl::posix_transaction_effect_driver_source::from_lock_directory_fd(
+          lock_fd, application_backend, lifecycle_backend,
+          value.store, archives);
+  CHECK(::close(lock_fd) == 0);
+
+  const auto admission = pkgctl::effect_attempt_record::admit(
+      session.identity(), session.before().size(), session.after().size(),
+      effect_nonce(103U));
+  const auto continuation_checkpoint = pkgctl::effect_restart_checkpoint::make(
+      session, admission, {}, std::nullopt, {},
+      std::nullopt, std::nullopt, std::nullopt);
+  const auto continuation_handoff =
+      make_operation_recovery_handoff(continuation_checkpoint, 103U);
+  auto continuation =
+      source->acquire_recovery_drivers(continuation_handoff);
+  CHECK(continuation.continuation != nullptr);
+  CHECK(continuation.resulting_state != nullptr);
+  CHECK(continuation.publication == nullptr);
+  CHECK(continuation.continuation && continuation.resulting_state &&
+        continuation.continuation->lease().identity() ==
+            continuation.resulting_state->lease().identity());
+  CHECK(archives.calls() == 0U);
+  continuation = {};
+
+  driver actuator(value.projection, value.outer_lease,
+                  value.receipt, value.store);
+  memory_effect_journal_store journal;
+  const auto completed = pkgctl::execute_effectful_operation_durable(
+      session, effect_nonce(104U), actuator, journal);
+  const auto completed_admission = pkgctl::effect_attempt_record::admit(
+      session.identity(), session.before().size(), session.after().size(),
+      effect_nonce(104U));
+  const auto completed_record = journal.load_latest(
+      completed_admission.attempt());
+  CHECK(completed_record.has_value());
+  if (completed_record)
+  {
+    const auto terminal_checkpoint = pkgctl::effect_restart_checkpoint::make(
+        session, *completed_record, completed.before(), completed.application(),
+        completed.after(), completed.publication_request(),
+        completed.publication_receipt(), std::nullopt);
+    const auto terminal_handoff =
+        make_operation_recovery_handoff(terminal_checkpoint, 104U);
+    auto terminal = source->acquire_recovery_drivers(terminal_handoff);
+    CHECK(terminal.continuation == nullptr);
+    CHECK(terminal.resulting_state != nullptr);
+    CHECK(terminal.publication == nullptr);
+    CHECK(terminal.resulting_state &&
+          terminal.resulting_state->read_state().identity() ==
+              value.store.read().identity());
+  }
+
+  removal_fixture publication_value;
+  const auto publication_session = pkgctl::effectful_operation_session::admit(
+      effect_request(publication_value), publication_value.before,
+      publication_value.after);
+  driver interrupted(
+      publication_value.projection, publication_value.outer_lease,
+      publication_value.receipt, publication_value.store,
+      std::nullopt, lease_release_point::never, publication_mode::native,
+      crash_point::publication_before_store);
+  memory_effect_journal_store publication_journal;
+  try
+  {
+    (void)pkgctl::execute_effectful_operation_durable(
+        publication_session, effect_nonce(105U), interrupted,
+        publication_journal);
+  }
+  catch (const std::runtime_error&)
+  {
+  }
+  const auto publication_admission = pkgctl::effect_attempt_record::admit(
+      publication_session.identity(), publication_session.before().size(),
+      publication_session.after().size(), effect_nonce(105U));
+  const auto publication_record = publication_journal.load_latest(
+      publication_admission.attempt());
+  CHECK(publication_record.has_value());
+  if (publication_record)
+  {
+    std::vector<pkgapply_exec::lifecycle_execution_result> before{
+        interrupted.lifecycle_results().front()};
+    std::vector<pkgapply_exec::lifecycle_execution_result> after{
+        interrupted.lifecycle_results().back()};
+    const auto publication_checkpoint =
+        pkgctl::effect_restart_checkpoint::make(
+            publication_session, *publication_record, std::move(before),
+            publication_value.receipt, std::move(after),
+            interrupted.last_publication_request(), std::nullopt,
+            std::nullopt);
+    const auto publication_handoff =
+        make_operation_recovery_handoff(publication_checkpoint, 105U);
+
+    forbidden_effect_archive_source publication_archives;
+    const auto publication_locks =
+        publication_value.temp.path() / "native-recovery-locks";
+    std::filesystem::create_directory(publication_locks);
+    const int publication_fd = open_directory(publication_locks);
+    auto publication_source =
+        pkgctl::posix_transaction_effect_driver_source::
+            from_lock_directory_fd(
+                publication_fd, application_backend, lifecycle_backend,
+                publication_value.store, publication_archives);
+    CHECK(::close(publication_fd) == 0);
+    auto publication =
+        publication_source->acquire_recovery_drivers(publication_handoff);
+    CHECK(publication.continuation == nullptr);
+    CHECK(publication.resulting_state == nullptr);
+    CHECK(publication.publication != nullptr);
+    CHECK(publication_archives.calls() == 0U);
+  }
+}
+
 void check_operation_start_commit_protocol()
 {
   removal_fixture value;
@@ -4225,6 +4744,9 @@ int main()
   check_durable_operation_execution();
   check_durable_operation_reconciliation();
   check_run_authority_rehydration();
+  check_native_effect_archive_source();
+  check_native_effect_driver_source();
+  check_native_effect_recovery_source();
   check_single_step_operation_advancement();
   return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

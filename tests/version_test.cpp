@@ -3,7 +3,7 @@
 #include <pkgctl/version.h>
 #include <string_view>
 static_assert(pkgctl::version_major == 0);
-static_assert(pkgctl::version_minor == 23);
+static_assert(pkgctl::version_minor == 24);
 static_assert(pkgctl::version_patch == 0);
 int main()
 {
