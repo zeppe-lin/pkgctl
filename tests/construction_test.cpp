@@ -12,11 +12,20 @@
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_restart.h>
+#include <pkgctl/run_runtime.h>
 
+#include <cerrno>
 #include <cstdint>
+#include <cstring>
+#include <filesystem>
+#include <fcntl.h>
 #include <iostream>
+#include <iterator>
+#include <memory>
 #include <optional>
 #include <vector>
+
+#include <unistd.h>
 
 namespace {
 
@@ -54,6 +63,11 @@ public:
     ++calls_;
     requested_record_ = record.identity();
     return progress_;
+  }
+
+  void replace(pkgctl::transaction_progress progress)
+  {
+    progress_ = std::move(progress);
   }
 
   std::size_t calls() const noexcept { return calls_; }
@@ -455,6 +469,95 @@ public:
     throw std::runtime_error("reserved recovery requested operation evidence");
   }
 };
+
+class forbidden_runtime_archive_source final
+    : public pkgctl::transaction_effect_archive_source {
+public:
+  std::unique_ptr<pkgimage::package_archive> open_archive(
+      const pkgapply::incoming_package_authority&) override
+  {
+    ++calls_;
+    throw std::runtime_error("construction runtime requested an archive");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  std::size_t calls_ = 0U;
+};
+
+class unreachable_runtime_application_backend final
+    : public pkgapply::application_backend {
+public:
+  unreachable_runtime_application_backend()
+      : mutation_(apply_identity<pkgapply::mutation_backend_identity>(201U)),
+        observation_(
+            apply_identity<pkgapply::observation_backend_identity>(202U)),
+        capabilities_(
+            apply_identity<pkgapply::execution_capability_profile_identity>(
+                203U))
+  {
+  }
+
+  const pkgapply::mutation_backend_identity& identity() const noexcept override
+  {
+    return mutation_;
+  }
+
+  const pkgapply::observation_backend_identity&
+  observation_identity() const noexcept override
+  {
+    return observation_;
+  }
+
+  const pkgapply::execution_capability_profile_identity&
+  capabilities() const noexcept override
+  {
+    return capabilities_;
+  }
+
+  std::unique_ptr<pkgapply::application_backend_transaction>
+  begin_with_incoming_image(
+      const pkgapply::package_application_request&,
+      pkgapply::target_mutation_lease&,
+      const pkgimage::package_image&) override
+  {
+    throw std::runtime_error(
+        "construction runtime reached incoming application authority");
+  }
+
+  std::unique_ptr<pkgapply::application_backend_transaction>
+  begin_without_incoming_image(
+      const pkgapply::package_application_request&,
+      pkgapply::target_mutation_lease&) override
+  {
+    throw std::runtime_error(
+        "construction runtime reached removal application authority");
+  }
+
+private:
+  pkgapply::mutation_backend_identity mutation_;
+  pkgapply::observation_backend_identity observation_;
+  pkgapply::execution_capability_profile_identity capabilities_;
+};
+
+int open_runtime_directory(const std::filesystem::path& path)
+{
+  const int fd = ::open(
+      path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+  if (fd < 0)
+    throw std::runtime_error(
+        "cannot open runtime test directory: " +
+        std::string(std::strerror(errno)));
+  return fd;
+}
+
+std::size_t directory_entry_count(const std::filesystem::path& path)
+{
+  return static_cast<std::size_t>(
+      std::distance(std::filesystem::directory_iterator(path),
+                    std::filesystem::directory_iterator()));
+}
 
 class throwing_construction_driver final : public pkgctl::construction_driver {
 public:
@@ -1750,6 +1853,127 @@ void check_single_step_transaction_advancement()
 
 
 
+
+void check_posix_transaction_run_runtime()
+{
+  test_support::temporary_directory temporary;
+  const auto state_path = temporary.path() / "state";
+  test_support::initialize_state(state_path);
+  pkgstate::canonical_generation_store state_store(
+      state_path, test_support::binding());
+
+  const std::string payload = "runtime construction payload\n";
+  auto transaction = transaction_session(
+      tool_source(sha256_text(payload), "1.0", false), {},
+      state_store.read(), state_path);
+  auto progress = pkgctl::transaction_progress::begin(transaction);
+  auto session = construction_session_without_inputs(
+      transaction, temporary.path() / "construction");
+  test_support::write(session.paths().local_source_root / "payload", payload);
+
+  fixed_progress_source progress_source(progress);
+  std::vector<std::string> nonce_trace;
+  replay_run_nonce_source run_nonces(211U, nonce_trace);
+  head_derived_nonce_source dispatch_nonces(212U);
+  construction_execution_authority_source execution(std::move(session));
+  unreachable_recovery_authority_source recovery;
+  forbidden_runtime_archive_source archives;
+  fixture_backend execution_backend(backend_mode::succeed);
+  unreachable_runtime_application_backend application_backend;
+
+  const auto run_path = temporary.path() / "run-store";
+  const auto selected_run_path = temporary.path() / "run-store-selected";
+  const auto effect_path = temporary.path() / "effect-store";
+  const auto lock_path = temporary.path() / "target-locks";
+  std::filesystem::create_directory(run_path);
+  std::filesystem::create_directory(effect_path);
+  std::filesystem::create_directory(lock_path);
+
+  const int run_fd = open_runtime_directory(run_path);
+  const int effect_fd = open_runtime_directory(effect_path);
+  const int lock_fd = open_runtime_directory(lock_path);
+  auto runtime = pkgctl::posix_transaction_run_runtime::from_directory_fds(
+      run_fd, effect_fd, lock_fd,
+      {run_nonces, dispatch_nonces, progress_source, execution, recovery,
+       archives},
+      {execution_backend, execution_backend, application_backend,
+       execution_backend, state_store});
+  CHECK(::close(run_fd) == 0);
+  CHECK(::close(effect_fd) == 0);
+  CHECK(::close(lock_fd) == 0);
+
+  std::filesystem::rename(run_path, selected_run_path);
+  std::filesystem::create_directory(run_path);
+
+  const auto result = runtime->launch(
+      progress, pkgctl::transaction_dispatch_policy::make(1U, 1U),
+      pkgctl::transaction_run_drive_policy::make(1U));
+  CHECK(result.origin() == pkgctl::transaction_run_launch_origin::admitted);
+  CHECK(result.admission_committed());
+  CHECK(result.drive().disposition() ==
+        pkgctl::transaction_run_drive_disposition::completed);
+  CHECK(result.run().progress().complete());
+  CHECK(result.record().sequence() == 3U);
+  CHECK(result.drive().steps().size() == 1U);
+  CHECK(result.drive().steps().front().disposition() ==
+        pkgctl::transaction_run_advance_disposition::executed_construction);
+  CHECK(run_nonces.calls() == 1U);
+  CHECK(dispatch_nonces.calls() == 1U);
+  CHECK(progress_source.calls() == 1U);
+  CHECK(execution.calls() == 1U);
+  CHECK(archives.calls() == 0U);
+  CHECK(nonce_trace == std::vector<std::string>({"nonce"}));
+  CHECK(directory_entry_count(selected_run_path) >= 4U);
+  CHECK(directory_entry_count(run_path) == 0U);
+  CHECK(directory_entry_count(effect_path) == 0U);
+  CHECK(directory_entry_count(lock_path) == 0U);
+  CHECK(std::filesystem::is_regular_file(
+      temporary.path() / "construction" / "artifact" / "tool.tar"));
+
+  progress_source.replace(result.run().progress());
+  const auto completed = runtime->drive(
+      result.record().journal(),
+      pkgctl::transaction_run_drive_policy::make(1U));
+  CHECK(completed.disposition() ==
+        pkgctl::transaction_run_drive_disposition::completed);
+  CHECK(completed.steps().size() == 1U);
+  CHECK(completed.steps().front().disposition() ==
+        pkgctl::transaction_run_advance_disposition::quiescent);
+  CHECK(completed.record().identity() == result.record().identity());
+  CHECK(dispatch_nonces.calls() == 1U);
+  CHECK(progress_source.calls() == 2U);
+
+  bool run_descriptor_refused = false;
+  try
+  {
+    const int valid_effect = open_runtime_directory(effect_path);
+    const int valid_lock = open_runtime_directory(lock_path);
+    try
+    {
+      (void)pkgctl::posix_transaction_run_runtime::from_directory_fds(
+          -1, valid_effect, valid_lock,
+          {run_nonces, dispatch_nonces, progress_source, execution, recovery,
+           archives},
+          {execution_backend, execution_backend, application_backend,
+           execution_backend, state_store});
+    }
+    catch (...)
+    {
+      (void)::close(valid_effect);
+      (void)::close(valid_lock);
+      throw;
+    }
+    (void)::close(valid_effect);
+    (void)::close(valid_lock);
+  }
+  catch (const pkgctl::transaction_run_journal_error& problem)
+  {
+    run_descriptor_refused = problem.code() ==
+        pkgctl::transaction_run_journal_error_code::store_open_failed;
+  }
+  CHECK(run_descriptor_refused);
+}
+
 void check_durable_transaction_run_admission()
 {
   test_support::temporary_directory temporary;
@@ -2341,6 +2565,7 @@ int main()
     check_durable_restart_reconciliation();
     check_run_authority_rehydration();
     check_single_step_transaction_advancement();
+    check_posix_transaction_run_runtime();
     check_durable_transaction_run_admission();
     check_bounded_serial_transaction_drive();
     check_restart_safe_transaction_launch();
