@@ -1854,6 +1854,51 @@ void check_single_step_transaction_advancement()
 
 
 
+void check_canonical_transaction_dispatch_nonce_authority()
+{
+  test_support::temporary_directory temporary;
+  const auto state_path = temporary.path() / "state";
+  test_support::initialize_state(state_path);
+  pkgstate::canonical_generation_store state_store(
+      state_path, test_support::binding());
+
+  auto transaction = transaction_session(
+      tool_source(sha256_text("canonical nonce payload\n"), "1.0", false),
+      {}, state_store.read(), state_path);
+  auto progress = pkgctl::transaction_progress::begin(transaction);
+  const auto policy = pkgctl::transaction_dispatch_policy::make(1U, 1U);
+  auto run = pkgctl::transaction_run::begin(progress, policy);
+  auto record = pkgctl::transaction_run_journal_record::admit(
+      run, journal_nonce(210U));
+
+  pkgctl::canonical_transaction_dispatch_nonce_source source;
+  const auto first = source.issue(record, run);
+  const auto repeated = source.issue(record, run);
+  CHECK(first == repeated);
+  CHECK(first == pkgctl::canonical_transaction_dispatch_nonce(record, run));
+
+  auto reserved = pkgctl::reserve_next(run, first);
+  CHECK(reserved.dispatch.has_value());
+  auto successor = record.successor(reserved.run);
+  const auto next = source.issue(successor, reserved.run);
+  CHECK(next != first);
+
+  auto foreign = pkgctl::transaction_run::begin(
+      progress, pkgctl::transaction_dispatch_policy::make(2U, 1U));
+  bool rejected = false;
+  try
+  {
+    (void)source.issue(record, foreign);
+  }
+  catch (const pkgctl::transaction_run_journal_error& problem)
+  {
+    rejected = problem.code() ==
+        pkgctl::transaction_run_journal_error_code::invalid_transition;
+  }
+  CHECK(rejected);
+}
+
+
 void check_posix_transaction_run_runtime()
 {
   test_support::temporary_directory temporary;
@@ -1872,9 +1917,6 @@ void check_posix_transaction_run_runtime()
   test_support::write(session.paths().local_source_root / "payload", payload);
 
   fixed_progress_source progress_source(progress);
-  std::vector<std::string> nonce_trace;
-  replay_run_nonce_source run_nonces(211U, nonce_trace);
-  head_derived_nonce_source dispatch_nonces(212U);
   construction_execution_authority_source execution(std::move(session));
   unreachable_recovery_authority_source recovery;
   forbidden_runtime_archive_source archives;
@@ -1894,8 +1936,7 @@ void check_posix_transaction_run_runtime()
   const int lock_fd = open_runtime_directory(lock_path);
   auto runtime = pkgctl::posix_transaction_run_runtime::from_directory_fds(
       run_fd, effect_fd, lock_fd,
-      {run_nonces, dispatch_nonces, progress_source, execution, recovery,
-       archives},
+      {progress_source, execution, recovery, archives},
       {execution_backend, execution_backend, application_backend,
        execution_backend, state_store});
   CHECK(::close(run_fd) == 0);
@@ -1907,6 +1948,7 @@ void check_posix_transaction_run_runtime()
 
   const auto result = runtime->launch(
       progress, pkgctl::transaction_dispatch_policy::make(1U, 1U),
+      journal_nonce(211U),
       pkgctl::transaction_run_drive_policy::make(1U));
   CHECK(result.origin() == pkgctl::transaction_run_launch_origin::admitted);
   CHECK(result.admission_committed());
@@ -1914,15 +1956,13 @@ void check_posix_transaction_run_runtime()
         pkgctl::transaction_run_drive_disposition::completed);
   CHECK(result.run().progress().complete());
   CHECK(result.record().sequence() == 3U);
+  CHECK(result.record().nonce() == journal_nonce(211U));
   CHECK(result.drive().steps().size() == 1U);
   CHECK(result.drive().steps().front().disposition() ==
         pkgctl::transaction_run_advance_disposition::executed_construction);
-  CHECK(run_nonces.calls() == 1U);
-  CHECK(dispatch_nonces.calls() == 1U);
   CHECK(progress_source.calls() == 1U);
   CHECK(execution.calls() == 1U);
   CHECK(archives.calls() == 0U);
-  CHECK(nonce_trace == std::vector<std::string>({"nonce"}));
   CHECK(directory_entry_count(selected_run_path) >= 4U);
   CHECK(directory_entry_count(run_path) == 0U);
   CHECK(directory_entry_count(effect_path) == 0U);
@@ -1940,7 +1980,6 @@ void check_posix_transaction_run_runtime()
   CHECK(completed.steps().front().disposition() ==
         pkgctl::transaction_run_advance_disposition::quiescent);
   CHECK(completed.record().identity() == result.record().identity());
-  CHECK(dispatch_nonces.calls() == 1U);
   CHECK(progress_source.calls() == 2U);
 
   bool run_descriptor_refused = false;
@@ -1952,8 +1991,7 @@ void check_posix_transaction_run_runtime()
     {
       (void)pkgctl::posix_transaction_run_runtime::from_directory_fds(
           -1, valid_effect, valid_lock,
-          {run_nonces, dispatch_nonces, progress_source, execution, recovery,
-           archives},
+          {progress_source, execution, recovery, archives},
           {execution_backend, execution_backend, application_backend,
            execution_backend, state_store});
     }
@@ -2565,6 +2603,7 @@ int main()
     check_durable_restart_reconciliation();
     check_run_authority_rehydration();
     check_single_step_transaction_advancement();
+    check_canonical_transaction_dispatch_nonce_authority();
     check_posix_transaction_run_runtime();
     check_durable_transaction_run_admission();
     check_bounded_serial_transaction_drive();

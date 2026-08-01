@@ -137,6 +137,7 @@ if not get_option('tests').disabled()
     'run_inspect.h',
     'run_launch.h',
     'run_native.h',
+    'run_nonce.h',
     'run_reconcile.h',
     'run_commit.h',
     'run_execute.h',
