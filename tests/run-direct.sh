@@ -34,6 +34,9 @@ done
 "$cxx" $flags "$srcdir/tests/run_store_fixture.cpp" $objects $libs \
   -o "$tmp/run-store-fixture"
 # shellcheck disable=SC2086
+"$cxx" $flags "$srcdir/tests/effect_store_fixture.cpp" $objects $libs \
+  -o "$tmp/effect-store-fixture"
+# shellcheck disable=SC2086
 "$cxx" $flags "$srcdir/cli/main.cpp" "$srcdir/cli/options.cpp" \
   $objects $libs -o "$tmp/pkgctl"
 version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";$/\1/p' \
@@ -43,7 +46,7 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
   exit 1
 }
 "$srcdir/tests/cli_test.sh" "$tmp/pkgctl" "$tmp/state-fixture" \
-  "$tmp/run-store-fixture" "$version"
+  "$tmp/run-store-fixture" "$tmp/effect-store-fixture" "$version"
 
 for header in "$srcdir"/include/pkgctl/*.h; do
   base=$(basename "$header")

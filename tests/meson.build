@@ -91,6 +91,12 @@ if not get_option('tests').disabled()
     dependencies: pkgctl_core_dep,
   )
 
+  effect_store_fixture = executable(
+    'effect-store-fixture',
+    'effect_store_fixture.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+
   cli_test = find_program('cli_test.sh')
   test(
     'cli',
@@ -99,6 +105,7 @@ if not get_option('tests').disabled()
       pkgctl_exe,
       state_fixture,
       run_store_fixture,
+      effect_store_fixture,
       meson.project_version(),
     ],
   )
