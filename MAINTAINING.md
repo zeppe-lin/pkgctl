@@ -70,6 +70,17 @@ choose retries or backoff, discover resources or evidence, adopt processes,
 roll back, clean up, compact journals, collect history, or expose a mutating
 command.
 
+The operation-driver source layer must acquire one call-scoped physical driver
+only from an exact validated execution or recovery handoff. Fresh acquisition
+must occur after the reservation successor is committed and before effect
+admission. The returned driver must retain a live target mutation lease and the
+exact state projection sealed into the operation session. Recovery must request
+a driver only when the classified effect checkpoint can touch the target or a
+successful terminal result requires a resulting-state read. The controller must
+not retain or serialize drivers, reuse one driver across dispatches, discover
+leases, stores, archives, credentials, or backend paths, or allow source failure
+to fabricate effect-attempt ownership.
+
 The durable effect-attempt inspection layer may load one committed head
 selected by an exact attempt identity, validate the storage-returned attempt,
 classify the controller-owned record through `assess_effect_restart()`, and

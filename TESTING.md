@@ -78,6 +78,15 @@ Every release must establish:
 - proof that all exposed CLI commands remain read-only, including exact run and
   effect inspection;
 - release, source, manual, shell, and patch-hygiene contracts.
+- one effect driver acquired from the exact per-dispatch execution or recovery
+  handoff rather than shared across a transaction run;
+- live target-lease and exact expected-state projection validation before fresh
+  effect admission;
+- driver-source refusal or invalid authority leaves only the durable reservation
+  and appends no effect attempt;
+- terminal failure and external-resolution recovery request no physical driver,
+  while successful terminal recovery may acquire one only to read resulting
+  state;
 
 ## Exact effect-inspection command tests
 

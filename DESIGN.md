@@ -13,6 +13,54 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.22.0 per-dispatch effect-driver authority boundary
+
+Release 0.22.0 removes the last global physical-operation driver from bounded
+transaction-run advancement:
+
+```text
+committed operation reservation
+              |
+              v
+ exact execution or recovery handoff
+              |
+              v
+ caller-owned effect-driver source
+              |
+              v
+ one call-scoped operation driver
+```
+
+A transaction may contain more than one target operation. Each operation can
+require a different target mutation lease, installed-state projection, incoming
+archive, lifecycle backend, application backend, and recovery binding. A single
+driver supplied for the whole run could therefore carry authority for the wrong
+dispatch. `transaction_effect_driver_source` instead receives the exact
+validated dispatch handoff and returns one uniquely owned driver for that
+advancement call. The driver is neither stored in the run journal nor reused for
+a later operation.
+
+Fresh acquisition occurs only after the reservation successor is durable and
+after semantic execution authority has been admitted. Before the effect attempt
+may be admitted, the controller validates the returned driver's live target
+mutation lease and proves that its state projection names the exact expected
+snapshot and ownership inventory sealed into the operation session. Source
+refusal or invalid physical authority leaves the durable dispatch reserved and
+creates no effect-attempt record.
+
+Recovery first classifies the exact retained effect checkpoint. Physical
+authority is requested only when continuation can touch the target or when a
+successful terminal effect requires a resulting-state read for run progression.
+Terminal failure and external-resolution states request no driver. A driver
+source therefore cannot turn unresolved evidence into target access merely
+because a run is being inspected for restart.
+
+This boundary adds no concrete lease, state-store, archive, backend, credential,
+or path discovery. It adds no driver serialization, driver retention, scheduler,
+worker, concurrency, retry policy, cleanup, reconciliation policy, or mutating
+command. Native runtime assembly remains a caller-owned composition problem for
+a later release.
+
 ## Release 0.21.0 exact effect-inspection command boundary
 
 Release 0.21.0 exposes the existing durable effect sensor through one exact

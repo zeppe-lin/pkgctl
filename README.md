@@ -6,6 +6,20 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.22.0 establishes per-dispatch effect-driver authority for bounded
+transaction-run advancement. A caller-owned `transaction_effect_driver_source`
+receives the exact validated execution or recovery handoff and returns one
+call-scoped driver for that operation. Fresh acquisition occurs after the
+reservation is durable and before effect admission; recovery acquires physical
+authority only when continuation can touch the target or a successful result
+requires a resulting-state read.
+
+The controller validates the returned live mutation lease and exact state
+projection before subordinate effect admission. Source refusal or invalid
+authority leaves the dispatch reserved and creates no effect journal. Drivers
+are not retained, serialized, reused across operations, or discovered by the
+frontend. No native backend assembly or mutating command is added.
+
 Release 0.21.0 exposes exact durable effect-attempt inspection on the read-only
 command surface:
 

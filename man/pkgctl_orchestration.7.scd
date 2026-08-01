@@ -27,6 +27,28 @@ opens one explicitly named existing POSIX transaction-run store for
 effect-attempt store for *inspect-effect*. Neither command creates its store or
 writer lock.
 
+# PER-DISPATCH EFFECT-DRIVER AUTHORITY
+
+Version 0.22.0 replaces the run-wide operation driver with a caller-owned
+*transaction_effect_driver_source*. After an operation reservation is committed
+and the exact semantic execution handoff is admitted, the source returns one
+call-scoped driver for that dispatch. Before effect admission, *pkgctl* validates
+its live target mutation lease and proves that its state projection matches the
+operation session's exact expected snapshot and ownership inventory.
+
+Restart first classifies the retained effect checkpoint. A recovery driver is
+requested only when continuation can touch the target or a successful terminal
+operation requires a resulting-state read. Terminal failure and
+external-resolution dispositions invoke no driver source. Source refusal or an
+invalid driver leaves the operation reserved and creates no effect-attempt
+journal.
+
+The driver source does not discover policy inside *pkgctl*. It remains
+responsible for caller-selected leases, state projections, archives, backends,
+credentials, and paths. Drivers are neither serialized nor retained across
+advancement calls. This version adds no native runtime assembly and no mutating
+command.
+
 # EXACT EFFECT-INSPECTION COMMAND
 
 Version 0.21.0 exposes the durable effect-attempt sensor as *pkgctl inspect-effect*. The caller supplies an existing POSIX effect-store path and one
