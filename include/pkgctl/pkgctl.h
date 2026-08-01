@@ -35,6 +35,7 @@
 #include <pkgctl/run_drive.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_restart.h>
+#include <pkgctl/run_runtime.h>
 #include <pkgctl/run_store.h>
 #include <pkgctl/session.h>
 #include <pkgctl/version.h>

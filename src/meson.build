@@ -33,6 +33,7 @@ pkgctl_core = static_library(
     'run_drive.cpp',
     'run_execute.cpp',
     'run_restart.cpp',
+    'run_runtime.cpp',
     'run_store.cpp',
     'request.cpp',
     'session.cpp',
