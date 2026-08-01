@@ -753,12 +753,6 @@ pkgapply::application_receipt transaction_effect_driver::resume_application(
               "effect driver does not support application restart");
 }
 
-pkgstate::snapshot transaction_effect_driver::read_state() const
-{
-  throw error(error_code::invalid_effect_session,
-              "effect driver does not support state reconciliation");
-}
-
 native_transaction_effect_driver::native_transaction_effect_driver(
     const pkgapply::lease_bound_state_projection& state,
     pkgapply::target_mutation_lease& lease,
@@ -841,9 +835,31 @@ native_transaction_effect_driver::resume_application(
               "application restart request has no operation body");
 }
 
-pkgstate::snapshot native_transaction_effect_driver::read_state() const
+native_transaction_effect_publication_driver::
+native_transaction_effect_publication_driver(
+    pkgapply::target_mutation_lease& lease,
+    pkgstate::canonical_store& state_store)
+    : lease_(lease), state_store_(state_store)
+{
+}
+
+pkgapply::target_mutation_lease&
+native_transaction_effect_publication_driver::lease() noexcept
+{
+  return lease_;
+}
+
+pkgstate::snapshot
+native_transaction_effect_publication_driver::read_state() const
 {
   return state_store_.read();
+}
+
+pkgstate::state_publication_receipt
+native_transaction_effect_publication_driver::publish_state(
+    const pkgstate::state_publication_request& request)
+{
+  return state_store_.compare_and_publish(request);
 }
 
 pkgstate::state_publication_receipt
@@ -1195,7 +1211,8 @@ effectful_operation_result execute_effectful_operation_durable(
 
 effect_restart_result resume_effectful_operation(
     effect_restart_checkpoint checkpoint,
-    transaction_effect_driver* driver,
+    transaction_effect_driver* continuation,
+    transaction_effect_publication_driver* publication,
     effect_journal_store& journal_store)
 {
   effect_attempt_record journal = checkpoint.record();
@@ -1279,22 +1296,23 @@ effect_restart_result resume_effectful_operation(
     }
   }
 
-  if (!effect_restart_requires_driver(checkpoint) || driver == nullptr)
-    throw error(error_code::invalid_effect_session,
-                "effect restart requires a physical driver");
-  auto& physical = *driver;
   const auto& request = session.request();
-  if (!physical.lease().held())
-    throw error(error_code::invalid_effect_session,
-                "effect restart requires a newly held target lease");
 
   if (assessment.disposition() ==
       effect_restart_disposition::reconcile_publication)
   {
+    if (!effect_restart_requires_publication_driver(checkpoint) ||
+        publication == nullptr)
+      throw error(error_code::invalid_effect_session,
+                  "publication reconciliation requires a state driver");
     if (!publication_request)
       throw error(error_code::invalid_effect_session,
                   "publication reconciliation lacks the exact request");
-    const auto observed = physical.read_state();
+
+    auto& state = *publication;
+    pkgapply::validate_target_mutation_lease_scope(
+        request.application().target(), state.lease());
+    const auto observed = state.read_state();
     const auto& expected = request.expected_state();
     const auto resulting = resulting_snapshot(expected, *publication_request);
     if (observed.identity() == resulting.identity())
@@ -1307,10 +1325,7 @@ effect_restart_result resume_effectful_operation(
           effect_restart_disposition::external_resolution_required,
           journal, std::nullopt);
     }
-    pkgapply::validate_target_mutation_lease(
-        request.application().target(), physical.state_projection(),
-        physical.lease());
-    publication_receipt = physical.publish_state(*publication_request);
+    publication_receipt = state.publish_state(*publication_request);
     if (publication_receipt->request() != publication_request->identity())
       throw error(error_code::driver_contract_violation,
                   "state driver returned evidence for another publication request");
@@ -1327,6 +1342,14 @@ effect_restart_result resume_effectful_operation(
     return finish(outcome);
   }
 
+  if (!effect_restart_requires_continuation_driver(checkpoint) ||
+      continuation == nullptr)
+    throw error(error_code::invalid_effect_session,
+                "effect restart requires a continuation driver");
+  auto& physical = *continuation;
+  if (!physical.lease().held())
+    throw error(error_code::invalid_effect_session,
+                "effect restart requires a newly held target lease");
   pkgapply::validate_target_mutation_lease(
       request.application().target(), physical.state_projection(),
       physical.lease());
@@ -1426,11 +1449,12 @@ effect_restart_result resume_effectful_operation(
 
 effect_restart_result resume_effectful_operation(
     effect_restart_checkpoint checkpoint,
-    transaction_effect_driver& driver,
+    transaction_effect_driver& continuation,
+    transaction_effect_publication_driver& publication,
     effect_journal_store& journal_store)
 {
   return resume_effectful_operation(
-      std::move(checkpoint), &driver, journal_store);
+      std::move(checkpoint), &continuation, &publication, journal_store);
 }
 
 } // namespace pkgctl

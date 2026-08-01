@@ -117,7 +117,7 @@ private:
   session_identity identity_;
 };
 
-/*! \brief Physical authority surface borrowed by the controller sequence. */
+/*! \brief Physical continuation authority borrowed by the effect controller. */
 class transaction_effect_driver {
 public:
   virtual ~transaction_effect_driver() = default;
@@ -141,12 +141,28 @@ public:
   resume_application(
       const pkgapply::package_application_request& request,
       const pkgapply::application_journal_record& journal);
-
-  /*! \brief Reread authoritative installed state for publication reconciliation. */
-  [[nodiscard]] virtual pkgstate::snapshot read_state() const;
 };
 
-/*! \brief Native driver composing the exact apply, exec, and state APIs. */
+/*! \brief Read-only canonical-state authority under one target-scoped lease. */
+class transaction_effect_state_observer {
+public:
+  virtual ~transaction_effect_state_observer() = default;
+
+  [[nodiscard]] virtual pkgapply::target_mutation_lease& lease() noexcept = 0;
+  [[nodiscard]] virtual pkgstate::snapshot read_state() const = 0;
+};
+
+/*! \brief Publication recovery authority extending exact state observation. */
+class transaction_effect_publication_driver
+    : public transaction_effect_state_observer {
+public:
+  ~transaction_effect_publication_driver() override = default;
+
+  [[nodiscard]] virtual pkgstate::state_publication_receipt
+  publish_state(const pkgstate::state_publication_request& request) = 0;
+};
+
+/*! \brief Native continuation driver composing apply, exec, and publication. */
 class native_transaction_effect_driver final : public transaction_effect_driver {
 public:
   native_transaction_effect_driver(
@@ -172,7 +188,6 @@ public:
   resume_application(
       const pkgapply::package_application_request& request,
       const pkgapply::application_journal_record& journal) override;
-  [[nodiscard]] pkgstate::snapshot read_state() const override;
 
 private:
   const pkgapply::lease_bound_state_projection& state_;
@@ -180,6 +195,24 @@ private:
   pkgapply::application_backend& application_backend_;
   const pkgimage::package_archive* incoming_archive_;
   pkgexec::execution_backend& lifecycle_backend_;
+  pkgstate::canonical_store& state_store_;
+};
+
+/*! \brief Native target-scoped canonical-state observation and publication. */
+class native_transaction_effect_publication_driver final
+    : public transaction_effect_publication_driver {
+public:
+  native_transaction_effect_publication_driver(
+      pkgapply::target_mutation_lease& lease,
+      pkgstate::canonical_store& state_store);
+
+  [[nodiscard]] pkgapply::target_mutation_lease& lease() noexcept override;
+  [[nodiscard]] pkgstate::snapshot read_state() const override;
+  [[nodiscard]] pkgstate::state_publication_receipt
+  publish_state(const pkgstate::state_publication_request& request) override;
+
+private:
+  pkgapply::target_mutation_lease& lease_;
   pkgstate::canonical_store& state_store_;
 };
 
@@ -223,7 +256,7 @@ private:
       transaction_effect_driver&, effect_journal_store&);
   friend effect_restart_result resume_effectful_operation(
       effect_restart_checkpoint, transaction_effect_driver*,
-      effect_journal_store&);
+      transaction_effect_publication_driver*, effect_journal_store&);
 
   [[nodiscard]] static effectful_operation_result seal(
       effectful_operation_session session,

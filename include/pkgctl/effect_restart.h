@@ -114,7 +114,7 @@ public:
 private:
   friend effect_restart_result resume_effectful_operation(
       effect_restart_checkpoint, transaction_effect_driver*,
-      effect_journal_store&);
+      transaction_effect_publication_driver*, effect_journal_store&);
   effect_restart_result(
       effect_restart_disposition disposition,
       effect_attempt_record journal,
@@ -124,26 +124,32 @@ private:
   std::optional<effectful_operation_result> operation_;
 };
 
-/*! \brief Return whether continuation must invoke physical target authority. */
-[[nodiscard]] bool effect_restart_requires_driver(
+/*! \brief Return whether continuation requires pre-publication authority. */
+[[nodiscard]] bool effect_restart_requires_continuation_driver(
     const effect_restart_checkpoint& checkpoint);
 
-/*! \brief Continue one exact durable attempt with optional physical authority.
+/*! \brief Return whether restart requires target-scoped publication authority. */
+[[nodiscard]] bool effect_restart_requires_publication_driver(
+    const effect_restart_checkpoint& checkpoint);
+
+/*! \brief Continue one exact durable attempt with separated physical authority.
  *
- * A null driver is accepted only when the durable checkpoint can be consumed
- * without touching the target: external-resolution, terminal sealing, an
- * already terminal record, or an application intent lacking an exact
- * application journal.
+ * Continuation authority is required only while lifecycle or application work
+ * can still run. Publication reconciliation instead receives one target-scoped
+ * state driver that can observe canonical state and retry the already durable
+ * publication request without fabricating an obsolete application projection.
  */
 [[nodiscard]] effect_restart_result resume_effectful_operation(
     effect_restart_checkpoint checkpoint,
-    transaction_effect_driver* driver,
+    transaction_effect_driver* continuation,
+    transaction_effect_publication_driver* publication,
     effect_journal_store& journal_store);
 
-/*! \brief Continue under a supplied physical driver. */
+/*! \brief Continue under explicit continuation and publication authority. */
 [[nodiscard]] effect_restart_result resume_effectful_operation(
     effect_restart_checkpoint checkpoint,
-    transaction_effect_driver& driver,
+    transaction_effect_driver& continuation,
+    transaction_effect_publication_driver& publication,
     effect_journal_store& journal_store);
 
 } // namespace pkgctl

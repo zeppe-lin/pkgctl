@@ -131,10 +131,24 @@ reconcile_check_dispatch_durable(
       std::move(result)};
 }
 
-bool operation_reconciliation_requires_driver(
+bool operation_reconciliation_requires_continuation_driver(
     const effect_restart_checkpoint& checkpoint)
 {
-  if (effect_restart_requires_driver(checkpoint))
+  return effect_restart_requires_continuation_driver(checkpoint);
+}
+
+bool operation_reconciliation_requires_publication_driver(
+    const effect_restart_checkpoint& checkpoint)
+{
+  return effect_restart_requires_publication_driver(checkpoint);
+}
+
+bool operation_reconciliation_requires_state_observer(
+    const effect_restart_checkpoint& checkpoint)
+{
+  if (operation_reconciliation_requires_publication_driver(checkpoint))
+    return false;
+  if (operation_reconciliation_requires_continuation_driver(checkpoint))
     return true;
 
   const auto assessment = assess_effect_restart(checkpoint.record());
@@ -160,7 +174,9 @@ reconcile_operation_dispatch_durable(
     transaction_run_restart_checkpoint checkpoint,
     const transaction_dispatch& dispatch,
     effect_restart_checkpoint effect_checkpoint,
-    transaction_effect_driver* driver,
+    transaction_effect_driver* continuation,
+    transaction_effect_state_observer* resulting_state,
+    transaction_effect_publication_driver* publication,
     effect_journal_store& effect_store,
     transaction_run_journal_store& run_store)
 {
@@ -188,8 +204,9 @@ reconcile_operation_dispatch_durable(
         std::nullopt, false};
   }
 
+  const auto target = effect_checkpoint.session().request().application().target();
   auto effect = resume_effectful_operation(
-      std::move(effect_checkpoint), driver, effect_store);
+      std::move(effect_checkpoint), continuation, publication, effect_store);
   if (!effect.operation())
   {
     if (!effect.external_resolution_required())
@@ -200,18 +217,38 @@ reconcile_operation_dispatch_durable(
         effect.journal(), std::nullopt, false};
   }
 
-  std::optional<pkgstate::snapshot> resulting_state;
+  std::optional<pkgstate::snapshot> observed_state;
   if (effect.operation()->succeeded())
   {
-    if (driver == nullptr)
+    transaction_effect_state_observer* observer = publication != nullptr
+        ? static_cast<transaction_effect_state_observer*>(publication)
+        : resulting_state;
+    if (observer == nullptr)
       invalid_reconciliation(
-          "successful effect reconciliation requires a state driver");
-    resulting_state = driver->read_state();
+          "successful effect reconciliation requires a state observer");
+    try
+    {
+      pkgapply::validate_target_mutation_lease_scope(
+          target, observer->lease());
+    }
+    catch (const pkgapply::mutation_lease_error& problem)
+    {
+      invalid_reconciliation(
+          std::string("resulting-state observer has invalid target authority: ") +
+          problem.what());
+    }
+    if (continuation != nullptr &&
+        continuation->lease().identity() != observer->lease().identity())
+    {
+      invalid_reconciliation(
+          "continuation and resulting-state authorities use different leases");
+    }
+    observed_state = observer->read_state();
   }
 
   auto next = submit_operation_dispatch_result(
       checkpoint.run(), dispatch, *effect.operation(),
-      std::move(resulting_state));
+      std::move(observed_state));
   auto committed = commit_transaction_run_successor(
       checkpoint.record(), std::move(next), run_store);
   return operation_dispatch_reconciliation_result{
@@ -219,18 +256,5 @@ reconcile_operation_dispatch_durable(
       effect.disposition(), effect.journal(), effect.operation(), true};
 }
 
-operation_dispatch_reconciliation_result
-reconcile_operation_dispatch_durable(
-    transaction_run_restart_checkpoint checkpoint,
-    const transaction_dispatch& dispatch,
-    effect_restart_checkpoint effect_checkpoint,
-    transaction_effect_driver& driver,
-    effect_journal_store& effect_store,
-    transaction_run_journal_store& run_store)
-{
-  return reconcile_operation_dispatch_durable(
-      std::move(checkpoint), dispatch, std::move(effect_checkpoint), &driver,
-      effect_store, run_store);
-}
 
 } // namespace pkgctl

@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <pkgctl/run_execute.h>
+#include <pkgctl/error.h>
 
 #include <optional>
+#include <string>
 #include <utility>
 
 namespace pkgctl {
@@ -67,7 +69,8 @@ execute_operation_dispatch_durable(
     const transaction_dispatch& dispatch,
     effectful_operation_session session,
     effect_attempt_nonce nonce,
-    transaction_effect_driver& driver,
+    transaction_effect_driver& continuation,
+    transaction_effect_state_observer& resulting_state,
     effect_journal_store& effect_store,
     transaction_run_journal_store& run_store)
 {
@@ -75,15 +78,35 @@ execute_operation_dispatch_durable(
       current_record, std::move(run), dispatch, session, nonce,
       effect_store, run_store);
 
-  auto result = execute_effectful_operation_durable(
-      session, nonce, driver, effect_store);
+  const auto& target = session.request().application().target();
+  try
+  {
+    pkgapply::validate_target_mutation_lease_scope(
+        target, resulting_state.lease());
+  }
+  catch (const pkgapply::mutation_lease_error& problem)
+  {
+    throw error(
+        error_code::driver_contract_violation,
+        std::string("resulting-state observer has invalid target authority: ") +
+            problem.what());
+  }
+  if (continuation.lease().identity() != resulting_state.lease().identity())
+  {
+    throw error(
+        error_code::driver_contract_violation,
+        "continuation and resulting-state authorities use different leases");
+  }
 
-  std::optional<pkgstate::snapshot> resulting_state;
+  auto result = execute_effectful_operation_durable(
+      session, nonce, continuation, effect_store);
+
+  std::optional<pkgstate::snapshot> observed_state;
   if (result.succeeded())
-    resulting_state = driver.read_state();
+    observed_state = resulting_state.read_state();
 
   auto next = submit_operation_dispatch_result(
-      std::move(started.run), dispatch, result, std::move(resulting_state));
+      std::move(started.run), dispatch, result, std::move(observed_state));
   auto completed = commit_transaction_run_successor(
       started.run_record, std::move(next), run_store);
 

@@ -41,25 +41,38 @@ struct transaction_run_advance_authorities final {
   transaction_dispatch_recovery_authority_source& recovery;
 };
 
-/*! \brief Caller-owned source of one call-scoped operation driver.
+/*! \brief Call-scoped authorities for one freshly admitted operation. */
+struct transaction_effect_execution_drivers final {
+  std::unique_ptr<transaction_effect_driver> continuation;
+  std::unique_ptr<transaction_effect_state_observer> resulting_state;
+};
+
+/*! \brief Call-scoped authorities selected for one retained operation. */
+struct transaction_effect_recovery_drivers final {
+  std::unique_ptr<transaction_effect_driver> continuation;
+  std::unique_ptr<transaction_effect_state_observer> resulting_state;
+  std::unique_ptr<transaction_effect_publication_driver> publication;
+};
+
+/*! \brief Caller-owned source of exact per-dispatch physical authority.
  *
- * A transaction may contain several operation dispatches.  Each dispatch can
+ * A transaction may contain several operation dispatches. Each dispatch can
  * require another target lease, installed-state projection, archive, and
- * recovery binding.  The source is therefore consulted only after an exact
- * semantic execution or recovery handoff has been validated.  Returned
- * drivers are owned for that single advancement call and are never retained
- * in a durable record.
+ * recovery binding. The source is consulted only after an exact semantic
+ * execution or recovery handoff has been validated. Continuation authority is
+ * separated from resulting-state observation and publication reconciliation;
+ * returned objects are owned for one advancement call and are never durable.
  */
 class transaction_effect_driver_source {
 public:
   virtual ~transaction_effect_driver_source() = default;
 
-  [[nodiscard]] virtual std::unique_ptr<transaction_effect_driver>
-  acquire_execution_driver(
+  [[nodiscard]] virtual transaction_effect_execution_drivers
+  acquire_execution_drivers(
       const transaction_dispatch_execution_handoff& handoff) = 0;
 
-  [[nodiscard]] virtual std::unique_ptr<transaction_effect_driver>
-  acquire_recovery_driver(
+  [[nodiscard]] virtual transaction_effect_recovery_drivers
+  acquire_recovery_drivers(
       const transaction_dispatch_recovery_handoff& handoff) = 0;
 };
 

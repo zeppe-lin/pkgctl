@@ -73,8 +73,16 @@ reconcile_check_dispatch_durable(
     transaction_check_result result,
     transaction_run_journal_store& run_store);
 
-/*! \brief Return whether run reconciliation requires physical target authority. */
-[[nodiscard]] bool operation_reconciliation_requires_driver(
+/*! \brief Return whether recovery can continue lifecycle or application work. */
+[[nodiscard]] bool operation_reconciliation_requires_continuation_driver(
+    const effect_restart_checkpoint& checkpoint);
+
+/*! \brief Return whether recovery needs a resulting canonical-state read. */
+[[nodiscard]] bool operation_reconciliation_requires_state_observer(
+    const effect_restart_checkpoint& checkpoint);
+
+/*! \brief Return whether recovery must reconcile an exact publication request. */
+[[nodiscard]] bool operation_reconciliation_requires_publication_driver(
     const effect_restart_checkpoint& checkpoint);
 
 /*! \brief Continue one exact durable operation attempt and commit its result.
@@ -92,17 +100,9 @@ reconcile_operation_dispatch_durable(
     transaction_run_restart_checkpoint checkpoint,
     const transaction_dispatch& dispatch,
     effect_restart_checkpoint effect_checkpoint,
-    transaction_effect_driver* driver,
-    effect_journal_store& effect_store,
-    transaction_run_journal_store& run_store);
-
-/*! \brief Reconcile with an explicitly supplied physical driver. */
-[[nodiscard]] operation_dispatch_reconciliation_result
-reconcile_operation_dispatch_durable(
-    transaction_run_restart_checkpoint checkpoint,
-    const transaction_dispatch& dispatch,
-    effect_restart_checkpoint effect_checkpoint,
-    transaction_effect_driver& driver,
+    transaction_effect_driver* continuation,
+    transaction_effect_state_observer* resulting_state,
+    transaction_effect_publication_driver* publication,
     effect_journal_store& effect_store,
     transaction_run_journal_store& run_store);
 

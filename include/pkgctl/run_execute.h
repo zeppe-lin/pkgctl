@@ -85,7 +85,8 @@ execute_operation_dispatch_durable(
     const transaction_dispatch& dispatch,
     effectful_operation_session session,
     effect_attempt_nonce nonce,
-    transaction_effect_driver& driver,
+    transaction_effect_driver& continuation,
+    transaction_effect_state_observer& resulting_state,
     effect_journal_store& effect_store,
     transaction_run_journal_store& run_store);
 
