@@ -13,6 +13,51 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.23.0 split effect-authority boundary
+
+Release 0.23.0 separates three physical capabilities that the previous
+per-dispatch driver surface combined:
+
+```text
+continuation authority       resulting-state observation
+  lease + old projection       lease + canonical read
+           |                            |
+           +------------+---------------+
+                        |
+              successful run evidence
+
+publication reconciliation
+  lease + canonical read + exact retained publication retry
+```
+
+A lease-bound application projection describes the state from which an
+application was authorized. It remains valid for lifecycle execution,
+application, and ordinary publication in that effect attempt. It is not a
+truthful prerequisite for observing state after publication may already have
+advanced the canonical store. Recovery must therefore not reconstruct or
+fabricate that old projection merely to decide whether a retained publication
+request already took effect.
+
+`transaction_effect_driver` is now continuation authority only.
+`transaction_effect_state_observer` can read canonical state under one
+caller-owned target-scoped lease. `transaction_effect_publication_driver`
+extends that observer with retry authority for the exact durable publication
+request. Fresh operation advancement acquires continuation and observation as
+one call-scoped bundle and proves both use the same lease acquisition. Recovery
+acquires exactly the subset selected by the pure restart classification.
+
+The controller rejects missing, surplus, foreign-target, expired, or
+cross-acquisition authority before effect continuation. Terminal failure and
+external-resolution states acquire nothing. A terminal success receives only a
+state observer. Publication-intent and indeterminate-publication recovery
+receive only publication authority. Continuation paths receive the old-state
+driver plus a distinct observer because they may complete successfully.
+
+This boundary adds no native driver-source implementation, path or credential
+discovery, lease acquisition, state-store selection, archive selection,
+backend construction, scheduler, worker, retry policy, cleanup, or mutating
+command.
+
 ## Release 0.22.0 per-dispatch effect-driver authority boundary
 
 Release 0.22.0 removes the last global physical-operation driver from bounded

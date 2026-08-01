@@ -6,6 +6,21 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.23.0 separates per-dispatch effect continuation from canonical-state
+observation and publication reconciliation. Fresh operation execution now
+requires a call-scoped continuation driver and a distinct resulting-state
+observer bound to the same live target lease. Recovery requests exactly the
+physical authority implied by the durable effect checkpoint: continuation,
+state observation, publication reconciliation, or none.
+
+The split prevents post-publication recovery from fabricating the old
+lease-bound application projection merely to read the current canonical state.
+Publication reconciliation uses only a target-scoped lease, the exact retained
+publication request, and the canonical store. Successful terminal recovery can
+read resulting state without receiving lifecycle, application, or publication
+authority. No concrete native source, policy discovery, scheduler, or mutating
+command is added.
+
 Release 0.22.0 establishes per-dispatch effect-driver authority for bounded
 transaction-run advancement. A caller-owned `transaction_effect_driver_source`
 receives the exact validated execution or recovery handoff and returns one

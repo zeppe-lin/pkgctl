@@ -1,3 +1,49 @@
+## 0.23.0 - 2026-08-01
+
+### Split effect continuation and state authority
+
+- Separates physical effect continuation from canonical-state observation and
+  publication reconciliation.
+- Adds `transaction_effect_state_observer` for target-scoped canonical reads and
+  `transaction_effect_publication_driver` for exact retained publication retry.
+- Replaces one returned per-dispatch driver with exact execution and recovery
+  authority bundles.
+- Requires fresh execution continuation and resulting-state observation to name
+  the same live lease acquisition before subordinate effect admission.
+- Classifies recovery before acquisition and rejects missing or surplus
+  continuation, observation, or publication authority.
+- Allows successful terminal recovery to read resulting state without lifecycle
+  or application authority, and publication reconciliation to proceed without
+  fabricating the obsolete pre-application state projection.
+- Keeps terminal failure and external-resolution recovery free of physical
+  target authority.
+- Adds no concrete native source, lease acquisition, archive or backend
+  discovery, scheduler, retry policy, cleanup, or mutating command.
+
+### Dependency contract
+
+- libpkgsource >= 2.0.0
+- libpkgsource-yaml >= 2.0.0
+- libpkgsource-plan >= 2.0.0
+- libpkgcatalog >= 2.0.0
+- libpkgcatalog-acquire >= 2.0.0
+- libpkgstate >= 2.3.0
+- libpkgstate-plan >= 2.3.0
+- libpkgstate-apply >= 2.3.0
+- libpkgfetch >= 1.0.0
+- libpkgbuild >= 2.0.0
+- libpkgbuild-exec >= 1.0.0
+- libpkgbuild-plan >= 2.0.0
+- libpkgimage >= 0.3.0
+- libpkgplan >= 0.2.0
+- libpkgexec >= 1.3.0
+- libpkgapply >= 2.2.0
+- libpkgapply-exec >= 1.0.0
+- libpkgresolve >= 2.0.0
+- libpkgtransaction >= 2.1.0
+- libpkgcheck >= 0.1.0
+- libpkgcheck-exec >= 0.1.1
+
 ## 0.22.0 - 2026-08-01
 
 ### Per-dispatch effect-driver authority

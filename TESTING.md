@@ -78,6 +78,15 @@ Every release must establish:
 - proof that all exposed CLI commands remain read-only, including exact run and
   effect inspection;
 - release, source, manual, shell, and patch-hygiene contracts.
+- continuation, resulting-state observation, and publication reconciliation
+  represented as distinct call-scoped authorities;
+- fresh execution requires continuation and observation bound to the same live
+  lease acquisition before effect admission;
+- recovery requests exactly the authority subset implied by the durable effect
+  checkpoint and rejects missing or surplus authority;
+- terminal success reads canonical state without receiving continuation
+  authority, while publication reconciliation receives no obsolete state
+  projection;
 - one effect driver acquired from the exact per-dispatch execution or recovery
   handoff rather than shared across a transaction run;
 - live target-lease and exact expected-state projection validation before fresh

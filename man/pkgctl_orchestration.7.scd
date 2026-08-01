@@ -27,6 +27,32 @@ opens one explicitly named existing POSIX transaction-run store for
 effect-attempt store for *inspect-effect*. Neither command creates its store or
 writer lock.
 
+# SPLIT EFFECT CONTINUATION AND STATE AUTHORITY
+
+Version 0.23.0 separates physical continuation from canonical-state observation
+and publication reconciliation. A fresh operation receives one continuation
+driver and one resulting-state observer. Both are validated against the exact
+operation target and must name the same live mutation-lease acquisition before
+the effect attempt is admitted.
+
+Restart classification selects the exact authority subset. Lifecycle or
+application continuation receives the old lease-bound state projection plus a
+separate resulting-state observer. A successful terminal effect receives only
+the observer. Publication-intent or indeterminate-publication recovery receives
+only a publication driver, which can read canonical state and retry the exact
+durable request under a target-scoped lease. Terminal failure and
+external-resolution states receive no physical authority.
+
+This split prevents recovery from manufacturing the obsolete state projection
+after publication may have advanced the canonical store. Sources returning
+missing or surplus authority, a foreign target, an expired lease, or different
+lease acquisitions are refused. Authorities remain call-scoped and are neither
+serialized nor retained.
+
+Version 0.23.0 adds no concrete native source, path or credential discovery,
+lease acquisition, archive selection, backend assembly, scheduler, worker,
+retry policy, cleanup, or mutating command.
+
 # PER-DISPATCH EFFECT-DRIVER AUTHORITY
 
 Version 0.22.0 replaces the run-wide operation driver with a caller-owned
