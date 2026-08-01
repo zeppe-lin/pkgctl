@@ -18,7 +18,13 @@
 namespace pkgctl::cli {
 namespace {
 
-enum class command_kind { catalog, resolve, transaction, inspect_run };
+enum class command_kind {
+  catalog,
+  resolve,
+  transaction,
+  inspect_run,
+  inspect_effect,
+};
 
 struct raw_collection final {
   std::string name;
@@ -137,6 +143,7 @@ command_kind parse_kind(std::string_view value)
   if (value == "resolve") return command_kind::resolve;
   if (value == "transaction") return command_kind::transaction;
   if (value == "inspect-run") return command_kind::inspect_run;
+  if (value == "inspect-effect") return command_kind::inspect_effect;
   fail("unknown command: " + std::string(value));
 }
 
@@ -181,6 +188,42 @@ run_inspection_command parse_run_inspection(int argc, char** argv)
   catch (const pkgctl::error& problem)
   {
     fail(std::string("invalid --journal: ") + problem.what());
+  }
+}
+
+effect_inspection_command parse_effect_inspection(int argc, char** argv)
+{
+  std::optional<std::string> store;
+  std::optional<std::string> attempt;
+  for (int index = 2; index < argc; ++index)
+  {
+    const std::string argument(argv[index]);
+    if (argument == "--effect-store")
+    {
+      set_once(store, require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    if (argument == "--attempt")
+    {
+      set_once(attempt, require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    fail("unknown inspect-effect option: " + argument);
+  }
+
+  if (!store || store->empty())
+    fail("--effect-store is required and must not be empty");
+  if (!attempt)
+    fail("--attempt is required");
+
+  try
+  {
+    return effect_inspection_command{
+        std::move(*store), session_identity::from_hex(std::move(*attempt))};
+  }
+  catch (const pkgctl::error& problem)
+  {
+    fail(std::string("invalid --attempt: ") + problem.what());
   }
 }
 
@@ -389,6 +432,8 @@ command parse_command(int argc, char** argv)
   const command_kind kind = parse_kind(argv[1]);
   if (kind == command_kind::inspect_run)
     return parse_run_inspection(argc, argv);
+  if (kind == command_kind::inspect_effect)
+    return parse_effect_inspection(argc, argv);
   raw_options parsed = parse_raw(kind, argc, argv);
   if (kind == command_kind::catalog)
     return catalog_from(parsed);
@@ -409,6 +454,7 @@ std::string help_text()
   pkgctl resolve OPTIONS --goal SCOPE=SUBJECT [--goal ...]
   pkgctl transaction OPTIONS --goal SCOPE=SUBJECT [--goal ...]
   pkgctl inspect-run --run-store PATH --journal SHA256
+  pkgctl inspect-effect --effect-store PATH --attempt SHA256
 
 Read and compose native package authorities without mutation.
 
@@ -443,11 +489,16 @@ Run inspection options:
   --run-store PATH                existing POSIX transaction-run store
   --journal SHA256                exact lowercase journal identity
 
+Effect inspection options:
+  --effect-store PATH             existing POSIX effect-attempt store
+  --attempt SHA256                exact lowercase effect-attempt identity
+
 Global options:
   -h, --help
   -V, --version
 
-The commands are read-only. pkgctl does not initialize state or run stores,
+The commands are read-only. pkgctl does not initialize state, run stores, or
+effect stores,
 build packages, open artifacts, plan filesystem changes, execute lifecycle
 programs, apply mutations, or publish installed state in this release.
 )";

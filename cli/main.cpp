@@ -4,6 +4,8 @@
 #include "options.h"
 
 #include <pkgctl/controller.h>
+#include <pkgctl/effect_inspect.h>
+#include <pkgctl/effect_store.h>
 #include <pkgctl/error.h>
 #include <pkgctl/report.h>
 #include <pkgctl/run_inspect.h>
@@ -27,6 +29,29 @@
 namespace {
 
 constexpr int usage_status = 2;
+
+const char* effect_journal_error_name(
+    pkgctl::effect_journal_error_code code) noexcept
+{
+  using code_type = pkgctl::effect_journal_error_code;
+  switch (code)
+  {
+    case code_type::invalid_nonce: return "invalid-nonce";
+    case code_type::invalid_record: return "invalid-record";
+    case code_type::invalid_transition: return "invalid-transition";
+    case code_type::corrupt_encoding: return "corrupt-encoding";
+    case code_type::unsupported_encoding: return "unsupported-encoding";
+    case code_type::store_open_failed: return "store-open-failed";
+    case code_type::store_read_failed: return "store-read-failed";
+    case code_type::store_write_failed: return "store-write-failed";
+    case code_type::store_sync_failed: return "store-sync-failed";
+    case code_type::store_conflict: return "store-conflict";
+    case code_type::store_corrupt: return "store-corrupt";
+    case code_type::store_contract_violation:
+      return "store-contract-violation";
+  }
+  return "unknown";
+}
 
 const char* run_journal_error_name(
     pkgctl::transaction_run_journal_error_code code) noexcept
@@ -66,12 +91,21 @@ int execute(pkgctl::cli::command command)
                                       pkgctl::transaction_request>)
       std::cout << pkgctl::render_report(
           pkgctl::compose_transaction(std::move(request)));
-    else
+    else if constexpr (std::is_same_v<
+                           request_type,
+                           pkgctl::cli::run_inspection_command>)
     {
       auto store = pkgctl::posix_transaction_run_journal_store::open(
           request.store);
       auto inspection = pkgctl::inspect_transaction_run(
           std::move(request.journal), store);
+      std::cout << pkgctl::render_report(inspection);
+    }
+    else
+    {
+      auto store = pkgctl::posix_effect_journal_store::open(request.store);
+      auto inspection = pkgctl::inspect_effect_attempt(
+          std::move(request.attempt), store);
       std::cout << pkgctl::render_report(inspection);
     }
   }, std::move(command));
@@ -138,6 +172,12 @@ int main(int argc, char** argv)
   catch (const pkgtransaction::error& value)
   {
     std::cerr << "pkgctl: transaction authority: " << value.what() << '\n';
+  }
+  catch (const pkgctl::effect_journal_error& value)
+  {
+    std::cerr << "pkgctl: effect journal: "
+              << effect_journal_error_name(value.code()) << ": "
+              << value.what() << '\n';
   }
   catch (const pkgctl::transaction_run_journal_error& value)
   {

@@ -16,10 +16,16 @@ struct run_inspection_command final {
   session_identity journal;
 };
 
+struct effect_inspection_command final {
+  std::string store;
+  session_identity attempt;
+};
+
 using command = std::variant<catalog_request,
                              resolution_request,
                              transaction_request,
-                             run_inspection_command>;
+                             run_inspection_command,
+                             effect_inspection_command>;
 
 class usage_error final : public std::invalid_argument {
 public:
