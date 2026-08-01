@@ -48,11 +48,13 @@ executable commands remain read-only: they never initialize or publish state,
 materialize sources, build packages, inspect artifacts, plan package changes,
 execute lifecycle programs, or apply mutations.
 
-Version 0.24.0 changes no command syntax. The controller library now provides
-a caller-configured POSIX per-dispatch effect source that composes the existing
-outer lease, lease-bound state projection, replayable archive, lifecycle,
-application, observation, and publication mechanisms. It performs no resource
-or policy discovery. The read-only command surface remains unchanged.
+Version 0.25.0 changes no command syntax. The controller library now provides
+a caller-configured POSIX transaction-run runtime that retains exact run,
+effect, and target-lock directory authorities and composes the existing native
+construction, check, and per-dispatch effect mechanisms. It borrows all nonce,
+semantic, archive, backend, and canonical-state authority, performs no resource
+or policy discovery, and executes only caller-bounded launch or exact-journal
+drive calls. The read-only command surface remains unchanged.
 
 # COMMANDS
 
