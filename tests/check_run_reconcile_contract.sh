@@ -28,6 +28,7 @@ for required in \
   'reconcile_construction_dispatch_durable' \
   'reconcile_check_dispatch_durable' \
   'reconcile_operation_dispatch_durable' \
+  'operation_reconciliation_requires_driver' \
   'transaction_dispatch_restart_disposition::release_reserved' \
   'transaction_dispatch_restart_disposition::recover_construction' \
   'transaction_dispatch_restart_disposition::recover_check' \
@@ -99,7 +100,7 @@ ordered_tokens "$operation_body" \
   'assess_effect_restart' \
   'automatically_continuable' \
   'resume_effectful_operation' \
-  'driver.read_state()' \
+  'driver->read_state()' \
   'submit_operation_dispatch_result' \
   'commit_transaction_run_successor'
 

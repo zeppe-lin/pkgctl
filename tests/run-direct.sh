@@ -69,6 +69,7 @@ done
 "$srcdir/tests/check_run_admit_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_authority_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_advance_contract.sh" "$srcdir"
+"$srcdir/tests/check_run_driver_source_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_drive_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_launch_contract.sh" "$srcdir"
 "$srcdir/tests/check_effect_inspect_contract.sh" "$srcdir"

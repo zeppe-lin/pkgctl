@@ -29,8 +29,9 @@ for required in \
   'effect_attempt_record::validate_successor_of' \
   'execute_effectful_operation_durable' \
   'resume_effectful_operation' \
-  'driver.resume_application' \
-  'driver.read_state' \
+  'effect_restart_requires_driver' \
+  'physical.resume_application' \
+  'physical.read_state' \
   'effect_restart_disposition::external_resolution_required' \
   'effect_attempt_legacy_encoding_version = 1' \
   'effect_attempt_encoding_version = 2' \
