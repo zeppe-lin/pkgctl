@@ -27,6 +27,25 @@ opens one explicitly named existing POSIX transaction-run store for
 effect-attempt store for *inspect-effect*. Neither command creates its store or
 writer lock.
 
+# EXPLICIT RUN INTENT AND CANONICAL DISPATCH NONCES
+
+Version 0.26.0 requires one explicit *transaction_run_nonce* on each runtime
+*launch*. The run nonce distinguishes caller intent between otherwise identical
+initial runs. Reusing it selects the same exact durable journal; changing it
+selects another history. The runtime does not generate, persist, discover, or
+infer this intent value.
+
+Fresh dispatch nonce authority is mechanical. The runtime owns one stateless
+*canonical_transaction_dispatch_nonce_source*. Before derivation it proves that
+the supplied transaction run is the exact semantic reopening of the committed
+journal record. It then hashes the journal, record, and run identities under a
+dedicated controller domain. An exact retry against one head derives the same
+nonce; every legal committed successor derives another.
+
+This mechanism uses no random generator, seed file, nonce database, hidden
+cache, journal scan, or process-lifetime state. It changes no command syntax and
+adds no mutating command.
+
 # CALLER-CONFIGURED POSIX TRANSACTION-RUN RUNTIME
 
 Version 0.25.0 provides *posix_transaction_run_runtime*, a mechanical
@@ -37,14 +56,15 @@ authorities and owns one POSIX run store, one POSIX effect store, native
 construction and check drivers, and one caller-configured POSIX per-dispatch
 effect source.
 
-The runtime borrows replay-safe run and dispatch nonce sources, semantic
-progression rehydration, exact dispatch execution and recovery sources, archive
-lookup, construction and check execution backends, application and lifecycle
-backends, and the canonical state store. The caller must keep every borrowed
-authority alive. No durable identity is used to discover or reconstruct one of
-those authorities.
+The runtime borrows semantic progression rehydration, exact dispatch execution
+and recovery sources, archive lookup, construction and check execution
+backends, application and lifecycle backends, and the canonical state store.
+The caller must keep every borrowed authority alive. Run intent is supplied
+explicitly to *launch*, while dispatch nonce derivation is owned mechanically by
+the runtime. No durable identity is used to discover or reconstruct semantic or
+physical package authority.
 
-*launch* accepts exact initial progression, a dispatch policy, and a positive
+*launch* accepts exact initial progression, a dispatch policy, one explicit run nonce, and a positive
 drive bound. It delegates restart-safe admission and bounded driving to the
 existing controller. *drive* accepts one exact journal identity and a positive
 bound; it performs no run enumeration or latest-run selection. Both operations

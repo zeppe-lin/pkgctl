@@ -79,8 +79,13 @@ Every release must establish:
   effect inspection;
 - release, source, manual, shell, and patch-hygiene contracts.
 - caller-configured POSIX transaction runtimes duplicate and retain exact run,
-  effect, and target-lock directory authorities while borrowing nonce, semantic,
+  effect, and target-lock directory authorities while borrowing semantic,
   archive, backend, and canonical-state authorities;
+- runtime launch receives one explicit caller run nonce and retains that exact
+  nonce in the admitted history;
+- canonical dispatch nonce derivation is stable for one exact committed
+  record/run pair, changes after a legal successor, and rejects a foreign run;
+- runtime drive carries no hidden nonce cache or caller dispatch-nonce service;
 - a retained run-store descriptor remains authoritative after the original
   pathname is renamed and replaced, and the replacement directory remains
   untouched;

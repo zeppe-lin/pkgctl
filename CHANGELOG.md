@@ -1,3 +1,31 @@
+## 0.26.0 - 2026-08-01
+
+### Explicit run intent and canonical dispatch nonce authority
+
+- Adds `canonical_transaction_dispatch_nonce()` and
+  `canonical_transaction_dispatch_nonce_source`.
+- Derives each fresh dispatch nonce from the exact committed journal, record,
+  and reopened run identities through domain-separated SHA-256 identity
+  construction.
+- Returns the same nonce for an exact retry against one committed head and a
+  different nonce after every legal successor head.
+- Validates that the supplied run is the exact semantic reopening of the
+  committed record before deriving authority.
+- Removes run and dispatch nonce sources from
+  `transaction_run_runtime_authorities`.
+- Requires `posix_transaction_run_runtime::launch()` to receive one explicit
+  `transaction_run_nonce`, because that nonce distinguishes caller intent
+  between otherwise identical durable histories.
+- Makes the POSIX runtime own the stateless canonical dispatch-nonce source, so
+  restart requires no hidden nonce cache or nonce side store.
+- Performs no random generation, seed management, run-intent persistence,
+  journal discovery, semantic rehydration, scheduling, retry, or command action.
+- Adds no mutating command.
+
+### Dependency contract
+
+- No dependency floor changes.
+
 ## 0.25.0 - 2026-08-01
 
 ### Caller-configured POSIX transaction-run runtime

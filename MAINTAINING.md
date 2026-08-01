@@ -73,11 +73,15 @@ command.
 The POSIX transaction-run runtime layer may own only mechanical lifetime and
 wiring authority. It may retain caller-opened run-store, effect-store, and
 target-lock directory descriptors; construct the corresponding stores and
-native driver adapters; and delegate one bounded launch or exact-journal drive.
-It must continue to borrow nonce sources, semantic rehydration, execution and
-recovery sources, archive lookup, backends, and canonical state. It may not
-discover paths or journals, initialize stores, issue policy-bearing evidence,
-select credentials or backends, retry, wait, schedule, clean up, or add a
+native driver adapters; own stateless dispatch nonce derivation from an exact
+committed head; and delegate one bounded launch or exact-journal drive. Each
+launch must receive an explicit caller run nonce because that value selects
+caller intent and must not be inferred from transaction semantics. The runtime
+must continue to borrow semantic rehydration, execution and recovery sources,
+archive lookup, backends, and canonical state. It may not discover paths or
+journals, initialize stores, generate or persist run intent, issue semantic
+evidence, select credentials or backends, retry, wait, schedule, clean up, or
+add a
 frontend command. Descriptor-anchored authority must remain valid if the
 original pathname is renamed or replaced.
 

@@ -6,6 +6,19 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.26.0 separates caller run intent from mechanical dispatch nonce
+issuance. `posix_transaction_run_runtime::launch()` now receives one explicit
+`transaction_run_nonce`; supplying the same nonce retries the same durable
+history, while another nonce intentionally selects another history.
+
+Fresh dispatch nonces no longer require a caller service. The stateless
+`canonical_transaction_dispatch_nonce_source` validates the exact committed
+record/run pair and derives one domain-separated nonce from that head. Exact
+retries derive the same nonce, while every committed successor establishes a
+new issuance domain. The derivation is not randomness authority and stores no
+hidden state. Semantic rehydration, execution/recovery materialization, archive
+lookup, backends, and canonical state remain caller-owned.
+
 Release 0.25.0 assembles the existing durable run controller into one
 caller-configured POSIX transaction runtime.
 `posix_transaction_run_runtime` retains three caller-opened directory
@@ -13,9 +26,11 @@ authorities for the transaction-run journal, effect-attempt journal, and target
 mutation locks. It owns the two POSIX journal stores, native construction and
 check drivers, and the concrete per-dispatch effect source.
 
-The runtime still borrows all policy-bearing authorities: replay-safe run and
-dispatch nonce sources, semantic progression and execution/recovery sources,
-archive lookup, physical execution backends, and the canonical state store.
+At its 0.25.0 boundary the runtime still borrowed replay-safe run and dispatch
+nonce sources together with semantic progression and execution/recovery
+sources, archive lookup, physical execution backends, and the canonical state
+store. Release 0.26.0 removes those nonce-source dependencies without moving
+caller run intent into the runtime.
 `launch()` admits or resumes one exact caller-supplied progression and drives it
 under one positive bound. `drive()` advances only one exact caller-supplied
 journal identity under one positive bound. Neither method discovers journals,

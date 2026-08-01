@@ -13,6 +13,46 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.26.0 explicit run intent and canonical dispatch nonce boundary
+
+Release 0.26.0 separates two values that were previously hidden behind the same
+abstract source shape:
+
+```text
+caller intent                         committed controller head
+     |                                         |
+explicit run nonce                    journal + record + reopened run
+     |                                         |
+     v                                         v
+select durable history       canonical dispatch nonce derivation
+```
+
+The transaction-run nonce distinguishes caller intent. Two otherwise identical
+initial runs can intentionally name different durable histories, so the
+controller cannot derive that nonce from transaction semantics without erasing
+that distinction. `posix_transaction_run_runtime::launch()` therefore receives
+one explicit `transaction_run_nonce`. Exact launch retry is the caller's visible
+act of supplying the same intent nonce again.
+
+A dispatch nonce has different semantics. It distinguishes fresh ownership
+attempts inside one already-selected run history. The committed journal head is
+already the exact retry domain: failure before reservation commit leaves that
+head unchanged, while any committed reservation, release, observation, or
+completion creates a successor. `canonical_transaction_dispatch_nonce()` first
+proves that the provided run is the exact reopening of the committed record and
+then derives a domain-separated SHA-256 value from the journal, record, and run
+identities. The same head yields the same nonce; a successor yields another.
+
+The POSIX transaction-run runtime owns one stateless canonical dispatch source.
+It no longer borrows run or dispatch nonce services. This introduces no nonce
+store, random generator, seed, hidden cache, journal enumeration, or process
+lifetime dependency. Run-intent generation and persistence remain outside the
+runtime; semantic progression, dispatch authority, archive, backend, and state
+authorities remain borrowed exactly as before.
+
+This boundary adds no scheduler, retry loop, worker, cleanup, discovery,
+semantic reconstruction, or mutating command.
+
 ## Release 0.25.0 native transaction-run runtime boundary
 
 Release 0.25.0 composes the already-qualified run and effect mechanisms into
