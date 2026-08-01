@@ -7,5 +7,5 @@ static_assert(pkgctl::version_minor == 24);
 static_assert(pkgctl::version_patch == 0);
 int main()
 {
-  return std::string_view(pkgctl::version_string) == "0.23.0" ? 0 : 1;
+  return std::string_view(pkgctl::version_string) == "0.24.0" ? 0 : 1;
 }

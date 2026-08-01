@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.23.0
+version=0.24.0
 
 require_line()
 {
@@ -20,23 +20,23 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 23;'
+  'inline constexpr unsigned version_minor = 24;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.23.0";'
+  'inline constexpr const char* version_string = "0.24.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 23);'
+  'static_assert(pkgctl::version_minor == 24);'
 
-grep -F '## 0.23.0 - 2026-08-01' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.23.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.23.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.24.0 - 2026-08-01' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.24.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.24.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
-grep -F 'transaction_effect_state_observer' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'transaction_effect_publication_driver' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'missing or surplus' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'obsolete pre-application state projection' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Version 0.23.0 separates physical continuation' \
+grep -F 'posix_transaction_effect_driver_source' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'acquire_transaction_effect_archive()' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'libpkgstate-apply 2.4.0' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'sharing one lease' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Version 0.24.0 provides *posix_transaction_effect_driver_source*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 for contract in \
@@ -47,7 +47,7 @@ for contract in \
   'libpkgcatalog-acquire >= 2.0.0' \
   'libpkgstate >= 2.3.0' \
   'libpkgstate-plan >= 2.3.0' \
-  'libpkgstate-apply >= 2.3.0' \
+  'libpkgstate-apply >= 2.4.0' \
   'libpkgfetch >= 1.0.0' \
   'libpkgbuild >= 2.0.0' \
   'libpkgbuild-exec >= 1.0.0' \
@@ -56,6 +56,7 @@ for contract in \
   'libpkgplan >= 0.2.0' \
   'libpkgexec >= 1.3.0' \
   'libpkgapply >= 2.2.0' \
+  'libpkgapply-posix >= 2.2.0' \
   'libpkgapply-exec >= 1.0.0' \
   'libpkgresolve >= 2.0.0' \
   'libpkgtransaction >= 2.1.0' \
