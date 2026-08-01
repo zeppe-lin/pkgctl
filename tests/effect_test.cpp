@@ -1213,7 +1213,9 @@ pkgctl::effect_attempt_nonce effect_nonce(std::uint8_t marker)
   return pkgctl::effect_attempt_nonce::from_bytes(bytes);
 }
 
-class driver final : public pkgctl::transaction_effect_driver {
+class driver final
+    : public pkgctl::transaction_effect_driver,
+      public pkgctl::transaction_effect_publication_driver {
 public:
   driver(pkgapply::lease_bound_state_projection projection,
          mutation_lease& outer_lease,
@@ -2103,7 +2105,7 @@ void check_restart_boundaries()
         session, *latest, actuator.lifecycle_results(), std::nullopt, {},
         std::nullopt, std::nullopt, std::nullopt);
     const auto unresolved = pkgctl::resume_effectful_operation(
-        unresolved_checkpoint, actuator, journal);
+        unresolved_checkpoint, &actuator, nullptr, journal);
     CHECK(unresolved.external_resolution_required());
     CHECK(!unresolved.operation());
     CHECK(actuator.resume_calls() == 0U);
@@ -2112,7 +2114,7 @@ void check_restart_boundaries()
         session, *latest, actuator.lifecycle_results(), std::nullopt, {},
         std::nullopt, std::nullopt, application_restart_journal(value));
     const auto restarted = pkgctl::resume_effectful_operation(
-        checkpoint, actuator, journal);
+        checkpoint, &actuator, nullptr, journal);
     CHECK(!restarted.external_resolution_required());
     CHECK(restarted.terminal());
     CHECK(restarted.operation());
@@ -2192,7 +2194,7 @@ void check_publication_retry()
   driver restart_driver(
       value.projection, value.outer_lease, value.receipt, value.store);
   const auto restarted = pkgctl::resume_effectful_operation(
-      checkpoint, restart_driver, journal);
+      checkpoint, nullptr, &restart_driver, journal);
   CHECK(restarted.terminal());
   CHECK(!restarted.external_resolution_required());
   CHECK(restarted.operation() && restarted.operation()->succeeded());
@@ -2241,7 +2243,7 @@ void check_publication_reconciliation()
       session, *latest, std::move(before), value.receipt, std::move(after),
       actuator.last_publication_request(), std::nullopt, std::nullopt);
   const auto restarted = pkgctl::resume_effectful_operation(
-      checkpoint, actuator, journal);
+      checkpoint, nullptr, &actuator, journal);
   CHECK(restarted.terminal());
   CHECK(!restarted.external_resolution_required());
   CHECK(restarted.operation().has_value());
@@ -2615,10 +2617,6 @@ public:
     return driver_.resume_application(request, journal);
   }
 
-  pkgstate::snapshot read_state() const override
-  {
-    return driver_.read_state();
-  }
 
 private:
   void mark_driver()
@@ -2635,34 +2633,113 @@ private:
   bool driver_seen_ = false;
 };
 
-class fixed_effect_driver_source final
-    : public pkgctl::transaction_effect_driver_source {
+class tracing_effect_state_observer final
+    : public pkgctl::transaction_effect_state_observer {
 public:
-  fixed_effect_driver_source(
-      pkgctl::transaction_effect_driver& driver,
+  tracing_effect_state_observer(
+      pkgctl::transaction_effect_state_observer& observer,
+      std::vector<std::string>& trace)
+      : observer_(observer), trace_(trace)
+  {
+  }
+
+  pkgapply::target_mutation_lease& lease() noexcept override
+  {
+    return observer_.lease();
+  }
+
+  pkgstate::snapshot read_state() const override
+  {
+    trace_.push_back("state-observer");
+    return observer_.read_state();
+  }
+
+private:
+  pkgctl::transaction_effect_state_observer& observer_;
+  std::vector<std::string>& trace_;
+};
+
+class tracing_effect_publication_driver final
+    : public pkgctl::transaction_effect_publication_driver {
+public:
+  tracing_effect_publication_driver(
+      pkgctl::transaction_effect_publication_driver& driver,
       std::vector<std::string>& trace)
       : driver_(driver), trace_(trace)
   {
   }
 
-  std::unique_ptr<pkgctl::transaction_effect_driver>
-  acquire_execution_driver(
+  pkgapply::target_mutation_lease& lease() noexcept override
+  {
+    return driver_.lease();
+  }
+
+  pkgstate::snapshot read_state() const override
+  {
+    trace_.push_back("publication-state");
+    return driver_.read_state();
+  }
+
+  pkgstate::state_publication_receipt publish_state(
+      const pkgstate::state_publication_request& request) override
+  {
+    trace_.push_back("publication-driver");
+    return driver_.publish_state(request);
+  }
+
+private:
+  pkgctl::transaction_effect_publication_driver& driver_;
+  std::vector<std::string>& trace_;
+};
+
+class fixed_effect_driver_source final
+    : public pkgctl::transaction_effect_driver_source {
+public:
+  fixed_effect_driver_source(
+      driver& driver,
+      std::vector<std::string>& trace)
+      : continuation_(driver), observer_(driver), publication_(driver),
+        trace_(trace)
+  {
+  }
+
+  pkgctl::transaction_effect_execution_drivers
+  acquire_execution_drivers(
       const pkgctl::transaction_dispatch_execution_handoff& handoff) override
   {
     ++execution_calls_;
     execution_handoff_ = handoff.identity();
     trace_.push_back("driver-source-execution");
-    return std::make_unique<tracing_effect_driver>(driver_, trace_);
+    return {
+        std::make_unique<tracing_effect_driver>(continuation_, trace_),
+        std::make_unique<tracing_effect_state_observer>(observer_, trace_)};
   }
 
-  std::unique_ptr<pkgctl::transaction_effect_driver>
-  acquire_recovery_driver(
+  pkgctl::transaction_effect_recovery_drivers
+  acquire_recovery_drivers(
       const pkgctl::transaction_dispatch_recovery_handoff& handoff) override
   {
     ++recovery_calls_;
     recovery_handoff_ = handoff.identity();
     trace_.push_back("driver-source-recovery");
-    return std::make_unique<tracing_effect_driver>(driver_, trace_);
+    const auto* checkpoint = handoff.operation();
+    if (checkpoint == nullptr)
+      throw std::runtime_error("recovery handoff has no operation checkpoint");
+
+    pkgctl::transaction_effect_recovery_drivers drivers;
+    if (pkgctl::operation_reconciliation_requires_continuation_driver(
+            *checkpoint))
+      drivers.continuation =
+          std::make_unique<tracing_effect_driver>(continuation_, trace_);
+    if (pkgctl::operation_reconciliation_requires_state_observer(*checkpoint))
+      drivers.resulting_state =
+          std::make_unique<tracing_effect_state_observer>(observer_, trace_);
+    if (pkgctl::operation_reconciliation_requires_publication_driver(
+            *checkpoint))
+      drivers.publication =
+          std::make_unique<tracing_effect_publication_driver>(
+              publication_, trace_);
+    return drivers;
   }
 
   std::size_t execution_calls() const noexcept { return execution_calls_; }
@@ -2673,7 +2750,9 @@ public:
   recovery_handoff() const noexcept { return recovery_handoff_; }
 
 private:
-  pkgctl::transaction_effect_driver& driver_;
+  pkgctl::transaction_effect_driver& continuation_;
+  pkgctl::transaction_effect_state_observer& observer_;
+  pkgctl::transaction_effect_publication_driver& publication_;
   std::vector<std::string>& trace_;
   std::size_t execution_calls_ = 0U;
   std::size_t recovery_calls_ = 0U;
@@ -2689,8 +2768,8 @@ public:
   {
   }
 
-  std::unique_ptr<pkgctl::transaction_effect_driver>
-  acquire_execution_driver(
+  pkgctl::transaction_effect_execution_drivers
+  acquire_execution_drivers(
       const pkgctl::transaction_dispatch_execution_handoff&) override
   {
     ++execution_calls_;
@@ -2698,8 +2777,8 @@ public:
     throw std::runtime_error("injected effect-driver source refusal");
   }
 
-  std::unique_ptr<pkgctl::transaction_effect_driver>
-  acquire_recovery_driver(
+  pkgctl::transaction_effect_recovery_drivers
+  acquire_recovery_drivers(
       const pkgctl::transaction_dispatch_recovery_handoff&) override
   {
     ++recovery_calls_;
@@ -3224,7 +3303,7 @@ void check_durable_operation_execution()
 
     const auto completed = pkgctl::execute_operation_dispatch_durable(
         reserved, reservation.run, *reservation.dispatch, session,
-        effect_nonce(71U), traced_driver, effect_store, run_store);
+        effect_nonce(71U), traced_driver, actuator, effect_store, run_store);
 
     CHECK(trace.size() >= 4U);
     if (trace.size() >= 4U)
@@ -3269,7 +3348,7 @@ void check_durable_operation_execution()
     {
       (void)pkgctl::execute_operation_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch, session,
-          effect_nonce(75U), traced_driver, effect_store, run_store);
+          effect_nonce(75U), traced_driver, actuator, effect_store, run_store);
     }
     catch (const pkgctl::effect_journal_error& problem)
     {
@@ -3299,7 +3378,7 @@ void check_durable_operation_execution()
     {
       (void)pkgctl::execute_operation_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch, session,
-          effect_nonce(72U), traced_driver, effect_store, run_store);
+          effect_nonce(72U), traced_driver, actuator, effect_store, run_store);
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -3331,7 +3410,7 @@ void check_durable_operation_execution()
     {
       (void)pkgctl::execute_operation_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch, session,
-          effect_nonce(73U), traced_driver, effect_store, run_store);
+          effect_nonce(73U), traced_driver, actuator, effect_store, run_store);
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -3379,7 +3458,7 @@ void check_durable_operation_execution()
     {
       (void)pkgctl::execute_operation_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch, session,
-          effect_nonce(76U), traced_driver, effect_store, run_store);
+          effect_nonce(76U), traced_driver, actuator, effect_store, run_store);
     }
     catch (const std::runtime_error&)
     {
@@ -3427,7 +3506,7 @@ void check_durable_operation_execution()
 
     const auto observed = pkgctl::execute_operation_dispatch_durable(
         reserved, reservation.run, *reservation.dispatch, session,
-        effect_nonce(74U), traced_driver, effect_store, run_store);
+        effect_nonce(74U), traced_driver, actuator, effect_store, run_store);
     CHECK(observed.result.outcome() ==
           pkgctl::effectful_operation_outcome::outer_lease_lost);
     CHECK(observed.run.records().size() == 1U);
@@ -3503,7 +3582,7 @@ void check_durable_operation_reconciliation()
             started.run.progress(), started.run_record),
         *reservation.dispatch,
         restart_checkpoint(session, effect_store.latest(), result),
-        actuator, effect_store, run_store);
+        nullptr, &actuator, nullptr, effect_store, run_store);
 
     CHECK(reconciled.run_advanced);
     CHECK(reconciled.disposition ==
@@ -3547,7 +3626,7 @@ void check_durable_operation_reconciliation()
           pkgctl::transaction_run_restart_checkpoint::make(
               started.run.progress(), started.run_record),
           *reservation.dispatch, effect_checkpoint,
-          actuator, effect_store, run_store);
+          nullptr, &actuator, nullptr, effect_store, run_store);
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -3562,7 +3641,7 @@ void check_durable_operation_reconciliation()
         pkgctl::transaction_run_restart_checkpoint::make(
             started.run.progress(), started.run_record),
         *reservation.dispatch, effect_checkpoint,
-        actuator, effect_store, run_store);
+        nullptr, &actuator, nullptr, effect_store, run_store);
     CHECK(reconciled.run_advanced);
     CHECK(reconciled.record.sequence() == started.run_record.sequence() + 1U);
     CHECK(actuator.trace() == driver_trace);
@@ -3589,7 +3668,7 @@ void check_durable_operation_reconciliation()
         pkgctl::effect_restart_checkpoint::make(
             session, effect_store.latest(), {}, std::nullopt, {},
             std::nullopt, std::nullopt),
-        actuator, effect_store, run_store);
+        &actuator, &actuator, nullptr, effect_store, run_store);
 
     CHECK(reconciled.run_advanced);
     CHECK(reconciled.result && reconciled.result->succeeded());
@@ -3621,7 +3700,7 @@ void check_durable_operation_reconciliation()
         pkgctl::effect_restart_checkpoint::make(
             session, intent, {}, std::nullopt, {},
             std::nullopt, std::nullopt),
-        nullptr, effect_store, run_store);
+        nullptr, nullptr, nullptr, effect_store, run_store);
 
     CHECK(!unresolved.run_advanced);
     CHECK(unresolved.disposition ==
@@ -3709,17 +3788,23 @@ void check_single_step_operation_advancement()
         trace.begin(), trace.end(), "effect-1");
     const auto started_run = std::find(trace.begin(), trace.end(), "run-2");
     const auto driver_call = std::find(trace.begin(), trace.end(), "driver");
+    const auto state_observation = std::find(
+        trace.begin(), trace.end(), "state-observer");
     CHECK(driver_source_call != trace.end());
     CHECK(effect_admission != trace.end());
     CHECK(started_run != trace.end());
     CHECK(driver_call != trace.end());
+    CHECK(state_observation != trace.end());
     if (driver_source_call != trace.end() && effect_admission != trace.end() &&
-        started_run != trace.end() && driver_call != trace.end())
+        started_run != trace.end() && driver_call != trace.end() &&
+        state_observation != trace.end())
     {
       CHECK(trace.begin() < driver_source_call);
       CHECK(driver_source_call < effect_admission);
       CHECK(effect_admission < started_run);
       CHECK(started_run < driver_call);
+      CHECK(driver_call < state_observation);
+      CHECK(state_observation < trace.end() - 1);
     }
     CHECK(trace.back() == "run-3");
   }
@@ -3858,8 +3943,9 @@ void check_single_step_operation_advancement()
     CHECK(driver_source.recovery_calls() == 1U);
     CHECK(driver_source.recovery_handoff().has_value());
     CHECK(actuator.trace() == driver_trace);
-    CHECK(trace.size() == trace_before.size() + 2U);
+    CHECK(trace.size() == trace_before.size() + 3U);
     CHECK(trace[trace_before.size()] == "driver-source-recovery");
+    CHECK(trace[trace_before.size() + 1U] == "state-observer");
     CHECK(trace.back() == "run-2");
   }
 
