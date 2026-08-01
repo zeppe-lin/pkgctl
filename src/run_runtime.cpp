@@ -6,6 +6,25 @@
 #include <utility>
 
 namespace pkgctl {
+namespace {
+
+class explicit_run_nonce_source final : public transaction_run_nonce_source {
+public:
+  explicit explicit_run_nonce_source(transaction_run_nonce nonce)
+      : nonce_(std::move(nonce))
+  {
+  }
+
+  transaction_run_nonce issue(const transaction_run&) override
+  {
+    return nonce_;
+  }
+
+private:
+  transaction_run_nonce nonce_;
+};
+
+} // namespace
 
 class posix_transaction_run_runtime::implementation final {
 public:
@@ -31,13 +50,14 @@ public:
   transaction_run_launch_result launch(
       transaction_progress progress,
       transaction_dispatch_policy dispatch_policy,
+      transaction_run_nonce run_nonce,
       transaction_run_drive_policy drive_policy)
   {
+    explicit_run_nonce_source run_nonces(std::move(run_nonce));
     return launch_transaction_run(
         std::move(progress), std::move(dispatch_policy),
-        std::move(drive_policy), authorities_.run_nonces,
-        authorities_.dispatch_nonces, semantic_authorities(), drivers(),
-        stores());
+        std::move(drive_policy), run_nonces, dispatch_nonces_,
+        semantic_authorities(), drivers(), stores());
   }
 
   transaction_run_drive_result drive(
@@ -45,9 +65,8 @@ public:
       transaction_run_drive_policy drive_policy)
   {
     return drive_transaction_run(
-        std::move(journal), std::move(drive_policy),
-        authorities_.dispatch_nonces, semantic_authorities(), drivers(),
-        stores());
+        std::move(journal), std::move(drive_policy), dispatch_nonces_,
+        semantic_authorities(), drivers(), stores());
   }
 
 private:
@@ -75,6 +94,7 @@ private:
   native_construction_driver construction_;
   native_transaction_check_driver check_;
   std::unique_ptr<posix_transaction_effect_driver_source> operation_;
+  canonical_transaction_dispatch_nonce_source dispatch_nonces_;
 };
 
 std::unique_ptr<posix_transaction_run_runtime>
@@ -103,10 +123,11 @@ posix_transaction_run_runtime::~posix_transaction_run_runtime() = default;
 transaction_run_launch_result posix_transaction_run_runtime::launch(
     transaction_progress progress,
     transaction_dispatch_policy dispatch_policy,
+    transaction_run_nonce run_nonce,
     transaction_run_drive_policy drive_policy)
 {
   return state_->launch(
-      std::move(progress), std::move(dispatch_policy),
+      std::move(progress), std::move(dispatch_policy), std::move(run_nonce),
       std::move(drive_policy));
 }
 

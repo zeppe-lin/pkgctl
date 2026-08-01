@@ -27,6 +27,7 @@
 #include <pkgctl/run_inspect.h>
 #include <pkgctl/run_launch.h>
 #include <pkgctl/run_native.h>
+#include <pkgctl/run_nonce.h>
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_admit.h>

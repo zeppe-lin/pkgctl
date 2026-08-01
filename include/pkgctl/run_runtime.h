@@ -10,13 +10,12 @@
 
 #include <pkgctl/run_launch.h>
 #include <pkgctl/run_native.h>
+#include <pkgctl/run_nonce.h>
 
 namespace pkgctl {
 
-/*! \brief Replay-safe and semantic authorities borrowed by one runtime. */
+/*! \brief Semantic authorities borrowed by one runtime. */
 struct transaction_run_runtime_authorities final {
-  transaction_run_nonce_source& run_nonces;
-  transaction_dispatch_nonce_source& dispatch_nonces;
   transaction_progress_rehydration_source& progress;
   transaction_dispatch_execution_authority_source& execution;
   transaction_dispatch_recovery_authority_source& recovery;
@@ -34,17 +33,19 @@ struct transaction_run_runtime_backends final {
 
 /*! \brief POSIX journal and native-driver composition for bounded run control.
  *
- * The caller supplies existing directory descriptors, exact replay-safe nonce
- * sources, semantic execution/recovery sources, archive authority, and already
- * selected physical backends. The runtime duplicates all three descriptors,
- * owns one run store, one effect store, native construction/check drivers, and
- * one POSIX per-dispatch effect source. Borrowed sources and backends must
- * outlive the runtime.
+ * The caller supplies existing directory descriptors, semantic
+ * execution/recovery sources, archive authority, and already selected physical
+ * backends. The runtime duplicates all three descriptors, owns one run store,
+ * one effect store, native construction/check drivers, one POSIX per-dispatch
+ * effect source, and canonical committed-head dispatch nonce authority.
+ * Borrowed sources and backends must outlive the runtime.
  *
- * The runtime only wires existing controller boundaries. It does not discover
- * paths or journals, initialize directories, issue semantic evidence, create
- * nonce policy, construct backends, wait, retry, schedule, clean up, compact,
- * or expose a command action.
+ * One explicit run nonce is supplied to each launch call because that nonce
+ * distinguishes caller intent between otherwise identical durable histories.
+ * Dispatch nonces are controller-mechanical and are derived from the exact
+ * committed head. The runtime does not discover paths or journals, initialize
+ * directories, issue run intent, reconstruct semantics, construct backends,
+ * wait, retry, schedule, clean up, compact, or expose a command action.
  */
 class posix_transaction_run_runtime final {
 public:
@@ -69,10 +70,11 @@ public:
       posix_transaction_run_runtime&&) = delete;
   ~posix_transaction_run_runtime();
 
-  /*! \brief Admit or resume one exact run and drive it under a caller bound. */
+  /*! \brief Admit or resume one explicit run intent and drive it boundedly. */
   [[nodiscard]] transaction_run_launch_result launch(
       transaction_progress progress,
       transaction_dispatch_policy dispatch_policy,
+      transaction_run_nonce run_nonce,
       transaction_run_drive_policy drive_policy);
 
   /*! \brief Drive one exact already-admitted journal under a caller bound. */
