@@ -8,7 +8,7 @@ cxx=${CXX:-c++}
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-direct.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
-modules='libpkgsource libpkgsource-yaml libpkgsource-plan libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec libcrypto'
+modules='libpkgsource libpkgsource-yaml libpkgsource-plan libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec libcrypto'
 cflags=$(pkg-config --cflags $modules)
 libs=$(pkg-config --libs $modules)
 flags="-std=c++17 -Wall -Wextra -Wpedantic -Werror -I$srcdir/include $cflags"
@@ -70,6 +70,7 @@ done
 "$srcdir/tests/check_run_authority_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_advance_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_driver_source_contract.sh" "$srcdir"
+"$srcdir/tests/check_run_native_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_drive_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_launch_contract.sh" "$srcdir"
 "$srcdir/tests/check_effect_inspect_contract.sh" "$srcdir"

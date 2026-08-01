@@ -50,6 +50,7 @@ for required in \
   'libpkgplan' \
   'libpkgexec' \
   'libpkgapply' \
+  'libpkgapply-posix' \
   'libpkgapply-exec' \
   'libpkgresolve' \
   'libpkgtransaction' \

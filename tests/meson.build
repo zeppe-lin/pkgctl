@@ -197,6 +197,13 @@ if not get_option('tests').disabled()
     args: [meson.project_source_root()],
   )
 
+  run_native_contract = find_program('check_run_native_contract.sh')
+  test(
+    'run-native-contract',
+    run_native_contract,
+    args: [meson.project_source_root()],
+  )
+
   run_drive_contract = find_program('check_run_drive_contract.sh')
   test('run-drive-contract', run_drive_contract, args: [meson.project_source_root()])
 
