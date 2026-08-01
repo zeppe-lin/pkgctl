@@ -113,7 +113,7 @@ public:
   [[nodiscard]] bool external_resolution_required() const noexcept;
 private:
   friend effect_restart_result resume_effectful_operation(
-      effect_restart_checkpoint, transaction_effect_driver&,
+      effect_restart_checkpoint, transaction_effect_driver*,
       effect_journal_store&);
   effect_restart_result(
       effect_restart_disposition disposition,
@@ -124,7 +124,23 @@ private:
   std::optional<effectful_operation_result> operation_;
 };
 
-/*! \brief Continue one exact durable attempt under a newly acquired lease. */
+/*! \brief Return whether continuation must invoke physical target authority. */
+[[nodiscard]] bool effect_restart_requires_driver(
+    const effect_restart_checkpoint& checkpoint);
+
+/*! \brief Continue one exact durable attempt with optional physical authority.
+ *
+ * A null driver is accepted only when the durable checkpoint can be consumed
+ * without touching the target: external-resolution, terminal sealing, an
+ * already terminal record, or an application intent lacking an exact
+ * application journal.
+ */
+[[nodiscard]] effect_restart_result resume_effectful_operation(
+    effect_restart_checkpoint checkpoint,
+    transaction_effect_driver* driver,
+    effect_journal_store& journal_store);
+
+/*! \brief Continue under a supplied physical driver. */
 [[nodiscard]] effect_restart_result resume_effectful_operation(
     effect_restart_checkpoint checkpoint,
     transaction_effect_driver& driver,

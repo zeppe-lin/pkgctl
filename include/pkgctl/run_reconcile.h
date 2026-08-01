@@ -73,6 +73,10 @@ reconcile_check_dispatch_durable(
     transaction_check_result result,
     transaction_run_journal_store& run_store);
 
+/*! \brief Return whether run reconciliation requires physical target authority. */
+[[nodiscard]] bool operation_reconciliation_requires_driver(
+    const effect_restart_checkpoint& checkpoint);
+
 /*! \brief Continue one exact durable operation attempt and commit its result.
  *
  * The supplied effect checkpoint must belong to the started dispatch and name
@@ -83,6 +87,16 @@ reconcile_check_dispatch_durable(
  * requiring external resolution invokes no effect driver and commits no run
  * successor.
  */
+[[nodiscard]] operation_dispatch_reconciliation_result
+reconcile_operation_dispatch_durable(
+    transaction_run_restart_checkpoint checkpoint,
+    const transaction_dispatch& dispatch,
+    effect_restart_checkpoint effect_checkpoint,
+    transaction_effect_driver* driver,
+    effect_journal_store& effect_store,
+    transaction_run_journal_store& run_store);
+
+/*! \brief Reconcile with an explicitly supplied physical driver. */
 [[nodiscard]] operation_dispatch_reconciliation_result
 reconcile_operation_dispatch_durable(
     transaction_run_restart_checkpoint checkpoint,

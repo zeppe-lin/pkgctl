@@ -1195,7 +1195,7 @@ effectful_operation_result execute_effectful_operation_durable(
 
 effect_restart_result resume_effectful_operation(
     effect_restart_checkpoint checkpoint,
-    transaction_effect_driver& driver,
+    transaction_effect_driver* driver,
     effect_journal_store& journal_store)
 {
   effect_attempt_record journal = checkpoint.record();
@@ -1279,8 +1279,12 @@ effect_restart_result resume_effectful_operation(
     }
   }
 
+  if (!effect_restart_requires_driver(checkpoint) || driver == nullptr)
+    throw error(error_code::invalid_effect_session,
+                "effect restart requires a physical driver");
+  auto& physical = *driver;
   const auto& request = session.request();
-  if (!driver.lease().held())
+  if (!physical.lease().held())
     throw error(error_code::invalid_effect_session,
                 "effect restart requires a newly held target lease");
 
@@ -1290,7 +1294,7 @@ effect_restart_result resume_effectful_operation(
     if (!publication_request)
       throw error(error_code::invalid_effect_session,
                   "publication reconciliation lacks the exact request");
-    const auto observed = driver.read_state();
+    const auto observed = physical.read_state();
     const auto& expected = request.expected_state();
     const auto resulting = resulting_snapshot(expected, *publication_request);
     if (observed.identity() == resulting.identity())
@@ -1304,9 +1308,9 @@ effect_restart_result resume_effectful_operation(
           journal, std::nullopt);
     }
     pkgapply::validate_target_mutation_lease(
-        request.application().target(), driver.state_projection(),
-        driver.lease());
-    publication_receipt = driver.publish_state(*publication_request);
+        request.application().target(), physical.state_projection(),
+        physical.lease());
+    publication_receipt = physical.publish_state(*publication_request);
     if (publication_receipt->request() != publication_request->identity())
       throw error(error_code::driver_contract_violation,
                   "state driver returned evidence for another publication request");
@@ -1324,7 +1328,8 @@ effect_restart_result resume_effectful_operation(
   }
 
   pkgapply::validate_target_mutation_lease(
-      request.application().target(), driver.state_projection(), driver.lease());
+      request.application().target(), physical.state_projection(),
+      physical.lease());
 
   if (assessment.disposition() ==
           effect_restart_disposition::continue_before_lifecycle ||
@@ -1333,10 +1338,10 @@ effect_restart_result resume_effectful_operation(
   {
     for (std::size_t index = before.size(); index < session.before().size(); ++index)
     {
-      if (!driver.lease().held())
+      if (!physical.lease().held())
         return finish(effectful_operation_outcome::outer_lease_lost);
       journal = append_record(journal_store, journal.begin_before(index));
-      auto result = driver.execute_lifecycle(session.before()[index]);
+      auto result = physical.execute_lifecycle(session.before()[index]);
       validate_lifecycle_result(session.before()[index], result);
       const bool succeeded = result.succeeded();
       before.push_back(result);
@@ -1349,19 +1354,19 @@ effect_restart_result resume_effectful_operation(
 
   if (!application)
   {
-    if (!driver.lease().held())
+    if (!physical.lease().held())
       return finish(effectful_operation_outcome::outer_lease_lost);
     if (journal.stage() != effect_attempt_stage::application_intent)
       journal = append_record(journal_store, journal.begin_application());
     if (assessment.disposition() == effect_restart_disposition::resume_application)
     {
-      application = driver.resume_application(
+      application = physical.resume_application(
           request.application(), *checkpoint.application_journal());
     }
     else
-      application = driver.apply_application(request.application());
+      application = physical.apply_application(request.application());
     validate_application_receipt(
-        request, driver.state_projection(), *application);
+        request, physical.state_projection(), *application);
     journal = append_record(
         journal_store, journal.complete_application(*application));
     if (application->outcome() !=
@@ -1371,10 +1376,10 @@ effect_restart_result resume_effectful_operation(
 
   for (std::size_t index = after.size(); index < session.after().size(); ++index)
   {
-    if (!driver.lease().held())
+    if (!physical.lease().held())
       return finish(effectful_operation_outcome::outer_lease_lost);
     journal = append_record(journal_store, journal.begin_after(index));
-    auto result = driver.execute_lifecycle(session.after()[index]);
+    auto result = physical.execute_lifecycle(session.after()[index]);
     validate_lifecycle_result(session.after()[index], result);
     const bool succeeded = result.succeeded();
     after.push_back(result);
@@ -1384,7 +1389,7 @@ effect_restart_result resume_effectful_operation(
           effectful_operation_outcome::lifecycle_failed_after_application);
   }
 
-  if (!driver.lease().held())
+  if (!physical.lease().held())
     return finish(effectful_operation_outcome::outer_lease_lost);
 
   if (!publication_request)
@@ -1393,18 +1398,18 @@ effect_restart_result resume_effectful_operation(
     const auto transaction = transaction_evidence(
         session, before, completed, after);
     publication_request = project_publication(
-        request, driver.state_projection(), completed, transaction);
+        request, physical.state_projection(), completed, transaction);
     journal = append_record(
         journal_store,
         journal.begin_publication(transaction, *publication_request));
   }
-  publication_receipt = driver.publish_state(*publication_request);
+  publication_receipt = physical.publish_state(*publication_request);
   if (publication_receipt->request() != publication_request->identity())
     throw error(error_code::driver_contract_violation,
                 "state driver returned evidence for another publication request");
   journal = append_record(
       journal_store, journal.complete_publication(*publication_receipt));
-  if (!driver.lease().held())
+  if (!physical.lease().held())
     return finish(effectful_operation_outcome::outer_lease_lost);
   const auto outcome = publication_outcome(*publication_receipt);
   if (outcome == effectful_operation_outcome::state_publication_indeterminate)
@@ -1417,6 +1422,15 @@ effect_restart_result resume_effectful_operation(
         std::move(operation));
   }
   return finish(outcome);
+}
+
+effect_restart_result resume_effectful_operation(
+    effect_restart_checkpoint checkpoint,
+    transaction_effect_driver& driver,
+    effect_journal_store& journal_store)
+{
+  return resume_effectful_operation(
+      std::move(checkpoint), &driver, journal_store);
 }
 
 } // namespace pkgctl

@@ -131,12 +131,36 @@ reconcile_check_dispatch_durable(
       std::move(result)};
 }
 
+bool operation_reconciliation_requires_driver(
+    const effect_restart_checkpoint& checkpoint)
+{
+  if (effect_restart_requires_driver(checkpoint))
+    return true;
+
+  const auto assessment = assess_effect_restart(checkpoint.record());
+  if (assessment.disposition() == effect_restart_disposition::terminal)
+  {
+    return checkpoint.record().terminal_outcome() ==
+        std::optional<effectful_operation_outcome>(
+            effectful_operation_outcome::completed);
+  }
+
+  if (assessment.disposition() == effect_restart_disposition::seal_terminal &&
+      checkpoint.record().stage() == effect_attempt_stage::publication_terminal)
+  {
+    return checkpoint.publication_receipt() &&
+        checkpoint.publication_receipt()->outcome() ==
+            pkgstate::state_publication_outcome::published;
+  }
+  return false;
+}
+
 operation_dispatch_reconciliation_result
 reconcile_operation_dispatch_durable(
     transaction_run_restart_checkpoint checkpoint,
     const transaction_dispatch& dispatch,
     effect_restart_checkpoint effect_checkpoint,
-    transaction_effect_driver& driver,
+    transaction_effect_driver* driver,
     effect_journal_store& effect_store,
     transaction_run_journal_store& run_store)
 {
@@ -178,7 +202,12 @@ reconcile_operation_dispatch_durable(
 
   std::optional<pkgstate::snapshot> resulting_state;
   if (effect.operation()->succeeded())
-    resulting_state = driver.read_state();
+  {
+    if (driver == nullptr)
+      invalid_reconciliation(
+          "successful effect reconciliation requires a state driver");
+    resulting_state = driver->read_state();
+  }
 
   auto next = submit_operation_dispatch_result(
       checkpoint.run(), dispatch, *effect.operation(),
@@ -188,6 +217,20 @@ reconcile_operation_dispatch_durable(
   return operation_dispatch_reconciliation_result{
       std::move(committed.run), std::move(committed.record),
       effect.disposition(), effect.journal(), effect.operation(), true};
+}
+
+operation_dispatch_reconciliation_result
+reconcile_operation_dispatch_durable(
+    transaction_run_restart_checkpoint checkpoint,
+    const transaction_dispatch& dispatch,
+    effect_restart_checkpoint effect_checkpoint,
+    transaction_effect_driver& driver,
+    effect_journal_store& effect_store,
+    transaction_run_journal_store& run_store)
+{
+  return reconcile_operation_dispatch_durable(
+      std::move(checkpoint), dispatch, std::move(effect_checkpoint), &driver,
+      effect_store, run_store);
 }
 
 } // namespace pkgctl

@@ -4,6 +4,7 @@
 #include <pkgctl/run_advance.h>
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -52,7 +53,6 @@ transaction_run_journal_record load_committed_head(
   return *latest;
 }
 
-
 construction_driver& require_construction_driver(
     transaction_run_advance_drivers drivers)
 {
@@ -70,12 +70,74 @@ transaction_check_driver& require_check_driver(
   return *drivers.check;
 }
 
-transaction_effect_driver& require_operation_driver(
+transaction_effect_driver_source& require_operation_driver_source(
     transaction_run_advance_drivers drivers)
 {
   if (drivers.operation == nullptr)
-    invalid_advancement("operation advancement requires an effect driver");
+    invalid_advancement(
+        "operation advancement requires an effect driver source");
   return *drivers.operation;
+}
+
+void validate_operation_driver(
+    const effectful_operation_session& session,
+    transaction_effect_driver& driver)
+{
+  const auto& request = session.request();
+  try
+  {
+    pkgapply::validate_target_mutation_lease(
+        request.application().target(), driver.state_projection(),
+        driver.lease());
+  }
+  catch (const pkgapply::mutation_lease_error& problem)
+  {
+    invalid_advancement(
+        std::string("operation driver has invalid target authority: ") +
+        problem.what());
+  }
+
+  const auto& expected = request.expected_state();
+  const auto& state = driver.state_projection();
+  if (state.snapshot().string() != expected.identity().string() ||
+      state.ownership_inventory().string() !=
+          expected.ownership_identity().string())
+  {
+    invalid_advancement(
+        "operation driver state projection belongs to another state epoch");
+  }
+}
+
+std::unique_ptr<transaction_effect_driver> acquire_execution_driver(
+    transaction_effect_driver_source& source,
+    const transaction_dispatch_execution_handoff& handoff)
+{
+  const auto* authority = handoff.operation();
+  if (authority == nullptr)
+    invalid_advancement(
+        "operation execution handoff carries no effect authority");
+  auto driver = source.acquire_execution_driver(handoff);
+  if (!driver)
+    invalid_advancement(
+        "operation effect driver source returned no execution driver");
+  validate_operation_driver(authority->session, *driver);
+  return driver;
+}
+
+std::unique_ptr<transaction_effect_driver> acquire_recovery_driver(
+    transaction_effect_driver_source& source,
+    const transaction_dispatch_recovery_handoff& handoff)
+{
+  const auto* checkpoint = handoff.operation();
+  if (checkpoint == nullptr)
+    invalid_advancement(
+        "operation recovery handoff carries no effect checkpoint");
+  auto driver = source.acquire_recovery_driver(handoff);
+  if (!driver)
+    invalid_advancement(
+        "operation effect driver source returned no recovery driver");
+  validate_operation_driver(checkpoint->session(), *driver);
+  return driver;
 }
 
 effect_journal_store& require_effect_store(
@@ -100,7 +162,7 @@ void require_execution_dependencies(
       (void)require_check_driver(drivers);
       return;
     case transaction_unit_kind::operation:
-      (void)require_operation_driver(drivers);
+      (void)require_operation_driver_source(drivers);
       (void)require_effect_store(stores);
       return;
   }
@@ -173,10 +235,15 @@ transaction_run_advance_result reconcile_active(
       if (recovery == nullptr)
         invalid_advancement(
             "operation recovery handoff carries no effect checkpoint");
+      std::unique_ptr<transaction_effect_driver> driver;
+      if (operation_reconciliation_requires_driver(*recovery))
+      {
+        driver = acquire_recovery_driver(
+            require_operation_driver_source(drivers), handoff);
+      }
       auto value = reconcile_operation_dispatch_durable(
-          handoff.checkpoint(), handoff.dispatch(), *recovery,
-          require_operation_driver(drivers), require_effect_store(stores),
-          stores.runs);
+          handoff.checkpoint(), handoff.dispatch(), *recovery, driver.get(),
+          require_effect_store(stores), stores.runs);
       const auto disposition = value.run_advanced
           ? transaction_run_advance_disposition::reconciled_operation
           : transaction_run_advance_disposition::external_resolution_required;
@@ -189,7 +256,6 @@ transaction_run_advance_result reconcile_active(
   }
   invalid_advancement("unknown transaction restart disposition");
 }
-
 
 void validate_advance_result(
     const transaction_run& run,
@@ -311,11 +377,12 @@ transaction_run_advance_result execute_reserved(
       if (authority == nullptr)
         invalid_advancement(
             "operation execution handoff carries no effect authority");
+      auto driver = acquire_execution_driver(
+          require_operation_driver_source(drivers), handoff);
       auto value = execute_operation_dispatch_durable(
           handoff.record(), handoff.run(), handoff.dispatch(),
-          authority->session, authority->nonce,
-          require_operation_driver(drivers), require_effect_store(stores),
-          stores.runs);
+          authority->session, authority->nonce, *driver,
+          require_effect_store(stores), stores.runs);
       transaction_run_operation_advance_evidence evidence{
           value.admission, value.result, std::nullopt};
       return detail_transaction_run_advance_access::make(

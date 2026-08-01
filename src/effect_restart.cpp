@@ -137,6 +137,29 @@ effect_restart_assessment assess_effect_restart(
       record.attempt(), record.identity(), record.stage(), disposition);
 }
 
+bool effect_restart_requires_driver(
+    const effect_restart_checkpoint& checkpoint)
+{
+  const auto assessment = assess_effect_restart(checkpoint.record());
+  switch (assessment.disposition())
+  {
+    case effect_restart_disposition::external_resolution_required:
+    case effect_restart_disposition::seal_terminal:
+    case effect_restart_disposition::terminal:
+      return false;
+    case effect_restart_disposition::resume_application:
+      return checkpoint.application_journal().has_value();
+    case effect_restart_disposition::continue_before_lifecycle:
+    case effect_restart_disposition::start_application:
+    case effect_restart_disposition::continue_after_application:
+    case effect_restart_disposition::continue_after_lifecycle:
+    case effect_restart_disposition::start_publication:
+    case effect_restart_disposition::reconcile_publication:
+      return true;
+  }
+  invalid_checkpoint("unknown effect restart disposition");
+}
+
 effect_restart_checkpoint::effect_restart_checkpoint(
     effectful_operation_session session,
     effect_attempt_record record,

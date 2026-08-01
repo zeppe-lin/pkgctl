@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <variant>
 
@@ -40,11 +41,33 @@ struct transaction_run_advance_authorities final {
   transaction_dispatch_recovery_authority_source& recovery;
 };
 
+/*! \brief Caller-owned source of one call-scoped operation driver.
+ *
+ * A transaction may contain several operation dispatches.  Each dispatch can
+ * require another target lease, installed-state projection, archive, and
+ * recovery binding.  The source is therefore consulted only after an exact
+ * semantic execution or recovery handoff has been validated.  Returned
+ * drivers are owned for that single advancement call and are never retained
+ * in a durable record.
+ */
+class transaction_effect_driver_source {
+public:
+  virtual ~transaction_effect_driver_source() = default;
+
+  [[nodiscard]] virtual std::unique_ptr<transaction_effect_driver>
+  acquire_execution_driver(
+      const transaction_dispatch_execution_handoff& handoff) = 0;
+
+  [[nodiscard]] virtual std::unique_ptr<transaction_effect_driver>
+  acquire_recovery_driver(
+      const transaction_dispatch_recovery_handoff& handoff) = 0;
+};
+
 /*! \brief Caller-owned effectors used by one advancement step. */
 struct transaction_run_advance_drivers final {
   construction_driver* construction;
   transaction_check_driver* check;
-  transaction_effect_driver* operation;
+  transaction_effect_driver_source* operation;
 };
 
 /*! \brief Caller-owned durable stores used by one advancement step. */

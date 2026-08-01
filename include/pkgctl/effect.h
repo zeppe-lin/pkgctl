@@ -222,7 +222,7 @@ private:
       effectful_operation_session, const effect_attempt_nonce&,
       transaction_effect_driver&, effect_journal_store&);
   friend effect_restart_result resume_effectful_operation(
-      effect_restart_checkpoint, transaction_effect_driver&,
+      effect_restart_checkpoint, transaction_effect_driver*,
       effect_journal_store&);
 
   [[nodiscard]] static effectful_operation_result seal(
