@@ -1,3 +1,50 @@
+## 0.22.0 - 2026-08-01
+
+### Per-dispatch effect-driver authority
+
+- Replaces the run-wide operation driver with a caller-owned
+  `transaction_effect_driver_source` that returns one call-scoped driver for an
+  exact validated execution or recovery handoff.
+- Acquires fresh operation authority only after the reservation successor is
+  committed and before the subordinate effect attempt is admitted.
+- Validates the returned live target mutation lease and proves its state
+  projection names the operation session's exact expected snapshot and
+  ownership inventory.
+- Leaves a source refusal or invalid physical authority as a durable reserved
+  dispatch and appends no effect-attempt record.
+- Classifies recovery before acquiring physical authority. Terminal failure and
+  external-resolution states request no driver; successful terminal recovery
+  may acquire one only to read the resulting state required by run progression.
+- Keeps drivers call-scoped: they are not serialized, retained in journals,
+  shared across operation dispatches, or reconstructed from durable identities.
+- Adds no concrete lease, state-store, archive, backend, credential, or path
+  discovery; no scheduler, worker, concurrency, retry policy, cleanup, native
+  runtime assembly, or mutating command.
+
+### Dependency contract
+
+- libpkgsource >= 2.0.0
+- libpkgsource-yaml >= 2.0.0
+- libpkgsource-plan >= 2.0.0
+- libpkgcatalog >= 2.0.0
+- libpkgcatalog-acquire >= 2.0.0
+- libpkgstate >= 2.3.0
+- libpkgstate-plan >= 2.3.0
+- libpkgstate-apply >= 2.3.0
+- libpkgfetch >= 1.0.0
+- libpkgbuild >= 2.0.0
+- libpkgbuild-exec >= 1.0.0
+- libpkgbuild-plan >= 2.0.0
+- libpkgimage >= 0.3.0
+- libpkgplan >= 0.2.0
+- libpkgexec >= 1.3.0
+- libpkgapply >= 2.0.0
+- libpkgapply-exec >= 1.0.0
+- libpkgresolve >= 2.0.0
+- libpkgtransaction >= 2.1.0
+- libpkgcheck >= 0.1.0
+- libpkgcheck-exec >= 0.1.1
+
 ## 0.21.0 - 2026-08-01
 
 ### Exact effect-attempt inspection command
