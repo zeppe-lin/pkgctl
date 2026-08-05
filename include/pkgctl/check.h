@@ -52,7 +52,7 @@ private:
 struct transaction_check_resources final {
   pkgcheck_exec::source_tree source;
   pkgcheck_exec::checked_package_tree package;
-  std::vector<pkgcheck_exec::package_input_tree> inputs;
+  std::vector<pkgcheck_exec::package_input_resource> inputs;
   pkgcheck_exec::session_paths paths;
   pkgcheck_exec::execution_identity execution_identity;
   pkgexec::resource_limits limits = pkgexec::resource_limits::make();

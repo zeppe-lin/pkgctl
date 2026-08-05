@@ -238,7 +238,7 @@ pkgctl::construction_session construction_session_for(
 {
   const auto& node = build_node_for(transaction, package);
   auto request = pkgctl::construction_request::make(
-      transaction, node.identity(), {},
+      transaction, node.identity(),
       pkgbuild::build_policy::make(
           pkgbuild::environment_policy::hermetic(
               2U, 0022, 1700000000)));
@@ -312,7 +312,7 @@ private:
 
 struct fixture final {
   test_support::temporary_directory temporary;
-  pkgstate::canonical_generation_store store;
+  pkgstate::posix::canonical_generation_store store;
   std::string payload;
   pkgsource::source_snapshot source;
   pkgctl::transaction_session transaction;

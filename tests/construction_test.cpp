@@ -605,7 +605,7 @@ void check_success()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
   auto source = tool_source(sha256_text(payload));
@@ -622,7 +622,7 @@ void check_success()
   CHECK(result.materialization().source().identity() == source.identity());
   CHECK(result.materialization().objects().size() == 1U);
   CHECK(result.build().build().outcome() == pkgbuild::build_outcome::succeeded);
-  CHECK(result.build().artifact_inspection().has_value());
+  CHECK(result.build().image_authority().has_value());
   CHECK(fs::is_regular_file(session.paths().build.artifact_path));
 
   auto progression = pkgctl::transaction_progress::begin(transaction);
@@ -660,7 +660,7 @@ void check_install_preparation()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
   auto source = tool_source(sha256_text(payload), "1.0", false);
@@ -707,7 +707,7 @@ void check_install_preparation()
       package_policy(), pkgctl::lifecycle_order::make({}, {}),
       pkgstate::installation_reason::explicit_request());
   pkgimage::libarchive_backend archives;
-  pkgctl::native_operation_preparation_driver preparation_driver(archives);
+  pkgctl::native_operation_preparation_driver preparation_driver;
   const auto result = pkgctl::prepare_operation(
       std::move(request), preparation_driver);
 
@@ -734,20 +734,20 @@ void check_install_preparation()
   CHECK(result.effect() &&
         result.effect()->expected_state().identity() ==
             progression.current_state().identity());
-  CHECK(result.artifact() && construction.build().artifact_inspection() &&
-        result.artifact()->image().receipt().archive_digest() ==
-            construction.build().artifact_inspection()->archive_digest());
-  CHECK(result.artifact()->image().receipt().image_identity() ==
-        construction.build().artifact_inspection()->image_identity());
-  CHECK(result.artifact()->image().receipt().entry_count() ==
-        construction.build().artifact_inspection()->entry_count());
+  CHECK(result.artifact() && construction.build().image_authority() &&
+        result.artifact()->authority().image().receipt().archive_digest() ==
+            construction.build().image_authority()->image().receipt().archive_digest());
+  CHECK(result.artifact()->authority().image().receipt().image_identity() ==
+        construction.build().image_authority()->image().receipt().image_identity());
+  CHECK(result.artifact()->authority().image().receipt().entry_count() ==
+        construction.build().image_authority()->image().receipt().entry_count());
 }
 
 void check_check_progression()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
   auto source = tool_source(
@@ -807,7 +807,7 @@ void check_failed_progression()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
   auto source = tool_source(sha256_text(payload), "1.0", false);
@@ -841,7 +841,7 @@ void check_failed_build()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
   auto source = tool_source(sha256_text(payload));
@@ -856,7 +856,7 @@ void check_failed_build()
   CHECK(!result.succeeded());
   CHECK(result.outcome() == pkgctl::construction_outcome::build_failed);
   CHECK(result.build().build().outcome() == pkgbuild::build_outcome::failed);
-  CHECK(!result.build().artifact_inspection().has_value());
+  CHECK(!result.build().image_authority().has_value());
   CHECK(!fs::exists(session.paths().build.artifact_path));
 }
 
@@ -864,7 +864,7 @@ void check_admission()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
   auto source = tool_source(sha256_text(payload));
@@ -877,7 +877,6 @@ void check_admission()
     (void)pkgctl::construction_request::make(
         transaction,
         source_identity<pkgtransaction::transaction_node_identity>('f'),
-        {dependency_input(transaction)},
         pkgbuild::build_policy::make(
             pkgbuild::environment_policy::hermetic(1)));
   }
@@ -888,20 +887,23 @@ void check_admission()
   }
   CHECK(unknown_node);
 
-  auto input = dependency_input(transaction);
   auto request = pkgctl::construction_request::make(
-      transaction, build_node(transaction).identity(), {input},
+      transaction, build_node(transaction).identity(),
       pkgbuild::build_policy::make(
           pkgbuild::environment_policy::hermetic(1)));
-  pkgbuild_exec::package_input_tree exact{
-      input.resolved().identity(), input.tree(), temporary.path() / "exact",
+  CHECK(request.inputs().size() == 1U);
+  const auto& input = request.inputs().front();
+  pkgbuild_exec::package_input_resource exact{
+      input.identity(),
+      pkgexec::resource_identity::from_sha256(input.identity().hex()),
+      temporary.path() / "exact",
   };
-  pkgbuild_exec::package_input_tree extra{
-      source_identity<pkgbuild::resolved_package_input_identity>('1'),
-      source_identity<pkgbuild::input_tree_identity>('2'),
+  pkgbuild_exec::package_input_resource extra{
+      source_identity<pkgbuild::build_input_identity>('1'),
+      source_identity<pkgexec::resource_identity>('2'),
       temporary.path() / "extra",
   };
-  bool extra_tree = false;
+  bool extra_resource = false;
   try
   {
     (void)pkgctl::construction_session::admit(
@@ -917,10 +919,31 @@ void check_admission()
   }
   catch (const pkgctl::error& value)
   {
-    extra_tree = value.code() ==
+    extra_resource = value.code() ==
         pkgctl::error_code::invalid_construction_session;
   }
-  CHECK(extra_tree);
+  CHECK(extra_resource);
+
+  bool missing_resource = false;
+  try
+  {
+    (void)pkgctl::construction_session::admit(
+        request,
+        {temporary.path() / "sources", temporary.path() / "store",
+         {pkgexec::root_view_identity::from_sha256(std::string(64U, 'b')),
+          temporary.path() / "root", temporary.path() / "session",
+          temporary.path() / "package", temporary.path() / "artifact.tar"}},
+        {},
+        {pkgexec::interpreter_identity::from_sha256(std::string(64U, 'c')),
+         static_cast<std::uint64_t>(::geteuid()),
+         static_cast<std::uint64_t>(::getegid()), {}});
+  }
+  catch (const pkgctl::error& value)
+  {
+    missing_resource = value.code() ==
+        pkgctl::error_code::invalid_construction_session;
+  }
+  CHECK(missing_resource);
 
   bool overlapping_coordinates = false;
   try
@@ -942,32 +965,6 @@ void check_admission()
         pkgctl::error_code::invalid_construction_session;
   }
   CHECK(overlapping_coordinates);
-
-  const auto& selected = dependency_selection(transaction);
-  auto forged = pkgbuild::materialized_package_input(
-      pkgbuild::resolved_package_input::make(
-          pkgbuild::input_scope::build,
-          pkgsource::package_reference("dep"),
-          pkgsource::package_release(
-              pkgsource::package_reference("dep"), "9.0", 1),
-          selected.source_snapshot(),
-          source_identity<pkgbuild::build_result_identity>('3'),
-          source_identity<pkgbuild::artifact_identity>('4')),
-      source_identity<pkgbuild::input_tree_identity>('5'));
-  bool forged_input = false;
-  try
-  {
-    (void)pkgctl::construction_request::make(
-        transaction, build_node(transaction).identity(), {forged},
-        pkgbuild::build_policy::make(
-            pkgbuild::environment_policy::hermetic(1)));
-  }
-  catch (const pkgctl::error& value)
-  {
-    forged_input = value.code() ==
-        pkgctl::error_code::invalid_construction_request;
-  }
-  CHECK(forged_input);
 }
 
 
@@ -975,7 +972,7 @@ void check_identity_and_driver_contract()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
   auto source = tool_source(sha256_text(payload));
@@ -983,7 +980,7 @@ void check_identity_and_driver_contract()
                                          temporary.path() / "state");
   auto first = construction_session(transaction, temporary.path() / "first");
   auto second = construction_session(transaction, temporary.path() / "second");
-  CHECK(first.identity() == second.identity());
+  CHECK(first.identity() != second.identity());
 
   test_support::write(first.paths().local_source_root / "payload", payload);
   mismatched_materialization_driver mismatch(
@@ -1004,7 +1001,12 @@ void check_identity_and_driver_contract()
       transaction, temporary.path() / "mismatched-build");
   test_support::write(
       build_session.paths().local_source_root / "payload", payload);
-  mismatched_build_driver mismatched_build;
+  const auto& subject = package_selection(transaction, "tool");
+  auto alternate = pkgbuild::build_request::seal(
+      transaction.resolution().resolution(), subject.identity(),
+      pkgbuild::build_policy::make(
+          pkgbuild::environment_policy::hermetic(3, 0022, 1700000000)));
+  mismatched_build_driver mismatched_build(std::move(alternate));
   bool build_rejected = false;
   try
   {
@@ -1039,7 +1041,7 @@ void check_durable_dispatch_execution()
 
   const auto make_fixture = [](const std::filesystem::path& root) {
     test_support::initialize_state(root / "state");
-    pkgstate::canonical_generation_store store(
+    pkgstate::posix::canonical_generation_store store(
         root / "state", test_support::binding());
     const std::string payload = "durable construction payload\n";
     auto source = tool_source(sha256_text(payload), "1.0", false);
@@ -1213,7 +1215,7 @@ void check_durable_restart_reconciliation()
 
   const auto make_fixture = [](const std::filesystem::path& root) {
     test_support::initialize_state(root / "state");
-    pkgstate::canonical_generation_store store(
+    pkgstate::posix::canonical_generation_store store(
         root / "state", test_support::binding());
     const std::string payload = "restart construction payload\n";
     auto source = tool_source(sha256_text(payload), "1.0", false);
@@ -1334,7 +1336,7 @@ void check_durable_restart_reconciliation()
     auto started = reserved.successor(started_run);
 
     const std::string payload = "restart construction payload\n";
-    pkgstate::canonical_generation_store state_store(
+    pkgstate::posix::canonical_generation_store state_store(
         temporary.path() / "state", test_support::binding());
     auto foreign_transaction = transaction_session(
         tool_source(sha256_text(payload), "2.0", false),
@@ -1390,7 +1392,7 @@ void check_run_authority_rehydration()
 
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "authority construction payload\n";
   auto source = tool_source(sha256_text(payload), "1.0", false);
@@ -1575,7 +1577,7 @@ void check_single_step_transaction_advancement()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store state_store(
+  pkgstate::posix::canonical_generation_store state_store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "single-step construction payload\n";
   auto source = tool_source(sha256_text(payload), "1.0", false);
@@ -1859,7 +1861,7 @@ void check_canonical_transaction_dispatch_nonce_authority()
   test_support::temporary_directory temporary;
   const auto state_path = temporary.path() / "state";
   test_support::initialize_state(state_path);
-  pkgstate::canonical_generation_store state_store(
+  pkgstate::posix::canonical_generation_store state_store(
       state_path, test_support::binding());
 
   auto transaction = transaction_session(
@@ -1904,7 +1906,7 @@ void check_posix_transaction_run_runtime()
   test_support::temporary_directory temporary;
   const auto state_path = temporary.path() / "state";
   test_support::initialize_state(state_path);
-  pkgstate::canonical_generation_store state_store(
+  pkgstate::posix::canonical_generation_store state_store(
       state_path, test_support::binding());
 
   const std::string payload = "runtime construction payload\n";
@@ -2016,7 +2018,7 @@ void check_durable_transaction_run_admission()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store state_store(
+  pkgstate::posix::canonical_generation_store state_store(
       temporary.path() / "state", test_support::binding());
   auto transaction = transaction_session(
       tool_source(sha256_text("admission payload\n"), "1.0", false),
@@ -2134,7 +2136,7 @@ void check_bounded_serial_transaction_drive()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store state_store(
+  pkgstate::posix::canonical_generation_store state_store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "bounded drive payload\n";
   auto source = tool_source(sha256_text(payload), "1.0", false);
@@ -2355,7 +2357,7 @@ void check_restart_safe_transaction_launch()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store state_store(
+  pkgstate::posix::canonical_generation_store state_store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "restart-safe launch payload\n";
   auto source = tool_source(sha256_text(payload), "1.0", false);

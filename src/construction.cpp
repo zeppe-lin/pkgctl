@@ -64,7 +64,7 @@ void require_disjoint(const std::filesystem::path& first,
 
 void normalize_session_coordinates(
     construction_paths& paths,
-    std::vector<pkgbuild_exec::package_input_tree>& package_inputs,
+    std::vector<pkgbuild_exec::package_input_resource>& package_inputs,
     pkgbuild_exec::execution_identity& identity,
     pkgbuild::artifact_compression compression,
     const construction_request& request)
@@ -86,7 +86,7 @@ void normalize_session_coordinates(
                 "artifact path must name a destination");
   if (compression != pkgbuild::artifact_compression::none)
     throw error(error_code::invalid_construction_session,
-                "construction v1 admits only uncompressed package_tar_v1");
+                "construction admits only uncompressed package_tar");
 
   // Validate the source/store coordinate contract before any acquisition.
   (void)pkgfetch::materialization_request::seal(
@@ -125,23 +125,23 @@ void normalize_session_coordinates(
   for (std::size_t index = 0; index < package_inputs.size(); ++index)
   {
     package_inputs[index].path = normalize_absolute(
-        package_inputs[index].path, "package input tree");
+        package_inputs[index].path, "package input resource");
     const auto& path = package_inputs[index].path;
-    require_disjoint(path, "package input tree", paths.build.root_view_path,
+    require_disjoint(path, "package input resource", paths.build.root_view_path,
                      "root view");
-    require_disjoint(path, "package input tree", paths.build.session_root,
+    require_disjoint(path, "package input resource", paths.build.session_root,
                      "session root");
-    require_disjoint(path, "package input tree",
+    require_disjoint(path, "package input resource",
                      paths.build.package_output_root, "package output root");
-    require_disjoint(path, "package input tree", paths.build.artifact_path,
+    require_disjoint(path, "package input resource", paths.build.artifact_path,
                      "artifact path");
-    require_disjoint(path, "package input tree", paths.local_source_root,
+    require_disjoint(path, "package input resource", paths.local_source_root,
                      "local source root");
-    require_disjoint(path, "package input tree", paths.content_store_root,
+    require_disjoint(path, "package input resource", paths.content_store_root,
                      "content store root");
     for (std::size_t previous = 0; previous < index; ++previous)
-      require_disjoint(path, "package input tree",
-                       package_inputs[previous].path, "package input tree");
+      require_disjoint(path, "package input resource",
+                       package_inputs[previous].path, "package input resource");
   }
 
   if (identity.user_id >=
@@ -186,87 +186,13 @@ const pkgtransaction::transaction_node& require_build_node(
 }
 
 
-const pkgresolve::selected_package& require_selection(
-    const pkgresolve::resolution_result& resolution,
-    const pkgresolve::package_selection_identity& identity)
-{
-  const pkgresolve::selected_package* found = nullptr;
-  for (const auto& selection : resolution.selections())
-  {
-    if (selection.identity() != identity)
-      continue;
-    if (found != nullptr)
-      throw error(error_code::invalid_construction_request,
-                  "resolution contains duplicate package selection authority");
-    found = &selection;
-  }
-  if (found == nullptr)
-    throw error(error_code::invalid_construction_request,
-                "construction requirement edge names an absent selection");
-  return *found;
-}
-
-pkgsource::requirement_scope requirement_scope(pkgbuild::input_scope scope)
-{
-  switch (scope)
-  {
-  case pkgbuild::input_scope::build:
-    return pkgsource::requirement_scope::build();
-  case pkgbuild::input_scope::check:
-    return pkgsource::requirement_scope::check();
-  }
-  throw error(error_code::invalid_construction_request,
-              "construction package input has an unknown scope");
-}
-
-void validate_package_input_authority(
-    const transaction_session& transaction,
-    const pkgtransaction::transaction_node& node,
-    const std::vector<pkgbuild::materialized_package_input>& inputs)
-{
-  const auto& resolution = transaction.resolution().resolution();
-  const auto& issuer = node.selection()->identity();
-
-  for (const auto& input : inputs)
-  {
-    const auto expected_scope = requirement_scope(input.resolved().scope());
-    const pkgresolve::requirement_edge* witness = nullptr;
-    for (const auto& edge : resolution.edges())
-    {
-      if (edge.issuer() != issuer || edge.scope() != expected_scope)
-        continue;
-      const auto& required = require_selection(resolution, edge.required());
-      if (required.package().name() !=
-          input.resolved().declared_package().name())
-        continue;
-      if (witness != nullptr)
-        throw error(error_code::invalid_construction_request,
-                    "construction package input has ambiguous resolver authority");
-      witness = &edge;
-    }
-    if (witness == nullptr)
-      throw error(error_code::invalid_construction_request,
-                  "construction package input lacks resolver authority");
-
-    const auto& required = require_selection(resolution, witness->required());
-    if (required.environment() != pkgresolve::resolution_environment::build ||
-        required.release().identity() !=
-            input.resolved().resolved_release().identity() ||
-        required.source_snapshot() != input.resolved().source_snapshot())
-    {
-      throw error(error_code::invalid_construction_request,
-                  "construction package input contradicts resolver selection");
-    }
-  }
-}
-
-void validate_input_trees(
-    const std::vector<pkgbuild::materialized_package_input>& expected,
-    const std::vector<pkgbuild_exec::package_input_tree>& supplied)
+void validate_input_resources(
+    const std::vector<pkgbuild::build_input>& expected,
+    const std::vector<pkgbuild_exec::package_input_resource>& supplied)
 {
   if (expected.size() != supplied.size())
     throw error(error_code::invalid_construction_session,
-                "construction package-input tree cardinality differs from request");
+                "construction package-input resource cardinality differs from request");
 
   std::vector<bool> consumed(supplied.size(), false);
   for (const auto& input : expected)
@@ -274,42 +200,33 @@ void validate_input_trees(
     std::optional<std::size_t> match;
     for (std::size_t index = 0; index < supplied.size(); ++index)
     {
-      if (supplied[index].input == input.resolved().identity() &&
-          supplied[index].tree == input.tree())
-      {
-        if (match)
-          throw error(error_code::invalid_construction_session,
-                      "construction package-input tree is supplied more than once");
-        match = index;
-      }
+      if (supplied[index].input != input.identity())
+        continue;
+      if (match)
+        throw error(error_code::invalid_construction_session,
+                    "construction package-input resource is supplied more than once");
+      match = index;
     }
     if (!match)
       throw error(error_code::invalid_construction_session,
-                  "construction package input lacks its exact host tree");
+                  "construction package input lacks its call-scoped resource");
     consumed[*match] = true;
   }
   if (std::find(consumed.begin(), consumed.end(), false) != consumed.end())
     throw error(error_code::invalid_construction_session,
-                "construction session contains an undeclared package-input tree");
+                "construction session contains an undeclared package-input resource");
 }
 
 std::vector<std::string> request_identity_fields(
     const transaction_session& transaction,
     const pkgtransaction::transaction_node_identity& build_node,
-    const pkgsource::source_snapshot& source,
-    const pkgbuild::build_input_set& inputs,
-    const pkgresolve::architecture_context& architectures,
-    const pkgbuild::build_policy& build_policy,
+    const pkgbuild::build_request& build,
     const pkgfetch::acquisition_policy& acquisition)
 {
   return {
       transaction.identity().hex(),
       build_node.hex(),
-      source.identity().hex(),
-      inputs.identity().hex(),
-      architectures.build().name(),
-      architectures.target().name(),
-      build_policy.identity().hex(),
+      build.identity().hex(),
       std::to_string(acquisition.max_object_bytes()),
       std::to_string(acquisition.max_redirects()),
       acquisition.allow_http() ? "1" : "0",
@@ -319,13 +236,20 @@ std::vector<std::string> request_identity_fields(
 
 std::vector<std::string> session_identity_fields(
     const construction_request& request,
-    const pkgbuild_exec::session_paths& paths,
+    const construction_paths& paths,
+    const std::vector<pkgbuild_exec::package_input_resource>& package_inputs,
     const pkgbuild_exec::execution_identity& identity,
     pkgbuild::artifact_compression compression)
 {
   std::vector<std::string> fields{
       request.identity().hex(),
-      paths.root_view.hex(),
+      paths.local_source_root.string(),
+      paths.content_store_root.string(),
+      paths.build.root_view.hex(),
+      paths.build.root_view_path.string(),
+      paths.build.session_root.string(),
+      paths.build.package_output_root.string(),
+      paths.build.artifact_path.string(),
       identity.interpreter.hex(),
       std::to_string(identity.user_id),
       std::to_string(identity.group_id),
@@ -333,22 +257,15 @@ std::vector<std::string> session_identity_fields(
   };
   for (const auto group : identity.supplementary_groups)
     fields.push_back(std::to_string(group));
+  fields.push_back(std::to_string(package_inputs.size()));
+  for (const auto& input : package_inputs)
+  {
+    fields.push_back(input.input.hex());
+    fields.push_back(input.resource.hex());
+    fields.push_back(input.path.string());
+  }
   fields.push_back(std::string(pkgbuild::to_string(compression)));
   return fields;
-}
-
-std::vector<pkgbuild::materialized_source> materialized_sources(
-    const pkgfetch::source_materialization& materialization)
-{
-  std::vector<pkgbuild::materialized_source> result;
-  result.reserve(materialization.objects().size());
-  for (const auto& object : materialization.objects())
-  {
-    result.push_back(pkgbuild::materialized_source::verify(
-        object.declaration(),
-        pkgbuild::sha256_digest(object.observed_digest().hex())));
-  }
-  return result;
 }
 
 void validate_materialization(
@@ -372,12 +289,12 @@ void validate_build_result(
       result.build().outcome() == pkgbuild::build_outcome::succeeded;
   if (succeeded &&
       (result.sealing_failure().has_value() ||
-       !result.artifact_inspection().has_value()))
+       !result.image_authority().has_value()))
   {
     throw error(error_code::construction_driver_contract_violation,
                 "successful construction lacks complete artifact evidence");
   }
-  if (!succeeded && result.artifact_inspection().has_value())
+  if (!succeeded && result.image_authority().has_value())
     throw error(error_code::construction_driver_contract_violation,
                 "failed construction carries successful artifact evidence");
 }
@@ -387,16 +304,11 @@ void validate_build_result(
 construction_request::construction_request(
     transaction_session transaction,
     pkgtransaction::transaction_node_identity build_node,
-    pkgsource::source_snapshot source,
-    std::vector<pkgbuild::materialized_package_input> package_inputs,
-    pkgresolve::architecture_context architectures,
-    pkgbuild::build_policy build_policy,
+    pkgbuild::build_request build,
     pkgfetch::acquisition_policy acquisition_policy,
     session_identity identity)
     : transaction_(std::move(transaction)), build_node_(std::move(build_node)),
-      source_(std::move(source)), package_inputs_(std::move(package_inputs)),
-      architectures_(std::move(architectures)),
-      build_policy_(std::move(build_policy)),
+      build_(std::move(build)),
       acquisition_policy_(std::move(acquisition_policy)),
       identity_(std::move(identity))
 {
@@ -405,7 +317,6 @@ construction_request::construction_request(
 construction_request construction_request::make(
     transaction_session transaction,
     pkgtransaction::transaction_node_identity build_node,
-    std::vector<pkgbuild::materialized_package_input> package_inputs,
     pkgbuild::build_policy build_policy,
     pkgfetch::acquisition_policy acquisition_policy)
 {
@@ -420,37 +331,33 @@ construction_request construction_request::make(
                 "transaction build node contradicts its catalog authority");
   }
 
-  auto source = candidate.source();
-  auto input_set = pkgbuild::build_input_set::seal(source, package_inputs);
-  validate_package_input_authority(transaction, node, input_set.inputs());
-  auto canonical_inputs = input_set.inputs();
-  (void)pkgbuild::architecture_binding::select(
-      source.recipe().architectures(), selection.architectures().build(),
-      selection.architectures().target());
+  auto build = pkgbuild::build_request::seal(
+      transaction.resolution().resolution(), selection.identity(),
+      std::move(build_policy));
   auto identity = make_session_identity(
       "pkgctl/construction-request/1",
-      request_identity_fields(transaction, build_node, source, input_set,
-                              selection.architectures(), build_policy,
+      request_identity_fields(transaction, build_node, build,
                               acquisition_policy));
   return construction_request(
-      std::move(transaction), std::move(build_node), std::move(source),
-      std::move(canonical_inputs), selection.architectures(),
-      std::move(build_policy), std::move(acquisition_policy),
-      std::move(identity));
+      std::move(transaction), std::move(build_node), std::move(build),
+      std::move(acquisition_policy), std::move(identity));
 }
 
 const transaction_session& construction_request::transaction() const noexcept
 { return transaction_; }
 const pkgtransaction::transaction_node_identity&
 construction_request::build_node() const noexcept { return build_node_; }
+const pkgbuild::build_request& construction_request::build() const noexcept
+{ return build_; }
 const pkgsource::source_snapshot& construction_request::source() const noexcept
-{ return source_; }
-const std::vector<pkgbuild::materialized_package_input>&
-construction_request::package_inputs() const noexcept { return package_inputs_; }
-const pkgresolve::architecture_context&
-construction_request::architectures() const noexcept { return architectures_; }
+{ return build_.source(); }
+const std::vector<pkgbuild::build_input>&
+construction_request::inputs() const noexcept { return build_.inputs().inputs(); }
+const pkgbuild::architecture_binding&
+construction_request::architectures() const noexcept
+{ return build_.architectures(); }
 const pkgbuild::build_policy& construction_request::build_policy() const noexcept
-{ return build_policy_; }
+{ return build_.policy(); }
 const pkgfetch::acquisition_policy&
 construction_request::acquisition_policy() const noexcept
 { return acquisition_policy_; }
@@ -460,12 +367,12 @@ const session_identity& construction_request::identity() const noexcept
 construction_session::construction_session(
     construction_request request,
     construction_paths paths,
-    std::vector<pkgbuild_exec::package_input_tree> package_input_trees,
+    std::vector<pkgbuild_exec::package_input_resource> package_inputs,
     pkgbuild_exec::execution_identity execution_identity,
     pkgbuild::artifact_compression compression,
     session_identity identity)
     : request_(std::move(request)), paths_(std::move(paths)),
-      package_input_trees_(std::move(package_input_trees)),
+      package_inputs_(std::move(package_inputs)),
       execution_identity_(std::move(execution_identity)),
       compression_(compression), identity_(std::move(identity))
 {
@@ -474,19 +381,19 @@ construction_session::construction_session(
 construction_session construction_session::admit(
     construction_request request,
     construction_paths paths,
-    std::vector<pkgbuild_exec::package_input_tree> package_input_trees,
+    std::vector<pkgbuild_exec::package_input_resource> package_inputs,
     pkgbuild_exec::execution_identity execution_identity,
     pkgbuild::artifact_compression compression)
 {
-  validate_input_trees(request.package_inputs(), package_input_trees);
-  normalize_session_coordinates(paths, package_input_trees,
+  validate_input_resources(request.inputs(), package_inputs);
+  normalize_session_coordinates(paths, package_inputs,
                                 execution_identity, compression, request);
   auto identity = make_session_identity(
       "pkgctl/construction-session/1",
-      session_identity_fields(request, paths.build, execution_identity,
-                              compression));
+      session_identity_fields(request, paths, package_inputs,
+                              execution_identity, compression));
   return construction_session(
-      std::move(request), std::move(paths), std::move(package_input_trees),
+      std::move(request), std::move(paths), std::move(package_inputs),
       std::move(execution_identity), compression, std::move(identity));
 }
 
@@ -494,9 +401,9 @@ const construction_request& construction_session::request() const noexcept
 { return request_; }
 const construction_paths& construction_session::paths() const noexcept
 { return paths_; }
-const std::vector<pkgbuild_exec::package_input_tree>&
-construction_session::package_input_trees() const noexcept
-{ return package_input_trees_; }
+const std::vector<pkgbuild_exec::package_input_resource>&
+construction_session::package_inputs() const noexcept
+{ return package_inputs_; }
 const pkgbuild_exec::execution_identity&
 construction_session::execution_identity() const noexcept
 { return execution_identity_; }
@@ -561,14 +468,9 @@ construction_result execute_construction(
   auto materialization = driver.materialize_source(materialization_request);
   validate_materialization(session.request(), materialization);
 
-  auto build_request = pkgbuild::build_request::seal(
-      session.request().source(), materialized_sources(materialization),
-      session.request().package_inputs(),
-      session.request().architectures().build(),
-      session.request().architectures().target(),
-      session.request().build_policy());
+  const auto& build_request = session.request().build();
   auto admitted = pkgbuild_exec::admitted_build_session::admit(
-      build_request, materialization, session.package_input_trees(),
+      build_request, materialization, session.package_inputs(),
       session.paths().build, session.execution_identity(),
       session.compression());
   auto build = driver.execute_build(admitted);

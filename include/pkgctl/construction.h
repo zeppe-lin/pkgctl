@@ -22,7 +22,6 @@ public:
   [[nodiscard]] static construction_request make(
       transaction_session transaction,
       pkgtransaction::transaction_node_identity build_node,
-      std::vector<pkgbuild::materialized_package_input> package_inputs,
       pkgbuild::build_policy build_policy,
       pkgfetch::acquisition_policy acquisition_policy =
           pkgfetch::acquisition_policy::defaults());
@@ -30,10 +29,11 @@ public:
   [[nodiscard]] const transaction_session& transaction() const noexcept;
   [[nodiscard]] const pkgtransaction::transaction_node_identity&
   build_node() const noexcept;
+  [[nodiscard]] const pkgbuild::build_request& build() const noexcept;
   [[nodiscard]] const pkgsource::source_snapshot& source() const noexcept;
-  [[nodiscard]] const std::vector<pkgbuild::materialized_package_input>&
-  package_inputs() const noexcept;
-  [[nodiscard]] const pkgresolve::architecture_context&
+  [[nodiscard]] const std::vector<pkgbuild::build_input>&
+  inputs() const noexcept;
+  [[nodiscard]] const pkgbuild::architecture_binding&
   architectures() const noexcept;
   [[nodiscard]] const pkgbuild::build_policy& build_policy() const noexcept;
   [[nodiscard]] const pkgfetch::acquisition_policy&
@@ -44,19 +44,13 @@ private:
   construction_request(
       transaction_session transaction,
       pkgtransaction::transaction_node_identity build_node,
-      pkgsource::source_snapshot source,
-      std::vector<pkgbuild::materialized_package_input> package_inputs,
-      pkgresolve::architecture_context architectures,
-      pkgbuild::build_policy build_policy,
+      pkgbuild::build_request build,
       pkgfetch::acquisition_policy acquisition_policy,
       session_identity identity);
 
   transaction_session transaction_;
   pkgtransaction::transaction_node_identity build_node_;
-  pkgsource::source_snapshot source_;
-  std::vector<pkgbuild::materialized_package_input> package_inputs_;
-  pkgresolve::architecture_context architectures_;
-  pkgbuild::build_policy build_policy_;
+  pkgbuild::build_request build_;
   pkgfetch::acquisition_policy acquisition_policy_;
   session_identity identity_;
 };
@@ -74,15 +68,15 @@ public:
   [[nodiscard]] static construction_session admit(
       construction_request request,
       construction_paths paths,
-      std::vector<pkgbuild_exec::package_input_tree> package_input_trees,
+      std::vector<pkgbuild_exec::package_input_resource> package_inputs,
       pkgbuild_exec::execution_identity execution_identity,
       pkgbuild::artifact_compression compression =
           pkgbuild::artifact_compression::none);
 
   [[nodiscard]] const construction_request& request() const noexcept;
   [[nodiscard]] const construction_paths& paths() const noexcept;
-  [[nodiscard]] const std::vector<pkgbuild_exec::package_input_tree>&
-  package_input_trees() const noexcept;
+  [[nodiscard]] const std::vector<pkgbuild_exec::package_input_resource>&
+  package_inputs() const noexcept;
   [[nodiscard]] const pkgbuild_exec::execution_identity&
   execution_identity() const noexcept;
   [[nodiscard]] pkgbuild::artifact_compression compression() const noexcept;
@@ -92,14 +86,14 @@ private:
   construction_session(
       construction_request request,
       construction_paths paths,
-      std::vector<pkgbuild_exec::package_input_tree> package_input_trees,
+      std::vector<pkgbuild_exec::package_input_resource> package_inputs,
       pkgbuild_exec::execution_identity execution_identity,
       pkgbuild::artifact_compression compression,
       session_identity identity);
 
   construction_request request_;
   construction_paths paths_;
-  std::vector<pkgbuild_exec::package_input_tree> package_input_trees_;
+  std::vector<pkgbuild_exec::package_input_resource> package_inputs_;
   pkgbuild_exec::execution_identity execution_identity_;
   pkgbuild::artifact_compression compression_;
   session_identity identity_;

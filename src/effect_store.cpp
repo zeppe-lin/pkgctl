@@ -486,7 +486,7 @@ std::optional<effect_attempt_record> load_latest_unlocked(
     if (record_encoding_version(encoding) != effect_attempt_encoding_version)
       throw effect_journal_error(
           effect_journal_error_code::store_corrupt,
-          "effect-journal head names a legacy snapshot");
+          "effect-journal head names an unsupported snapshot");
     auto record = decode_effect_attempt_record(encoding);
     if (record.attempt() != attempt ||
         record.sequence() != head->sequence ||
@@ -512,7 +512,6 @@ std::optional<effect_attempt_record> load_latest_unlocked(
   }
   ::rewinddir(directory.get());
 
-  std::map<std::uint64_t, effect_attempt_record> records;
   while (true)
   {
     errno = 0;
@@ -538,7 +537,10 @@ std::optional<effect_attempt_record> load_latest_unlocked(
     }
 
     const auto encoding = read_encoding(directory_fd, entry->d_name);
-    const auto encoding_version = record_encoding_version(encoding);
+    if (record_encoding_version(encoding) != effect_attempt_encoding_version)
+      throw effect_journal_error(
+          effect_journal_error_code::store_corrupt,
+          "effect-journal snapshot has an unsupported encoding");
     auto record = decode_effect_attempt_record(encoding);
     if (record.attempt() != attempt ||
         record.sequence() != parsed->sequence ||
@@ -547,65 +549,16 @@ std::optional<effect_attempt_record> load_latest_unlocked(
           effect_journal_error_code::store_corrupt,
           "controller journal filename and content disagree");
 
-    if (encoding_version == effect_attempt_encoding_version)
-    {
-      if (pending != nullptr &&
-          record.sequence() == pending->sequence() &&
-          record.identity() == pending->identity())
-        continue;
-      throw effect_journal_error(
-          effect_journal_error_code::store_corrupt,
-          "version-two effect-journal snapshot exists without a durable head");
-    }
-
-    if (encoding_version != effect_attempt_legacy_encoding_version)
-      throw effect_journal_error(
-          effect_journal_error_code::store_corrupt,
-          "effect-journal snapshot has an unsupported store encoding");
-    if (!records.emplace(record.sequence(), std::move(record)).second)
-      throw effect_journal_error(
-          effect_journal_error_code::store_conflict,
-          "controller journal contains a sequence fork");
+    if (pending != nullptr &&
+        record.sequence() == pending->sequence() &&
+        record.identity() == pending->identity())
+      continue;
+    throw effect_journal_error(
+        effect_journal_error_code::store_corrupt,
+        "effect-journal snapshot exists without a durable head");
   }
 
-  if (records.empty())
-    return std::nullopt;
-
-  const effect_attempt_record* previous = nullptr;
-  std::uint64_t expected_sequence = 0U;
-  for (const auto& [sequence, record] : records)
-  {
-    if (sequence != expected_sequence)
-      throw effect_journal_error(
-          effect_journal_error_code::store_corrupt,
-          "legacy controller journal sequence has a gap");
-    if (previous == nullptr)
-    {
-      if (record.previous())
-        throw effect_journal_error(
-            effect_journal_error_code::store_corrupt,
-            "legacy controller journal admission has a predecessor");
-    }
-    else
-    {
-      try
-      {
-        record.validate_successor_of(*previous);
-      }
-      catch (const effect_journal_error& problem)
-      {
-        if (problem.code() != effect_journal_error_code::invalid_transition)
-          throw;
-        throw effect_journal_error(
-            effect_journal_error_code::store_corrupt,
-            std::string("legacy controller journal transition is invalid: ") +
-                problem.what());
-      }
-    }
-    previous = &record;
-    ++expected_sequence;
-  }
-  return records.rbegin()->second;
+  return std::nullopt;
 }
 
 void verify_existing_snapshot(
@@ -618,7 +571,7 @@ void verify_existing_snapshot(
       effect_attempt_encoding_version)
     throw effect_journal_error(
         effect_journal_error_code::store_corrupt,
-        "existing effect-journal snapshot is not version two");
+        "existing effect-journal snapshot has an unsupported encoding");
 
   const auto expected_encoding = encode_effect_attempt_record(expected);
   if (existing_encoding != expected_encoding)
@@ -654,68 +607,6 @@ void write_all(int fd, const effect_attempt_encoding& encoding)
           effect_journal_error_code::store_write_failed,
           "controller journal snapshot write made no progress");
     offset += static_cast<std::size_t>(count);
-  }
-}
-
-void upgrade_legacy_snapshot(
-    int directory_fd,
-    const effect_attempt_record& record)
-{
-  const std::string final_name = record_name(record);
-  const auto legacy_encoding = read_encoding(directory_fd, final_name);
-  if (record_encoding_version(legacy_encoding) !=
-      effect_attempt_legacy_encoding_version)
-    throw effect_journal_error(
-        effect_journal_error_code::store_corrupt,
-        "effect-journal retry does not name a legacy snapshot");
-
-  const auto legacy_record = decode_effect_attempt_record(legacy_encoding);
-  if (legacy_record.identity() != record.identity() ||
-      legacy_record.attempt() != record.attempt() ||
-      legacy_record.sequence() != record.sequence())
-    throw effect_journal_error(
-        effect_journal_error_code::store_corrupt,
-        "legacy effect-journal retry authority is invalid");
-
-  const auto encoding = encode_effect_attempt_record(record);
-  const std::string temporary_name =
-      ".tmp-effect-upgrade-" +
-      std::to_string(static_cast<unsigned long long>(::getpid())) +
-      "-" + record.identity().hex();
-  if (::unlinkat(directory_fd, temporary_name.c_str(), 0) != 0 &&
-      errno != ENOENT)
-    io_error(effect_journal_error_code::store_write_failed,
-             "cannot remove stale effect-journal upgrade snapshot");
-
-  fd_guard temporary(::openat(
-      directory_fd, temporary_name.c_str(),
-      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600));
-  if (temporary.get() < 0)
-    io_error(effect_journal_error_code::store_write_failed,
-             "cannot create effect-journal upgrade snapshot");
-
-  try
-  {
-    write_all(temporary.get(), encoding);
-    if (::fchmod(temporary.get(), 0444) != 0)
-      io_error(effect_journal_error_code::store_write_failed,
-               "cannot seal effect-journal upgrade snapshot");
-    if (::fsync(temporary.get()) != 0)
-      io_error(effect_journal_error_code::store_sync_failed,
-               "cannot synchronize effect-journal upgrade snapshot");
-    if (::renameat(directory_fd, temporary_name.c_str(),
-                   directory_fd, final_name.c_str()) != 0)
-      io_error(effect_journal_error_code::store_write_failed,
-               "cannot publish effect-journal upgrade snapshot");
-    temporary.reset();
-    if (::fsync(directory_fd) != 0)
-      io_error(effect_journal_error_code::store_sync_failed,
-               "cannot synchronize effect-journal upgrade directory");
-  }
-  catch (...)
-  {
-    (void)::unlinkat(directory_fd, temporary_name.c_str(), 0);
-    throw;
   }
 }
 
@@ -898,16 +789,12 @@ effect_attempt_record posix_effect_journal_store::append(
           effect_journal_error_code::store_corrupt,
           "committed effect-journal snapshot authority is invalid");
     const auto existing = read_encoding(directory_fd_, record_name(record));
-    const auto version = record_encoding_version(existing);
-    if (version == effect_attempt_legacy_encoding_version)
-      upgrade_legacy_snapshot(directory_fd_, record);
-    else if (version == effect_attempt_encoding_version)
-      verify_existing_snapshot(
-          directory_fd_, record_name(record), record);
-    else
+    if (record_encoding_version(existing) != effect_attempt_encoding_version)
       throw effect_journal_error(
           effect_journal_error_code::store_corrupt,
           "committed effect-journal snapshot has unsupported encoding");
+    verify_existing_snapshot(
+        directory_fd_, record_name(record), record);
     publish_head(directory_fd_, record);
     return record;
   }

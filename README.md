@@ -6,6 +6,13 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.27.0 makes construction inputs resolver-issued authority rather
+than caller-written digest bundles. Concrete package resources are admitted only
+for one exact build or check execution, operation preparation consumes the
+retained build/image admission, and the standalone build-plan projection owns
+planner translation. The effect journal now has one first-generation encoding
+with a mandatory durable head; no undeployed compatibility lineage remains.
+
 Release 0.26.0 separates caller run intent from mechanical dispatch nonce
 issuance. `posix_transaction_run_runtime::launch()` now receives one explicit
 `transaction_run_nonce`; supplying the same nonce retries the same durable

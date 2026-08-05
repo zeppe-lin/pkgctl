@@ -493,7 +493,7 @@ session_identity result_identity(
   if (!reconciled_state)
     return make_session_identity("pkgctl/effectful-operation-result/1", fields);
   fields.push_back(reconciled_state->string());
-  return make_session_identity("pkgctl/effectful-operation-result/2", fields);
+  return make_session_identity("pkgctl/effectful-operation-result/1", fields);
 }
 
 effectful_operation_outcome publication_outcome(
@@ -672,7 +672,7 @@ effectful_operation_request effectful_operation_request::make(
                        ? reason_kind(*installation_reason)
                        : std::string());
   session_identity identity = make_session_identity(
-      "pkgctl/effectful-operation-request/2", fields);
+      "pkgctl/effectful-operation-request/1", fields);
   return effectful_operation_request(
       std::move(transaction), std::move(expected_state),
       std::move(action_node), std::move(application),

@@ -14,10 +14,8 @@
 
 namespace pkgctl {
 
-/*! \brief Record-only encoding accepted for pre-head journal histories. */
-inline constexpr std::uint16_t effect_attempt_legacy_encoding_version = 1;
 /*! \brief Current encoding whose POSIX store requires a durable head. */
-inline constexpr std::uint16_t effect_attempt_encoding_version = 2;
+inline constexpr std::uint16_t effect_attempt_encoding_version = 1;
 /*! \brief Hard refusal bound for one effect-attempt snapshot. */
 inline constexpr std::size_t maximum_effect_attempt_encoding_size =
     1024U * 1024U;

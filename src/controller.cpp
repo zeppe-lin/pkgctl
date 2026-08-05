@@ -4,7 +4,7 @@
 #include <pkgctl/controller.h>
 
 #include <libpkgresolve/resolver.h>
-#include <libpkgstate/canonical_generation_store.h>
+#include <libpkgstate-posix/canonical_generation_store.h>
 #include <libpkgtransaction/composer.h>
 
 #include <utility>
@@ -23,8 +23,8 @@ resolution_session resolve_packages(resolution_request request)
 {
   catalog_session catalog = acquire_catalog(request.catalog());
   const state_location& location = request.state();
-  pkgstate::canonical_generation_store store =
-      pkgstate::canonical_generation_store::open_existing(
+  pkgstate::posix::canonical_generation_store store =
+      pkgstate::posix::canonical_generation_store::open_existing(
           location.canonical_store(), location.target_binding());
   pkgstate::snapshot installed = store.read();
 

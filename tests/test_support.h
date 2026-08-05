@@ -13,7 +13,7 @@
 
 #include <unistd.h>
 
-#include <libpkgstate/canonical_generation_store.h>
+#include <libpkgstate-posix/canonical_generation_store.h>
 
 #include <pkgctl/request.h>
 
@@ -126,7 +126,7 @@ inline pkgstate::state_target_binding binding()
 
 inline void initialize_state(const std::filesystem::path& root)
 {
-  const pkgstate::canonical_generation_store store(root, binding());
+  const pkgstate::posix::canonical_generation_store store(root, binding());
   (void)store;
 }
 

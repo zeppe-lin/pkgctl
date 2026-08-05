@@ -125,7 +125,6 @@ std::vector<std::string> session_identity_fields(
 
   for (const auto& input : execution_session.inputs()) {
     fields.push_back(input.input.hex());
-    fields.push_back(input.tree.hex());
     fields.push_back(input.resource.hex());
     fields.push_back(path_text(input.path));
   }

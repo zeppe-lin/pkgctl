@@ -13,6 +13,41 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.27.0 resolver-backed construction authority
+
+Release 0.27.0 removes the controller's last caller-written imitations of
+resolver, build-materialization, and image authority.
+
+```text
+transaction resolution + selected build node
+                    |
+                    v
+        pkgbuild::build_request
+                    |
+      exact logical build/check inputs
+                    |
+                    + caller-scoped resource identities and paths
+                    v
+          build/check execution session
+```
+
+A construction request seals its `libpkgbuild` request directly from the exact
+resolution retained by the transaction. The request's build/check inputs are
+therefore the resolver-issued direct requirement edges and selections. Callers
+cannot supply release, source, build-result, artifact, or invented tree
+digests. A construction or check session admits only one concrete resource
+identity and host path for every exact logical input.
+
+Construction retains the complete successful `libpkgbuild-image` admission
+returned by `libpkgbuild-exec`. Operation preparation consumes that authority
+through the standalone pure `libpkgbuild-plan` projection. It does not reopen,
+size, or inspect archive bytes and does not reproduce payload/image equality.
+
+The effect journal has one first-generation encoding. Immutable snapshots are
+committed only by their checksummed durable head; an orphan snapshot is not a
+legacy history and fails closed. This correction adds no materializer,
+discovery policy, scheduler, retry loop, or mutating command.
+
 ## Release 0.26.0 explicit run intent and canonical dispatch nonce boundary
 
 Release 0.26.0 separates two values that were previously hidden behind the same
@@ -1188,17 +1223,18 @@ Preparation-request identity binds the transaction session, exact action node,
 completed construction where required, target application context, execution
 control, observations, runtime closure, normalized policy, lifecycle order, and
 installation reason. Preparation-result identity adds the projected installed
-ownership universe, exact build/candidate/artifact/image/inspection evidence,
-incoming application authority, and either the planner refusal or the complete
-plan, application, and effect identities.
+ownership universe, exact retained build/image admission, planner artifact
+projection, incoming application authority, and either the planner refusal or
+the complete plan, application, and effect identities.
 
 ### Read-only boundary
 
-Preparation performs no target mutation. Incoming preparation may read exact
-artifact bytes through an injected `libpkgimage` backend, but it does not acquire
-the target lease, admit executable lifecycle sessions, call `libpkgapply`, or
-publish installed state. It adds no scheduler, recursive construction, check
-execution, durable preparation journal, or command frontend.
+Preparation performs no target mutation and reads no artifact bytes. Incoming
+preparation consumes the exact build/image admission retained by construction
+and delegates pure planner projection to `libpkgbuild-plan`. It does not acquire
+the target lease, admit executable lifecycle sessions, call an application
+backend, or publish installed state. It adds no scheduler, recursive
+construction, check execution, durable preparation journal, or command frontend.
 
 ## Release 0.5.0 construction boundary
 
@@ -1504,11 +1540,12 @@ A resolution session retains that catalog session, one installed-state snapshot,
 and one resolution result. A transaction session retains the resolution session
 and one transaction program.
 
-A `construction_request` retains one exact transaction build node, canonical
-package-input facts, selected architectures, build policy, and source-acquisition
-bounds. A `construction_session` adds explicit source/store and build coordinates,
-concrete package-input trees, interpreter, credentials, and compression. Host
-paths remain outside semantic identity.
+A `construction_request` retains one exact transaction build node, the
+resolver-backed `libpkgbuild` request, and source-acquisition bounds. A
+`construction_session` adds explicit source/store and build coordinates, one
+call-scoped resource identity and host path for each exact logical input,
+interpreter, credentials, and compression. Concrete paths participate in the
+session identity but not in the logical build-request identity.
 
 A `transaction_progress` retains the transaction session, current canonical
 state epoch, accepted terminal construction and effect evidence, exact node

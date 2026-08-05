@@ -504,7 +504,7 @@ struct detail_dispatch_access final {
       std::optional<session_identity> terminal)
   {
     auto identity = make_session_identity(
-        "pkgctl/transaction-dispatch-record/2",
+        "pkgctl/transaction-dispatch-record/1",
         record_identity_fields(
             dispatch, state, attempt, effect_attempt, observations, terminal));
     return transaction_dispatch_record(
@@ -696,30 +696,19 @@ pkgsource::requirement_scope package_input_scope(
               "construction input has an unknown requirement scope");
 }
 
-std::string state_reference_string(std::string_view hex)
-{
-  return std::string("v1:sha256:") + std::string(hex);
-}
-
 const pkgtransaction::transaction_edge& require_input_edge(
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
-    const pkgbuild::materialized_package_input& input)
+    const pkgbuild::build_input& input)
 {
-  const auto expected_scope = package_input_scope(input.resolved().scope());
+  const auto expected_scope = package_input_scope(input.scope());
   const pkgtransaction::transaction_edge* match = nullptr;
   for (const auto& edge : progress.transaction().program().edges())
   {
     if (edge.kind() != pkgtransaction::transaction_edge_kind::requirement ||
         edge.after() != dispatch.unit().primary_node() || !edge.scope() ||
-        *edge.scope() != expected_scope)
-      continue;
-
-    const auto* predecessor =
-        progress.transaction().program().find(edge.before());
-    if (predecessor == nullptr ||
-        predecessor->package().name() !=
-            input.resolved().declared_package().name())
+        *edge.scope() != expected_scope || !edge.requirement_witness() ||
+        *edge.requirement_witness() != input.requirement().identity())
       continue;
 
     if (match != nullptr)
@@ -730,24 +719,20 @@ const pkgtransaction::transaction_edge& require_input_edge(
 
   if (match == nullptr)
     throw error(error_code::invalid_dispatch,
-                "construction input lacks transaction requirement authority");
+                "construction input lacks exact transaction requirement authority");
   return *match;
 }
 
 void validate_selected_input_authority(
     const pkgtransaction::transaction_node& predecessor,
-    const pkgbuild::materialized_package_input& input)
+    const pkgbuild::build_input& input)
 {
   const auto* selection = predecessor.selection();
   if (selection == nullptr)
     throw error(error_code::invalid_dispatch,
-                "built construction input lacks selected package authority");
-
-  const auto& resolved = input.resolved();
-  if (resolved.declared_package() != selection->package() ||
-      resolved.resolved_release().identity() !=
-          selection->release().identity() ||
-      resolved.source_snapshot() != selection->source_snapshot())
+                "construction input lacks selected package authority");
+  if (selection->identity() != input.selection().identity() ||
+      selection->package() != input.package())
     throw error(error_code::invalid_dispatch,
                 "construction input differs from selected package authority");
 }
@@ -756,7 +741,7 @@ void validate_built_input(
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
     const pkgtransaction::transaction_node& predecessor,
-    const pkgbuild::materialized_package_input& input)
+    const pkgbuild::build_input& input)
 {
   validate_selected_input_authority(predecessor, input);
 
@@ -766,11 +751,9 @@ void validate_built_input(
                 "construction input lacks successful predecessor evidence");
 
   const auto& build = construction->build().build();
-  if (!build.artifact() ||
-      input.resolved().build_result() != build.identity() ||
-      input.resolved().artifact() != build.artifact()->identity())
+  if (build.request().subject().identity() != input.selection().identity())
     throw error(error_code::invalid_dispatch,
-                "construction input differs from predecessor build evidence");
+                "construction input differs from predecessor build authority");
 
   const auto* dependency =
       dispatch_dependency(dispatch, predecessor.identity());
@@ -780,19 +763,10 @@ void validate_built_input(
                 "dispatch does not retain predecessor construction evidence");
 }
 
-bool release_matches(
-    const pkgstate::package_release& installed,
-    const pkgsource::package_release& resolved) noexcept
-{
-  return installed.name() == resolved.package().name() &&
-         installed.version() == resolved.version() &&
-         installed.release() == resolved.release();
-}
-
 void validate_retained_input(
     const transaction_progress& progress,
     const pkgtransaction::transaction_node& predecessor,
-    const pkgbuild::materialized_package_input& input)
+    const pkgbuild::build_input& input)
 {
   const auto* installed = predecessor.installed();
   if (installed == nullptr)
@@ -805,22 +779,12 @@ void validate_retained_input(
     throw error(error_code::invalid_dispatch,
                 "retained construction input is stale in current state");
 
-  const auto& resolved = input.resolved();
-  const auto& source = installed->control().source();
-  if (resolved.declared_package().name() != installed->release().name() ||
-      !release_matches(installed->release(), resolved.resolved_release()) ||
-      source.snapshot().string() !=
-          state_reference_string(resolved.source_snapshot().hex()))
+  validate_selected_input_authority(predecessor, input);
+  const auto* selected_installed = input.selection().installed();
+  if (selected_installed == nullptr ||
+      selected_installed->identity() != installed->identity())
     throw error(error_code::invalid_dispatch,
                 "construction input differs from retained package authority");
-
-  const auto& provenance = installed->control().build();
-  if (provenance.build_result().string() !=
-          state_reference_string(resolved.build_result().hex()) ||
-      provenance.artifact().string() !=
-          state_reference_string(resolved.artifact().hex()))
-    throw error(error_code::invalid_dispatch,
-                "construction input differs from retained build provenance");
 }
 
 void validate_construction_inputs(
@@ -829,7 +793,7 @@ void validate_construction_inputs(
     const construction_session& session)
 {
   std::set<pkgtransaction::transaction_edge_identity> matched_edges;
-  for (const auto& input : session.request().package_inputs())
+  for (const auto& input : session.request().inputs())
   {
     const auto& edge = require_input_edge(run.progress(), dispatch, input);
     if (!matched_edges.insert(edge.identity()).second)
@@ -845,8 +809,7 @@ void validate_construction_inputs(
     switch (predecessor->action())
     {
       case pkgtransaction::transaction_action_kind::build:
-        validate_built_input(
-            run.progress(), dispatch, *predecessor, input);
+        validate_built_input(run.progress(), dispatch, *predecessor, input);
         break;
       case pkgtransaction::transaction_action_kind::retain:
         validate_retained_input(run.progress(), *predecessor, input);

@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.26.0
+version=0.27.0
 
 require_line()
 {
@@ -20,48 +20,49 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 26;'
+  'inline constexpr unsigned version_minor = 27;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.26.0";'
+  'inline constexpr const char* version_string = "0.27.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 26);'
+  'static_assert(pkgctl::version_minor == 27);'
 
-grep -F '## 0.26.0 - 2026-08-01' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.26.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.26.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.27.0 - 2026-08-05' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.27.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.27.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
-grep -F 'canonical_transaction_dispatch_nonce()' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'transaction_run_runtime_authorities' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'explicit' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'No dependency floor changes.' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Version 0.26.0 requires one explicit *transaction_run_nonce*' \
+grep -F 'resolver-issued authority' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'libpkgbuild-image' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'no imaginary legacy history is decoded' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Version 0.27.0 derives every logical construction and check input' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 for contract in \
-  'libpkgsource >= 2.0.0' \
-  'libpkgsource-yaml >= 2.0.0' \
-  'libpkgsource-plan >= 2.0.0' \
-  'libpkgcatalog >= 2.0.0' \
-  'libpkgcatalog-acquire >= 2.0.0' \
-  'libpkgstate >= 2.3.0' \
-  'libpkgstate-plan >= 2.3.0' \
-  'libpkgstate-apply >= 2.4.0' \
-  'libpkgfetch >= 1.0.0' \
-  'libpkgbuild >= 2.0.0' \
-  'libpkgbuild-exec >= 1.0.0' \
-  'libpkgbuild-plan >= 2.0.0' \
-  'libpkgimage >= 0.3.0' \
-  'libpkgplan >= 0.2.0' \
-  'libpkgexec >= 1.3.0' \
-  'libpkgapply >= 2.2.0' \
-  'libpkgapply-posix >= 2.2.0' \
-  'libpkgapply-exec >= 1.0.0' \
-  'libpkgresolve >= 2.0.0' \
-  'libpkgtransaction >= 2.1.0' \
-  'libpkgcheck >= 0.1.0' \
-  'libpkgcheck-exec >= 0.1.1'; do
+  'libpkgsource >= 3.0.0, < 4.0.0' \
+  'libpkgsource-yaml >= 1.0.0, < 2.0.0' \
+  'libpkgsource-plan >= 1.0.0, < 2.0.0' \
+  'libpkgcatalog >= 3.0.0, < 4.0.0' \
+  'libpkgcatalog-acquire >= 3.0.0, < 4.0.0' \
+  'libpkgstate >= 3.0.0, < 4.0.0' \
+  'libpkgstate-posix >= 3.0.0, < 4.0.0' \
+  'libpkgstate-plan >= 3.0.0, < 4.0.0' \
+  'libpkgstate-apply >= 3.0.0, < 4.0.0' \
+  'libpkgfetch >= 1.0.0, < 2.0.0' \
+  'libpkgbuild >= 3.0.0, < 4.0.0' \
+  'libpkgbuild-exec >= 2.0.0, < 3.0.0' \
+  'libpkgbuild-image >= 1.0.0, < 2.0.0' \
+  'libpkgbuild-plan >= 1.0.0, < 2.0.0' \
+  'libpkgimage >= 0.4.0, < 1.0.0' \
+  'libpkgplan >= 0.3.0, < 1.0.0' \
+  'libpkgexec >= 1.4.0, < 2.0.0' \
+  'libpkgapply >= 3.0.0, < 4.0.0' \
+  'libpkgapply-posix >= 3.0.0, < 4.0.0' \
+  'libpkgapply-exec >= 2.0.0, < 3.0.0' \
+  'libpkgresolve >= 2.0.0, < 3.0.0' \
+  'libpkgtransaction >= 2.1.0, < 3.0.0' \
+  'libpkgcheck >= 0.2.0, < 1.0.0' \
+  'libpkgcheck-exec >= 0.3.0, < 1.0.0'; do
   grep -F "$contract" "$srcdir/CHANGELOG.md" >/dev/null || {
     echo "missing dependency floor in changelog: $contract" >&2
     exit 1

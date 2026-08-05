@@ -48,6 +48,11 @@ executable commands remain read-only: they never initialize or publish state,
 materialize sources, build packages, inspect artifacts, plan package changes,
 execute lifecycle programs, or apply mutations.
 
+Version 0.27.0 changes no command syntax. It corrects internal authority
+composition: construction and check resources bind resolver-issued logical
+inputs, and operation preparation consumes retained build/image and planner
+projection authority without reopening package archives.
+
 Version 0.26.0 changes no command syntax. The caller-configured POSIX
 transaction-run runtime now receives one explicit run nonce on each launch and
 owns stateless canonical dispatch-nonce derivation from the exact committed

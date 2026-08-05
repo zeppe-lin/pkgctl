@@ -21,12 +21,12 @@ for required in \
   'class native_construction_driver final' \
   'pkgfetch::materialize' \
   'pkgbuild::build_request::seal' \
-  'validate_package_input_authority' \
+  'validate_input_resources' \
   'transaction.resolution().resolution()' \
   'pkgbuild_exec::admitted_build_session::admit' \
   'pkgbuild_exec::execute' \
   'construction_driver_contract_violation' \
-  'artifact_inspection'; do
+  'image_authority'; do
   grep -F "$required" "$header" "$source" >/dev/null || {
     echo "missing construction authority contract: $required" >&2
     exit 1

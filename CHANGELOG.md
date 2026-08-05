@@ -1,3 +1,51 @@
+## 0.27.0 - 2026-08-05
+
+### Resolver-backed construction and planner-ready application authority
+
+- Seals each construction request directly from resolver-issued authority in
+  the exact transaction resolution and selected build node; callers can no longer reconstruct build
+  inputs from release, source, artifact, or result identities.
+- Replaces unissued package-input tree identities with explicit call-scoped
+  resources bound to exact logical `libpkgbuild` input identities.
+- Projects check inputs from the admitted build request and admits their
+  concrete resources only at the `libpkgcheck-exec` boundary.
+- Consumes retained `libpkgbuild-image` authority during operation preparation;
+  archive bytes are not reopened or re-inspected by the controller.
+- Uses the standalone pure `libpkgbuild-plan` projection and the POSIX state
+  generation store under their corrected authority boundaries.
+- Collapses the undeployed effect-attempt encoding and controller identity
+  domains to their first actual generation. The one effect-journal format
+  requires a checksummed durable head; no imaginary legacy history is decoded.
+- Adds no package-input materializer, scheduler, discovery policy, retry loop,
+  or mutating command.
+
+### Dependency contract
+
+- libpkgsource >= 3.0.0, < 4.0.0
+- libpkgsource-yaml >= 1.0.0, < 2.0.0
+- libpkgsource-plan >= 1.0.0, < 2.0.0
+- libpkgcatalog >= 3.0.0, < 4.0.0
+- libpkgcatalog-acquire >= 3.0.0, < 4.0.0
+- libpkgstate >= 3.0.0, < 4.0.0
+- libpkgstate-posix >= 3.0.0, < 4.0.0
+- libpkgstate-plan >= 3.0.0, < 4.0.0
+- libpkgstate-apply >= 3.0.0, < 4.0.0
+- libpkgfetch >= 1.0.0, < 2.0.0
+- libpkgbuild >= 3.0.0, < 4.0.0
+- libpkgbuild-exec >= 2.0.0, < 3.0.0
+- libpkgbuild-image >= 1.0.0, < 2.0.0
+- libpkgbuild-plan >= 1.0.0, < 2.0.0
+- libpkgimage >= 0.4.0, < 1.0.0
+- libpkgplan >= 0.3.0, < 1.0.0
+- libpkgexec >= 1.4.0, < 2.0.0
+- libpkgapply >= 3.0.0, < 4.0.0
+- libpkgapply-posix >= 3.0.0, < 4.0.0
+- libpkgapply-exec >= 2.0.0, < 3.0.0
+- libpkgresolve >= 2.0.0, < 3.0.0
+- libpkgtransaction >= 2.1.0, < 3.0.0
+- libpkgcheck >= 0.2.0, < 1.0.0
+- libpkgcheck-exec >= 0.3.0, < 1.0.0
+
 ## 0.26.0 - 2026-08-01
 
 ### Explicit run intent and canonical dispatch nonce authority

@@ -42,6 +42,8 @@
 
 #include <libpkgapply-posix/mutation_lease.h>
 #include <libpkgbuild/libpkgbuild.h>
+#include <libpkgbuild-image/libpkgbuild-image.h>
+#include <libpkgbuild-plan/libpkgbuild-plan.h>
 #include <libpkgcatalog/collection.h>
 #include <libpkgimage/inspection_receipt.h>
 #include <libpkgimage/package_entry.h>
@@ -49,8 +51,9 @@
 #include <libpkgplan/remove.h>
 #include <libpkgplan/upgrade.h>
 #include <libpkgresolve/result.h>
+#include <libpkgresolve/resolver.h>
 #include <libpkgtransaction/composer.h>
-#include <libpkgstate/canonical_generation_store.h>
+#include <libpkgstate-posix/canonical_generation_store.h>
 #include <libpkgstate/installed_control.h>
 #include <libpkgstate/installed_package.h>
 #include <libpkgstate/owned_entry.h>
@@ -159,7 +162,7 @@ pkgsource::source_snapshot source_snapshot(
                 std::string(to_string(action)) + "\n"));
   }
   return seal_source(
-      source_origin("recipe.yml"), source_syntax::recipe_yaml_v1,
+      source_origin("recipe.yml"),
       recipe_declaration(
           package_release(package_reference("tool"), std::move(version), 1),
           package_metadata("Tool", std::nullopt, std::nullopt,
@@ -209,13 +212,44 @@ pkgimage::inspected_package_image incoming_image(std::uint8_t content_seed = 1)
       std::move(image), std::move(receipt));
 }
 
+pkgcatalog::catalog_snapshot catalog_snapshot(
+    const pkgsource::source_snapshot& source);
+
+pkgresolve::resolution_result build_resolution(
+    const pkgsource::source_snapshot& source)
+{
+  auto catalog = catalog_snapshot(source);
+  std::vector<pkgresolve::resolution_goal> goals;
+  goals.emplace_back(
+      pkgsource::requirement_scope::build(),
+      pkgsource::requirement_subject(pkgsource::package_reference("tool")),
+      "<effect-build>");
+  return pkgresolve::resolve(pkgresolve::resolution_request::seal(
+      std::move(catalog), pkgstate::snapshot::make(test_support::binding()),
+      pkgresolve::architecture_context(
+          pkgsource::architecture_reference("x86_64"),
+          pkgsource::architecture_reference("x86_64")),
+      std::move(goals), pkgresolve::resolution_policy()));
+}
+
+const pkgresolve::selected_package& build_subject(
+    const pkgresolve::resolution_result& resolution)
+{
+  for (const auto& selection : resolution.selections()) {
+    if (selection.environment() == pkgresolve::resolution_environment::target &&
+        selection.package().name() == "tool")
+      return selection;
+  }
+  throw std::runtime_error("effect fixture resolution lacks tool subject");
+}
+
 pkgapply::incoming_package_authority incoming_authority(
     const pkgsource::source_snapshot& source,
     std::uint8_t content_seed = 1)
 {
+  auto resolved = build_resolution(source);
   const pkgbuild::build_request request = pkgbuild::build_request::seal(
-      source, {}, {}, pkgsource::architecture_reference("x86_64"),
-      pkgsource::architecture_reference("x86_64"),
+      resolved, build_subject(resolved).identity(),
       pkgbuild::build_policy::make(
           pkgbuild::environment_policy::hermetic(1, 0022, 1700000000)));
   const pkgbuild::payload_manifest payload = pkgbuild::payload_manifest::seal({
@@ -225,14 +259,16 @@ pkgapply::incoming_package_authority incoming_authority(
           pkgbuild::sha256_digest(hex_digest(content_seed))),
   });
   pkgbuild::sealed_artifact artifact = pkgbuild::sealed_artifact::make(
-      pkgbuild::artifact_encoding::package_tar_v1,
+      pkgbuild::artifact_encoding::package_tar,
       pkgbuild::artifact_compression::none, 4,
       pkgbuild::sha256_digest(hex_digest(static_cast<std::uint8_t>(content_seed + 30U))));
   pkgbuild::build_result result = pkgbuild::build_result::succeeded(
       request, payload, artifact,
       pkgbuild::execution_evidence_identity::from_sha256(hex_digest(61)));
-  return pkgapply::incoming_package_authority::admit(
+  auto admitted = pkgbuild::image_adapter::build_image_authority::admit(
       std::move(result), incoming_image(content_seed));
+  return pkgapply::incoming_package_authority::admit(
+      pkgbuild::plan_adapter::project_artifact(admitted));
 }
 
 
@@ -332,8 +368,6 @@ pkgstate::installed_package installed_package(
           pkgstate::architecture_reference("x86_64"),
           pkgstate::architecture_reference("x86_64")),
       {},
-      imported_state_identity<pkgstate::source_recipe_identity>(
-          recipe.identity().hex()),
       imported_state_identity<pkgstate::source_snapshot_identity>(
           source.identity().hex()));
 
@@ -342,7 +376,6 @@ pkgstate::installed_package installed_package(
       pkgstate::build_provenance(
           source_record.identity(),
           state_identity<pkgstate::build_request_identity>(100),
-          state_identity<pkgstate::source_material_set_identity>(101),
           state_identity<pkgstate::build_input_set_identity>(102),
           state_identity<pkgstate::environment_policy_identity>(103),
           state_identity<pkgstate::build_policy_identity>(104),
@@ -352,8 +385,9 @@ pkgstate::installed_package installed_package(
           state_identity<pkgstate::artifact_content_identity>(108),
           state_identity<pkgstate::artifact_binding_identity>(109),
           state_identity<pkgstate::execution_evidence_identity>(110),
-          state_identity<pkgstate::artifact_image_identity>(111),
-          state_identity<pkgstate::artifact_inspection_identity>(112)));
+          state_identity<pkgstate::build_image_identity>(111),
+          state_identity<pkgstate::artifact_image_identity>(112),
+          state_identity<pkgstate::artifact_inspection_identity>(113)));
   std::vector<pkgstate::owned_entry> manifest;
   manifest.push_back(pkgstate::owned_entry::make(
       pkgstate::package_path::parse("tool"), state_regular(content),
@@ -366,7 +400,7 @@ pkgstate::installed_package installed_package(
 }
 
 pkgstate::snapshot publish_initial_package(
-    pkgstate::canonical_generation_store& store,
+    pkgstate::posix::canonical_generation_store& store,
     const pkgstate::installed_package& package)
 {
   const auto empty = store.read();
@@ -1494,7 +1528,7 @@ private:
 
 struct fixture final {
   test_support::temporary_directory temp;
-  pkgstate::canonical_generation_store store;
+  pkgstate::posix::canonical_generation_store store;
   pkgstate::snapshot expected;
   pkgsource::source_snapshot source;
   pkgapply::incoming_package_authority incoming;
@@ -1581,7 +1615,7 @@ application_restart_journal(const fixture& value)
 
 struct upgrade_fixture final {
   test_support::temporary_directory temp;
-  pkgstate::canonical_generation_store store;
+  pkgstate::posix::canonical_generation_store store;
   pkgsource::source_snapshot old_source;
   pkgstate::installed_package old_package;
   pkgstate::snapshot expected;
@@ -1691,7 +1725,7 @@ void check_upgrade_success()
 
 struct removal_fixture final {
   test_support::temporary_directory temp;
-  pkgstate::canonical_generation_store store;
+  pkgstate::posix::canonical_generation_store store;
   pkgsource::source_snapshot source;
   pkgstate::installed_package old_package;
   pkgstate::snapshot expected;

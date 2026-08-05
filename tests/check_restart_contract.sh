@@ -35,16 +35,13 @@ for required in \
   'state.read_state()' \
   'state.publish_state' \
   'effect_restart_disposition::external_resolution_required' \
-  'effect_attempt_legacy_encoding_version = 1' \
-  'effect_attempt_encoding_version = 2' \
+  'effect_attempt_encoding_version = 1' \
   'pkgctl/effect-journal-head/1' \
   'head_magic' \
   'record_encoding_version' \
   'read_head' \
   'publish_head' \
   'verify_existing_snapshot' \
-  'upgrade_legacy_snapshot' \
-  'legacy controller journal transition is invalid' \
   'effect-attempt journal sequence disagrees with retained history' \
   'lease-loss terminal record follows unresolved publication intent' \
   'latest->identity() == record.identity()' \

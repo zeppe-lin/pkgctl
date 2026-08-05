@@ -29,6 +29,12 @@ writer lock.
 
 # EXPLICIT RUN INTENT AND CANONICAL DISPATCH NONCES
 
+Version 0.27.0 derives every logical construction and check input from the
+exact resolver result retained by the transaction. Callers supply only
+call-scoped resource identities and host paths for those exact inputs. Operation
+preparation consumes the construction result's retained build/image admission
+and the standalone planner projection; it does not reopen artifact bytes.
+
 Version 0.26.0 requires one explicit *transaction_run_nonce* on each runtime
 *launch*. The run nonce distinguishes caller intent between otherwise identical
 initial runs. Reusing it selects the same exact durable journal; changing it
@@ -556,14 +562,11 @@ the exact authority returned by both stores. Only after both commits may an
 effect driver run. An exact interrupted call is retryable. An orphan admission
 does not promote a still-reserved dispatch into started target mutation.
 
-Version 0.9.1 established the same committed-head discipline for effect-attempt
-encoding version two. A selected snapshot's sequence must equal the exact
+The effect-attempt journal has one first-generation encoding with the same
+committed-head discipline. A selected snapshot's sequence must equal the exact
 transition count implied by its retained stage and evidence; lease loss cannot
-hide an unresolved publication intent. Strict version-one record-only histories
-remain readable through semantic-chain validation. Appending a successor
-establishes a version-two head; exact retry of a legacy latest record first
-atomically rewrites the selected snapshot as version two and only then publishes
-its head. Durable run support
+hide an unresolved publication intent. A snapshot without its exact durable
+head is uncommitted and fails closed. Durable run support
 adds no journal discovery, semantic-evidence serialization, automatic release,
 driver invocation, resource recovery, retry, rollback, or command frontend.
 
@@ -637,12 +640,11 @@ evidence. Its sequence is not advisory: it must equal the exact transition count
 derivable from that retained stage and evidence.
 
 The supplied POSIX store is anchored to an explicit directory or directory
-descriptor. Encoding version two publishes read-only snapshots without
+descriptor. Encoding version one publishes read-only snapshots without
 replacement and atomically advances a checksummed committed head. Operational
-recovery opens only that exact head-selected snapshot. Strict version-one
-record-only histories remain readable by full chain validation and are upgraded
-by the first exact version-two append. The store does not use an ambient
-package-manager state path.
+recovery opens only that exact head-selected snapshot. A snapshot without its
+head is not promoted through directory enumeration. The store does not use an
+ambient package-manager state path.
 
 # RESTART
 

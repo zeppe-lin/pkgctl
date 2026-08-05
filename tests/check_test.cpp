@@ -399,26 +399,6 @@ pkgctl::construction_session independent_construction_session(
     const fs::path& root,
     const std::string& package);
 
-pkgbuild::materialized_package_input check_input_from_construction(
-    const pkgctl::transaction_session& transaction,
-    std::string package,
-    const pkgctl::construction_result& construction,
-    char tree_seed)
-{
-  const auto& artifact = construction.build().build().artifact();
-  if (!artifact)
-    throw std::runtime_error(
-        "check dependency construction lacks an artifact");
-  const auto& selection = package_selection(transaction, package);
-  return pkgbuild::materialized_package_input(
-      pkgbuild::resolved_package_input::make(
-          pkgbuild::input_scope::check,
-          pkgsource::package_reference(std::move(package)),
-          selection.release(), selection.source_snapshot(),
-          construction.build().build().identity(), artifact->identity()),
-      source_identity<pkgbuild::input_tree_identity>(tree_seed));
-}
-
 struct ready_check_fixture final {
   pkgctl::transaction_session transaction;
   pkgctl::construction_result construction;
@@ -438,7 +418,7 @@ ready_check_fixture make_ready_check(
     ready_check_options options = {})
 {
   test_support::initialize_state(root / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       root / "state", test_support::binding());
 
   const std::string payload = "source payload\n";
@@ -465,24 +445,15 @@ ready_check_fixture make_ready_check(
   fixture_backend dependency_backend(backend_mode::succeed);
   pkgctl::native_construction_driver dependency_driver(dependency_backend);
   std::vector<pkgctl::construction_result> dependency_constructions;
-  std::vector<pkgbuild::materialized_package_input> inputs;
-  for (std::size_t index = 0;
-       index < options.check_dependencies.size();
-       ++index) {
-    const auto& package = options.check_dependencies[index];
+  for (const auto& package : options.check_dependencies) {
     auto dependency_session = independent_construction_session(
         transaction, root / "dependencies" / package, package);
-    auto dependency_construction = pkgctl::execute_construction(
-        dependency_session, dependency_driver);
-    inputs.push_back(check_input_from_construction(
-        transaction, package, dependency_construction,
-        hexadecimal_offset('9', index)));
-    dependency_constructions.push_back(
-        std::move(dependency_construction));
+    dependency_constructions.push_back(pkgctl::execute_construction(
+        dependency_session, dependency_driver));
   }
 
   auto session = construction_session_with_inputs(
-      transaction, root / "tool", std::move(inputs));
+      transaction, root / "tool", true);
   test_support::write(
       session.paths().local_source_root / "payload", payload);
 
@@ -509,51 +480,48 @@ ready_check_fixture make_ready_check(
 
 using check_resources = pkgctl::transaction_check_resources;
 
-const pkgbuild_exec::package_input_tree& concrete_input_tree(
+const pkgbuild_exec::package_input_resource& concrete_input_resource(
     const pkgctl::construction_result& construction,
-    const pkgbuild::materialized_package_input& expected)
+    const pkgbuild::build_input& expected)
 {
-  const pkgbuild_exec::package_input_tree* found = nullptr;
-  for (const auto& tree : construction.session().package_input_trees()) {
-    if (tree.input != expected.resolved().identity() ||
-        tree.tree != expected.tree())
+  const pkgbuild_exec::package_input_resource* found = nullptr;
+  for (const auto& resource : construction.session().package_inputs()) {
+    if (resource.input != expected.identity())
       continue;
     if (found != nullptr)
       throw std::runtime_error(
-          "construction fixture contains duplicate package input trees");
-    found = &tree;
+          "construction fixture contains duplicate package input resources");
+    found = &resource;
   }
 
   if (found == nullptr)
     throw std::runtime_error(
-        "construction fixture lacks a package input tree");
+        "construction fixture lacks a package input resource");
   return *found;
 }
 
-std::vector<pkgcheck_exec::package_input_tree> check_input_resources(
+std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
     const pkgctl::construction_result& construction,
     char seed)
 {
-  std::vector<pkgcheck_exec::package_input_tree> result;
+  std::vector<pkgcheck_exec::package_input_resource> result;
   const auto inputs = construction.build().build().request().inputs().for_scope(
       pkgbuild::input_scope::check);
   result.reserve(inputs.size());
 
   for (std::size_t index = 0; index < inputs.size(); ++index) {
     const auto& input = inputs[index];
-    const auto& tree = concrete_input_tree(construction, input);
+    const auto& concrete = concrete_input_resource(construction, input);
     result.push_back({
-        input.resolved().identity(),
-        input.tree(),
+        input.identity(),
         pkgexec::resource_identity::from_sha256(
-            std::string(
-                64U,
-                hexadecimal_offset(seed, 4 + index))),
-        tree.path,
+            std::string(64U, hexadecimal_offset(seed, 4 + index))),
+        concrete.path,
     });
   }
   return result;
 }
+
 
 check_resources resources_for(
     const pkgctl::construction_result& construction,
@@ -633,7 +601,7 @@ pkgctl::construction_session independent_construction_session(
     throw std::runtime_error("independent build node is absent");
 
   auto request = pkgctl::construction_request::make(
-      transaction, selected->identity(), {},
+      transaction, selected->identity(),
       pkgbuild::build_policy::make(
           pkgbuild::environment_policy::hermetic(2, 0022, 1700000000)));
   pkgctl::construction_paths paths{
@@ -810,7 +778,7 @@ void check_admission_requires_ready_check()
 {
   test_support::temporary_directory temporary;
   test_support::initialize_state(temporary.path() / "state");
-  pkgstate::canonical_generation_store store(
+  pkgstate::posix::canonical_generation_store store(
       temporary.path() / "state", test_support::binding());
   const std::string payload = "source payload\n";
   auto source = tool_source(
@@ -996,7 +964,7 @@ void check_exact_input_resource_projection()
         canonical.execution_session().inputs().size());
   for (std::size_t index = 0; index < expected_inputs.size(); ++index) {
     CHECK(canonical.execution_session().inputs()[index].input ==
-          expected_inputs[index].resolved().identity());
+          expected_inputs[index].identity());
   }
 
   const auto prepared = pkgcheck_exec::prepare(
@@ -1031,8 +999,8 @@ void check_exact_input_resource_projection()
   }));
 
   auto forged = canonical_resources;
-  forged.inputs.front().tree =
-      source_identity<pkgbuild::input_tree_identity>('f');
+  forged.inputs.front().input =
+      source_identity<pkgbuild::build_input_identity>('f');
   CHECK(rejects(pkgctl::error_code::invalid_check_session, [&] {
     (void)admit_check(
         fixture.progress, fixture.transaction, std::move(forged));

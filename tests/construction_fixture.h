@@ -92,11 +92,8 @@ inline pkgsource::source_snapshot tool_source(
             5));
   }
 
-  const auto syntax = options.check_program
-      ? source_syntax::recipe_yaml_v2
-      : source_syntax::recipe_yaml_v1;
   return seal_source(
-      source_origin("tool/recipe.yml"), syntax,
+      source_origin("tool/recipe.yml"),
       recipe_declaration(
           package_release(
               package_reference("tool"), std::move(options.version), 1),
@@ -136,7 +133,7 @@ inline pkgsource::source_snapshot package_source(std::string name)
   using namespace pkgsource;
   const auto origin = name + "/recipe.yml";
   return seal_source(
-      source_origin(origin), source_syntax::recipe_yaml_v1,
+      source_origin(origin),
       recipe_declaration(
           package_release(package_reference(name), "1.0", 1),
           package_metadata(
@@ -398,30 +395,6 @@ inline const pkgresolve::selected_package& dependency_selection(
   return package_selection(session, "dep");
 }
 
-inline pkgbuild::materialized_package_input package_input(
-    const pkgctl::transaction_session& session,
-    std::string package,
-    pkgbuild::input_scope scope,
-    char result_seed,
-    char artifact_seed,
-    char tree_seed)
-{
-  const auto& selection = package_selection(session, package);
-  return pkgbuild::materialized_package_input(
-      pkgbuild::resolved_package_input::make(
-          scope, pkgsource::package_reference(std::move(package)),
-          selection.release(), selection.source_snapshot(),
-          source_identity<pkgbuild::build_result_identity>(result_seed),
-          source_identity<pkgbuild::artifact_identity>(artifact_seed)),
-      source_identity<pkgbuild::input_tree_identity>(tree_seed));
-}
-
-inline pkgbuild::materialized_package_input dependency_input(
-    const pkgctl::transaction_session& session)
-{
-  return package_input(
-      session, "dep", pkgbuild::input_scope::build, 'd', 'e', 'f');
-}
 
 inline pkgexec::backend_capability_profile capabilities()
 {
@@ -511,6 +484,9 @@ private:
 
 class mismatched_build_driver final : public pkgctl::construction_driver {
 public:
+  explicit mismatched_build_driver(pkgbuild::build_request alternate)
+      : alternate_(std::move(alternate)) {}
+
   pkgfetch::source_materialization materialize_source(
       const pkgfetch::materialization_request& request) override
   {
@@ -520,31 +496,25 @@ public:
   pkgbuild_exec::build_execution_result execute_build(
       const pkgbuild_exec::admitted_build_session& session) override
   {
-    auto alternate = pkgbuild::build_request::seal(
-        session.request().source(), session.request().sources().materials(),
-        session.request().inputs().inputs(),
-        session.request().architectures().build(),
-        session.request().architectures().target(),
-        pkgbuild::build_policy::make(
-            pkgbuild::environment_policy::hermetic(3, 0022, 1700000000)));
     auto admitted = pkgbuild_exec::admitted_build_session::admit(
-        std::move(alternate), session.sources(), session.package_inputs(),
+        alternate_, session.sources(), session.package_inputs(),
         session.paths(), session.identity(), session.compression());
     return pkgbuild_exec::execute(admitted, backend_);
   }
 
 private:
+  pkgbuild::build_request alternate_;
   fixture_backend backend_{backend_mode::fail};
 };
 
 inline pkgctl::construction_session construction_session_with_inputs(
     const pkgctl::transaction_session& transaction,
     const fs::path& root,
-    std::vector<pkgbuild::materialized_package_input> inputs)
+    bool supply_inputs)
 {
   const auto& node = build_node(transaction);
   auto request = pkgctl::construction_request::make(
-      transaction, node.identity(), inputs,
+      transaction, node.identity(),
       pkgbuild::build_policy::make(
           pkgbuild::environment_policy::hermetic(2, 0022, 1700000000)));
   pkgctl::construction_paths paths{
@@ -561,21 +531,24 @@ inline pkgctl::construction_session construction_session_with_inputs(
   fs::create_directories(paths.local_source_root);
   fs::create_directories(paths.build.root_view_path);
 
-  std::vector<pkgbuild_exec::package_input_tree> trees;
-  trees.reserve(inputs.size());
-  for (const auto& input : inputs) {
-    const auto input_path =
-        root / "inputs" / input.resolved().identity().hex();
-    test_support::write(input_path / "payload", "dependency tree\n");
-    if (::chmod(input_path.c_str(), 0555) != 0 ||
-        ::chmod((input_path / "payload").c_str(), 0444) != 0)
-      throw std::runtime_error("cannot make package input tree read-only");
-    trees.push_back(
-        {input.resolved().identity(), input.tree(), input_path});
+  std::vector<pkgbuild_exec::package_input_resource> resources;
+  if (supply_inputs) {
+    resources.reserve(request.inputs().size());
+    for (const auto& input : request.inputs()) {
+      const auto input_path = root / "inputs" / input.identity().hex();
+      test_support::write(input_path / "payload", "dependency tree\n");
+      if (::chmod(input_path.c_str(), 0555) != 0 ||
+          ::chmod((input_path / "payload").c_str(), 0444) != 0)
+        throw std::runtime_error("cannot make package input resource read-only");
+      resources.push_back({
+          input.identity(),
+          pkgexec::resource_identity::from_sha256(input.identity().hex()),
+          input_path});
+    }
   }
 
   return pkgctl::construction_session::admit(
-      std::move(request), std::move(paths), std::move(trees),
+      std::move(request), std::move(paths), std::move(resources),
       {
           pkgexec::interpreter_identity::from_sha256(std::string(64U, 'c')),
           static_cast<std::uint64_t>(::geteuid()),
@@ -588,16 +561,16 @@ inline pkgctl::construction_session construction_session(
     const pkgctl::transaction_session& transaction,
     const fs::path& root)
 {
-  return construction_session_with_inputs(
-      transaction, root, {dependency_input(transaction)});
+  return construction_session_with_inputs(transaction, root, true);
 }
 
 inline pkgctl::construction_session construction_session_without_inputs(
     const pkgctl::transaction_session& transaction,
     const fs::path& root)
 {
-  return construction_session_with_inputs(transaction, root, {});
+  return construction_session_with_inputs(transaction, root, false);
 }
+
 
 
 

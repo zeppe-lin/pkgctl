@@ -42,7 +42,7 @@ int main(int argc, char** argv)
     const fs::path state_path = run_store_path.parent_path() / "run-state";
     fs::create_directories(run_store_path);
 
-    pkgstate::canonical_generation_store state(
+    pkgstate::posix::canonical_generation_store state(
         state_path, test_support::binding());
     const std::string payload("source payload\n");
     auto source = tool_source(

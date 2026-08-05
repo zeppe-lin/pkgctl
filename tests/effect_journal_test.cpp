@@ -88,21 +88,8 @@ std::array<std::uint8_t, 32> sha256(
        EVP_DigestUpdate(context.get(), data, size) != 1) ||
       EVP_DigestFinal_ex(context.get(), result.data(), &length) != 1 ||
       length != result.size())
-    throw std::runtime_error("cannot hash legacy effect-journal fixture");
+    throw std::runtime_error("cannot hash effect-journal fixture");
   return result;
-}
-
-pkgctl::effect_attempt_encoding legacy_encoding(
-    pkgctl::effect_attempt_encoding encoding)
-{
-  encoding[8] = 0U;
-  encoding[9] = static_cast<std::uint8_t>(
-      pkgctl::effect_attempt_legacy_encoding_version);
-  const auto payload_size = encoding.size() - 32U;
-  const auto checksum = sha256(encoding.data(), payload_size);
-  std::copy(checksum.begin(), checksum.end(),
-            encoding.begin() + static_cast<std::ptrdiff_t>(payload_size));
-  return encoding;
 }
 
 pkgctl::effect_attempt_encoding refresh_checksum(
@@ -278,11 +265,6 @@ void check_model_and_codec()
   CHECK(decoded.nonce() == admitted.nonce());
   CHECK(decoded.before_total() == 2U);
   CHECK(decoded.after_total() == 1U);
-  const auto legacy = pkgctl::decode_effect_attempt_record(
-      legacy_encoding(encoding));
-  CHECK(legacy.identity() == admitted.identity());
-  CHECK(legacy.attempt() == admitted.attempt());
-
   auto damaged = encoding;
   damaged[damaged.size() / 2U] ^= 0x80U;
   bool rejected = false;
@@ -463,92 +445,6 @@ void check_store()
         pkgctl::effect_journal_error_code::store_corrupt,
         [&] { (void)damaged_head_store.load_latest(value.attempt()); }));
     CHECK(::chmod(head_path.c_str(), 0444) == 0);
-  }
-
-  {
-    test_support::temporary_directory legacy_directory;
-    auto legacy_store = pkgctl::posix_effect_journal_store::open(
-        legacy_directory.path().string());
-    const auto legacy_admitted = pkgctl::effect_attempt_record::admit(
-        pkgctl::make_session_identity(
-            "pkgctl/test-effect-session/1", {"legacy-store"}),
-        0U, 0U, nonce(6));
-    const auto legacy_terminal = legacy_admitted.seal_terminal(
-        pkgctl::effectful_operation_outcome::outer_lease_lost);
-    write_read_only(
-        legacy_directory.path() / record_name(legacy_admitted),
-        legacy_encoding(
-            pkgctl::encode_effect_attempt_record(legacy_admitted)));
-    const auto loaded_legacy =
-        legacy_store.load_latest(legacy_admitted.attempt());
-    CHECK(loaded_legacy &&
-          loaded_legacy->identity() == legacy_admitted.identity());
-    CHECK(legacy_store.append(legacy_admitted).identity() ==
-          legacy_admitted.identity());
-    const auto upgraded = read_bytes(
-        legacy_directory.path() / record_name(legacy_admitted));
-    CHECK(upgraded.size() > 10U);
-    CHECK(static_cast<unsigned char>(upgraded[8]) == 0U);
-    CHECK(static_cast<unsigned char>(upgraded[9]) ==
-          pkgctl::effect_attempt_encoding_version);
-    CHECK(legacy_store.load_latest(legacy_admitted.attempt())->identity() ==
-          legacy_admitted.identity());
-    CHECK(legacy_store.append(legacy_terminal).identity() ==
-          legacy_terminal.identity());
-    CHECK(std::filesystem::is_regular_file(
-        legacy_directory.path() / head_name(legacy_admitted)));
-  }
-
-  {
-    test_support::temporary_directory legacy_chain_directory;
-    auto legacy_chain_store = pkgctl::posix_effect_journal_store::open(
-        legacy_chain_directory.path().string());
-    const auto first = pkgctl::effect_attempt_record::admit(
-        pkgctl::make_session_identity(
-            "pkgctl/test-effect-session/1", {"legacy-chain"}),
-        0U, 0U, nonce(7));
-    const auto last = first.seal_terminal(
-        pkgctl::effectful_operation_outcome::outer_lease_lost);
-    write_read_only(
-        legacy_chain_directory.path() / record_name(first),
-        legacy_encoding(pkgctl::encode_effect_attempt_record(first)));
-    write_read_only(
-        legacy_chain_directory.path() / record_name(last),
-        legacy_encoding(pkgctl::encode_effect_attempt_record(last)));
-    CHECK(legacy_chain_store.load_latest(first.attempt())->identity() ==
-          last.identity());
-    CHECK(::unlink(
-              (legacy_chain_directory.path() / record_name(first)).c_str()) ==
-          0);
-    CHECK(rejects(
-        pkgctl::effect_journal_error_code::store_corrupt,
-        [&] { (void)legacy_chain_store.load_latest(first.attempt()); }));
-  }
-
-  {
-    test_support::temporary_directory semantic_chain_directory;
-    auto semantic_chain_store = pkgctl::posix_effect_journal_store::open(
-        semantic_chain_directory.path().string());
-    const auto first = pkgctl::effect_attempt_record::admit(
-        pkgctl::make_session_identity(
-            "pkgctl/test-effect-session/1", {"semantic-chain"}),
-        0U, 0U, nonce(10));
-    const auto terminal = first.seal_terminal(
-        pkgctl::effectful_operation_outcome::outer_lease_lost);
-    const auto forged = forge_terminal_successor(terminal);
-    write_read_only(
-        semantic_chain_directory.path() / record_name(first),
-        legacy_encoding(pkgctl::encode_effect_attempt_record(first)));
-    write_read_only(
-        semantic_chain_directory.path() / record_name(terminal),
-        legacy_encoding(pkgctl::encode_effect_attempt_record(terminal)));
-    write_read_only(
-        semantic_chain_directory.path() /
-            record_name(first.attempt(), forged.sequence, forged.identity),
-        legacy_encoding(forged.encoding));
-    CHECK(rejects(
-        pkgctl::effect_journal_error_code::corrupt_encoding,
-        [&] { (void)semantic_chain_store.load_latest(first.attempt()); }));
   }
 
   {

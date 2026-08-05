@@ -115,18 +115,15 @@ public:
   project_artifact(const construction_result& construction) = 0;
 };
 
-/*! \brief Native composition of libpkgbuild-plan and libpkgimage. */
+/*! \brief Native pure projection through libpkgbuild-plan. */
 class native_operation_preparation_driver final
     : public operation_preparation_driver {
 public:
-  explicit native_operation_preparation_driver(
-      const pkgimage::archive_backend& archives);
+  native_operation_preparation_driver() = default;
 
   [[nodiscard]] pkgbuild::plan_adapter::artifact_projection
   project_artifact(const construction_result& construction) override;
 
-private:
-  const pkgimage::archive_backend& archives_;
 };
 
 /*! \brief Closed operation-specific planning refusal. */

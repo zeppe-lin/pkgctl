@@ -296,8 +296,7 @@ effect_attempt_record decode_effect_attempt_record(
     reader input(encoding.data(), payload_size);
     input.expect(magic.data(), magic.size());
     const auto encoding_version = input.u16();
-    if (encoding_version != effect_attempt_legacy_encoding_version &&
-        encoding_version != effect_attempt_encoding_version)
+    if (encoding_version != effect_attempt_encoding_version)
       throw effect_journal_error(
           effect_journal_error_code::unsupported_encoding,
           "journal encoding version is unsupported");

@@ -170,7 +170,7 @@ void validate_construction_authority(
     throw error(error_code::invalid_preparation_request,
                 "target operation is not ready in transaction progression");
 
-  if (!construction.build().artifact_inspection())
+  if (!construction.build().image_authority())
     throw error(error_code::invalid_preparation_request,
                 "completed construction lacks archive inspection evidence");
 }
@@ -204,7 +204,7 @@ session_identity request_identity(
                        ? installation_reason_identity(*installation_reason)
                        : std::string());
   return make_session_identity(
-      "pkgctl/operation-preparation-request/2", fields);
+      "pkgctl/operation-preparation-request/1", fields);
 }
 
 const pkgplan::installed_package_fact& require_installed_projection(
@@ -227,8 +227,8 @@ void validate_artifact_projection(
     const pkgbuild::plan_adapter::artifact_projection& projection)
 {
   const auto& expected = construction.build().build();
-  if (projection.build().identity() != expected.identity() ||
-      projection.build().request().identity() != expected.request().identity() ||
+  if (projection.authority().build().identity() != expected.identity() ||
+      projection.authority().build().request().identity() != expected.request().identity() ||
       projection.candidate().source_identity() !=
           expected.request().source().identity())
   {
@@ -236,17 +236,12 @@ void validate_artifact_projection(
                 "preparation driver projected another build authority");
   }
 
-  const auto& construction_receipt =
-      *construction.build().artifact_inspection();
-  const auto& projected_receipt = projection.image().receipt();
-  if (projected_receipt.archive_digest() !=
-          construction_receipt.archive_digest() ||
-      projected_receipt.image_identity() !=
-          construction_receipt.image_identity() ||
-      projected_receipt.entry_count() != construction_receipt.entry_count())
+  const auto& construction_authority =
+      *construction.build().image_authority();
+  if (projection.authority().identity() != construction_authority.identity())
   {
     throw error(error_code::preparation_driver_contract_violation,
-                "preparation reinspection differs from construction evidence");
+                "preparation projection differs from construction build/image authority");
   }
 
   if (projection.artifact().release() !=
@@ -272,7 +267,7 @@ void append_artifact_projection_fields(
     const std::optional<pkgbuild::plan_adapter::artifact_projection>& artifact,
     const std::optional<pkgapply::incoming_package_authority>& incoming)
 {
-  fields.push_back(artifact ? artifact->build().identity().hex() : std::string());
+  fields.push_back(artifact ? artifact->authority().build().identity().hex() : std::string());
   fields.push_back(artifact
                        ? artifact->candidate().candidate().identity().string()
                        : std::string());
@@ -283,10 +278,10 @@ void append_artifact_projection_fields(
                        ? artifact->artifact().manifest().string()
                        : std::string());
   fields.push_back(artifact
-                       ? artifact->image().image().identity().string()
+                       ? artifact->authority().image().image().identity().string()
                        : std::string());
   fields.push_back(artifact
-                       ? artifact->image().receipt().identity().string()
+                       ? artifact->authority().image().receipt().identity().string()
                        : std::string());
   fields.push_back(incoming ? incoming->identity().string() : std::string());
 }
@@ -509,20 +504,15 @@ operation_preparation_request::installation_reason() const noexcept
 const session_identity&
 operation_preparation_request::identity() const noexcept { return identity_; }
 
-native_operation_preparation_driver::native_operation_preparation_driver(
-    const pkgimage::archive_backend& archives)
-    : archives_(archives)
-{
-}
-
 pkgbuild::plan_adapter::artifact_projection
 native_operation_preparation_driver::project_artifact(
     const construction_result& construction)
 {
+  if (!construction.build().image_authority())
+    throw error(error_code::invalid_preparation_request,
+                "completed construction lacks build/image authority");
   return pkgbuild::plan_adapter::project_artifact(
-      construction.build().build(),
-      construction.session().paths().build.artifact_path,
-      archives_);
+      *construction.build().image_authority());
 }
 
 operation_planning_refusal::operation_planning_refusal(
@@ -695,17 +685,17 @@ operation_preparation_result prepare_operation(
   auto artifact = driver.project_artifact(*request.construction());
   validate_artifact_projection(*request.construction(), artifact);
   auto incoming = pkgapply::incoming_package_authority::admit(
-      artifact.build(), artifact.image());
+      artifact);
   if (incoming.candidate() != artifact.candidate().candidate())
     throw error(error_code::preparation_driver_contract_violation,
                 "application and planner candidate projections disagree");
 
-  const auto expected_archive = artifact.image().receipt().archive_digest();
+  const auto expected_archive = artifact.authority().image().receipt().archive_digest();
   if (request.kind() == pkgplan::operation_kind::install)
   {
     auto planning = pkgplan::plan_install(pkgplan::installation_request(
         incoming.candidate(), artifact.artifact(), expected_archive,
-        artifact.image(), installed.ownership().snapshot(),
+        artifact.authority().image(), installed.ownership().snapshot(),
         installed.ownership(), request.target().target(),
         request.observations(), *request.runtime_closure(), request.policy()));
     if (const auto* refusal = planning.refusal())
@@ -736,7 +726,7 @@ operation_preparation_result prepare_operation(
       installed, *native_installed);
   auto planning = pkgplan::plan_upgrade(pkgplan::upgrade_request(
       projected, incoming.candidate(), artifact.artifact(), expected_archive,
-      artifact.image(), installed.ownership().snapshot(),
+      artifact.authority().image(), installed.ownership().snapshot(),
       installed.ownership(), request.target().target(),
       request.observations(), *request.runtime_closure(), request.policy()));
   if (const auto* refusal = planning.refusal())

@@ -88,13 +88,13 @@ pkgctl::construction_session construction_session_for(
     const pkgctl::transaction_session& transaction,
     const fs::path& root,
     const std::string& package,
-    std::vector<pkgbuild::materialized_package_input> package_inputs = {},
-    std::vector<pkgbuild_exec::package_input_tree> package_input_trees = {},
+    std::optional<std::vector<pkgbuild_exec::package_input_resource>>
+        supplied_inputs = std::nullopt,
     std::uint32_t parallelism = 2U)
 {
   const auto& node = build_node_for(transaction, package);
   auto request = pkgctl::construction_request::make(
-      transaction, node.identity(), std::move(package_inputs),
+      transaction, node.identity(),
       pkgbuild::build_policy::make(
           pkgbuild::environment_policy::hermetic(
               parallelism, 0022, 1700000000)));
@@ -112,11 +112,27 @@ pkgctl::construction_session construction_session_for(
   };
   fs::create_directories(paths.local_source_root);
   fs::create_directories(paths.build.root_view_path);
-  for (const auto& input : package_input_trees)
+
+  std::vector<pkgbuild_exec::package_input_resource> inputs;
+  if (supplied_inputs) {
+    inputs = std::move(*supplied_inputs);
+  } else {
+    inputs.reserve(request.inputs().size());
+    for (const auto& input : request.inputs()) {
+      const auto path = root / "inputs" / input.package().name();
+      fs::create_directories(path);
+      inputs.push_back({
+          input.identity(),
+          pkgexec::resource_identity::from_sha256(input.identity().hex()),
+          path,
+      });
+    }
+  }
+  for (const auto& input : inputs)
     fs::create_directories(input.path);
 
   return pkgctl::construction_session::admit(
-      std::move(request), std::move(paths), std::move(package_input_trees),
+      std::move(request), std::move(paths), std::move(inputs),
       {
           pkgexec::interpreter_identity::from_sha256(std::string(64U, 'c')),
           static_cast<std::uint64_t>(::geteuid()),
@@ -139,75 +155,9 @@ pkgctl::construction_result execute_build(
 }
 
 
-pkgbuild::materialized_package_input construction_input(
-    const pkgctl::construction_result& construction,
-    pkgbuild::input_scope scope,
-    char tree_seed)
-{
-  const auto& build = construction.build().build();
-  if (!build.artifact())
-    throw std::runtime_error("dispatch input fixture lacks build artifact");
-  return pkgbuild::materialized_package_input(
-      pkgbuild::resolved_package_input::make(
-          scope, build.request().release().package(), build.request().release(),
-          build.request().source().identity(), build.identity(),
-          build.artifact()->identity()),
-      source_identity<pkgbuild::input_tree_identity>(tree_seed));
-}
-
-pkgbuild_exec::package_input_tree construction_input_tree(
-    const pkgbuild::materialized_package_input& input,
-    const fs::path& path)
-{
-  return {input.resolved().identity(), input.tree(), path};
-}
-
-pkgbuild::materialized_package_input forged_construction_input(
-    const pkgctl::construction_result& construction,
-    pkgbuild::input_scope scope,
-    char result_seed,
-    char artifact_seed,
-    char tree_seed)
-{
-  const auto& build = construction.build().build();
-  return pkgbuild::materialized_package_input(
-      pkgbuild::resolved_package_input::make(
-          scope, build.request().release().package(), build.request().release(),
-          build.request().source().identity(),
-          source_identity<pkgbuild::build_result_identity>(result_seed),
-          source_identity<pkgbuild::artifact_identity>(artifact_seed)),
-      source_identity<pkgbuild::input_tree_identity>(tree_seed));
-}
-
-
-pkgbuild::materialized_package_input forged_construction_authority_input(
-    const pkgctl::construction_result& construction,
-    pkgbuild::input_scope scope,
-    bool forge_release,
-    bool forge_source,
-    char tree_seed)
-{
-  const auto& build = construction.build().build();
-  const auto release = forge_release
-      ? pkgsource::package_release(
-            build.request().release().package(), "9.0", 1)
-      : build.request().release();
-  const auto source = forge_source
-      ? source_identity<pkgsource::source_snapshot_identity>('8')
-      : build.request().source().identity();
-  if (!build.artifact())
-    throw std::runtime_error("dispatch input fixture lacks build artifact");
-
-  return pkgbuild::materialized_package_input(
-      pkgbuild::resolved_package_input::make(
-          scope, build.request().release().package(), release, source,
-          build.identity(), build.artifact()->identity()),
-      source_identity<pkgbuild::input_tree_identity>(tree_seed));
-}
-
 struct two_build_fixture final {
   test_support::temporary_directory temporary;
-  pkgstate::canonical_generation_store store;
+  pkgstate::posix::canonical_generation_store store;
   std::string payload;
   pkgsource::source_snapshot source;
   pkgctl::transaction_session transaction;
@@ -233,7 +183,7 @@ struct two_build_fixture final {
 
 struct dependent_build_fixture final {
   test_support::temporary_directory temporary;
-  pkgstate::canonical_generation_store store;
+  pkgstate::posix::canonical_generation_store store;
   std::string payload;
   pkgsource::source_snapshot source;
   pkgctl::transaction_session transaction;
@@ -258,7 +208,7 @@ struct dependent_build_fixture final {
 
 struct check_input_fixture final {
   test_support::temporary_directory temporary;
-  pkgstate::canonical_generation_store store;
+  pkgstate::posix::canonical_generation_store store;
   std::string payload;
   pkgsource::source_snapshot source;
   pkgctl::transaction_session transaction;
@@ -365,21 +315,28 @@ pkgctl::transaction_check_resources check_resources(
   fs::create_directories(root / "root-view");
   fs::create_directories(root / "temporary");
 
-  std::vector<pkgcheck_exec::package_input_tree> inputs;
+  std::vector<pkgcheck_exec::package_input_resource> inputs;
   const auto check_inputs =
       build.request().inputs().for_scope(pkgbuild::input_scope::check);
   inputs.reserve(check_inputs.size());
   for (std::size_t index = 0; index < check_inputs.size(); ++index)
   {
-    const auto path = root / "inputs" /
-        check_inputs[index].resolved().declared_package().name();
-    fs::create_directories(path);
+    const auto& logical = check_inputs[index];
+    const pkgbuild_exec::package_input_resource* concrete = nullptr;
+    for (const auto& candidate : construction.session().package_inputs()) {
+      if (candidate.input == logical.identity()) {
+        concrete = &candidate;
+        break;
+      }
+    }
+    if (concrete == nullptr)
+      throw std::runtime_error(
+          "dispatch check fixture lacks concrete input resource");
     inputs.push_back({
-        check_inputs[index].resolved().identity(),
-        check_inputs[index].tree(),
+        logical.identity(),
         external_identity<pkgexec::resource_identity>(
             static_cast<std::uint8_t>(marker + 4U + index)),
-        path,
+        concrete->path,
     });
   }
 
@@ -415,7 +372,7 @@ pkgctl::transaction_check_resources check_resources(
 
 struct ready_check_fixture final {
   test_support::temporary_directory temporary;
-  pkgstate::canonical_generation_store store;
+  pkgstate::posix::canonical_generation_store store;
   std::string payload;
   pkgsource::source_snapshot source;
   pkgctl::transaction_session transaction;
@@ -690,49 +647,12 @@ void check_construction_binds_exact_predecessor_evidence()
   CHECK(reservation.dispatch->dependencies().front().evidence() ==
         dependency.identity());
 
-  auto exact_input = construction_input(
-      dependency, pkgbuild::input_scope::build, '4');
   auto exact_session = construction_session_for(
-      fixture.transaction, fixture.temporary.path() / "exact-tool", "tool",
-      {exact_input},
-      {construction_input_tree(
-          exact_input, fixture.temporary.path() / "exact-dependency-tree")});
-
-  auto forged_input = forged_construction_input(
-      dependency, pkgbuild::input_scope::build, '5', '6', '7');
-  auto forged_session = construction_session_for(
-      fixture.transaction, fixture.temporary.path() / "forged-tool", "tool",
-      {forged_input},
-      {construction_input_tree(
-          forged_input, fixture.temporary.path() / "forged-dependency-tree")});
-  CHECK(rejects(pkgctl::error_code::invalid_dispatch, [&] {
-    (void)pkgctl::start_construction_dispatch(
-        reservation.run, *reservation.dispatch, forged_session);
-  }));
-
-  auto forged_release_input = forged_construction_authority_input(
-      dependency, pkgbuild::input_scope::build, true, false, '8');
-  CHECK(rejects(pkgctl::error_code::invalid_construction_request, [&] {
-    (void)construction_session_for(
-        fixture.transaction,
-        fixture.temporary.path() / "forged-release-tool", "tool",
-        {forged_release_input},
-        {construction_input_tree(
-            forged_release_input,
-            fixture.temporary.path() / "forged-release-dependency-tree")});
-  }));
-
-  auto forged_source_input = forged_construction_authority_input(
-      dependency, pkgbuild::input_scope::build, false, true, '9');
-  CHECK(rejects(pkgctl::error_code::invalid_construction_request, [&] {
-    (void)construction_session_for(
-        fixture.transaction,
-        fixture.temporary.path() / "forged-source-tool", "tool",
-        {forged_source_input},
-        {construction_input_tree(
-            forged_source_input,
-            fixture.temporary.path() / "forged-source-dependency-tree")});
-  }));
+      fixture.transaction, fixture.temporary.path() / "exact-tool", "tool");
+  CHECK(exact_session.request().inputs().size() == 1U);
+  CHECK(exact_session.package_inputs().size() == 1U);
+  CHECK(exact_session.package_inputs().front().input ==
+        exact_session.request().inputs().front().identity());
 
   auto started = pkgctl::start_construction_dispatch(
       reservation.run, *reservation.dispatch, exact_session);
@@ -759,13 +679,11 @@ void check_check_inputs_are_constructed_before_checked_package()
   CHECK(after_tester.ready_units().front().primary_node() ==
         build_node_for(fixture.transaction, "tool").identity());
 
-  auto check_input = construction_input(
-      tester, pkgbuild::input_scope::check, '8');
   auto tool_session = construction_session_for(
       fixture.transaction, fixture.temporary.path() / "checked-build",
-      "tool", {check_input},
-      {construction_input_tree(
-          check_input, fixture.temporary.path() / "tester-input-tree")});
+      "tool");
+  CHECK(tool_session.request().inputs().size() == 1U);
+  const auto check_input = tool_session.request().inputs().front();
 
   auto run = pkgctl::transaction_run::begin(
       after_tester,
@@ -794,7 +712,8 @@ void check_check_inputs_are_constructed_before_checked_package()
       check_reservation.run.progress(),
       check_node(fixture.transaction).identity());
   CHECK(request.check().inputs().inputs().size() == 1U);
-  CHECK(request.check().inputs().inputs().front() == check_input);
+  CHECK(request.check().inputs().inputs().front().identity() ==
+        check_input.identity());
   auto session = pkgctl::transaction_check_session::admit(
       std::move(request),
       check_resources(
@@ -833,7 +752,7 @@ void check_check_completion_and_cross_session_refusal()
 
   auto other_construction_session = construction_session_for(
       fixture.transaction, fixture.temporary.path() / "other-build",
-      "tool", {}, {}, 3U);
+      "tool", std::nullopt, 3U);
   auto other_construction = execute_build(
       other_construction_session, fixture.payload, backend_mode::succeed);
   auto other_progress = pkgctl::advance_construction(
