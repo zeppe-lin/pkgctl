@@ -1,3 +1,31 @@
+## 0.30.0 - 2026-08-07
+
+### Shared construction/check session authority
+
+- Replaces separate fresh-execution and restart-context inputs in the POSIX
+  runtime with one deterministic construction/check session source. The same
+  durable record, run, and dispatch must reproduce the same admitted session in
+  both paths.
+- Adds operation-only execution and recovery sources and composes them with the
+  shared session source, preserving effect-journal ownership of operation
+  restart.
+- Adds pure canonical execution-request projections to `libpkgbuild-exec` and
+  `libpkgcheck-exec`. Recovery can reproduce exact request authority without
+  invoking effectful workspace/source preparation.
+- Adds native construction/check recovery context composition: construction
+  reacquires genuine `libpkgfetch` materialization, both paths reproduce the
+  canonical execution request, and both use capability evidence from the
+  already selected backend before the durable decoder runs.
+- Qualifies exact runtime construction recovery through the shared session
+  source and exact check recovery through the same native context composition.
+- Adds no concrete session/resource locator, package-input materializer, process
+  adoption, scheduler, retry policy, mutating command, or durable encoding.
+
+### Dependency contract
+
+- libpkgbuild-exec >= 2.1.0, < 3.0.0
+- libpkgcheck-exec >= 0.4.0, < 1.0.0
+
 ## 0.29.0 - 2026-08-07
 
 ### Evidence-backed construction and check recovery

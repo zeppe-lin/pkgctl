@@ -1,3 +1,22 @@
+## Release 0.30.0 shared-session recovery qualification
+
+The shared-session suite must prove:
+
+- fresh construction/check execution and restart recovery consult the same
+  deterministic session source;
+- pure build/check request projection is identical to the request used by
+  effectful preparation;
+- pure projection creates, removes, stages, chmods, or otherwise touches no
+  host resource;
+- construction recovery reacquires genuine source material and reproduces the
+  retained materialization identity;
+- check recovery reproduces the exact admitted execution request;
+- backend capability drift and foreign session authority fail before decode;
+- operation execution and operation recovery remain delegated to their own
+  sources;
+- the POSIX runtime recovers a started construction from a reopened evidence
+  store without consulting a separate construction recovery provider.
+
 # pkgctl testing
 
 ## Release 0.29.0 recovery qualification

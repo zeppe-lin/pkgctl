@@ -412,6 +412,33 @@ This boundary performs no record discovery, semantic reconstruction, resource
 realization, backend selection, process adoption, retry policy, scheduling,
 cleanup, compaction, garbage collection, or command action.
 
+# SHARED CONSTRUCTION AND CHECK SESSION AUTHORITY
+
+Version 0.30.0 makes one deterministic session source authoritative for both
+fresh construction/check execution and restart recovery. Given the same durable
+record, reopened run, and dispatch, the source must reproduce the same admitted
+session. The runtime composes that source with separate operation execution and
+operation recovery authorities; operation restart remains owned by the effect
+journal.
+
+The build and check execution adapters expose pure request projections. These
+projections bind the exact semantic request, logical resources, root view,
+program, environment, credentials, limits, and cancellation policy without
+touching host paths. Effectful preparation uses the same request and remains the
+only boundary which stages source bytes or binds concrete materializations.
+
+Construction restart reacquires the exact source materialization through
+*libpkgfetch*, admits the build-exec session, reproduces the execution request,
+and reads the selected backend capability profile. Check restart reproduces its
+execution request from the admitted check session and selected check backend.
+The retained evidence record then validates and decodes those bodies exactly as
+in version 0.29.0.
+
+This boundary does not implement session discovery or concrete path policy. The
+caller still owns package-input resources, predecessor artifacts, retained
+installed-package resources, root views, credentials, workspaces, and artifact
+destinations.
+
 # EVIDENCE-BACKED CONSTRUCTION AND CHECK RECOVERY
 
 Version 0.29.0 composes one exact durable construction/check record with the

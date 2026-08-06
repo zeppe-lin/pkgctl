@@ -106,6 +106,14 @@ add a
 frontend command. Descriptor-anchored authority must remain valid if the
 original pathname is renamed or replaced.
 
+Fresh and recovered construction/check work must derive from one shared
+deterministic session source. Do not introduce a second recovery-only session,
+path, credential, root-view, package-input, or workspace provider. The exact
+execution request must be reproduced through the pure build/check adapter
+projection; recovery must never call effectful `prepare()` merely to obtain
+request authority. Construction may reacquire genuine source material through
+`libpkgfetch`; operation restart remains delegated to the effect journal.
+
 The construction/check evidence layer may serialize only one exact typed
 dispatch-evidence record and the existing canonical subordinate result encoding.
 It must bind the run journal, transaction, dispatch, node, attempt, controller

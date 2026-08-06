@@ -13,6 +13,51 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.30.0 shared session and pure recovery projection boundary
+
+Fresh construction/check execution and restart recovery must not receive
+independent context providers. The runtime now borrows one deterministic
+`transaction_dispatch_session_source` and composes it in both directions:
+
+```text
+                    durable record + dispatch
+                              |
+                              v
+             deterministic construction/check session
+                       /                 \
+                      v                   v
+             fresh execution        restart recovery
+                      |                   |
+              effectful prepare     rematerialize source
+                                          +
+                                  pure request projection
+                                          +
+                                  selected backend profile
+```
+
+`libpkgbuild-exec` and `libpkgcheck-exec` expose pure execution-request
+projections. They bind the exact logical resources, root view, program,
+environment, credentials, limits, and cancellation policy without opening,
+creating, removing, staging, or chmodding any path. Their existing `prepare()`
+functions remain the effect boundary and use the same canonical request.
+
+For construction recovery, the native context source reacquires the exact
+`libpkgfetch` materialization from the session's retained request and roots,
+admits the build-exec session, reproduces its execution request, and reads the
+capability profile from the selected construction backend. Check recovery
+reproduces the request from the exact admitted check session and selected check
+backend. The evidence-backed decoder still validates every retained identity.
+
+Operation execution and recovery remain separate sources because operation
+restart belongs to the effect-journal boundary. The runtime composes an
+operation-only execution source with the shared construction/check session
+source; it does not widen the evidence store into operation authority.
+
+This release does not implement the session source. Concrete resource, path,
+predecessor artifact, retained installed-package, root-view, credential, and
+workspace policy remains caller-owned. The next native composition must realize
+that policy without reconstructing semantic authorities from paths.
+
 ## Release 0.29.0 evidence-backed semantic recovery boundary
 
 Release 0.29.0 composes the durable construction/check evidence store with the

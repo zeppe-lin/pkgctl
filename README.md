@@ -6,6 +6,21 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.30.0 removes the remaining split between fresh and restart
+construction/check context. One deterministic session source now supplies the
+exact admitted construction or check session for both paths. The runtime
+composes that source with operation-only execution authority, and recovery
+reacquires genuine construction source material, reproduces the canonical
+build/check execution request through pure adapter projections, and obtains the
+capability profile from the already selected backend.
+
+The pure projections touch no host resource; effectful preparation remains the
+only boundary that stages source bytes or binds concrete paths. Operation
+recovery remains under the effect journal. The caller still owns the session
+source and therefore the concrete path, predecessor-artifact, installed-package,
+credential, and root-view policy. This release does not add discovery, a native
+resource realizer, scheduling, process adoption, or a mutating command.
+
 Release 0.29.0 closes the semantic half of construction/check restart
 recovery without moving authority into the durable store. The runtime selects
 one exact evidence record by run journal, dispatch, and attempt session, asks a
@@ -533,7 +548,7 @@ selected durable journal, and destructive convergence choice is explicit.
 `--converge-exact`. The inspection commands open only the exact existing store
 and identity supplied by the caller.
 
-There are no effect-implying CLI commands in 0.29.0. The command frontend
+There are no effect-implying CLI commands in 0.30.0. The command frontend
 executes no source acquisition, build, check, planner, lifecycle, application,
 publication, restart, reconciliation, or repair authority. The library can
 execute or reconcile one caller-selected dispatch only through injected drivers,

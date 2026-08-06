@@ -28,6 +28,23 @@ require_line "$srcdir/include/pkgctl/version.h" \
 require_line "$srcdir/src/core.cpp" \
   'static_assert(pkgctl::version_minor == 30);'
 
+require_dependency_range()
+{
+  module=$1
+  lower=$2
+  upper=$3
+  grep -A 3 -F "  '$module'," "$srcdir/meson.build" |
+    grep -F "  version: ['$lower', '$upper']," >/dev/null || {
+      echo "missing Meson dependency range: $module $lower, $upper" >&2
+      exit 1
+    }
+}
+
+require_dependency_range libpkgbuild-exec '>=2.1.0' '<3.0.0'
+require_dependency_range libpkgcheck-exec '>=0.4.0' '<1.0.0'
+require_dependency_range libpkgresolve '>=2.0.0' '<3.0.0'
+require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
+
 grep -F '## 0.30.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F 'Release 0.30.0' "$srcdir/README.md" >/dev/null
 grep -F 'Version 0.30.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
