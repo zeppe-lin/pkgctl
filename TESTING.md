@@ -45,6 +45,9 @@ Every release must establish:
 - removal preparation proven independent of incoming artifact authority;
 - explicit non-completed and indeterminate publication outcomes;
 - CLI usage, authority-failure, and deterministic output contracts;
+- malformed YAML reaches the command boundary as the exact typed
+  `pkgsource::yaml::yaml_error`, while the controller core remains free of the
+  syntax adapter;
 - durable intent and terminal snapshots around every irreversible handoff;
 - strict codec, causal-shape, committed-head, legacy-chain, and POSIX store
   validation;

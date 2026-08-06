@@ -36,15 +36,35 @@ if grep -R -n 'SPDX-License-Identifier: GPL-2' \
   exit 1
 fi
 
+direct_build=$srcdir/tests/run-direct.sh
+core_modules=$(sed -n "s/^core_modules='\(.*\)'$/\1/p" "$direct_build")
+[ -n "$core_modules" ] || {
+  echo 'direct qualification core module closure is missing' >&2
+  exit 1
+}
+
+reviewed_core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
+[ "$core_modules" = "$reviewed_core_modules" ] || {
+  echo 'direct qualification core module closure differs from review' >&2
+  echo "expected: $reviewed_core_modules" >&2
+  echo "actual:   $core_modules" >&2
+  exit 1
+}
+
 for required in \
+  'libcrypto' \
+  'libpkgsource' \
+  'libpkgsource-plan' \
+  'libpkgcatalog' \
   'libpkgcatalog-acquire' \
   'libpkgstate' \
+  'libpkgstate-posix' \
   'libpkgstate-plan' \
   'libpkgstate-apply' \
   'libpkgfetch' \
   'libpkgbuild' \
   'libpkgbuild-exec' \
-  'libpkgsource-plan' \
+  'libpkgbuild-image' \
   'libpkgbuild-plan' \
   'libpkgimage' \
   'libpkgplan' \
@@ -60,4 +80,11 @@ for required in \
     echo "missing native authority dependency: $required" >&2
     exit 1
   }
+  case " $core_modules " in
+    *" $required "*) ;;
+    *)
+      echo "direct qualification omits native authority dependency: $required" >&2
+      exit 1
+      ;;
+  esac
 done

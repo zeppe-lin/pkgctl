@@ -82,6 +82,24 @@ catalog=$($pkgctl catalog --collection "core=$collection")
 printf '%s\n' "$catalog" | grep -F 'session.kind=catalog' >/dev/null
 printf '%s\n' "$catalog" | grep -F 'catalog.candidates=3' >/dev/null
 
+invalid_collection=$root/invalid-collection
+mkdir -p "$invalid_collection/broken"
+cat >"$invalid_collection/broken/recipe.yml" <<'YAML'
+format: zeppe-lin.recipe/1
+package: [
+YAML
+if $pkgctl catalog --collection "broken=$invalid_collection" \
+    >"$root/invalid-yaml.out" 2>"$root/invalid-yaml.err"; then
+  echo 'malformed YAML unexpectedly succeeded' >&2
+  exit 1
+else
+  [ "$?" -eq 1 ]
+fi
+grep -F 'pkgctl: yaml: ' "$root/invalid-yaml.err" >/dev/null
+grep -F "$invalid_collection/broken/recipe.yml:" \
+  "$root/invalid-yaml.err" >/dev/null
+[ ! -s "$root/invalid-yaml.out" ]
+
 before=$(find "$state" -type f -print | sort | xargs sha256sum)
 # shellcheck disable=SC2086
 resolution=$($pkgctl resolve \

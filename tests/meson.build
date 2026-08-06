@@ -255,6 +255,13 @@ if not get_option('tests').disabled()
   source_contract = find_program('check_source_contract.sh')
   test('source-contract', source_contract, args: [meson.project_source_root()])
 
+  cli_yaml_boundary = find_program('check_cli_yaml_boundary_contract.sh')
+  test(
+    'cli-yaml-boundary-contract',
+    cli_yaml_boundary,
+    args: [meson.project_source_root()],
+  )
+
   effect_contract = find_program('check_effect_contract.sh')
   test('effect-contract', effect_contract, args: [meson.project_source_root()])
 
