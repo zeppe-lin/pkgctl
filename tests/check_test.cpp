@@ -11,6 +11,7 @@
 #include <pkgctl/run_advance.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
+#include <pkgctl/run_recovery.h>
 #include <pkgctl/run_journal.h>
 #include <pkgctl/run_restart.h>
 
@@ -280,6 +281,56 @@ pkgexec::backend_capability_profile check_capabilities(char seed = '8')
       pkgexec::backend_identity::from_sha256(std::string(64U, seed)),
       check_guarantees());
 }
+
+
+class check_recovery_context_source final
+    : public pkgctl::transaction_dispatch_recovery_context_source {
+public:
+  explicit check_recovery_context_source(
+      pkgctl::transaction_check_result result,
+      std::optional<pkgexec::backend_capability_profile> backend = std::nullopt)
+      : result_(std::move(result)), backend_(backend
+            ? std::move(*backend)
+            : result_.execution().execution().backend())
+  {
+  }
+
+  pkgctl::construction_dispatch_recovery_context construction(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::construction_dispatch_evidence_record&) override
+  {
+    throw std::runtime_error("unexpected construction recovery context request");
+  }
+
+  pkgctl::check_dispatch_recovery_context check(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::check_dispatch_evidence_record&) override
+  {
+    ++calls_;
+    return {
+        result_.session(), result_.execution().execution().request(), backend_,
+    };
+  }
+
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation recovery context request");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  pkgctl::transaction_check_result result_;
+  pkgexec::backend_capability_profile backend_;
+  std::size_t calls_ = 0U;
+};
 
 enum class check_backend_mode {
   pass,
@@ -1475,6 +1526,107 @@ void check_run_authority_rehydration()
 }
 
 
+
+void check_stored_check_recovery()
+{
+  test_support::temporary_directory temporary;
+  auto fixture = make_ready_check(temporary.path());
+  auto session = admit_check(
+      fixture.progress, fixture.transaction,
+      resources_for(fixture.construction, temporary.path() / "check"));
+  check_backend backend(check_backend_mode::pass);
+  pkgctl::native_transaction_check_driver driver(backend);
+  auto result = pkgctl::execute_transaction_check(session, driver);
+
+  auto run = pkgctl::transaction_run::begin(
+      fixture.progress,
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, journal_nonce(74U));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(74U));
+  CHECK(reservation.dispatch.has_value());
+  if (!reservation.dispatch)
+    return;
+  auto reserved = admitted.successor(reservation.run);
+  auto started_run = pkgctl::start_check_dispatch(
+      reservation.run, *reservation.dispatch, session);
+  auto started = reserved.successor(started_run);
+
+  const auto evidence_path = temporary.path() / "evidence";
+  std::filesystem::create_directory(evidence_path);
+  auto evidence = pkgctl::check_dispatch_evidence_record::admit(
+      started, *reservation.dispatch, result);
+  {
+    auto writer = pkgctl::posix_transaction_run_evidence_store::open(
+        evidence_path.string());
+    CHECK(writer.publish(evidence).identity() == evidence.identity());
+  }
+  auto evidence_store = pkgctl::posix_transaction_run_evidence_store::open(
+      evidence_path.string());
+
+  auto checkpoint = pkgctl::transaction_run_restart_checkpoint::make(
+      started_run.progress(), started);
+  check_recovery_context_source context(result);
+  pkgctl::stored_transaction_dispatch_recovery_authority_source recovery_source(
+      evidence_store, context);
+  auto recovery = pkgctl::acquire_transaction_dispatch_recovery_authority(
+      checkpoint, *reservation.dispatch, recovery_source);
+  CHECK(context.calls() == 1U);
+  CHECK(recovery.check() != nullptr);
+  if (recovery.check())
+  {
+    CHECK(recovery.check()->identity() == result.identity());
+    CHECK(recovery.check()->session().identity() == result.session().identity());
+    CHECK(pkgcheck_exec::encode_check_execution_result(
+              recovery.check()->execution()) ==
+          pkgcheck_exec::encode_check_execution_result(result.execution()));
+  }
+
+  const auto empty_path = temporary.path() / "empty-evidence";
+  std::filesystem::create_directory(empty_path);
+  auto empty_store = pkgctl::posix_transaction_run_evidence_store::open(
+      empty_path.string());
+  check_recovery_context_source unused_context(result);
+  pkgctl::stored_transaction_dispatch_recovery_authority_source missing_source(
+      empty_store, unused_context);
+  bool missing = false;
+  try
+  {
+    (void)pkgctl::acquire_transaction_dispatch_recovery_authority(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started_run.progress(), started),
+        *reservation.dispatch, missing_source);
+  }
+  catch (const pkgctl::transaction_run_evidence_error& problem)
+  {
+    missing = problem.code() ==
+        pkgctl::transaction_run_evidence_error_code::evidence_missing;
+  }
+  CHECK(missing);
+  CHECK(unused_context.calls() == 0U);
+
+  check_recovery_context_source foreign_context(
+      result, check_capabilities('9'));
+  pkgctl::stored_transaction_dispatch_recovery_authority_source foreign_source(
+      evidence_store, foreign_context);
+  bool mismatched = false;
+  try
+  {
+    (void)pkgctl::acquire_transaction_dispatch_recovery_authority(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started_run.progress(), started),
+        *reservation.dispatch, foreign_source);
+  }
+  catch (const pkgctl::transaction_run_evidence_error& problem)
+  {
+    mismatched = problem.code() ==
+        pkgctl::transaction_run_evidence_error_code::
+            recovery_context_mismatch;
+  }
+  CHECK(mismatched);
+  CHECK(foreign_context.calls() == 1U);
+}
+
 void check_single_step_check_advancement()
 {
   test_support::temporary_directory temporary;
@@ -1521,7 +1673,7 @@ void check_single_step_check_advancement()
     CHECK(progress_source.calls() == 1U);
     CHECK(execution_source.calls() == 1U);
     CHECK(trace == std::vector<std::string>({
-        "run-1", "run-2", "check", "run-3"}));
+        "run-1", "run-2", "check", "evidence-check", "run-3"}));
   }
 
   {
@@ -1577,6 +1729,7 @@ int main()
     check_durable_dispatch_execution();
     check_durable_restart_reconciliation();
     check_run_authority_rehydration();
+    check_stored_check_recovery();
     check_single_step_check_advancement();
   } catch (const std::exception& problem) {
     std::cerr << "unexpected exception: " << problem.what() << '\n';

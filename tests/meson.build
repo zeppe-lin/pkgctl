@@ -142,6 +142,7 @@ if not get_option('tests').disabled()
     'run_native.h',
     'run_nonce.h',
     'run_reconcile.h',
+    'run_recovery.h',
     'run_commit.h',
     'run_execute.h',
     'run_restart.h',
@@ -185,6 +186,13 @@ if not get_option('tests').disabled()
   test(
     'run-evidence-contract',
     run_evidence_contract,
+    args: [meson.project_source_root()],
+  )
+
+  run_recovery_contract = find_program('check_run_recovery_contract.sh')
+  test(
+    'run-recovery-contract',
+    run_recovery_contract,
     args: [meson.project_source_root()],
   )
 

@@ -21,6 +21,7 @@
 #include <pkgctl/run_commit.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
+#include <pkgctl/run_recovery.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_store.h>
 
@@ -2654,6 +2655,50 @@ private:
   std::optional<pkgctl::session_identity> dispatch_;
 };
 
+
+class operation_recovery_context_source final
+    : public pkgctl::transaction_dispatch_recovery_context_source {
+public:
+  explicit operation_recovery_context_source(
+      pkgctl::effect_restart_checkpoint checkpoint)
+      : checkpoint_(std::move(checkpoint))
+  {
+  }
+
+  pkgctl::construction_dispatch_recovery_context construction(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::construction_dispatch_evidence_record&) override
+  {
+    throw std::runtime_error("unexpected construction recovery context request");
+  }
+
+  pkgctl::check_dispatch_recovery_context check(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::check_dispatch_evidence_record&) override
+  {
+    throw std::runtime_error("unexpected check recovery context request");
+  }
+
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    ++calls_;
+    return checkpoint_;
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  pkgctl::effect_restart_checkpoint checkpoint_;
+  std::size_t calls_ = 0U;
+};
+
 class recording_effect_store final : public pkgctl::effect_journal_store {
 public:
   recording_effect_store(
@@ -4727,6 +4772,22 @@ void check_run_authority_rehydration()
           start.effect_attempt.identity());
     CHECK(recovery.operation()->session().identity() == session.identity());
   }
+
+  std::vector<std::string> recovery_trace;
+  run_execute_support::sequenced_evidence_store unused_evidence(recovery_trace);
+  operation_recovery_context_source operation_context(effect_checkpoint);
+  pkgctl::stored_transaction_dispatch_recovery_authority_source stored_recovery(
+      unused_evidence, operation_context);
+  const auto delegated =
+      pkgctl::acquire_transaction_dispatch_recovery_authority(
+          pkgctl::transaction_run_restart_checkpoint::make(
+              start.run.progress(), started_record),
+          *reservation.dispatch, stored_recovery);
+  CHECK(operation_context.calls() == 1U);
+  CHECK(delegated.operation() != nullptr);
+  CHECK(delegated.operation() &&
+        delegated.operation()->record().identity() ==
+            start.effect_attempt.identity());
 
   auto foreign_admission = pkgctl::effect_attempt_record::admit(
       session.identity(), session.before().size(), session.after().size(),

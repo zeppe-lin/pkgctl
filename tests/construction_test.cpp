@@ -11,6 +11,7 @@
 #include <pkgctl/run_launch.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
+#include <pkgctl/run_recovery.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_runtime.h>
 
@@ -478,6 +479,84 @@ private:
   std::optional<pkgctl::session_identity> record_;
   std::optional<pkgctl::session_identity> assessment_;
   std::optional<pkgctl::session_identity> dispatch_;
+};
+
+
+class construction_recovery_context_source final
+    : public pkgctl::transaction_dispatch_recovery_context_source {
+public:
+  explicit construction_recovery_context_source(
+      pkgctl::construction_result result)
+      : result_(std::move(result))
+  {
+  }
+
+  pkgctl::construction_dispatch_recovery_context construction(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::construction_dispatch_evidence_record&) override
+  {
+    ++calls_;
+    return {
+        result_.session(), result_.materialization(),
+        result_.build().execution().request(),
+        result_.build().execution().backend(),
+    };
+  }
+
+  pkgctl::check_dispatch_recovery_context check(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::check_dispatch_evidence_record&) override
+  {
+    throw std::runtime_error("unexpected check recovery context request");
+  }
+
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation recovery context request");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  pkgctl::construction_result result_;
+  std::size_t calls_ = 0U;
+};
+
+class unreachable_recovery_context_source final
+    : public pkgctl::transaction_dispatch_recovery_context_source {
+public:
+  pkgctl::construction_dispatch_recovery_context construction(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::construction_dispatch_evidence_record&) override
+  {
+    throw std::runtime_error("unexpected construction recovery context request");
+  }
+
+  pkgctl::check_dispatch_recovery_context check(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::check_dispatch_evidence_record&) override
+  {
+    throw std::runtime_error("unexpected check recovery context request");
+  }
+
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation recovery context request");
+  }
 };
 
 class unreachable_recovery_authority_source final
@@ -1873,6 +1952,126 @@ void check_run_authority_rehydration()
 }
 
 
+
+void check_stored_construction_recovery()
+{
+  test_support::temporary_directory temporary;
+  const auto state_path = temporary.path() / "state";
+  test_support::initialize_state(state_path);
+  pkgstate::posix::canonical_generation_store state_store(
+      state_path, test_support::binding());
+
+  const std::string payload = "stored construction recovery payload\n";
+  auto transaction = transaction_session(
+      tool_source(sha256_text(payload), "1.0", false),
+      dependency_source(), state_store.read(), state_path);
+  auto progress = pkgctl::transaction_progress::begin(transaction);
+  auto session = construction_session_without_inputs(
+      transaction, temporary.path() / "construction");
+  test_support::write(session.paths().local_source_root / "payload", payload);
+
+  auto run = pkgctl::transaction_run::begin(
+      progress, pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, journal_nonce(218U));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(218U));
+  CHECK(reservation.dispatch.has_value());
+  if (!reservation.dispatch)
+    return;
+  auto reserved = admitted.successor(reservation.run);
+  auto started_run = pkgctl::start_construction_dispatch(
+      reservation.run, *reservation.dispatch, session);
+  auto started = reserved.successor(started_run);
+
+  fixture_backend backend(backend_mode::succeed);
+  pkgctl::native_construction_driver driver(backend);
+  auto result = pkgctl::execute_construction(session, driver);
+
+  const auto evidence_path = temporary.path() / "evidence";
+  std::filesystem::create_directory(evidence_path);
+  auto evidence = pkgctl::construction_dispatch_evidence_record::admit(
+      started, *reservation.dispatch, result);
+  {
+    auto writer = pkgctl::posix_transaction_run_evidence_store::open(
+        evidence_path.string());
+    CHECK(writer.publish(evidence).identity() == evidence.identity());
+  }
+  auto evidence_store = pkgctl::posix_transaction_run_evidence_store::open(
+      evidence_path.string());
+
+  auto checkpoint = pkgctl::transaction_run_restart_checkpoint::make(
+      started_run.progress(), started);
+  construction_recovery_context_source context(result);
+  pkgctl::stored_transaction_dispatch_recovery_authority_source recovery_source(
+      evidence_store, context);
+  auto recovery = pkgctl::acquire_transaction_dispatch_recovery_authority(
+      checkpoint, *reservation.dispatch, recovery_source);
+  CHECK(context.calls() == 1U);
+  CHECK(recovery.construction() != nullptr);
+  if (recovery.construction())
+  {
+    CHECK(recovery.construction()->identity() == result.identity());
+    CHECK(recovery.construction()->session().identity() ==
+          result.session().identity());
+    CHECK(recovery.construction()->materialization().identity() ==
+          result.materialization().identity());
+    CHECK(pkgbuild_exec::encode_build_execution_result(
+              recovery.construction()->build()) ==
+          pkgbuild_exec::encode_build_execution_result(result.build()));
+  }
+
+  const auto empty_path = temporary.path() / "empty-evidence";
+  std::filesystem::create_directory(empty_path);
+  auto empty_store = pkgctl::posix_transaction_run_evidence_store::open(
+      empty_path.string());
+  construction_recovery_context_source unused_context(result);
+  pkgctl::stored_transaction_dispatch_recovery_authority_source missing_source(
+      empty_store, unused_context);
+  bool missing = false;
+  try
+  {
+    (void)pkgctl::acquire_transaction_dispatch_recovery_authority(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started_run.progress(), started),
+        *reservation.dispatch, missing_source);
+  }
+  catch (const pkgctl::transaction_run_evidence_error& problem)
+  {
+    missing = problem.code() ==
+        pkgctl::transaction_run_evidence_error_code::evidence_missing;
+  }
+  CHECK(missing);
+  CHECK(unused_context.calls() == 0U);
+
+  auto foreign_transaction = transaction_session(
+      tool_source(sha256_text(payload), "2.0", false),
+      dependency_source(), state_store.read(), state_path);
+  auto foreign_session = construction_session_without_inputs(
+      foreign_transaction, temporary.path() / "foreign");
+  test_support::write(
+      foreign_session.paths().local_source_root / "payload", payload);
+  auto foreign_result = pkgctl::execute_construction(foreign_session, driver);
+  construction_recovery_context_source foreign_context(foreign_result);
+  pkgctl::stored_transaction_dispatch_recovery_authority_source foreign_source(
+      evidence_store, foreign_context);
+  bool mismatched = false;
+  try
+  {
+    (void)pkgctl::acquire_transaction_dispatch_recovery_authority(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started_run.progress(), started),
+        *reservation.dispatch, foreign_source);
+  }
+  catch (const pkgctl::transaction_run_evidence_error& problem)
+  {
+    mismatched = problem.code() ==
+        pkgctl::transaction_run_evidence_error_code::
+            recovery_context_mismatch;
+  }
+  CHECK(mismatched);
+  CHECK(foreign_context.calls() == 1U);
+}
+
 void check_single_step_transaction_advancement()
 {
   test_support::temporary_directory temporary;
@@ -1930,7 +2129,8 @@ void check_single_step_transaction_advancement()
     CHECK(progress_source.calls() == 1U);
     CHECK(execution_source.calls() == 1U);
     CHECK(trace == std::vector<std::string>({
-        "run-1", "run-2", "materialize", "build", "run-3"}));
+        "run-1", "run-2", "materialize", "build",
+        "evidence-construction", "run-3"}));
   }
 
   {
@@ -2209,6 +2409,106 @@ void check_canonical_transaction_dispatch_nonce_authority()
 }
 
 
+void check_posix_transaction_run_runtime_recovery()
+{
+  test_support::temporary_directory temporary;
+  const auto state_path = temporary.path() / "state";
+  test_support::initialize_state(state_path);
+  pkgstate::posix::canonical_generation_store state_store(
+      state_path, test_support::binding());
+
+  const std::string payload = "runtime recovered construction payload\n";
+  auto transaction = transaction_session(
+      tool_source(sha256_text(payload), "1.0", false), {},
+      state_store.read(), state_path);
+  auto progress = pkgctl::transaction_progress::begin(transaction);
+  auto session = construction_session_without_inputs(
+      transaction, temporary.path() / "construction");
+  test_support::write(session.paths().local_source_root / "payload", payload);
+
+  auto run = pkgctl::transaction_run::begin(
+      progress, pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, journal_nonce(219U));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(219U));
+  CHECK(reservation.dispatch.has_value());
+  if (!reservation.dispatch)
+    return;
+  auto reserved = admitted.successor(reservation.run);
+  auto started_run = pkgctl::start_construction_dispatch(
+      reservation.run, *reservation.dispatch, session);
+  auto started = reserved.successor(started_run);
+
+  fixture_backend execution_backend(backend_mode::succeed);
+  pkgctl::native_construction_driver driver(execution_backend);
+  auto result = pkgctl::execute_construction(session, driver);
+  auto evidence = pkgctl::construction_dispatch_evidence_record::admit(
+      started, *reservation.dispatch, result);
+
+  const auto run_path = temporary.path() / "run-store";
+  const auto evidence_path = temporary.path() / "evidence-store";
+  const auto effect_path = temporary.path() / "effect-store";
+  const auto lock_path = temporary.path() / "target-locks";
+  std::filesystem::create_directory(run_path);
+  std::filesystem::create_directory(evidence_path);
+  std::filesystem::create_directory(effect_path);
+  std::filesystem::create_directory(lock_path);
+
+  {
+    auto run_store = pkgctl::posix_transaction_run_journal_store::open(
+        run_path.string());
+    CHECK(run_store.append(admitted).identity() == admitted.identity());
+    CHECK(run_store.append(reserved).identity() == reserved.identity());
+    CHECK(run_store.append(started).identity() == started.identity());
+  }
+  {
+    auto evidence_store = pkgctl::posix_transaction_run_evidence_store::open(
+        evidence_path.string());
+    CHECK(evidence_store.publish(evidence).identity() == evidence.identity());
+  }
+
+  fixed_progress_source progress_source(started_run.progress());
+  construction_execution_authority_source execution(session);
+  construction_recovery_context_source recovery(result);
+  forbidden_runtime_archive_source archives;
+  unreachable_runtime_application_backend application_backend;
+
+  const int run_fd = open_runtime_directory(run_path);
+  const int evidence_fd = open_runtime_directory(evidence_path);
+  const int effect_fd = open_runtime_directory(effect_path);
+  const int lock_fd = open_runtime_directory(lock_path);
+  auto runtime = pkgctl::posix_transaction_run_runtime::from_directory_fds(
+      run_fd, evidence_fd, effect_fd, lock_fd,
+      {progress_source, execution, recovery, archives},
+      {execution_backend, execution_backend, application_backend,
+       execution_backend, state_store});
+  CHECK(::close(run_fd) == 0);
+  CHECK(::close(evidence_fd) == 0);
+  CHECK(::close(effect_fd) == 0);
+  CHECK(::close(lock_fd) == 0);
+
+  const auto recovered = runtime->drive(
+      admitted.journal(), pkgctl::transaction_run_drive_policy::make(1U));
+  CHECK(recovered.disposition() ==
+        pkgctl::transaction_run_drive_disposition::completed);
+  CHECK(recovered.steps().size() == 1U);
+  CHECK(recovered.steps().front().disposition() ==
+        pkgctl::transaction_run_advance_disposition::reconciled_construction);
+  CHECK(recovered.steps().front().construction() != nullptr);
+  CHECK(recovered.steps().front().construction() &&
+        recovered.steps().front().construction()->identity() ==
+            result.identity());
+  CHECK(recovered.record().sequence() == 3U);
+  CHECK(recovered.run().progress().complete());
+  CHECK(progress_source.calls() == 1U);
+  CHECK(execution.calls() == 0U);
+  CHECK(recovery.calls() == 1U);
+  CHECK(archives.calls() == 0U);
+  CHECK(directory_entry_count(effect_path) == 0U);
+  CHECK(directory_entry_count(lock_path) == 0U);
+}
+
+
 void check_posix_transaction_run_runtime()
 {
   test_support::temporary_directory temporary;
@@ -2228,7 +2528,7 @@ void check_posix_transaction_run_runtime()
 
   fixed_progress_source progress_source(progress);
   construction_execution_authority_source execution(std::move(session));
-  unreachable_recovery_authority_source recovery;
+  unreachable_recovery_context_source recovery;
   forbidden_runtime_archive_source archives;
   fixture_backend execution_backend(backend_mode::succeed);
   unreachable_runtime_application_backend application_backend;
@@ -2936,8 +3236,10 @@ int main()
     check_transaction_run_evidence_storage();
     check_durable_restart_reconciliation();
     check_run_authority_rehydration();
+    check_stored_construction_recovery();
     check_single_step_transaction_advancement();
     check_canonical_transaction_dispatch_nonce_authority();
+    check_posix_transaction_run_runtime_recovery();
     check_posix_transaction_run_runtime();
     check_durable_transaction_run_admission();
     check_bounded_serial_transaction_drive();

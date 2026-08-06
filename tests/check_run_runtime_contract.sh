@@ -26,7 +26,8 @@ for required in \
   'canonical_transaction_dispatch_nonce_source dispatch_nonces_' \
   'transaction_progress_rehydration_source& progress' \
   'transaction_dispatch_execution_authority_source& execution' \
-  'transaction_dispatch_recovery_authority_source& recovery' \
+  'transaction_dispatch_recovery_context_source& recovery' \
+  'stored_transaction_dispatch_recovery_authority_source recovery_' \
   'transaction_effect_archive_source& archives' \
   'struct transaction_run_runtime_backends final' \
   'class posix_transaction_run_runtime final' \
