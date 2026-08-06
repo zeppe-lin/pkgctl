@@ -267,13 +267,26 @@ pkgctl::construction_session construction_session_for(
       });
 }
 
+void stage_fixture_source(
+    const pkgctl::construction_session& session,
+    const std::string& payload)
+{
+  const auto& sources = session.request().source().recipe().sources();
+  if (sources.empty())
+    return;
+  if (sources.size() != 1U ||
+      sources.front().kind() != pkgsource::source_input_kind::local)
+    throw std::runtime_error(
+        "run journal fixture requires one package-local source");
+  test_support::write(
+      session.paths().local_source_root / sources.front().location(), payload);
+}
+
 pkgctl::construction_result execute_build(
     const pkgctl::construction_session& session,
     const std::string& payload)
 {
-  if (!session.request().source().recipe().sources().empty())
-    test_support::write(
-        session.paths().local_source_root / "payload", payload);
+  stage_fixture_source(session, payload);
   fixture_backend backend(backend_mode::succeed);
   pkgctl::native_construction_driver driver(backend);
   return pkgctl::execute_construction(session, driver);
@@ -419,6 +432,7 @@ void check_read_only_run_inspection()
   CHECK(started_report.find("run.external-evidence-required=true\n") !=
         std::string::npos);
 
+  stage_fixture_source(session, value.payload);
   fixture_backend failed_backend(backend_mode::fail);
   pkgctl::native_construction_driver failed_driver(failed_backend);
   const auto failed_result = pkgctl::execute_construction(session, failed_driver);
