@@ -507,11 +507,7 @@ pkgplan::installation_plan installation_plan(
   const pkgplan::package_path path = pkgplan::package_path::parse("tool");
   const auto archive = incoming.image().receipt().archive_digest();
   pkgplan::installation_request request(
-      incoming.candidate(),
-      pkgplan::artifact_package_fact(
-          translate_identity<pkgplan::artifact_identity>(archive),
-          plan_identity<pkgplan::artifact_manifest_identity>(73),
-          incoming.candidate().release()),
+      incoming.candidate(), incoming.artifact(),
       archive, incoming.image(),
       translate_identity<pkgplan::installed_state_snapshot_identity>(
           expected.identity()),
@@ -545,11 +541,7 @@ pkgplan::upgrade_plan upgrade_plan(
   const auto archive = incoming.image().receipt().archive_digest();
   pkgplan::upgrade_request request(
       planner_installed(expected, installed), incoming.candidate(),
-      pkgplan::artifact_package_fact(
-          translate_identity<pkgplan::artifact_identity>(archive),
-          plan_identity<pkgplan::artifact_manifest_identity>(77),
-          incoming.candidate().release()),
-      archive, incoming.image(),
+      incoming.artifact(), archive, incoming.image(),
       translate_identity<pkgplan::installed_state_snapshot_identity>(
           expected.identity()),
       planner_ownership(expected, installed), target,
