@@ -23,9 +23,14 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.21.0 retains the native catalog, resolution, transaction, and exact
-durable transaction-run inspection commands and exposes the existing durable
-effect-attempt sensor through one exact read-only command.
+Version 0.28.0 retains the native catalog, resolution, transaction, and exact
+durable run/effect inspection commands. The command surface remains read-only.
+The controller library now persists exact construction/check execution evidence
+between started dispatch ownership and terminal run retirement, but no command
+creates, discovers, or rehydrates those records.
+
+Version 0.21.0 introduced the exact durable effect-attempt inspection command
+alongside the existing run-inspection command; both remain read-only sensors.
 
 The controller library also defines exact one-candidate construction,
 transaction progression, immutable dispatch ownership, durable transaction-run
@@ -42,11 +47,18 @@ Library clients may advance one durable journal by reconciling retained ownershi
 or, only when the run is quiescent, reserving and realizing one canonical
 policy-allowed unit through injected authorities, drivers, and stores. No
 scheduler, worker, unbounded executor, or mutating command is provided.
-Preparation can inspect exact artifact bytes and seal
-package-local plan/application handoffs when called by a library client. All
+Preparation consumes retained build/image admission and the pure
+build-plan projection to seal package-local plan/application handoffs when
+called by a library client; it does not reopen artifact bytes. All
 executable commands remain read-only: they never initialize or publish state,
 materialize sources, build packages, inspect artifacts, plan package changes,
 execute lifecycle programs, or apply mutations.
+
+Version 0.28.0 changes no command syntax. Construction and check execution
+now publish one exact typed evidence record before terminal run retirement. The
+POSIX runtime retains a fourth caller-opened directory authority for those
+records. The store preserves canonical bytes and context identities but does
+not reconstruct semantic results or discover missing resources.
 
 Version 0.27.0 changes no command syntax. It corrects internal authority
 composition: construction and check resources bind resolver-issued logical

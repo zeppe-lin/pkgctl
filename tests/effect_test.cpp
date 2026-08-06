@@ -4292,6 +4292,7 @@ void check_single_step_operation_advancement()
     std::vector<std::string> trace;
     sequenced_effect_store effect_store(trace);
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     driver actuator(
         value.projection, value.outer_lease, value.receipt, value.store);
     fixed_effect_driver_source driver_source(actuator, trace);
@@ -4299,7 +4300,7 @@ void check_single_step_operation_advancement()
     const auto advanced = pkgctl::advance_transaction_run_once(
         admitted.journal(), dispatch_nonce(101U),
         {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, &driver_source}, {run_store, &effect_store});
+        {nullptr, nullptr, &driver_source}, {run_store, evidence_store, &effect_store});
 
     CHECK(advanced.disposition() ==
           pkgctl::transaction_run_advance_disposition::executed_operation);
@@ -4366,6 +4367,7 @@ void check_single_step_operation_advancement()
     std::vector<std::string> trace;
     sequenced_effect_store effect_store(trace);
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     rejecting_effect_driver_source driver_source(trace);
 
     bool rejected = false;
@@ -4374,7 +4376,7 @@ void check_single_step_operation_advancement()
       (void)pkgctl::advance_transaction_run_once(
           admitted.journal(), dispatch_nonce(106U),
           {progress_source, execution_source, recovery_source},
-          {nullptr, nullptr, &driver_source}, {run_store, &effect_store});
+          {nullptr, nullptr, &driver_source}, {run_store, evidence_store, &effect_store});
     }
     catch (const std::runtime_error& problem)
     {
@@ -4408,6 +4410,7 @@ void check_single_step_operation_advancement()
     std::vector<std::string> trace;
     sequenced_effect_store effect_store(trace);
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     driver actuator(
         value.projection, value.outer_lease, value.receipt, value.store);
     value.outer_lease.release();
@@ -4419,7 +4422,7 @@ void check_single_step_operation_advancement()
       (void)pkgctl::advance_transaction_run_once(
           admitted.journal(), dispatch_nonce(107U),
           {progress_source, execution_source, recovery_source},
-          {nullptr, nullptr, &driver_source}, {run_store, &effect_store});
+          {nullptr, nullptr, &driver_source}, {run_store, evidence_store, &effect_store});
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -4446,6 +4449,7 @@ void check_single_step_operation_advancement()
     std::vector<std::string> trace;
     sequenced_effect_store effect_store(trace);
     run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     const auto started = pkgctl::commit_operation_dispatch_start(
         reserved, reservation.run, *reservation.dispatch, session,
         effect_nonce(102U), effect_store, run_store);
@@ -4466,7 +4470,7 @@ void check_single_step_operation_advancement()
     const auto reconciled = pkgctl::advance_transaction_run_once(
         started.run_record.journal(), dispatch_nonce(103U),
         {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, &driver_source}, {run_store, &effect_store});
+        {nullptr, nullptr, &driver_source}, {run_store, evidence_store, &effect_store});
 
     CHECK(reconciled.disposition() ==
           pkgctl::transaction_run_advance_disposition::reconciled_operation);
@@ -4507,6 +4511,7 @@ void check_single_step_operation_advancement()
     std::vector<std::string> trace;
     sequenced_effect_store effect_store(trace);
     run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     const auto started = pkgctl::commit_operation_dispatch_start(
         reserved, reservation.run, *reservation.dispatch, session,
         effect_nonce(108U), effect_store, run_store);
@@ -4533,7 +4538,7 @@ void check_single_step_operation_advancement()
     const auto reconciled = pkgctl::advance_transaction_run_once(
         started.run_record.journal(), dispatch_nonce(109U),
         {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, &driver_source}, {run_store, &effect_store});
+        {nullptr, nullptr, &driver_source}, {run_store, evidence_store, &effect_store});
 
     CHECK(reconciled.disposition() ==
           pkgctl::transaction_run_advance_disposition::reconciled_operation);
@@ -4561,6 +4566,7 @@ void check_single_step_operation_advancement()
     std::vector<std::string> trace;
     sequenced_effect_store effect_store(trace);
     run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     const auto started = pkgctl::commit_operation_dispatch_start(
         reserved, reservation.run, *reservation.dispatch, session,
         effect_nonce(104U), effect_store, run_store);
@@ -4582,7 +4588,7 @@ void check_single_step_operation_advancement()
     const auto unresolved = pkgctl::advance_transaction_run_once(
         started.run_record.journal(), dispatch_nonce(105U),
         {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, &driver_source}, {run_store, &effect_store});
+        {nullptr, nullptr, &driver_source}, {run_store, evidence_store, &effect_store});
 
     CHECK(unresolved.disposition() ==
           pkgctl::transaction_run_advance_disposition::
@@ -4612,7 +4618,7 @@ void check_single_step_operation_advancement()
         started.run_record.journal(),
         pkgctl::transaction_run_drive_policy::make(4U), nonces,
         {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, &driver_source}, {run_store, &effect_store});
+        {nullptr, nullptr, &driver_source}, {run_store, evidence_store, &effect_store});
     CHECK(driven.disposition() ==
           pkgctl::transaction_run_drive_disposition::
               external_resolution_required);

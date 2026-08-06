@@ -35,6 +35,7 @@ for required in \
   'explicit_run_nonce_source' \
   'transaction_run_drive_result drive(' \
   'posix_transaction_run_journal_store::from_directory_fd' \
+  'posix_transaction_run_evidence_store::from_directory_fd' \
   'posix_effect_journal_store::from_directory_fd' \
   'posix_transaction_effect_driver_source::from_lock_directory_fd' \
   'native_construction_driver' \
@@ -60,6 +61,7 @@ body=$(sed -n '/implementation(/,/^  }/p' "$source")
 previous=0
 for token in \
   'posix_transaction_run_journal_store::from_directory_fd' \
+  'posix_transaction_run_evidence_store::from_directory_fd' \
   'posix_effect_journal_store::from_directory_fd' \
   'posix_transaction_effect_driver_source::from_lock_directory_fd'; do
   line=$(printf '%s\n' "$body" | awk -v token="$token" -v previous="$previous" \
@@ -75,6 +77,7 @@ for required_test in \
   'check_posix_transaction_run_runtime' \
   'posix_transaction_run_runtime::from_directory_fds' \
   'std::filesystem::rename(run_path, selected_run_path)' \
+  'std::filesystem::rename(evidence_path, selected_evidence_path)' \
   'runtime->launch(' \
   'journal_nonce(211U)' \
   'result.record().nonce() == journal_nonce(211U)' \
@@ -84,6 +87,8 @@ for required_test in \
   'executed_construction' \
   'archives.calls() == 0U' \
   'directory_entry_count(run_path) == 0U' \
+  'directory_entry_count(selected_evidence_path) >= 3U' \
+  'directory_entry_count(evidence_path) == 0U' \
   'directory_entry_count(effect_path) == 0U' \
   'directory_entry_count(lock_path) == 0U' \
   'transaction_run_journal_error_code::store_open_failed'; do
@@ -96,7 +101,8 @@ done
 for required_doc in \
   'Caller-configured POSIX transaction-run runtime' \
   'Release 0.25.0 native transaction-run runtime boundary' \
-  'CALLER-CONFIGURED POSIX TRANSACTION-RUN RUNTIME'; do
+  'CALLER-CONFIGURED POSIX TRANSACTION-RUN RUNTIME' \
+  'construction/check evidence directory'; do
   grep -F "$required_doc" "$srcdir/CHANGELOG.md" "$design" "$manual" \
       >/dev/null || {
     echo "missing POSIX transaction-run runtime documentation: $required_doc" >&2

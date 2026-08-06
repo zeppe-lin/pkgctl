@@ -3,9 +3,9 @@
 #include <pkgctl/version.h>
 #include <string_view>
 static_assert(pkgctl::version_major == 0);
-static_assert(pkgctl::version_minor == 27);
+static_assert(pkgctl::version_minor == 28);
 static_assert(pkgctl::version_patch == 0);
 int main()
 {
-  return std::string_view(pkgctl::version_string) == "0.27.0" ? 0 : 1;
+  return std::string_view(pkgctl::version_string) == "0.28.0" ? 0 : 1;
 }

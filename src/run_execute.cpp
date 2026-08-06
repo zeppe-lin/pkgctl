@@ -17,6 +17,7 @@ execute_construction_dispatch_durable(
     const transaction_dispatch& dispatch,
     construction_session session,
     construction_driver& driver,
+    transaction_run_evidence_store& evidence_store,
     transaction_run_journal_store& run_store)
 {
   auto started = start_construction_dispatch(
@@ -25,6 +26,9 @@ execute_construction_dispatch_durable(
       current_record, std::move(started), run_store);
 
   auto result = execute_construction(std::move(session), driver);
+  auto admitted_evidence = construction_dispatch_evidence_record::admit(
+      started_checkpoint.record, dispatch, result);
+  auto evidence = evidence_store.publish(admitted_evidence);
   auto completed = complete_construction_dispatch(
       std::move(started_checkpoint.run), dispatch, result);
   auto completed_checkpoint = commit_transaction_run_successor(
@@ -33,7 +37,8 @@ execute_construction_dispatch_durable(
   return construction_dispatch_execution_checkpoint{
       std::move(completed_checkpoint.run),
       std::move(completed_checkpoint.record),
-      std::move(result)};
+      std::move(result),
+      std::move(evidence)};
 }
 
 check_dispatch_execution_checkpoint
@@ -43,6 +48,7 @@ execute_check_dispatch_durable(
     const transaction_dispatch& dispatch,
     transaction_check_session session,
     transaction_check_driver& driver,
+    transaction_run_evidence_store& evidence_store,
     transaction_run_journal_store& run_store)
 {
   auto started = start_check_dispatch(
@@ -51,6 +57,9 @@ execute_check_dispatch_durable(
       current_record, std::move(started), run_store);
 
   auto result = execute_transaction_check(std::move(session), driver);
+  auto admitted_evidence = check_dispatch_evidence_record::admit(
+      started_checkpoint.record, dispatch, result);
+  auto evidence = evidence_store.publish(admitted_evidence);
   auto completed = complete_check_dispatch(
       std::move(started_checkpoint.run), dispatch, result);
   auto completed_checkpoint = commit_transaction_run_successor(
@@ -59,7 +68,8 @@ execute_check_dispatch_durable(
   return check_dispatch_execution_checkpoint{
       std::move(completed_checkpoint.run),
       std::move(completed_checkpoint.record),
-      std::move(result)};
+      std::move(result),
+      std::move(evidence)};
 }
 
 operation_dispatch_execution_checkpoint

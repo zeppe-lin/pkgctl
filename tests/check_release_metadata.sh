@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.27.0
+version=0.28.0
 
 require_line()
 {
@@ -20,22 +20,22 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 27;'
+  'inline constexpr unsigned version_minor = 28;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.27.0";'
+  'inline constexpr const char* version_string = "0.28.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 27);'
+  'static_assert(pkgctl::version_minor == 28);'
 
-grep -F '## 0.27.0 - 2026-08-05' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.27.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.27.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.28.0 - 2026-08-06' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.28.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.28.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
-grep -F 'resolver-issued authority' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'libpkgbuild-image' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'no imaginary legacy history is decoded' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Version 0.27.0 derives every logical construction and check input' \
+grep -F 'construction/check evidence' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'descriptor-anchored evidence store' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'no semantic result is reconstructed from identities' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Version 0.28.0 commits construction and check evidence' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 for contract in \

@@ -86,6 +86,7 @@ struct transaction_run_advance_drivers final {
 /*! \brief Caller-owned durable stores used by one advancement step. */
 struct transaction_run_advance_stores final {
   transaction_run_journal_store& runs;
+  transaction_run_evidence_store& evidence;
   effect_journal_store* effects;
 };
 

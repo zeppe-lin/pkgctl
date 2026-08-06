@@ -23,6 +23,10 @@ for required in \
   'construction_dispatch_execution_checkpoint' \
   'check_dispatch_execution_checkpoint' \
   'operation_dispatch_execution_checkpoint' \
+  'transaction_run_evidence_store& evidence_store' \
+  'construction_dispatch_evidence_record::admit' \
+  'check_dispatch_evidence_record::admit' \
+  'evidence_store.publish' \
   'execute_construction_dispatch_durable' \
   'execute_check_dispatch_durable' \
   'execute_operation_dispatch_durable' \
@@ -67,6 +71,8 @@ ordered_tokens "$construction_body" \
   'start_construction_dispatch' \
   'commit_transaction_run_successor' \
   'execute_construction' \
+  'construction_dispatch_evidence_record::admit' \
+  'evidence_store.publish' \
   'complete_construction_dispatch' \
   'commit_transaction_run_successor'
 
@@ -75,6 +81,8 @@ ordered_tokens "$check_body" \
   'start_check_dispatch' \
   'commit_transaction_run_successor' \
   'execute_transaction_check' \
+  'check_dispatch_evidence_record::admit' \
+  'evidence_store.publish' \
   'complete_check_dispatch' \
   'commit_transaction_run_successor'
 
@@ -91,6 +99,10 @@ ordered_tokens "$operation_body" \
 for required_test in \
   'injected run-store failure' \
   'injected effect-store failure' \
+  'injected construction-evidence failure' \
+  'injected check-evidence failure' \
+  'evidence-construction' \
+  'evidence-check' \
   'recover_construction' \
   'recover_check' \
   'inspect_effect_journal' \

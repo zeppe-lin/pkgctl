@@ -23,6 +23,7 @@ for required in \
   'transaction_run_advance_authorities' \
   'transaction_run_advance_drivers' \
   'transaction_run_advance_stores' \
+  'transaction_run_evidence_store& evidence' \
   'transaction_run_advance_disposition' \
   'transaction_run_operation_advance_evidence' \
   'transaction_run_advance_evidence' \
@@ -43,6 +44,7 @@ for required in \
   'execute_construction_dispatch_durable' \
   'execute_check_dispatch_durable' \
   'execute_operation_dispatch_durable' \
+  'stores.evidence' \
   'run advancement journal has no committed store head' \
   'run store returned foreign advancement authority' \
   'quiescent advancement carries dispatch or semantic evidence' \
@@ -116,6 +118,8 @@ for required_test in \
   'executed_operation' \
   'reconciled_operation' \
   'external_resolution_required' \
+  'evidence-construction' \
+  'evidence-check' \
   'run-1' \
   'run-2' \
   'run-3'; do

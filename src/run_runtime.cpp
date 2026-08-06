@@ -30,6 +30,7 @@ class posix_transaction_run_runtime::implementation final {
 public:
   implementation(
       int run_store_directory_fd,
+      int evidence_store_directory_fd,
       int effect_store_directory_fd,
       int target_lock_directory_fd,
       transaction_run_runtime_authorities authorities,
@@ -37,6 +38,8 @@ public:
       : authorities_(authorities),
         runs_(posix_transaction_run_journal_store::from_directory_fd(
             run_store_directory_fd)),
+        evidence_(posix_transaction_run_evidence_store::from_directory_fd(
+            evidence_store_directory_fd)),
         effects_(posix_effect_journal_store::from_directory_fd(
             effect_store_directory_fd)),
         construction_(backends.construction), check_(backends.check),
@@ -85,11 +88,12 @@ private:
 
   transaction_run_advance_stores stores() noexcept
   {
-    return transaction_run_advance_stores{runs_, &effects_};
+    return transaction_run_advance_stores{runs_, evidence_, &effects_};
   }
 
   transaction_run_runtime_authorities authorities_;
   posix_transaction_run_journal_store runs_;
+  posix_transaction_run_evidence_store evidence_;
   posix_effect_journal_store effects_;
   native_construction_driver construction_;
   native_transaction_check_driver check_;
@@ -100,14 +104,16 @@ private:
 std::unique_ptr<posix_transaction_run_runtime>
 posix_transaction_run_runtime::from_directory_fds(
     int run_store_directory_fd,
+    int evidence_store_directory_fd,
     int effect_store_directory_fd,
     int target_lock_directory_fd,
     transaction_run_runtime_authorities authorities,
     transaction_run_runtime_backends backends)
 {
   auto state = std::make_unique<implementation>(
-      run_store_directory_fd, effect_store_directory_fd,
-      target_lock_directory_fd, authorities, backends);
+      run_store_directory_fd, evidence_store_directory_fd,
+      effect_store_directory_fd, target_lock_directory_fd,
+      authorities, backends);
   return std::unique_ptr<posix_transaction_run_runtime>(
       new posix_transaction_run_runtime(std::move(state)));
 }

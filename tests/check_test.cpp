@@ -1058,16 +1058,18 @@ void check_durable_dispatch_execution()
 
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     check_backend backend(check_backend_mode::pass);
     pkgctl::native_transaction_check_driver native_driver(backend);
     tracing_check_driver driver(native_driver, trace);
     const auto completed = pkgctl::execute_check_dispatch_durable(
         reserved, reservation.run, *reservation.dispatch,
-        session, driver, run_store);
+        session, driver, evidence_store, run_store);
 
     CHECK(trace == std::vector<std::string>(
-        {"run-1", "check", "run-2"}));
+        {"run-1", "check", "evidence-check", "run-2"}));
     CHECK(completed.result.succeeded());
+    CHECK(completed.evidence.result() == completed.result.identity());
     CHECK(completed.record.sequence() == reserved.sequence() + 2U);
     CHECK(completed.run.records().size() == 1U);
     if (completed.run.records().size() == 1U)
@@ -1078,6 +1080,25 @@ void check_durable_dispatch_execution()
             std::optional<pkgctl::session_identity>(
                 completed.result.identity()));
     }
+
+    const auto encoding = pkgctl::encode_check_dispatch_evidence(
+        completed.evidence);
+    const auto decoded = pkgctl::decode_check_dispatch_evidence(encoding);
+    CHECK(decoded.identity() == completed.evidence.identity());
+    CHECK(decoded.encoding() == completed.evidence.encoding());
+    CHECK(pkgctl::encode_check_dispatch_evidence(decoded) == encoding);
+
+    const auto evidence_path = temporary.path() / "check-evidence";
+    fs::create_directory(evidence_path);
+    auto durable_store = pkgctl::posix_transaction_run_evidence_store::open(
+        evidence_path.string());
+    CHECK(durable_store.publish(completed.evidence).identity() ==
+          completed.evidence.identity());
+    const auto loaded = durable_store.load_check(
+        completed.evidence.journal(), completed.evidence.dispatch(),
+        completed.evidence.attempt_session());
+    CHECK(loaded.has_value());
+    CHECK(loaded && loaded->identity() == completed.evidence.identity());
   }
 
   {
@@ -1091,6 +1112,7 @@ void check_durable_dispatch_execution()
 
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace, 1U);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     check_backend backend(check_backend_mode::pass);
     pkgctl::native_transaction_check_driver native_driver(backend);
     tracing_check_driver driver(native_driver, trace);
@@ -1099,7 +1121,7 @@ void check_durable_dispatch_execution()
     {
       (void)pkgctl::execute_check_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch,
-          session, driver, run_store);
+          session, driver, evidence_store, run_store);
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -1122,6 +1144,7 @@ void check_durable_dispatch_execution()
 
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace, 2U);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     check_backend backend(check_backend_mode::pass);
     pkgctl::native_transaction_check_driver native_driver(backend);
     tracing_check_driver driver(native_driver, trace);
@@ -1130,7 +1153,7 @@ void check_durable_dispatch_execution()
     {
       (void)pkgctl::execute_check_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch,
-          session, driver, run_store);
+          session, driver, evidence_store, run_store);
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -1139,7 +1162,58 @@ void check_durable_dispatch_execution()
     }
     CHECK(failed);
     CHECK(trace == std::vector<std::string>(
-        {"run-1", "check", "run-2"}));
+        {"run-1", "check", "evidence-check", "run-2"}));
+    CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
+    const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
+        reservation.run.progress(), run_store.latest()).assessment();
+    CHECK(assessment.active().size() == 1U);
+    if (assessment.active().size() == 1U)
+    {
+      CHECK(assessment.active().front().disposition() ==
+            pkgctl::transaction_dispatch_restart_disposition::recover_check);
+    }
+    CHECK(!run_store.latest().dispatches().empty());
+    if (!run_store.latest().dispatches().empty() &&
+        run_store.latest().dispatches().front().attempt_session())
+    {
+      const auto retained = evidence_store.load_check(
+          run_store.latest().journal(), reservation.dispatch->identity(),
+          *run_store.latest().dispatches().front().attempt_session());
+      CHECK(retained.has_value());
+    }
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_ready_check(temporary.path());
+    auto resources = resources_for(
+        fixture.construction, temporary.path() / "check");
+    auto session = admit_check(
+        fixture.progress, fixture.transaction, std::move(resources));
+    auto [reservation, reserved] = reserve_check(fixture, 45U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    run_execute_support::sequenced_evidence_store evidence_store(
+        trace, false, true);
+    check_backend backend(check_backend_mode::pass);
+    pkgctl::native_transaction_check_driver native_driver(backend);
+    tracing_check_driver driver(native_driver, trace);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_check_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch,
+          session, driver, evidence_store, run_store);
+    }
+    catch (const pkgctl::transaction_run_evidence_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_evidence_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>(
+        {"run-1", "check", "evidence-check"}));
     CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
     const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
         reservation.run.progress(), run_store.latest()).assessment();
@@ -1162,6 +1236,7 @@ void check_durable_dispatch_execution()
 
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     throwing_driver escaped;
     tracing_check_driver driver(escaped, trace);
     bool failed = false;
@@ -1169,7 +1244,7 @@ void check_durable_dispatch_execution()
     {
       (void)pkgctl::execute_check_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch,
-          session, driver, run_store);
+          session, driver, evidence_store, run_store);
     }
     catch (const pkgctl::error& problem)
     {
@@ -1426,12 +1501,13 @@ void check_single_step_check_advancement()
     unreachable_check_recovery_source recovery_source;
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     tracing_check_driver driver(native_driver, trace);
 
     const auto advanced = pkgctl::advance_transaction_run_once(
         admitted.journal(), dispatch_nonce(71U),
         {progress_source, execution_source, recovery_source},
-        {nullptr, &driver, nullptr}, {run_store, nullptr});
+        {nullptr, &driver, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(advanced.disposition() ==
           pkgctl::transaction_run_advance_disposition::executed_check);
@@ -1465,11 +1541,12 @@ void check_single_step_check_advancement()
     check_recovery_authority_source recovery_source(result);
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(started, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     const auto reconciled = pkgctl::advance_transaction_run_once(
         started.journal(), dispatch_nonce(73U),
         {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, nullptr}, {run_store, nullptr});
+        {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(reconciled.disposition() ==
           pkgctl::transaction_run_advance_disposition::reconciled_check);

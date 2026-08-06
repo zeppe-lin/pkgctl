@@ -13,6 +13,60 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.28.0 durable construction/check evidence boundary
+
+Release 0.28.0 closes the physical durability gap between successful
+construction/check execution and terminal transaction-run retirement.
+
+```text
+committed reserved dispatch
+            |
+            v
+commit exact started run successor
+            |
+            v
+execute admitted construction/check session
+            |
+            v
+admit typed dispatch evidence record
+            |
+            v
+persist immutable canonical result bytes
+            |
+            v
+persist immutable journal/dispatch/attempt index
+            |
+            v
+commit terminal run successor
+```
+
+The evidence record binds the exact run journal, transaction, dispatch, graph
+node, attempt session, controller result, original controller request, and every
+subordinate request/backend/execution/result identity needed to validate later
+rehydration. Its payload is the existing canonical encoding produced by
+`libpkgbuild-exec` or `libpkgcheck-exec`; `pkgctl` does not invent another build
+or check serialization.
+
+The POSIX store publishes the content object before the typed index and
+synchronizes both directory transitions. Exact retries are idempotent. A
+conflicting record for one journal/dispatch/attempt, a corrupt index, a missing
+indexed object, or altered content fails closed. Descriptor anchoring preserves
+the selected store authority if its original pathname is renamed or replaced.
+
+This closes durable observation, not semantic resurrection. The subordinate
+codecs require complete original request, execution-request, and backend-profile
+bodies; construction additionally requires genuine source-materialization
+authority. The store retains their identities so a future native recovery
+provider can obtain and prove those bodies. It deliberately does not promote an
+identity into a semantic result or search the host for missing authority.
+
+`posix_transaction_run_runtime` now retains four caller-opened directory
+authorities: a transaction-run journal directory, a
+construction/check evidence directory, an effect-attempt journal directory,
+and a target-mutation lock directory. The runtime still performs
+no discovery, store initialization, semantic rehydration, resource realization,
+retry, scheduling, cleanup, or command action.
+
 ## Release 0.27.0 resolver-backed construction authority
 
 Release 0.27.0 removes the controller's last caller-written imitations of

@@ -410,7 +410,7 @@ transaction_run_advance_result execute_reserved(
             "construction execution handoff carries no admitted session");
       auto value = execute_construction_dispatch_durable(
           handoff.record(), handoff.run(), handoff.dispatch(), *session,
-          require_construction_driver(drivers), stores.runs);
+          require_construction_driver(drivers), stores.evidence, stores.runs);
       auto evidence = value.result;
       return detail_transaction_run_advance_access::make(
           std::move(value.run), std::move(value.record),
@@ -425,7 +425,7 @@ transaction_run_advance_result execute_reserved(
             "check execution handoff carries no admitted session");
       auto value = execute_check_dispatch_durable(
           handoff.record(), handoff.run(), handoff.dispatch(), *session,
-          require_check_driver(drivers), stores.runs);
+          require_check_driver(drivers), stores.evidence, stores.runs);
       auto evidence = value.result;
       return detail_transaction_run_advance_access::make(
           std::move(value.run), std::move(value.record),

@@ -56,9 +56,10 @@ adds no mutating command.
 
 Version 0.25.0 provides *posix_transaction_run_runtime*, a mechanical
 composition root for the existing durable transaction controller. The caller
-supplies already-open directories for transaction-run journals, effect-attempt
-journals, and target-mutation locks. The runtime retains those directory
-authorities and owns one POSIX run store, one POSIX effect store, native
+supplies already-open directories for transaction-run journals,
+construction/check evidence, effect-attempt journals, and target-mutation locks.
+The runtime retains those four directory authorities and owns one POSIX run
+store, one POSIX construction/check evidence store, one POSIX effect store, native
 construction and check drivers, and one caller-configured POSIX per-dispatch
 effect source.
 
@@ -374,6 +375,43 @@ concurrency, adaptive scheduling, retry timing, resource or evidence discovery,
 process adoption, rollback, cleanup, compaction, garbage collection, or
 effect-implying command.
 
+# DURABLE CONSTRUCTION AND CHECK EVIDENCE
+
+Version 0.28.0 commits construction and check evidence after driver completion
+and before terminal run retirement. The exact order is:
+
+. commit the started transaction-run successor;
+. execute the already admitted construction or check session;
+. admit one typed dispatch-evidence record;
+. publish the immutable canonical subordinate result object;
+. publish the immutable journal/dispatch/attempt index;
+. commit the terminal transaction-run successor.
+
+A failure before evidence publication leaves the started dispatch durable and
+publishes no terminal successor. A failure of the terminal run commit leaves the
+same started ownership together with exact loadable evidence. An exact retry may
+reuse identical content and index objects; conflicting publication for one
+journal, dispatch, and attempt fails closed.
+
+The POSIX store is anchored to an explicit directory descriptor. It publishes
+content before index and synchronizes every commit point. Read-time validation
+rejects malformed encoding, wrong identities, corrupt indexes, absent indexed
+objects, altered content, non-regular objects, and conflicting publication.
+Renaming or replacing the original pathname does not change the retained
+directory authority.
+
+The evidence record contains the existing canonical *libpkgbuild-exec* or
+*libpkgcheck-exec* result encoding and the exact context identities required to
+validate later rehydration. The stored identity is never promoted into semantic
+evidence. The store does not call the subordinate semantic decoders because
+those require complete original request, execution-request, backend-profile,
+and, for construction, source-materialization authority. Supplying those bodies
+remains the responsibility of a later caller-owned recovery provider.
+
+This boundary performs no record discovery, semantic reconstruction, resource
+realization, backend selection, process adoption, retry policy, scheduling,
+cleanup, compaction, garbage collection, or command action.
+
 # SINGLE-DISPATCH EXECUTION
 
 Version 0.11.0 can realize one exact caller-selected dispatch. It does not select
@@ -383,10 +421,12 @@ and explicit stores.
 
 Construction and check start by appending the exact *started* run successor.
 Only after that append returns the same committed authority may the driver run.
-Returned evidence is submitted through the ordinary completion function and the
-resulting successor is appended. A failed start append invokes no driver. Driver
-escape or a failed final append leaves the started dispatch selected for exact
-recovery.
+Returned construction/check evidence is admitted and published through the
+exact evidence store before the ordinary completion function may append the
+terminal successor. A failed start append invokes no driver. Driver escape,
+evidence-store failure, or a failed final append leaves the started dispatch
+selected for exact recovery; after a final-append failure, the evidence remains
+loadable.
 
 Operation start first appends effect-attempt admission, then appends the started
 run retaining that attempt identity. Both commits precede every physical effect.

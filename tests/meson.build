@@ -132,6 +132,9 @@ if not get_option('tests').disabled()
     'run_authority.h',
     'run_advance.h',
     'run_drive.h',
+    'run_evidence.h',
+    'run_evidence_codec.h',
+    'run_evidence_store.h',
     'run_journal.h',
     'run_journal_codec.h',
     'run_inspect.h',
@@ -177,6 +180,13 @@ if not get_option('tests').disabled()
 
   run_execute_contract = find_program('check_run_execute_contract.sh')
   test('run-execute-contract', run_execute_contract, args: [meson.project_source_root()])
+
+  run_evidence_contract = find_program('check_run_evidence_contract.sh')
+  test(
+    'run-evidence-contract',
+    run_evidence_contract,
+    args: [meson.project_source_root()],
+  )
 
   run_reconcile_contract = find_program('check_run_reconcile_contract.sh')
   test('run-reconcile-contract', run_reconcile_contract, args: [meson.project_source_root()])

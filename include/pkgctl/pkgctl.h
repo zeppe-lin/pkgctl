@@ -34,6 +34,9 @@
 #include <pkgctl/run_advance.h>
 #include <pkgctl/run_commit.h>
 #include <pkgctl/run_drive.h>
+#include <pkgctl/run_evidence.h>
+#include <pkgctl/run_evidence_codec.h>
+#include <pkgctl/run_evidence_store.h>
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_runtime.h>

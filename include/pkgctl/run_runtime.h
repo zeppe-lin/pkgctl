@@ -35,8 +35,9 @@ struct transaction_run_runtime_backends final {
  *
  * The caller supplies existing directory descriptors, semantic
  * execution/recovery sources, archive authority, and already selected physical
- * backends. The runtime duplicates all three descriptors, owns one run store,
- * one effect store, native construction/check drivers, one POSIX per-dispatch
+ * backends. The runtime duplicates all four descriptors, owns one run store,
+ * one construction/check evidence store, one effect store, native
+ * construction/check drivers, one POSIX per-dispatch
  * effect source, and canonical committed-head dispatch nonce authority.
  * Borrowed sources and backends must outlive the runtime.
  *
@@ -49,14 +50,16 @@ struct transaction_run_runtime_backends final {
  */
 class posix_transaction_run_runtime final {
 public:
-  /*! \brief Retain three caller-selected directory authorities.
+  /*! \brief Retain four caller-selected directory authorities.
    *
    * Descriptors respectively identify the transaction-run journal directory,
-   * effect-attempt journal directory, and target-mutation lock directory.
+   * construction/check evidence directory, effect-attempt journal directory,
+   * and target-mutation lock directory.
    */
   [[nodiscard]] static std::unique_ptr<posix_transaction_run_runtime>
   from_directory_fds(
       int run_store_directory_fd,
+      int evidence_store_directory_fd,
       int effect_store_directory_fd,
       int target_lock_directory_fd,
       transaction_run_runtime_authorities authorities,

@@ -10,6 +10,7 @@
 #include <pkgctl/construction.h>
 #include <pkgctl/effect.h>
 #include <pkgctl/run_commit.h>
+#include <pkgctl/run_evidence_store.h>
 
 namespace pkgctl {
 
@@ -18,6 +19,7 @@ struct construction_dispatch_execution_checkpoint final {
   transaction_run run;
   transaction_run_journal_record record;
   construction_result result;
+  construction_dispatch_evidence_record evidence;
 };
 
 /*! \brief Durable terminal checkpoint for one check dispatch. */
@@ -25,6 +27,7 @@ struct check_dispatch_execution_checkpoint final {
   transaction_run run;
   transaction_run_journal_record record;
   transaction_check_result result;
+  check_dispatch_evidence_record evidence;
 };
 
 /*! \brief Durable checkpoint after one operation execution attempt.
@@ -44,8 +47,9 @@ struct operation_dispatch_execution_checkpoint final {
 /*! \brief Start, execute, and durably retire one construction dispatch.
  *
  * The started run successor is committed before the construction driver is
- * invoked.  If execution or terminal commitment fails, no terminal run record
- * is fabricated; restart therefore observes the exact started dispatch.
+ * invoked. Returned evidence is published before terminal retirement. An
+ * execution or evidence-store failure leaves only the exact started dispatch;
+ * a terminal-commit failure leaves that ownership plus loadable evidence.
  */
 [[nodiscard]] construction_dispatch_execution_checkpoint
 execute_construction_dispatch_durable(
@@ -54,13 +58,15 @@ execute_construction_dispatch_durable(
     const transaction_dispatch& dispatch,
     construction_session session,
     construction_driver& driver,
+    transaction_run_evidence_store& evidence_store,
     transaction_run_journal_store& run_store);
 
 /*! \brief Start, execute, and durably retire one check dispatch.
  *
  * The started run successor is committed before the check driver is invoked.
- * Driver or terminal-commit failure leaves the exact started ownership durable
- * for external recovery.
+ * Returned evidence is published before terminal retirement. Driver or store
+ * failure leaves started ownership; terminal-commit failure also leaves the
+ * exact evidence loadable for recovery.
  */
 [[nodiscard]] check_dispatch_execution_checkpoint
 execute_check_dispatch_durable(
@@ -69,6 +75,7 @@ execute_check_dispatch_durable(
     const transaction_dispatch& dispatch,
     transaction_check_session session,
     transaction_check_driver& driver,
+    transaction_run_evidence_store& evidence_store,
     transaction_run_journal_store& run_store);
 
 /*! \brief Start and execute one operation through both durable journals.

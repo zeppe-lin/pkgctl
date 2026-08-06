@@ -91,8 +91,9 @@ roll back, clean up, compact journals, collect history, or expose a mutating
 command.
 
 The POSIX transaction-run runtime layer may own only mechanical lifetime and
-wiring authority. It may retain caller-opened run-store, effect-store, and
-target-lock directory descriptors; construct the corresponding stores and
+wiring authority. It may retain caller-opened run-store, construction/check
+evidence-store, effect-store, and target-lock directory descriptors; construct
+the corresponding stores and
 native driver adapters; own stateless dispatch nonce derivation from an exact
 committed head; and delegate one bounded launch or exact-journal drive. Each
 launch must receive an explicit caller run nonce because that value selects
@@ -104,6 +105,17 @@ evidence, select credentials or backends, retry, wait, schedule, clean up, or
 add a
 frontend command. Descriptor-anchored authority must remain valid if the
 original pathname is renamed or replaced.
+
+The construction/check evidence layer may serialize only one exact typed
+dispatch-evidence record and the existing canonical subordinate result encoding.
+It must bind the run journal, transaction, dispatch, node, attempt, controller
+request/result, and subordinate context identities before publication. The
+content object must become durable before the typed index, and terminal run
+retirement must follow evidence publication. The store may validate encoding and
+index integrity but must not decode a build/check result without the complete
+original request, execution-request, backend-profile, source-materialization,
+and resource authorities. It must not discover those authorities, scan indexes,
+or promote an identity into semantic evidence.
 
 The operation-driver source layer must acquire one call-scoped physical driver
 only from an exact validated execution or recovery handoff. Fresh acquisition
@@ -263,7 +275,10 @@ legacy behavior.
    reservation-before-authority
    acquisition, exact reserved release, caller-rehydrated
    build/check recovery, effect-journal continuation, lost-terminal-write
-   recovery, preparation projection and typed refusal, effect sequencing,
+   recovery, immutable construction/check evidence publication before
+   terminal retirement, corrupt/missing/conflicting evidence refusal,
+   descriptor-anchored evidence reopening, preparation projection and typed
+   refusal, effect sequencing,
    intent-before-effect persistence, exact restart checkpoints, outer-lease
    reacquisition, publication reconciliation, publication provenance, CLI
    read-only behavior, and missing-state refusal;

@@ -2,6 +2,30 @@
 
 The suite protects authority composition rather than implementation shape.
 
+## Release 0.28.0 durable evidence qualification
+
+The construction/check evidence suite must prove the complete crash barrier:
+
+- started run ownership is durable before the driver is invoked;
+- exact canonical subordinate result bytes are admitted only for the same
+  journal, transaction, dispatch, node, attempt, request, and execution chain;
+- the immutable content object is durable before its typed index;
+- terminal run retirement is attempted only after evidence publication;
+- evidence-store failure leaves started ownership and no terminal successor;
+- final run-commit failure leaves both started ownership and loadable evidence;
+- exact publication retries are idempotent, while a conflicting publication for
+  one journal/dispatch/attempt fails closed;
+- corrupt encodings, corrupt indexes, absent indexed objects, and altered
+  content are rejected;
+- descriptor anchoring survives path rename and replacement;
+- construction and check record domains cannot be substituted for one another;
+- the store never reconstructs semantic results from retained identities;
+- the POSIX runtime uses four independent caller-opened directory authorities.
+
+The native Meson qualification must run with `tests=enabled` and exercise the
+full controller closure under ASan and UBSan. A source-only contract pass is not
+a substitute for the runtime store tests.
+
 ## Required qualification
 
 Every release must establish:

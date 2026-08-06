@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <fcntl.h>
 #include <iostream>
 #include <iterator>
@@ -46,6 +47,43 @@ pkgctl::transaction_dispatch_nonce dispatch_nonce(std::uint8_t marker)
   pkgctl::transaction_dispatch_nonce::byte_array bytes{};
   bytes.back() = marker;
   return pkgctl::transaction_dispatch_nonce::from_bytes(bytes);
+}
+
+std::filesystem::path evidence_file_with_suffix(
+    const std::filesystem::path& directory,
+    const std::string& suffix)
+{
+  std::optional<std::filesystem::path> selected;
+  for (const auto& entry : std::filesystem::directory_iterator(directory))
+  {
+    const auto name = entry.path().filename().string();
+    if (name.size() < suffix.size() ||
+        name.compare(name.size() - suffix.size(), suffix.size(), suffix) != 0)
+      continue;
+    if (selected)
+      throw std::runtime_error("evidence fixture found duplicate suffix");
+    selected = entry.path();
+  }
+  if (!selected)
+    throw std::runtime_error("evidence fixture did not find expected file");
+  return *selected;
+}
+
+void flip_first_byte(const std::filesystem::path& path)
+{
+  std::fstream stream(path, std::ios::in | std::ios::out | std::ios::binary);
+  if (!stream)
+    throw std::runtime_error("cannot open evidence fixture for corruption");
+  char value = 0;
+  stream.read(&value, 1);
+  if (!stream)
+    throw std::runtime_error("cannot read evidence fixture for corruption");
+  value = static_cast<char>(static_cast<unsigned char>(value) ^ 0x01U);
+  stream.seekp(0);
+  stream.write(&value, 1);
+  stream.flush();
+  if (!stream)
+    throw std::runtime_error("cannot corrupt evidence fixture");
 }
 
 
@@ -1062,16 +1100,18 @@ void check_durable_dispatch_execution()
 
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     fixture_backend backend(backend_mode::succeed);
     pkgctl::native_construction_driver native_driver(backend);
     tracing_construction_driver driver(native_driver, trace);
     const auto completed = pkgctl::execute_construction_dispatch_durable(
         reserved, reservation.run, *reservation.dispatch,
-        fixture.second, driver, run_store);
+        fixture.second, driver, evidence_store, run_store);
 
     CHECK(trace == std::vector<std::string>(
-        {"run-1", "materialize", "build", "run-2"}));
+        {"run-1", "materialize", "build", "evidence-construction", "run-2"}));
     CHECK(completed.result.succeeded());
+    CHECK(completed.evidence.result() == completed.result.identity());
     CHECK(completed.record.sequence() == reserved.sequence() + 2U);
     CHECK(completed.run.records().size() == 1U);
     if (completed.run.records().size() == 1U)
@@ -1092,6 +1132,7 @@ void check_durable_dispatch_execution()
 
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace, 1U);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     fixture_backend backend(backend_mode::succeed);
     pkgctl::native_construction_driver native_driver(backend);
     tracing_construction_driver driver(native_driver, trace);
@@ -1100,7 +1141,7 @@ void check_durable_dispatch_execution()
     {
       (void)pkgctl::execute_construction_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch,
-          fixture.second, driver, run_store);
+          fixture.second, driver, evidence_store, run_store);
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -1120,6 +1161,7 @@ void check_durable_dispatch_execution()
 
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace, 2U);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     fixture_backend backend(backend_mode::succeed);
     pkgctl::native_construction_driver native_driver(backend);
     tracing_construction_driver driver(native_driver, trace);
@@ -1128,7 +1170,7 @@ void check_durable_dispatch_execution()
     {
       (void)pkgctl::execute_construction_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch,
-          fixture.second, driver, run_store);
+          fixture.second, driver, evidence_store, run_store);
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -1137,7 +1179,7 @@ void check_durable_dispatch_execution()
     }
     CHECK(failed);
     CHECK(trace == std::vector<std::string>(
-        {"run-1", "materialize", "build", "run-2"}));
+        {"run-1", "materialize", "build", "evidence-construction", "run-2"}));
     CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
     const auto reopened = run_store.latest().reopen(reservation.run.progress());
     CHECK(reopened.records().size() == 1U);
@@ -1146,6 +1188,55 @@ void check_durable_dispatch_execution()
       CHECK(reopened.records().front().state() ==
             pkgctl::transaction_dispatch_state::started);
     }
+    const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
+        reservation.run.progress(), run_store.latest()).assessment();
+    CHECK(assessment.active().size() == 1U);
+    if (assessment.active().size() == 1U)
+    {
+      CHECK(assessment.active().front().disposition() ==
+            pkgctl::transaction_dispatch_restart_disposition::
+                recover_construction);
+    }
+    CHECK(!run_store.latest().dispatches().empty());
+    if (!run_store.latest().dispatches().empty() &&
+        run_store.latest().dispatches().front().attempt_session())
+    {
+      const auto retained = evidence_store.load_construction(
+          run_store.latest().journal(), reservation.dispatch->identity(),
+          *run_store.latest().dispatches().front().attempt_session());
+      CHECK(retained.has_value());
+    }
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 45U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    run_execute_support::sequenced_evidence_store evidence_store(
+        trace, true, false);
+    fixture_backend backend(backend_mode::succeed);
+    pkgctl::native_construction_driver native_driver(backend);
+    tracing_construction_driver driver(native_driver, trace);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_construction_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch,
+          fixture.second, driver, evidence_store, run_store);
+    }
+    catch (const pkgctl::transaction_run_evidence_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_evidence_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>(
+        {"run-1", "materialize", "build", "evidence-construction"}));
+    CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
     const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
         reservation.run.progress(), run_store.latest()).assessment();
     CHECK(assessment.active().size() == 1U);
@@ -1165,6 +1256,7 @@ void check_durable_dispatch_execution()
 
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace, 0U);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     throwing_construction_driver escaped;
     tracing_construction_driver driver(escaped, trace);
     bool failed = false;
@@ -1172,7 +1264,7 @@ void check_durable_dispatch_execution()
     {
       (void)pkgctl::execute_construction_dispatch_durable(
           reserved, reservation.run, *reservation.dispatch,
-          fixture.second, driver, run_store);
+          fixture.second, driver, evidence_store, run_store);
     }
     catch (const std::runtime_error&)
     {
@@ -1193,6 +1285,214 @@ void check_durable_dispatch_execution()
   }
 }
 
+
+
+void check_transaction_run_evidence_storage()
+{
+  test_support::temporary_directory temporary;
+  const auto state_path = temporary.path() / "state";
+  test_support::initialize_state(state_path);
+  pkgstate::posix::canonical_generation_store state_store(
+      state_path, test_support::binding());
+
+  const std::string payload = "durable evidence payload\n";
+  auto transaction = transaction_session(
+      tool_source(sha256_text(payload), "1.0", false), dependency_source(),
+      state_store.read(), state_path);
+  auto session = construction_session_without_inputs(
+      transaction, temporary.path() / "construction");
+  test_support::write(
+      session.paths().local_source_root / "payload", payload);
+
+  auto run = pkgctl::transaction_run::begin(
+      pkgctl::transaction_progress::begin(transaction),
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, journal_nonce(61U));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(61U));
+  CHECK(reservation.dispatch.has_value());
+  if (!reservation.dispatch)
+    throw std::runtime_error("evidence fixture did not reserve construction");
+  auto reserved = admitted.successor(reservation.run);
+  auto started_run = pkgctl::start_construction_dispatch(
+      reservation.run, *reservation.dispatch, session);
+  auto started = reserved.successor(started_run);
+
+  fixture_backend backend(backend_mode::succeed);
+  pkgctl::native_construction_driver driver(backend);
+  const auto result = pkgctl::execute_construction(session, driver);
+  const auto record = pkgctl::construction_dispatch_evidence_record::admit(
+      started, *reservation.dispatch, result);
+
+  CHECK(record.journal() == started.journal());
+  CHECK(record.transaction() == transaction.identity());
+  CHECK(record.dispatch() == reservation.dispatch->identity());
+  CHECK(record.node() == reservation.dispatch->unit().primary_node());
+  CHECK(record.attempt_session() == session.identity());
+  CHECK(record.result() == result.identity());
+  CHECK(record.controller_request() == session.request().identity());
+  CHECK(record.materialization() == result.materialization().identity());
+  CHECK(record.build_request() == session.request().build().identity());
+  CHECK(record.execution_request() ==
+        result.build().execution().request().identity());
+  CHECK(record.backend() == result.build().execution().backend().identity());
+  CHECK(record.execution() == result.build().execution().identity());
+  CHECK(record.build() == result.build().build().identity());
+
+  const auto encoding =
+      pkgctl::encode_construction_dispatch_evidence(record);
+  const auto decoded =
+      pkgctl::decode_construction_dispatch_evidence(encoding);
+  CHECK(decoded.identity() == record.identity());
+  CHECK(decoded.encoding() == record.encoding());
+  CHECK(pkgctl::encode_construction_dispatch_evidence(decoded) == encoding);
+
+  {
+    auto corrupt = encoding;
+    corrupt.front() ^= 0x01U;
+    bool rejected = false;
+    try
+    {
+      (void)pkgctl::decode_construction_dispatch_evidence(corrupt);
+    }
+    catch (const pkgctl::transaction_run_evidence_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::transaction_run_evidence_error_code::corrupt_encoding;
+    }
+    CHECK(rejected);
+  }
+
+  {
+    auto truncated = encoding;
+    truncated.pop_back();
+    bool rejected = false;
+    try
+    {
+      (void)pkgctl::decode_construction_dispatch_evidence(truncated);
+    }
+    catch (const pkgctl::transaction_run_evidence_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::transaction_run_evidence_error_code::corrupt_encoding;
+    }
+    CHECK(rejected);
+  }
+
+  const auto original_path = temporary.path() / "evidence-original";
+  const auto selected_path = temporary.path() / "evidence-selected";
+  std::filesystem::create_directory(original_path);
+  const int directory_fd = open_runtime_directory(original_path);
+  auto store = pkgctl::posix_transaction_run_evidence_store::from_directory_fd(
+      directory_fd);
+  CHECK(::close(directory_fd) == 0);
+  std::filesystem::rename(original_path, selected_path);
+  std::filesystem::create_directory(original_path);
+
+  CHECK(!store.load_construction(
+      record.journal(), record.dispatch(),
+      pkgctl::session_identity::from_hex(std::string(64U, 'f'))));
+  CHECK(!std::filesystem::exists(
+      selected_path / ".pkgctl-run-evidence.lock"));
+  CHECK(store.publish(record).identity() == record.identity());
+  CHECK(store.publish(record).identity() == record.identity());
+  const auto loaded = store.load_construction(
+      record.journal(), record.dispatch(), record.attempt_session());
+  CHECK(loaded.has_value());
+  CHECK(loaded && loaded->identity() == record.identity());
+  CHECK(directory_entry_count(selected_path) >= 3U);
+  CHECK(directory_entry_count(original_path) == 0U);
+  const auto object_permissions = std::filesystem::status(
+      evidence_file_with_suffix(selected_path, ".pce")).permissions();
+  const auto index_permissions = std::filesystem::status(
+      evidence_file_with_suffix(selected_path, ".pci")).permissions();
+  CHECK((object_permissions & std::filesystem::perms::owner_write) ==
+        std::filesystem::perms::none);
+  CHECK((index_permissions & std::filesystem::perms::owner_write) ==
+        std::filesystem::perms::none);
+
+  auto reopened = pkgctl::posix_transaction_run_evidence_store::open(
+      selected_path.string());
+  const auto reopened_record = reopened.load_construction(
+      record.journal(), record.dispatch(), record.attempt_session());
+  CHECK(reopened_record.has_value());
+  CHECK(reopened_record && reopened_record->identity() == record.identity());
+
+  fixture_backend failing_backend(backend_mode::fail);
+  pkgctl::native_construction_driver failing_driver(failing_backend);
+  const auto alternate_result =
+      pkgctl::execute_construction(session, failing_driver);
+  const auto alternate = pkgctl::construction_dispatch_evidence_record::admit(
+      started, *reservation.dispatch, alternate_result);
+  CHECK(alternate.identity() != record.identity());
+  bool conflict = false;
+  try
+  {
+    (void)store.publish(alternate);
+  }
+  catch (const pkgctl::transaction_run_evidence_error& problem)
+  {
+    conflict = problem.code() ==
+        pkgctl::transaction_run_evidence_error_code::store_conflict;
+  }
+  CHECK(conflict);
+
+  {
+    const auto absent_path = temporary.path() / "evidence-absent-object";
+    std::filesystem::create_directory(absent_path);
+    auto absent_store = pkgctl::posix_transaction_run_evidence_store::open(
+        absent_path.string());
+    (void)absent_store.publish(record);
+    std::filesystem::remove(evidence_file_with_suffix(absent_path, ".pce"));
+    bool rejected = false;
+    try
+    {
+      (void)absent_store.load_construction(
+          record.journal(), record.dispatch(), record.attempt_session());
+    }
+    catch (const pkgctl::transaction_run_evidence_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::transaction_run_evidence_error_code::store_corrupt;
+    }
+    CHECK(rejected);
+  }
+
+  {
+    const auto corrupt_index_path = temporary.path() / "evidence-corrupt-index";
+    std::filesystem::create_directory(corrupt_index_path);
+    auto corrupt_store = pkgctl::posix_transaction_run_evidence_store::open(
+        corrupt_index_path.string());
+    (void)corrupt_store.publish(record);
+    flip_first_byte(evidence_file_with_suffix(corrupt_index_path, ".pci"));
+    bool rejected = false;
+    try
+    {
+      (void)corrupt_store.load_construction(
+          record.journal(), record.dispatch(), record.attempt_session());
+    }
+    catch (const pkgctl::transaction_run_evidence_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::transaction_run_evidence_error_code::store_corrupt;
+    }
+    CHECK(rejected);
+  }
+
+  flip_first_byte(evidence_file_with_suffix(selected_path, ".pce"));
+  bool corrupt_object = false;
+  try
+  {
+    (void)store.load_construction(
+        record.journal(), record.dispatch(), record.attempt_session());
+  }
+  catch (const pkgctl::transaction_run_evidence_error& problem)
+  {
+    corrupt_object = problem.code() ==
+        pkgctl::transaction_run_evidence_error_code::corrupt_encoding;
+  }
+  CHECK(corrupt_object);
+}
 
 void check_durable_restart_reconciliation()
 {
@@ -1608,12 +1908,13 @@ void check_single_step_transaction_advancement()
     unreachable_recovery_authority_source recovery_source;
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     tracing_construction_driver driver(native_driver, trace);
 
     const auto advanced = pkgctl::advance_transaction_run_once(
         admitted.journal(), dispatch_nonce(71U),
         {progress_source, execution_source, recovery_source},
-        {&driver, nullptr, nullptr}, {run_store, nullptr});
+        {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(advanced.disposition() ==
           pkgctl::transaction_run_advance_disposition::
@@ -1644,11 +1945,12 @@ void check_single_step_transaction_advancement()
     unreachable_recovery_authority_source recovery_source;
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     const auto released = pkgctl::advance_transaction_run_once(
         reserved.journal(), dispatch_nonce(73U),
         {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, nullptr}, {run_store, nullptr});
+        {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(released.disposition() ==
           pkgctl::transaction_run_advance_disposition::released_reserved);
@@ -1676,11 +1978,12 @@ void check_single_step_transaction_advancement()
     construction_recovery_authority_source recovery_source(recovered_result);
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(started, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     const auto reconciled = pkgctl::advance_transaction_run_once(
         started.journal(), dispatch_nonce(75U),
         {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, nullptr}, {run_store, nullptr});
+        {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(reconciled.disposition() ==
           pkgctl::transaction_run_advance_disposition::
@@ -1706,6 +2009,7 @@ void check_single_step_transaction_advancement()
     unreachable_recovery_authority_source recovery_source;
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     bool refused = false;
     try
@@ -1713,7 +2017,7 @@ void check_single_step_transaction_advancement()
       (void)pkgctl::advance_transaction_run_once(
           foreign_admitted.journal(), dispatch_nonce(77U),
           {progress_source, execution_source, recovery_source},
-          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+          {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -1734,6 +2038,7 @@ void check_single_step_transaction_advancement()
     unreachable_recovery_authority_source recovery_source;
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     bool refused = false;
     try
@@ -1741,7 +2046,7 @@ void check_single_step_transaction_advancement()
       (void)pkgctl::advance_transaction_run_once(
           admitted.journal(), dispatch_nonce(78U),
           {progress_source, execution_source, recovery_source},
-          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+          {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -1762,6 +2067,7 @@ void check_single_step_transaction_advancement()
     unreachable_recovery_authority_source recovery_source;
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     bool failed = false;
     try
@@ -1769,7 +2075,7 @@ void check_single_step_transaction_advancement()
       (void)pkgctl::advance_transaction_run_once(
           admitted.journal(), dispatch_nonce(79U),
           {progress_source, execution_source, recovery_source},
-          {&native_driver, nullptr, nullptr}, {run_store, nullptr});
+          {&native_driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     }
     catch (const std::runtime_error& problem)
     {
@@ -1792,13 +2098,14 @@ void check_single_step_transaction_advancement()
     unreachable_recovery_authority_source recovery_source;
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     fixture_backend failing_backend(backend_mode::fail);
     pkgctl::native_construction_driver failing_driver(failing_backend);
 
     const auto failed = pkgctl::advance_transaction_run_once(
         admitted.journal(), dispatch_nonce(80U),
         {progress_source, execution_source, recovery_source},
-        {&failing_driver, nullptr, nullptr}, {run_store, nullptr});
+        {&failing_driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     CHECK(failed.disposition() ==
           pkgctl::transaction_run_advance_disposition::
               executed_construction);
@@ -1812,7 +2119,7 @@ void check_single_step_transaction_advancement()
     const auto quiescent = pkgctl::advance_transaction_run_once(
         failed.record().journal(), dispatch_nonce(81U),
         {stopped_progress, unused_execution, recovery_source},
-        {nullptr, nullptr, nullptr}, {run_store, nullptr});
+        {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     CHECK(quiescent.disposition() ==
           pkgctl::transaction_run_advance_disposition::quiescent);
     CHECK(!quiescent.durable_transition_committed());
@@ -1829,6 +2136,7 @@ void check_single_step_transaction_advancement()
     unreachable_recovery_authority_source recovery_source;
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     throwing_construction_driver driver;
 
     bool escaped = false;
@@ -1837,7 +2145,7 @@ void check_single_step_transaction_advancement()
       (void)pkgctl::advance_transaction_run_once(
           admitted.journal(), dispatch_nonce(82U),
           {progress_source, execution_source, recovery_source},
-          {&driver, nullptr, nullptr}, {run_store, nullptr});
+          {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     }
     catch (const std::runtime_error& problem)
     {
@@ -1927,26 +2235,34 @@ void check_posix_transaction_run_runtime()
 
   const auto run_path = temporary.path() / "run-store";
   const auto selected_run_path = temporary.path() / "run-store-selected";
+  const auto evidence_path = temporary.path() / "evidence-store";
+  const auto selected_evidence_path =
+      temporary.path() / "evidence-store-selected";
   const auto effect_path = temporary.path() / "effect-store";
   const auto lock_path = temporary.path() / "target-locks";
   std::filesystem::create_directory(run_path);
+  std::filesystem::create_directory(evidence_path);
   std::filesystem::create_directory(effect_path);
   std::filesystem::create_directory(lock_path);
 
   const int run_fd = open_runtime_directory(run_path);
+  const int evidence_fd = open_runtime_directory(evidence_path);
   const int effect_fd = open_runtime_directory(effect_path);
   const int lock_fd = open_runtime_directory(lock_path);
   auto runtime = pkgctl::posix_transaction_run_runtime::from_directory_fds(
-      run_fd, effect_fd, lock_fd,
+      run_fd, evidence_fd, effect_fd, lock_fd,
       {progress_source, execution, recovery, archives},
       {execution_backend, execution_backend, application_backend,
        execution_backend, state_store});
   CHECK(::close(run_fd) == 0);
+  CHECK(::close(evidence_fd) == 0);
   CHECK(::close(effect_fd) == 0);
   CHECK(::close(lock_fd) == 0);
 
   std::filesystem::rename(run_path, selected_run_path);
   std::filesystem::create_directory(run_path);
+  std::filesystem::rename(evidence_path, selected_evidence_path);
+  std::filesystem::create_directory(evidence_path);
 
   const auto result = runtime->launch(
       progress, pkgctl::transaction_dispatch_policy::make(1U, 1U),
@@ -1967,6 +2283,8 @@ void check_posix_transaction_run_runtime()
   CHECK(archives.calls() == 0U);
   CHECK(directory_entry_count(selected_run_path) >= 4U);
   CHECK(directory_entry_count(run_path) == 0U);
+  CHECK(directory_entry_count(selected_evidence_path) >= 3U);
+  CHECK(directory_entry_count(evidence_path) == 0U);
   CHECK(directory_entry_count(effect_path) == 0U);
   CHECK(directory_entry_count(lock_path) == 0U);
   CHECK(std::filesystem::is_regular_file(
@@ -1987,22 +2305,25 @@ void check_posix_transaction_run_runtime()
   bool run_descriptor_refused = false;
   try
   {
+    const int valid_evidence = open_runtime_directory(evidence_path);
     const int valid_effect = open_runtime_directory(effect_path);
     const int valid_lock = open_runtime_directory(lock_path);
     try
     {
       (void)pkgctl::posix_transaction_run_runtime::from_directory_fds(
-          -1, valid_effect, valid_lock,
+          -1, valid_evidence, valid_effect, valid_lock,
           {progress_source, execution, recovery, archives},
           {execution_backend, execution_backend, application_backend,
            execution_backend, state_store});
     }
     catch (...)
     {
+      (void)::close(valid_evidence);
       (void)::close(valid_effect);
       (void)::close(valid_lock);
       throw;
     }
+    (void)::close(valid_evidence);
     (void)::close(valid_effect);
     (void)::close(valid_lock);
   }
@@ -2168,12 +2489,13 @@ void check_bounded_serial_transaction_drive()
     head_derived_nonce_source nonces(91U);
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     tracing_construction_driver driver(native_driver, trace);
 
     const auto driven = pkgctl::drive_transaction_run(
         admitted.journal(), pkgctl::transaction_run_drive_policy::make(4U),
         nonces, {progress_source, execution_source, recovery_source},
-        {&driver, nullptr, nullptr}, {run_store, nullptr});
+        {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(driven.disposition() ==
           pkgctl::transaction_run_drive_disposition::completed);
@@ -2204,13 +2526,14 @@ void check_bounded_serial_transaction_drive()
     head_derived_nonce_source nonces(95U);
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     fixture_backend failing_backend(backend_mode::fail);
     pkgctl::native_construction_driver failing_driver(failing_backend);
 
     const auto driven = pkgctl::drive_transaction_run(
         admitted.journal(), pkgctl::transaction_run_drive_policy::make(3U),
         nonces, {progress_source, execution_source, recovery_source},
-        {&failing_driver, nullptr, nullptr}, {run_store, nullptr});
+        {&failing_driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(driven.disposition() ==
           pkgctl::transaction_run_drive_disposition::stopped_after_failure);
@@ -2239,12 +2562,13 @@ void check_bounded_serial_transaction_drive()
     head_derived_nonce_source nonces(93U);
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     tracing_construction_driver driver(native_driver, trace);
 
     const auto driven = pkgctl::drive_transaction_run(
         reserved.journal(), pkgctl::transaction_run_drive_policy::make(3U),
         nonces, {progress_source, execution_source, recovery_source},
-        {&driver, nullptr, nullptr}, {run_store, nullptr});
+        {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(driven.disposition() ==
           pkgctl::transaction_run_drive_disposition::completed);
@@ -2271,6 +2595,7 @@ make_admitted(96U);
     head_derived_nonce_source nonces(96U);
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     for (std::size_t attempt = 0U; attempt < 2U; ++attempt)
     {
@@ -2281,7 +2606,7 @@ make_admitted(96U);
             admitted.journal(),
             pkgctl::transaction_run_drive_policy::make(1U), nonces,
             {progress_source, execution_source, recovery_source},
-            {nullptr, nullptr, nullptr}, {run_store, nullptr});
+            {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
       }
       catch (const pkgctl::transaction_run_journal_error& problem)
       {
@@ -2302,7 +2627,7 @@ make_admitted(96U);
     const auto driven = pkgctl::drive_transaction_run(
         admitted.journal(), pkgctl::transaction_run_drive_policy::make(1U),
         nonces, {progress_source, execution_source, recovery_source},
-        {&native_driver, nullptr, nullptr}, {run_store, nullptr});
+        {&native_driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     CHECK(driven.disposition() ==
           pkgctl::transaction_run_drive_disposition::completed);
     CHECK(nonces.calls() == 3U);
@@ -2323,11 +2648,12 @@ make_admitted(96U);
     head_derived_nonce_source nonces(94U);
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     const auto driven = pkgctl::drive_transaction_run(
         reserved.journal(), pkgctl::transaction_run_drive_policy::make(1U),
         nonces, {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, nullptr}, {run_store, nullptr});
+        {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(driven.disposition() ==
           pkgctl::transaction_run_drive_disposition::step_limit_reached);
@@ -2381,13 +2707,14 @@ void check_restart_safe_transaction_launch()
     construction_execution_authority_source execution_source(session);
     unreachable_recovery_authority_source recovery_source;
     launch_run_store run_store(trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     tracing_construction_driver driver(native_driver, trace);
 
     const auto launched = pkgctl::launch_transaction_run(
         initial, policy, pkgctl::transaction_run_drive_policy::make(4U),
         run_nonces, dispatch_nonces,
         {progress_source, execution_source, recovery_source},
-        {&driver, nullptr, nullptr}, {run_store, nullptr});
+        {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(launched.origin() ==
           pkgctl::transaction_run_launch_origin::admitted);
@@ -2409,7 +2736,7 @@ void check_restart_safe_transaction_launch()
         initial, policy, pkgctl::transaction_run_drive_policy::make(2U),
         run_nonces, dispatch_nonces,
         {resumed_progress, resumed_execution, resumed_recovery},
-        {&driver, nullptr, nullptr}, {run_store, nullptr});
+        {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(resumed.origin() ==
           pkgctl::transaction_run_launch_origin::resumed);
@@ -2438,6 +2765,7 @@ void check_restart_safe_transaction_launch()
     construction_execution_authority_source execution_source(session);
     unreachable_recovery_authority_source recovery_source;
     launch_run_store run_store(trace, 1U);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     tracing_construction_driver driver(native_driver, trace);
 
     bool failed = false;
@@ -2447,7 +2775,7 @@ void check_restart_safe_transaction_launch()
           initial, policy, pkgctl::transaction_run_drive_policy::make(2U),
           run_nonces, dispatch_nonces,
           {progress_source, execution_source, recovery_source},
-          {&driver, nullptr, nullptr}, {run_store, nullptr});
+          {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -2465,7 +2793,7 @@ void check_restart_safe_transaction_launch()
         initial, policy, pkgctl::transaction_run_drive_policy::make(2U),
         run_nonces, dispatch_nonces,
         {progress_source, execution_source, recovery_source},
-        {&driver, nullptr, nullptr}, {run_store, nullptr});
+        {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     CHECK(retried.admission_committed());
     CHECK(retried.run().progress().complete());
     CHECK(run_nonces.calls() == 2U);
@@ -2483,6 +2811,7 @@ void check_restart_safe_transaction_launch()
     construction_execution_authority_source execution_source(session);
     unreachable_recovery_authority_source recovery_source;
     launch_run_store run_store(trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     bool refused = false;
     try
@@ -2491,7 +2820,7 @@ void check_restart_safe_transaction_launch()
           initial, policy, pkgctl::transaction_run_drive_policy::make(1U),
           run_nonces, dispatch_nonces,
           {progress_source, execution_source, recovery_source},
-          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+          {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -2510,7 +2839,7 @@ void check_restart_safe_transaction_launch()
         initial, policy, pkgctl::transaction_run_drive_policy::make(2U),
         run_nonces, dispatch_nonces,
         {retry_progress, retry_execution, retry_recovery},
-        {&native_driver, nullptr, nullptr}, {run_store, nullptr});
+        {&native_driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     CHECK(retried.origin() ==
           pkgctl::transaction_run_launch_origin::resumed);
     CHECK(retried.starting_record().sequence() == 0U);
@@ -2528,6 +2857,7 @@ void check_restart_safe_transaction_launch()
             transaction, temporary.path() / "launch-refused"));
     unreachable_recovery_authority_source recovery_source;
     launch_run_store run_store(trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
 
     bool refused = false;
     try
@@ -2536,7 +2866,7 @@ void check_restart_safe_transaction_launch()
           initial, policy, pkgctl::transaction_run_drive_policy::make(1U),
           refusing, dispatch_nonces,
           {progress_source, execution_source, recovery_source},
-          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+          {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     }
     catch (const std::runtime_error& problem)
     {
@@ -2557,6 +2887,7 @@ void check_restart_safe_transaction_launch()
         foreign_run, journal_nonce(115U));
     foreign_launch_head_store run_store(std::move(foreign_record));
     std::vector<std::string> trace;
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
     replay_run_nonce_source run_nonces(116U, trace);
     head_derived_nonce_source dispatch_nonces(116U);
     fixed_progress_source progress_source(initial);
@@ -2572,7 +2903,7 @@ void check_restart_safe_transaction_launch()
           initial, policy, pkgctl::transaction_run_drive_policy::make(1U),
           run_nonces, dispatch_nonces,
           {progress_source, execution_source, recovery_source},
-          {nullptr, nullptr, nullptr}, {run_store, nullptr});
+          {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
     }
     catch (const pkgctl::transaction_run_journal_error& problem)
     {
@@ -2602,6 +2933,7 @@ int main()
     check_admission();
     check_identity_and_driver_contract();
     check_durable_dispatch_execution();
+    check_transaction_run_evidence_storage();
     check_durable_restart_reconciliation();
     check_run_authority_rehydration();
     check_single_step_transaction_advancement();

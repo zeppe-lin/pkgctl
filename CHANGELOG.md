@@ -1,3 +1,34 @@
+## 0.28.0 - 2026-08-06
+
+### Durable construction and check evidence barrier
+
+- Adds typed construction-dispatch and check-dispatch evidence records bound to
+  the exact run journal, transaction, dispatch, graph node, attempt session,
+  controller result, subordinate request/backend/execution identities, and the
+  existing canonical `libpkgbuild-exec` or `libpkgcheck-exec` result encoding.
+- Publishes each exact encoding as an immutable content object and then
+  publishes one immutable typed index selected by journal, dispatch, and
+  attempt identity. The descriptor-anchored evidence store makes the object
+  durable before the index; both are synchronized, collision-safe, and fail
+  closed on corruption or conflicting publication.
+- Commits the started transaction-run successor before execution, publishes
+  construction/check evidence after the driver returns, and only then commits
+  terminal run retirement. A failed evidence publication or final run commit
+  leaves the exact started ownership durable for recovery.
+- Extends the caller-configured POSIX transaction runtime with a fourth
+  caller-opened directory authority for construction/check evidence.
+- Treats the evidence store as physical durable memory, not semantic model
+  authority: no semantic result is reconstructed from identities. Complete
+  restart still requires caller-owned providers for source materialization,
+  request, execution-request, backend-profile, and concrete resource bodies.
+- Adds no evidence discovery, semantic deserialization service, scheduler,
+  retry policy, garbage collector, mutating command, or new subordinate codec.
+- Enables the project test suite by default.
+
+### Dependency contract
+
+- No dependency floor changes.
+
 ## 0.27.0 - 2026-08-05
 
 ### Resolver-backed construction and planner-ready application authority
