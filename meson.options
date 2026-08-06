@@ -12,7 +12,7 @@ option(
 option(
   'tests',
   type: 'feature',
-  value: 'auto',
+  value: 'enabled',
   description: 'build the pkgctl regression suite',
 )
 
