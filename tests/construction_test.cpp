@@ -72,19 +72,32 @@ std::filesystem::path evidence_file_with_suffix(
 
 void flip_first_byte(const std::filesystem::path& path)
 {
-  std::fstream stream(path, std::ios::in | std::ios::out | std::ios::binary);
-  if (!stream)
-    throw std::runtime_error("cannot open evidence fixture for corruption");
-  char value = 0;
-  stream.read(&value, 1);
-  if (!stream)
-    throw std::runtime_error("cannot read evidence fixture for corruption");
-  value = static_cast<char>(static_cast<unsigned char>(value) ^ 0x01U);
-  stream.seekp(0);
-  stream.write(&value, 1);
-  stream.flush();
-  if (!stream)
-    throw std::runtime_error("cannot corrupt evidence fixture");
+  const auto original_permissions = std::filesystem::status(path).permissions();
+  std::filesystem::permissions(
+      path, std::filesystem::perms::owner_write,
+      std::filesystem::perm_options::add);
+  try
+  {
+    std::fstream stream(path, std::ios::in | std::ios::out | std::ios::binary);
+    if (!stream)
+      throw std::runtime_error("cannot open evidence fixture for corruption");
+    char value = 0;
+    stream.read(&value, 1);
+    if (!stream)
+      throw std::runtime_error("cannot read evidence fixture for corruption");
+    value = static_cast<char>(static_cast<unsigned char>(value) ^ 0x01U);
+    stream.seekp(0);
+    stream.write(&value, 1);
+    stream.flush();
+    if (!stream)
+      throw std::runtime_error("cannot corrupt evidence fixture");
+  }
+  catch (...)
+  {
+    std::filesystem::permissions(path, original_permissions);
+    throw;
+  }
+  std::filesystem::permissions(path, original_permissions);
 }
 
 
