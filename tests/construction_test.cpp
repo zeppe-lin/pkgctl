@@ -1001,7 +1001,7 @@ void check_identity_and_driver_contract()
       transaction, temporary.path() / "mismatched-build");
   test_support::write(
       build_session.paths().local_source_root / "payload", payload);
-  const auto& subject = package_selection(transaction, "tool");
+  const auto& subject = construction_subject_selection(transaction);
   auto alternate = pkgbuild::build_request::seal(
       transaction.resolution().resolution(), subject.identity(),
       pkgbuild::build_policy::make(

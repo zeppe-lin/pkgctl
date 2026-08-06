@@ -371,11 +371,12 @@ inline pkgplan::target_observation_set empty_target_observations(
 
 inline const pkgresolve::selected_package& package_selection(
     const pkgctl::transaction_session& session,
-    std::string_view package)
+    std::string_view package,
+    pkgresolve::resolution_environment environment)
 {
   const pkgresolve::selected_package* found = nullptr;
   for (const auto& selection : session.resolution().resolution().selections()) {
-    if (selection.environment() != pkgresolve::resolution_environment::build ||
+    if (selection.environment() != environment ||
         selection.package().name() != package)
       continue;
     if (found != nullptr)
@@ -389,10 +390,20 @@ inline const pkgresolve::selected_package& package_selection(
   return *found;
 }
 
+// Direct build/check goals select the package being built in the target
+// environment; only dependency edges enter the build environment.
+inline const pkgresolve::selected_package& construction_subject_selection(
+    const pkgctl::transaction_session& session)
+{
+  return package_selection(
+      session, "tool", pkgresolve::resolution_environment::target);
+}
+
 inline const pkgresolve::selected_package& dependency_selection(
     const pkgctl::transaction_session& session)
 {
-  return package_selection(session, "dep");
+  return package_selection(
+      session, "dep", pkgresolve::resolution_environment::build);
 }
 
 
