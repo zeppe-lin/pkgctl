@@ -16,6 +16,8 @@
 
 namespace pkgctl {
 
+struct detail_run_recovery_access;
+
 /*! \brief One exact transaction build node and semantic construction policy. */
 class construction_request final {
 public:
@@ -144,6 +146,7 @@ public:
   [[nodiscard]] const session_identity& identity() const noexcept;
 
 private:
+  friend struct detail_run_recovery_access;
   friend construction_result execute_construction(
       construction_session, construction_driver&);
 

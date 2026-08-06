@@ -43,6 +43,7 @@ public:
         effects_(posix_effect_journal_store::from_directory_fd(
             effect_store_directory_fd)),
         construction_(backends.construction), check_(backends.check),
+        recovery_(evidence_, authorities_.recovery),
         operation_(
             posix_transaction_effect_driver_source::from_lock_directory_fd(
                 target_lock_directory_fd, backends.application,
@@ -76,8 +77,7 @@ private:
   transaction_run_advance_authorities semantic_authorities() noexcept
   {
     return transaction_run_advance_authorities{
-        authorities_.progress, authorities_.execution,
-        authorities_.recovery};
+        authorities_.progress, authorities_.execution, recovery_};
   }
 
   transaction_run_advance_drivers drivers() noexcept
@@ -97,6 +97,7 @@ private:
   posix_effect_journal_store effects_;
   native_construction_driver construction_;
   native_transaction_check_driver check_;
+  stored_transaction_dispatch_recovery_authority_source recovery_;
   std::unique_ptr<posix_transaction_effect_driver_source> operation_;
   canonical_transaction_dispatch_nonce_source dispatch_nonces_;
 };

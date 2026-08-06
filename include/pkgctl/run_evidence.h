@@ -34,6 +34,9 @@ enum class transaction_run_evidence_error_code : std::uint8_t {
   store_conflict = 8,
   store_corrupt = 9,
   store_contract_violation = 10,
+  evidence_missing = 11,
+  recovery_context_mismatch = 12,
+  recovery_decode_failed = 13,
 };
 
 class transaction_run_evidence_error final : public std::runtime_error {

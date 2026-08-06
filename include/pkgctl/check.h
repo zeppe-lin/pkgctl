@@ -14,6 +14,8 @@
 
 namespace pkgctl {
 
+struct detail_run_recovery_access;
+
 class transaction_progress;
 
 /*! \brief Pure controller authority for one ready transaction check node. */
@@ -117,6 +119,7 @@ public:
   [[nodiscard]] const session_identity& identity() const noexcept;
 
 private:
+  friend struct detail_run_recovery_access;
   friend transaction_check_result execute_transaction_check(
       transaction_check_session, transaction_check_driver&);
 
