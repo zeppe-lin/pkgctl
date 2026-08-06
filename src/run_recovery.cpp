@@ -219,6 +219,107 @@ struct detail_run_recovery_access final {
   }
 };
 
+native_transaction_dispatch_recovery_context_source::
+native_transaction_dispatch_recovery_context_source(
+    transaction_dispatch_session_source& sessions,
+    pkgexec::execution_backend& construction_backend,
+    pkgexec::execution_backend& check_backend,
+    transaction_operation_recovery_authority_source& operations)
+    : sessions_(sessions), construction_backend_(construction_backend),
+      check_backend_(check_backend), operations_(operations)
+{
+}
+
+construction_dispatch_recovery_context
+native_transaction_dispatch_recovery_context_source::construction(
+    const transaction_run_restart_checkpoint& checkpoint,
+    const transaction_dispatch_restart_assessment& assessment,
+    const transaction_dispatch& dispatch,
+    const construction_dispatch_evidence_record& evidence)
+{
+  const auto& attempt = require_attempt(assessment);
+  auto session = sessions_.construction(
+      checkpoint.record(), checkpoint.run(), dispatch);
+  auto backend = construction_backend_.capabilities();
+  const auto& request = session.request();
+  if (session.identity() != evidence.attempt_session() ||
+      session.identity() != attempt ||
+      request.identity() != evidence.controller_request() ||
+      request.transaction().identity() != evidence.transaction() ||
+      request.build_node() != evidence.node() ||
+      request.build().identity() != evidence.build_request() ||
+      backend.identity() != evidence.backend())
+  {
+    context_mismatch(
+        "native construction context differs from retained evidence");
+  }
+
+  auto materialization = pkgfetch::materialize(
+      pkgfetch::materialization_request::seal(
+          session.request().source(), session.paths().local_source_root,
+          session.paths().content_store_root,
+          session.request().acquisition_policy()));
+  if (materialization.identity() != evidence.materialization())
+    context_mismatch(
+        "native construction materialization differs from retained evidence");
+
+  auto admitted = pkgbuild_exec::admitted_build_session::admit(
+      request.build(), materialization, session.package_inputs(),
+      session.paths().build, session.execution_identity(),
+      session.compression());
+  auto execution_request =
+      pkgbuild_exec::seal_execution_request(admitted);
+  if (execution_request.identity() != evidence.execution_request())
+    context_mismatch(
+        "native construction request differs from retained evidence");
+  return {
+      std::move(session), std::move(materialization),
+      std::move(execution_request), std::move(backend),
+  };
+}
+
+check_dispatch_recovery_context
+native_transaction_dispatch_recovery_context_source::check(
+    const transaction_run_restart_checkpoint& checkpoint,
+    const transaction_dispatch_restart_assessment& assessment,
+    const transaction_dispatch& dispatch,
+    const check_dispatch_evidence_record& evidence)
+{
+  const auto& attempt = require_attempt(assessment);
+  auto session = sessions_.check(
+      checkpoint.record(), checkpoint.run(), dispatch);
+  auto backend = check_backend_.capabilities();
+  const auto& request = session.request();
+  if (session.identity() != evidence.attempt_session() ||
+      session.identity() != attempt ||
+      request.identity() != evidence.controller_request() ||
+      request.transaction().identity() != evidence.transaction() ||
+      request.check_node() != evidence.node() ||
+      request.construction().identity() != evidence.construction() ||
+      request.check().identity() != evidence.check_request() ||
+      backend.identity() != evidence.backend())
+  {
+    context_mismatch("native check context differs from retained evidence");
+  }
+
+  auto execution_request = pkgcheck_exec::seal_execution_request(
+      session.execution_session());
+  if (execution_request.identity() != evidence.execution_request())
+    context_mismatch("native check request differs from retained evidence");
+  return {
+      std::move(session), std::move(execution_request), std::move(backend),
+  };
+}
+
+effect_restart_checkpoint
+native_transaction_dispatch_recovery_context_source::operation(
+    const transaction_run_restart_checkpoint& checkpoint,
+    const transaction_dispatch_restart_assessment& assessment,
+    const transaction_dispatch& dispatch)
+{
+  return operations_.operation(checkpoint, assessment, dispatch);
+}
+
 stored_transaction_dispatch_recovery_authority_source::
 stored_transaction_dispatch_recovery_authority_source(
     transaction_run_evidence_store& evidence,

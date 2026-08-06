@@ -57,6 +57,59 @@ public:
       const transaction_dispatch& dispatch) = 0;
 };
 
+/*! \brief Effect-journal recovery authority for one operation dispatch. */
+class transaction_operation_recovery_authority_source {
+public:
+  virtual ~transaction_operation_recovery_authority_source() = default;
+
+  [[nodiscard]] virtual effect_restart_checkpoint operation(
+      const transaction_run_restart_checkpoint& checkpoint,
+      const transaction_dispatch_restart_assessment& assessment,
+      const transaction_dispatch& dispatch) = 0;
+};
+
+/*! \brief Reproduce construction/check recovery context from one session source.
+ *
+ * The same deterministic session source used for fresh execution is consulted
+ * again under the retained durable record and dispatch.  Construction source
+ * material is reacquired through libpkgfetch, execution requests are reproduced
+ * through the pure build/check projections, and backend capability profiles are
+ * obtained from the already-selected native backends.  Operation recovery is
+ * delegated to its effect-journal owner.
+ */
+class native_transaction_dispatch_recovery_context_source final
+    : public transaction_dispatch_recovery_context_source {
+public:
+  native_transaction_dispatch_recovery_context_source(
+      transaction_dispatch_session_source& sessions,
+      pkgexec::execution_backend& construction_backend,
+      pkgexec::execution_backend& check_backend,
+      transaction_operation_recovery_authority_source& operations);
+
+  [[nodiscard]] construction_dispatch_recovery_context construction(
+      const transaction_run_restart_checkpoint& checkpoint,
+      const transaction_dispatch_restart_assessment& assessment,
+      const transaction_dispatch& dispatch,
+      const construction_dispatch_evidence_record& evidence) override;
+
+  [[nodiscard]] check_dispatch_recovery_context check(
+      const transaction_run_restart_checkpoint& checkpoint,
+      const transaction_dispatch_restart_assessment& assessment,
+      const transaction_dispatch& dispatch,
+      const check_dispatch_evidence_record& evidence) override;
+
+  [[nodiscard]] effect_restart_checkpoint operation(
+      const transaction_run_restart_checkpoint& checkpoint,
+      const transaction_dispatch_restart_assessment& assessment,
+      const transaction_dispatch& dispatch) override;
+
+private:
+  transaction_dispatch_session_source& sessions_;
+  pkgexec::execution_backend& construction_backend_;
+  pkgexec::execution_backend& check_backend_;
+  transaction_operation_recovery_authority_source& operations_;
+};
+
 /*! \brief Recover exact semantic authorities from durable typed evidence.
  *
  * Construction and check records are selected by the exact durable journal,

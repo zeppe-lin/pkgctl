@@ -207,6 +207,41 @@ void validate_operation_recovery(
 
 } // namespace
 
+composed_transaction_dispatch_execution_authority_source::
+composed_transaction_dispatch_execution_authority_source(
+    transaction_dispatch_session_source& sessions,
+    transaction_operation_execution_authority_source& operations)
+    : sessions_(sessions), operations_(operations)
+{
+}
+
+construction_session
+composed_transaction_dispatch_execution_authority_source::construction(
+    const transaction_run_journal_record& record,
+    const transaction_run& run,
+    const transaction_dispatch& dispatch)
+{
+  return sessions_.construction(record, run, dispatch);
+}
+
+transaction_check_session
+composed_transaction_dispatch_execution_authority_source::check(
+    const transaction_run_journal_record& record,
+    const transaction_run& run,
+    const transaction_dispatch& dispatch)
+{
+  return sessions_.check(record, run, dispatch);
+}
+
+operation_dispatch_execution_authority
+composed_transaction_dispatch_execution_authority_source::operation(
+    const transaction_run_journal_record& record,
+    const transaction_run& run,
+    const transaction_dispatch& dispatch)
+{
+  return operations_.operation(record, run, dispatch);
+}
+
 transaction_dispatch_execution_handoff::
 transaction_dispatch_execution_handoff(
     transaction_run_journal_record record,

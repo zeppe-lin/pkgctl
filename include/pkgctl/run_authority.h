@@ -46,6 +46,39 @@ public:
       const transaction_run_journal_record& record) = 0;
 };
 
+/*! \brief Deterministic construction/check sessions for one exact dispatch.
+ *
+ * Implementations select explicit paths and call-scoped resources but do not
+ * execute the dispatch.  The same source may be consulted for fresh execution
+ * and restart recovery; it must therefore reproduce the same session identity
+ * from the same durable record, run, and dispatch.
+ */
+class transaction_dispatch_session_source {
+public:
+  virtual ~transaction_dispatch_session_source() = default;
+
+  [[nodiscard]] virtual construction_session construction(
+      const transaction_run_journal_record& record,
+      const transaction_run& run,
+      const transaction_dispatch& dispatch) = 0;
+
+  [[nodiscard]] virtual transaction_check_session check(
+      const transaction_run_journal_record& record,
+      const transaction_run& run,
+      const transaction_dispatch& dispatch) = 0;
+};
+
+/*! \brief Caller-owned operation session and attempt nonce for fresh work. */
+class transaction_operation_execution_authority_source {
+public:
+  virtual ~transaction_operation_execution_authority_source() = default;
+
+  [[nodiscard]] virtual operation_dispatch_execution_authority operation(
+      const transaction_run_journal_record& record,
+      const transaction_run& run,
+      const transaction_dispatch& dispatch) = 0;
+};
+
 /*! \brief Caller-owned source of concrete resources for one fresh dispatch. */
 class transaction_dispatch_execution_authority_source {
 public:
@@ -65,6 +98,34 @@ public:
       const transaction_run_journal_record& record,
       const transaction_run& run,
       const transaction_dispatch& dispatch) = 0;
+};
+
+/*! \brief Compose one shared construction/check source with operation input. */
+class composed_transaction_dispatch_execution_authority_source final
+    : public transaction_dispatch_execution_authority_source {
+public:
+  composed_transaction_dispatch_execution_authority_source(
+      transaction_dispatch_session_source& sessions,
+      transaction_operation_execution_authority_source& operations);
+
+  [[nodiscard]] construction_session construction(
+      const transaction_run_journal_record& record,
+      const transaction_run& run,
+      const transaction_dispatch& dispatch) override;
+
+  [[nodiscard]] transaction_check_session check(
+      const transaction_run_journal_record& record,
+      const transaction_run& run,
+      const transaction_dispatch& dispatch) override;
+
+  [[nodiscard]] operation_dispatch_execution_authority operation(
+      const transaction_run_journal_record& record,
+      const transaction_run& run,
+      const transaction_dispatch& dispatch) override;
+
+private:
+  transaction_dispatch_session_source& sessions_;
+  transaction_operation_execution_authority_source& operations_;
 };
 
 /*! \brief Caller-owned source of exact evidence for one active restart item. */

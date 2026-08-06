@@ -42,8 +42,12 @@ public:
             evidence_store_directory_fd)),
         effects_(posix_effect_journal_store::from_directory_fd(
             effect_store_directory_fd)),
+        execution_(authorities_.sessions, authorities_.operation_execution),
+        recovery_context_(
+            authorities_.sessions, backends.construction, backends.check,
+            authorities_.operation_recovery),
+        recovery_(evidence_, recovery_context_),
         construction_(backends.construction), check_(backends.check),
-        recovery_(evidence_, authorities_.recovery),
         operation_(
             posix_transaction_effect_driver_source::from_lock_directory_fd(
                 target_lock_directory_fd, backends.application,
@@ -77,7 +81,7 @@ private:
   transaction_run_advance_authorities semantic_authorities() noexcept
   {
     return transaction_run_advance_authorities{
-        authorities_.progress, authorities_.execution, recovery_};
+        authorities_.progress, execution_, recovery_};
   }
 
   transaction_run_advance_drivers drivers() noexcept
@@ -95,9 +99,11 @@ private:
   posix_transaction_run_journal_store runs_;
   posix_transaction_run_evidence_store evidence_;
   posix_effect_journal_store effects_;
+  composed_transaction_dispatch_execution_authority_source execution_;
+  native_transaction_dispatch_recovery_context_source recovery_context_;
+  stored_transaction_dispatch_recovery_authority_source recovery_;
   native_construction_driver construction_;
   native_transaction_check_driver check_;
-  stored_transaction_dispatch_recovery_authority_source recovery_;
   std::unique_ptr<posix_transaction_effect_driver_source> operation_;
   canonical_transaction_dispatch_nonce_source dispatch_nonces_;
 };

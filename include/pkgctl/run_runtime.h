@@ -18,8 +18,9 @@ namespace pkgctl {
 /*! \brief Semantic authorities borrowed by one runtime. */
 struct transaction_run_runtime_authorities final {
   transaction_progress_rehydration_source& progress;
-  transaction_dispatch_execution_authority_source& execution;
-  transaction_dispatch_recovery_context_source& recovery;
+  transaction_dispatch_session_source& sessions;
+  transaction_operation_execution_authority_source& operation_execution;
+  transaction_operation_recovery_authority_source& operation_recovery;
   transaction_effect_archive_source& archives;
 };
 
@@ -34,9 +35,10 @@ struct transaction_run_runtime_backends final {
 
 /*! \brief POSIX journal and native-driver composition for bounded run control.
  *
- * The caller supplies existing directory descriptors, semantic
- * execution and recovery-context sources, archive authority, and already
- * selected physical backends. The runtime duplicates all four descriptors, owns one run store,
+ * The caller supplies existing directory descriptors, one shared deterministic
+ * construction/check session source, operation execution/recovery sources,
+ * archive authority, and already selected physical backends. The runtime
+ * duplicates all four descriptors, owns one run store,
  * one construction/check evidence store, one effect store, native
  * construction/check drivers, one POSIX per-dispatch
  * effect source, and canonical committed-head dispatch nonce authority.
