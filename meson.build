@@ -163,10 +163,9 @@ libpkgcheck_exec_dep = dependency(
   static: want_static,
 )
 
-pkgctl_authority_deps = [
+pkgctl_core_authority_deps = [
   libcrypto_dep,
   libpkgsource_dep,
-  libpkgsource_yaml_dep,
   libpkgcatalog_dep,
   libpkgcatalog_acquire_dep,
   libpkgstate_dep,

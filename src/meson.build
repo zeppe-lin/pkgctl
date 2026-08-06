@@ -40,12 +40,12 @@ pkgctl_core = static_library(
     'session.cpp',
   ],
   include_directories: pkgctl_inc,
-  dependencies: pkgctl_authority_deps,
+  dependencies: pkgctl_core_authority_deps,
   install: false,
 )
 
 pkgctl_core_dep = declare_dependency(
   link_with: pkgctl_core,
   include_directories: pkgctl_inc,
-  dependencies: pkgctl_authority_deps,
+  dependencies: pkgctl_core_authority_deps,
 )

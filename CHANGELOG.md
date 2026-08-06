@@ -18,6 +18,9 @@
   requires a checksummed durable head; no imaginary legacy history is decoded.
 - Adds no package-input materializer, scheduler, discovery policy, retry loop,
   or mutating command.
+- Keeps `libpkgsource-yaml` at the command diagnostic boundary: the controller
+  core does not link the syntax adapter, while the CLI reports its exact typed
+  parser failures without translating them into controller authority.
 
 ### Dependency contract
 

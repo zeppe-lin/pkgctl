@@ -1578,6 +1578,11 @@ Reports remain deterministic line-oriented diagnostics. They expose exact
 session and subordinate authority identities but are not authority themselves.
 A machine protocol requires a separate versioned contract.
 
+Catalog acquisition deliberately preserves `pkgsource::yaml::yaml_error`. The
+command frontend names that adapter-owned type directly so it can render source
+location and protocol path. The controller core neither includes nor links the
+YAML adapter; syntax parsing remains outside controller authority.
+
 Release 0.8.0 adds no effect-implying CLI command. `catalog`, `resolve`, and
 `transaction` remain read-only. Recursive construction scheduling, check
 execution, selecting among ready units, durable progression or preparation,

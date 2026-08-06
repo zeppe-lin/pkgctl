@@ -147,7 +147,7 @@ int main(int argc, char** argv)
               << pkgcatalog::acquire::to_string(value.code()) << ": "
               << value.what() << '\n';
   }
-  catch (const pkgsource::yaml_adapter::yaml_error& value)
+  catch (const pkgsource::yaml::yaml_error& value)
   {
     std::cerr << "pkgctl: yaml: " << value.document() << ':'
               << value.line() << ':' << value.column() << ": "

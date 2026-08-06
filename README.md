@@ -529,6 +529,8 @@ diagnostics, and presentation.
 The following meanings remain external:
 
 - recipe and profile syntax: `libpkgsource-yaml`;
+  the executable reports its typed parser diagnostics directly, while the
+  controller core does not link the syntax adapter;
 - available package universe: `libpkgcatalog` and
   `libpkgcatalog-acquire`;
 - installed truth, planner projection, and publication: `libpkgstate`,
