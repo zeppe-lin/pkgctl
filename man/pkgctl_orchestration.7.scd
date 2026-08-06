@@ -63,8 +63,8 @@ store, one POSIX construction/check evidence store, one POSIX effect store, nati
 construction and check drivers, and one caller-configured POSIX per-dispatch
 effect source.
 
-The runtime borrows semantic progression rehydration, exact dispatch execution
-and recovery sources, archive lookup, construction and check execution
+The runtime borrows semantic progression rehydration, exact dispatch execution and recovery-context
+sources, archive lookup, construction and check execution
 backends, application and lifecycle backends, and the canonical state store.
 The caller must keep every borrowed authority alive. Run intent is supplied
 explicitly to *launch*, while dispatch nonce derivation is owned mechanically by
@@ -411,6 +411,35 @@ remains the responsibility of a later caller-owned recovery provider.
 This boundary performs no record discovery, semantic reconstruction, resource
 realization, backend selection, process adoption, retry policy, scheduling,
 cleanup, compaction, garbage collection, or command action.
+
+# EVIDENCE-BACKED CONSTRUCTION AND CHECK RECOVERY
+
+Version 0.29.0 composes one exact durable construction/check record with the
+semantic bodies required by the existing subordinate decoder. The store-backed
+recovery source first selects by journal, dispatch, and attempt session. It then
+asks a caller-owned context source for the exact admitted controller session,
+execution request, backend capability profile, and, for construction, source
+materialization.
+
+Every supplied body must reproduce the transaction, graph node, controller
+request, build/check request, retained construction, materialization, execution
+request, and backend identities recorded durably. Only then may the source call
+the canonical *libpkgbuild-exec* or *libpkgcheck-exec* decoder. The decoded
+execution and result identities are checked again, and the private controller
+result is accepted only when the original canonical result identity is
+reproduced.
+
+No durable identity is promoted into a semantic body. Missing evidence means a
+started dispatch has no recoverable construction/check execution record; it does
+not mean that execution never began and does not release the reservation.
+Foreign or contradictory context and subordinate decoder refusal fail before
+run reconciliation. Operation recovery remains delegated to the exact effect
+journal checkpoint and never consults this evidence store.
+
+The POSIX transaction runtime owns the store-backed recovery source and borrows
+only the context provider. This boundary does not discover sessions, resources,
+paths, source objects, execution requests, backends, or processes; choose a
+retry; or add a command action.
 
 # SINGLE-DISPATCH EXECUTION
 

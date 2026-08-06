@@ -117,6 +117,18 @@ original request, execution-request, backend-profile, source-materialization,
 and resource authorities. It must not discover those authorities, scan indexes,
 or promote an identity into semantic evidence.
 
+The evidence-backed recovery layer may select only the exact typed index named
+by the committed journal, dispatch, and attempt. It must obtain complete context
+bodies from a caller-owned source, prove every body against the identities in the
+durable record, invoke the existing subordinate decoder, and reproduce the
+canonical controller-result identity before returning recovery authority. It
+must treat absent evidence as unresolved started ownership, not as a releasable
+reservation. It must not discover paths, reconstruct a request from identities,
+substitute a current backend profile, accept a semantically similar session, or
+parse subordinate bytes through a second codec. Operation recovery remains an
+effect-journal responsibility and must not be routed through construction/check
+objects.
+
 The operation-driver source layer must acquire one call-scoped physical driver
 only from an exact validated execution or recovery handoff. Fresh acquisition
 must occur after the reservation successor is committed and before effect

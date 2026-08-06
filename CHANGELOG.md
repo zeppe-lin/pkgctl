@@ -1,3 +1,35 @@
+## 0.29.0 - 2026-08-07
+
+### Evidence-backed construction and check recovery
+
+- Adds a typed recovery-context source for the exact semantic bodies which the
+  durable construction/check store deliberately does not own: the admitted
+  controller session, subordinate execution request, backend capability
+  profile, and, for construction, genuine source-materialization authority.
+- Adds a store-backed recovery-authority source which selects evidence by the
+  exact run journal, dispatch, and attempt session; validates every retained
+  transaction, node, request, materialization, execution, backend, and result
+  identity; invokes the existing canonical build/check decoder; and rebuilds
+  the controller result only when its canonical identity is reproduced.
+- Makes the caller-configured POSIX transaction runtime own that store-backed
+  recovery composition. Callers provide context bodies, not reconstructed
+  construction/check results and not identity-shaped substitutes. Operation
+  recovery remains delegated to the effect-journal authority boundary.
+- Missing evidence remains unresolved started work. It is never translated
+  into "the dispatch did not run," released ownership, or a fabricated result.
+  Foreign context, contradictory decoded evidence, and decoder refusal fail
+  through typed durable-evidence errors before run reconciliation.
+- Qualifies exact construction and check replay after closing and reopening the
+  POSIX evidence store, rejection of absent and foreign context, operation
+  delegation, and the runtime-owned recovery topology.
+- Adds no context discovery, source/resource reconstruction, process adoption,
+  scheduler, retry policy, garbage collection, mutating command, or new
+  subordinate durable encoding.
+
+### Dependency contract
+
+- No dependency floor changes.
+
 ## 0.28.0 - 2026-08-06
 
 ### Durable construction and check evidence barrier

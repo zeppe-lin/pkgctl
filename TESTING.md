@@ -1,5 +1,35 @@
 # pkgctl testing
 
+## Release 0.29.0 recovery qualification
+
+The evidence-backed recovery suite must prove:
+
+- construction and check evidence are selected only by the exact durable run
+  journal, dispatch, and attempt session;
+- missing evidence refuses recovery before the context source is called;
+- the caller supplies complete semantic bodies rather than result identities;
+- every controller session, transaction, graph node, request, materialization,
+  execution request, backend profile, subordinate execution, and result identity
+  agrees with the durable record;
+- the existing `libpkgbuild-exec` and `libpkgcheck-exec` decoders are used and no
+  second subordinate codec or controller result parser exists;
+- a recovered controller result reproduces the exact fresh canonical identity
+  and canonical subordinate encoding after the POSIX store is closed and
+  reopened;
+- foreign construction sessions, source materializations, execution requests,
+  backend profiles, build requests, check requests, or retained constructions
+  fail before transaction-run reconciliation;
+- operation recovery bypasses the construction/check store and remains delegated
+  to the exact effect-journal recovery authority;
+- the POSIX transaction runtime owns one store-backed recovery source and borrows
+  only the caller's context provider;
+- no recovery path calls `from_sha256`, scans for semantic bodies, infers that
+  missing evidence means no execution occurred, or fabricates controller result
+  identity.
+
+The native Meson pass must run the recovered construction and check tests under
+ASan and UBSan against the complete staged dependency closure.
+
 The suite protects authority composition rather than implementation shape.
 
 ## Release 0.28.0 durable evidence qualification

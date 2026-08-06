@@ -13,6 +13,62 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.29.0 evidence-backed semantic recovery boundary
+
+Release 0.29.0 composes the durable construction/check evidence store with the
+existing subordinate decoders and controller recovery handoff:
+
+```text
+started durable dispatch
+          |
+          v
+exact journal / dispatch / attempt index
+          |
+          v
+canonical subordinate result bytes
+          +
+caller-owned original semantic context bodies
+          |
+          v
+validate every retained identity
+          |
+          v
+libpkgbuild-exec or libpkgcheck-exec canonical decoder
+          |
+          v
+recompute exact pkgctl controller-result identity
+          |
+          v
+transaction dispatch recovery handoff
+```
+
+The store-backed source owns selection and validation, not context discovery.
+For construction, the caller supplies the exact admitted construction session,
+genuine source materialization, execution request, and backend capability
+profile. For check, it supplies the exact admitted check session, execution
+request, and backend profile. The durable record already binds the identities
+of those bodies; the source refuses any mismatch before decoding.
+
+The subordinate decoder receives complete original authorities rather than
+identity-shaped substitutes. Its decoded execution, request, backend, build or
+check result, and controller request are checked again against the durable
+record. The controller then reconstructs the private result body only through
+the same canonical identity domain used during fresh execution. A different
+identity is corruption or foreign context, not a recoverable variation.
+
+An absent evidence record means a started dispatch lacks recoverable execution
+evidence. It is not interpreted as a never-started reservation and does not
+release ownership. Operation recovery remains delegated to the effect-journal
+boundary because construction/check evidence storage does not own lifecycle,
+application, publication, or target-observation records.
+
+`posix_transaction_run_runtime` now owns this store-backed recovery composition.
+It borrows a context source rather than a caller-created construction/check
+result source. The caller is still responsible for locating and realizing the
+original sessions, source objects, execution requests, backend profiles, and
+concrete resources. This release performs no context discovery, process
+adoption, retry selection, scheduling, cleanup, or frontend mutation.
+
 ## Release 0.28.0 durable construction/check evidence boundary
 
 Release 0.28.0 closes the physical durability gap between successful

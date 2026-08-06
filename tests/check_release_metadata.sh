@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.28.0
+version=0.29.0
 
 require_line()
 {
@@ -20,22 +20,22 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 28;'
+  'inline constexpr unsigned version_minor = 29;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.28.0";'
+  'inline constexpr const char* version_string = "0.29.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 28);'
+  'static_assert(pkgctl::version_minor == 29);'
 
-grep -F '## 0.28.0 - 2026-08-06' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.28.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.28.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.29.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.29.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.29.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
-grep -F 'construction/check evidence' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'descriptor-anchored evidence store' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'no semantic result is reconstructed from identities' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Version 0.28.0 commits construction and check evidence' \
+grep -F 'Evidence-backed construction and check recovery' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Missing evidence remains unresolved started work' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'caller-configured POSIX transaction runtime own' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Version 0.29.0 composes one exact durable construction/check record' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 for contract in \

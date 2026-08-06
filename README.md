@@ -6,20 +6,28 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.28.0 adds durable construction and check evidence between
-started dispatch ownership and terminal run retirement. The runtime stores the
-exact canonical build/check execution encoding as an immutable content object,
-then publishes one typed journal/dispatch/attempt index. Evidence publication
-must complete before the terminal run successor may retire the dispatch.
+Release 0.29.0 closes the semantic half of construction/check restart
+recovery without moving authority into the durable store. The runtime selects
+one exact evidence record by run journal, dispatch, and attempt session, asks a
+caller-owned context source for the original admitted session, execution
+request, backend profile, and source materialization where required, validates
+those bodies against every retained identity, and invokes the existing
+canonical build/check decoder. The controller result is accepted only when its
+canonical identity is reproduced exactly.
 
-The evidence store is controller-owned physical memory, not a new build or
-check model. It retains every context identity required for later recovery but
-does not reconstruct semantic results from identities. Complete restart still
-requires caller-owned providers for the original source materialization,
-request, execution-request, backend-profile, and concrete resource authorities.
-The caller-configured POSIX runtime therefore retains four directory
-authorities: a run-journal directory, a construction/check evidence directory,
-an effect-journal directory, and a target-lock directory. The command surface remains read-only.
+Missing evidence remains unresolved started work. Foreign context and
+contradictory decoded evidence fail closed; no identity is promoted into a
+semantic body. Operation recovery remains owned by the effect-journal path.
+The caller still owns discovery and realization of the context bodies, so this
+release adds no path scan, resource materializer, process adoption, scheduler,
+retry loop, or mutating command. The command surface remains read-only.
+
+Release 0.28.0 added the preceding durable evidence barrier. Construction and
+check execution publish the exact canonical subordinate result encoding as an
+immutable content object and then publish one typed journal/dispatch/attempt
+index before terminal run retirement. The caller-configured POSIX runtime
+retains four directory authorities: run journal, construction/check evidence,
+effect journal, and target lock.
 
 Release 0.27.0 makes construction inputs resolver-issued authority rather
 than caller-written digest bundles. Concrete package resources are admitted only
@@ -525,7 +533,7 @@ selected durable journal, and destructive convergence choice is explicit.
 `--converge-exact`. The inspection commands open only the exact existing store
 and identity supplied by the caller.
 
-There are no effect-implying CLI commands in 0.27.0. The command frontend
+There are no effect-implying CLI commands in 0.29.0. The command frontend
 executes no source acquisition, build, check, planner, lifecycle, application,
 publication, restart, reconciliation, or repair authority. The library can
 execute or reconcile one caller-selected dispatch only through injected drivers,
