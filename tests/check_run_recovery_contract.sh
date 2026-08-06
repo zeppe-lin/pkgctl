@@ -23,6 +23,12 @@ for required in \
   'struct construction_dispatch_recovery_context final' \
   'struct check_dispatch_recovery_context final' \
   'class transaction_dispatch_recovery_context_source' \
+  'class transaction_operation_recovery_authority_source' \
+  'class native_transaction_dispatch_recovery_context_source final' \
+  'transaction_dispatch_session_source& sessions_' \
+  'pkgexec::execution_backend& construction_backend_' \
+  'pkgexec::execution_backend& check_backend_' \
+  'transaction_operation_recovery_authority_source& operations_' \
   'class stored_transaction_dispatch_recovery_authority_source final' \
   'transaction_run_evidence_store& evidence_' \
   'transaction_dispatch_recovery_context_source& context_' \
@@ -33,7 +39,10 @@ for required in \
   'evidence_missing' \
   'recovery_context_mismatch' \
   'recovery_decode_failed' \
-  'detail_run_recovery_access'; do
+  'detail_run_recovery_access' \
+  'pkgfetch::materialize(' \
+  'pkgbuild_exec::seal_execution_request(' \
+  'pkgcheck_exec::seal_execution_request('; do
   grep -F "$required" "$header" "$source" \
       "$srcdir/include/pkgctl/run_evidence.h" >/dev/null || {
     echo "missing evidence recovery contract: $required" >&2
@@ -46,7 +55,8 @@ for required_test in \
   'construction_dispatch_evidence_record::admit' \
   'stored_transaction_dispatch_recovery_authority_source recovery_source' \
   'transaction_run_evidence_error_code::evidence_missing' \
-  'recovery_context_mismatch'; do
+  'recovery_context_mismatch' \
+  'check_posix_transaction_run_runtime_recovery'; do
   grep -F "$required_test" "$construction" >/dev/null || {
     echo "missing construction evidence recovery test: $required_test" >&2
     exit 1
@@ -58,7 +68,8 @@ for required_test in \
   'check_dispatch_evidence_record::admit' \
   'stored_transaction_dispatch_recovery_authority_source recovery_source' \
   'transaction_run_evidence_error_code::evidence_missing' \
-  'recovery_context_mismatch'; do
+  'recovery_context_mismatch' \
+  'native_transaction_dispatch_recovery_context_source'; do
   grep -F "$required_test" "$check" >/dev/null || {
     echo "missing check evidence recovery test: $required_test" >&2
     exit 1

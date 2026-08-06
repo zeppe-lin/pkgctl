@@ -44,6 +44,15 @@ core_modules=$(sed -n "s/^core_modules='\(.*\)'$/\1/p" "$direct_build")
 }
 
 reviewed_core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
+for constraint in \
+  'libpkgbuild-exec >= 2.1.0' 'libpkgbuild-exec < 3.0.0' \
+  'libpkgcheck-exec >= 0.4.0' 'libpkgcheck-exec < 1.0.0'; do
+  grep -F "'$constraint'" "$direct_build" >/dev/null || {
+    echo "direct qualification omits adapter API constraint: $constraint" >&2
+    exit 1
+  }
+done
+
 [ "$core_modules" = "$reviewed_core_modules" ] || {
   echo 'direct qualification core module closure differs from review' >&2
   echo "expected: $reviewed_core_modules" >&2

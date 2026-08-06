@@ -25,8 +25,11 @@ for required in \
   'transaction_run_nonce run_nonce' \
   'canonical_transaction_dispatch_nonce_source dispatch_nonces_' \
   'transaction_progress_rehydration_source& progress' \
-  'transaction_dispatch_execution_authority_source& execution' \
-  'transaction_dispatch_recovery_context_source& recovery' \
+  'transaction_dispatch_session_source& sessions' \
+  'transaction_operation_execution_authority_source& operation_execution' \
+  'transaction_operation_recovery_authority_source& operation_recovery' \
+  'composed_transaction_dispatch_execution_authority_source execution_' \
+  'native_transaction_dispatch_recovery_context_source recovery_context_' \
   'stored_transaction_dispatch_recovery_authority_source recovery_' \
   'transaction_effect_archive_source& archives' \
   'struct transaction_run_runtime_backends final' \
@@ -41,6 +44,8 @@ for required in \
   'posix_transaction_effect_driver_source::from_lock_directory_fd' \
   'native_construction_driver' \
   'native_transaction_check_driver' \
+  'execution_(authorities_.sessions, authorities_.operation_execution)' \
+  'authorities_.sessions, backends.construction, backends.check' \
   'launch_transaction_run(' \
   'drive_transaction_run('; do
   grep -F "$required" "$header" "$source" >/dev/null || {
@@ -86,6 +91,8 @@ for required_test in \
   'transaction_run_launch_origin::admitted' \
   'transaction_run_drive_disposition::completed' \
   'executed_construction' \
+  'reconciled_construction' \
+  'execution.calls() == 1U' \
   'archives.calls() == 0U' \
   'directory_entry_count(run_path) == 0U' \
   'directory_entry_count(selected_evidence_path) >= 3U' \
@@ -103,7 +110,9 @@ for required_doc in \
   'Caller-configured POSIX transaction-run runtime' \
   'Release 0.25.0 native transaction-run runtime boundary' \
   'CALLER-CONFIGURED POSIX TRANSACTION-RUN RUNTIME' \
-  'construction/check evidence directory'; do
+  'construction/check evidence directory' \
+  'Release 0.30.0 shared session and pure recovery projection boundary' \
+  'SHARED CONSTRUCTION AND CHECK SESSION AUTHORITY'; do
   grep -F "$required_doc" "$srcdir/CHANGELOG.md" "$design" "$manual" \
       >/dev/null || {
     echo "missing POSIX transaction-run runtime documentation: $required_doc" >&2

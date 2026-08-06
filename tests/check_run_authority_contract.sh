@@ -23,8 +23,14 @@ for required in \
   'transaction_dispatch_execution_authority_body' \
   'transaction_dispatch_recovery_authority_body' \
   'transaction_progress_rehydration_source' \
+  'transaction_dispatch_session_source' \
+  'transaction_operation_execution_authority_source' \
   'transaction_dispatch_execution_authority_source' \
+  'composed_transaction_dispatch_execution_authority_source' \
   'transaction_dispatch_recovery_authority_source' \
+  'sessions_.construction(record, run, dispatch)' \
+  'sessions_.check(record, run, dispatch)' \
+  'operations_.operation(record, run, dispatch)' \
   'transaction_dispatch_execution_handoff' \
   'transaction_dispatch_recovery_handoff' \
   'rehydrate_transaction_run' \
@@ -108,6 +114,7 @@ ordered_tokens "$recovery_body" \
 for required_test in \
   'fixed_progress_source' \
   'construction_execution_authority_source' \
+  'unreachable_operation_execution_authority_source' \
   'construction_recovery_authority_source' \
   'check_execution_authority_source' \
   'check_recovery_authority_source' \

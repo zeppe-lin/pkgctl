@@ -9,6 +9,9 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-direct.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
 core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
+pkg-config --exists \
+  'libpkgbuild-exec >= 2.1.0' 'libpkgbuild-exec < 3.0.0' \
+  'libpkgcheck-exec >= 0.4.0' 'libpkgcheck-exec < 1.0.0'
 core_cflags=$(pkg-config --cflags $core_modules)
 core_libs=$(pkg-config --libs $core_modules)
 yaml_cflags=$(pkg-config --cflags libpkgsource-yaml)
@@ -67,6 +70,7 @@ done
 "$srcdir/tests/check_dispatch_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_journal_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_execute_contract.sh" "$srcdir"
+"$srcdir/tests/check_run_evidence_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_recovery_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_reconcile_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_admit_contract.sh" "$srcdir"

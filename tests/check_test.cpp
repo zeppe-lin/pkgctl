@@ -147,7 +147,8 @@ private:
 
 
 class check_execution_authority_source final
-    : public pkgctl::transaction_dispatch_execution_authority_source {
+    : public pkgctl::transaction_dispatch_execution_authority_source,
+      public pkgctl::transaction_dispatch_session_source {
 public:
   explicit check_execution_authority_source(
       pkgctl::transaction_check_session session)
@@ -337,6 +338,19 @@ enum class check_backend_mode {
   unavailable,
   program_failed,
 };
+
+class unreachable_operation_recovery_context_source final
+    : public pkgctl::transaction_operation_recovery_authority_source {
+public:
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation recovery context request");
+  }
+};
+
 
 class check_backend final : public pkgexec::execution_backend {
 public:
@@ -1625,6 +1639,23 @@ void check_stored_check_recovery()
   }
   CHECK(mismatched);
   CHECK(foreign_context.calls() == 1U);
+
+  check_execution_authority_source sessions(session);
+  unreachable_operation_recovery_context_source operations;
+  pkgctl::native_transaction_dispatch_recovery_context_source native_context(
+      sessions, backend, backend, operations);
+  pkgctl::stored_transaction_dispatch_recovery_authority_source native_source(
+      evidence_store, native_context);
+  auto native_recovery =
+      pkgctl::acquire_transaction_dispatch_recovery_authority(
+          checkpoint, *reservation.dispatch, native_source);
+  CHECK(sessions.calls() == 1U);
+  CHECK(native_recovery.check() != nullptr);
+  if (native_recovery.check())
+  {
+    CHECK(native_recovery.check()->identity() == result.identity());
+    CHECK(native_recovery.check()->session().identity() == session.identity());
+  }
 }
 
 void check_single_step_check_advancement()

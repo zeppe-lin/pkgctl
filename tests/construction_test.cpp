@@ -354,7 +354,8 @@ private:
 };
 
 class construction_execution_authority_source final
-    : public pkgctl::transaction_dispatch_execution_authority_source {
+    : public pkgctl::transaction_dispatch_execution_authority_source,
+      public pkgctl::transaction_dispatch_session_source {
 public:
   explicit construction_execution_authority_source(
       pkgctl::construction_session session)
@@ -597,6 +598,30 @@ public:
       const pkgctl::transaction_dispatch&) override
   {
     throw std::runtime_error("reserved recovery requested operation evidence");
+  }
+};
+
+class unreachable_operation_execution_authority_source final
+    : public pkgctl::transaction_operation_execution_authority_source {
+public:
+  pkgctl::operation_dispatch_execution_authority operation(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_run&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation execution authority request");
+  }
+};
+
+class unreachable_operation_recovery_context_source final
+    : public pkgctl::transaction_operation_recovery_authority_source {
+public:
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_restart_checkpoint&,
+      const pkgctl::transaction_dispatch_restart_assessment&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected operation recovery authority request");
   }
 };
 
@@ -2083,6 +2108,26 @@ void check_stored_construction_recovery()
   }
   CHECK(mismatched);
   CHECK(foreign_context.calls() == 1U);
+
+  construction_execution_authority_source sessions(session);
+  unreachable_operation_recovery_context_source operations;
+  pkgctl::native_transaction_dispatch_recovery_context_source native_context(
+      sessions, backend, backend, operations);
+  pkgctl::stored_transaction_dispatch_recovery_authority_source native_source(
+      evidence_store, native_context);
+  auto native_recovery =
+      pkgctl::acquire_transaction_dispatch_recovery_authority(
+          checkpoint, *reservation.dispatch, native_source);
+  CHECK(sessions.calls() == 1U);
+  CHECK(native_recovery.construction() != nullptr);
+  if (native_recovery.construction())
+  {
+    CHECK(native_recovery.construction()->identity() == result.identity());
+    CHECK(native_recovery.construction()->session().identity() ==
+          session.identity());
+    CHECK(native_recovery.construction()->materialization().identity() ==
+          result.materialization().identity());
+  }
 }
 
 void check_single_step_transaction_advancement()
@@ -2482,7 +2527,8 @@ void check_posix_transaction_run_runtime_recovery()
 
   fixed_progress_source progress_source(started_run.progress());
   construction_execution_authority_source execution(session);
-  construction_recovery_context_source recovery(result);
+  unreachable_operation_execution_authority_source operation_execution;
+  unreachable_operation_recovery_context_source operation_recovery;
   forbidden_runtime_archive_source archives;
   unreachable_runtime_application_backend application_backend;
 
@@ -2492,7 +2538,8 @@ void check_posix_transaction_run_runtime_recovery()
   const int lock_fd = open_runtime_directory(lock_path);
   auto runtime = pkgctl::posix_transaction_run_runtime::from_directory_fds(
       run_fd, evidence_fd, effect_fd, lock_fd,
-      {progress_source, execution, recovery, archives},
+      {progress_source, execution, operation_execution, operation_recovery,
+       archives},
       {execution_backend, execution_backend, application_backend,
        execution_backend, state_store});
   CHECK(::close(run_fd) == 0);
@@ -2514,8 +2561,7 @@ void check_posix_transaction_run_runtime_recovery()
   CHECK(recovered.record().sequence() == 3U);
   CHECK(recovered.run().progress().complete());
   CHECK(progress_source.calls() == 1U);
-  CHECK(execution.calls() == 0U);
-  CHECK(recovery.calls() == 1U);
+  CHECK(execution.calls() == 1U);
   CHECK(archives.calls() == 0U);
   CHECK(directory_entry_count(effect_path) == 0U);
   CHECK(directory_entry_count(lock_path) == 0U);
@@ -2541,7 +2587,8 @@ void check_posix_transaction_run_runtime()
 
   fixed_progress_source progress_source(progress);
   construction_execution_authority_source execution(std::move(session));
-  unreachable_recovery_context_source recovery;
+  unreachable_operation_execution_authority_source operation_execution;
+  unreachable_operation_recovery_context_source operation_recovery;
   forbidden_runtime_archive_source archives;
   fixture_backend execution_backend(backend_mode::succeed);
   unreachable_runtime_application_backend application_backend;
@@ -2564,7 +2611,8 @@ void check_posix_transaction_run_runtime()
   const int lock_fd = open_runtime_directory(lock_path);
   auto runtime = pkgctl::posix_transaction_run_runtime::from_directory_fds(
       run_fd, evidence_fd, effect_fd, lock_fd,
-      {progress_source, execution, recovery, archives},
+      {progress_source, execution, operation_execution, operation_recovery,
+       archives},
       {execution_backend, execution_backend, application_backend,
        execution_backend, state_store});
   CHECK(::close(run_fd) == 0);
@@ -2625,7 +2673,8 @@ void check_posix_transaction_run_runtime()
     {
       (void)pkgctl::posix_transaction_run_runtime::from_directory_fds(
           -1, valid_evidence, valid_effect, valid_lock,
-          {progress_source, execution, recovery, archives},
+          {progress_source, execution, operation_execution,
+           operation_recovery, archives},
           {execution_backend, execution_backend, application_backend,
            execution_backend, state_store});
     }
