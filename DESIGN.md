@@ -1155,11 +1155,11 @@ request and terminal check result.
 
 Release 0.8.0 adds no durable progression/check store or effectful command frontend.
 
-## Release 0.6.0 operation-preparation boundary
+## Historical release 0.6.0 operation-preparation boundary
 
-Release 0.6.0 prepares one exact target action already present in a sealed
-transaction program. It accepts only `install`, `upgrade`, or `remove`. The
-caller supplies:
+Release 0.6.0 introduced preparation for one exact target action already
+present in a sealed transaction program. It accepted only `install`, `upgrade`,
+or `remove`. The caller supplied:
 
 1. the exact `transaction_session` and target-action node;
 2. one matching completed `construction_result` for install or upgrade;
@@ -1169,18 +1169,17 @@ caller supplies:
 6. one complete lifecycle order and, for installation, an installation reason;
 7. one injected read-only artifact-projection driver.
 
-The controller first projects the complete canonical installed snapshot through
-`libpkgstate-plan`. Incoming operations must identify the exact transaction
-`build` node ordered before the target action, and both nodes must carry one
-resolver selection. `libpkgbuild-plan` then reopens the retained artifact,
-verifies its bytes and payload against the build result, and projects the exact
-candidate, image, and artifact facts required by `libpkgplan`.
+The original 0.6 mechanism projected the installed snapshot through
+`libpkgstate-plan`, then used an injected artifact driver to reopen and inspect
+package bytes before planner projection. That mechanism is historical. Release
+0.27.0 removed controller artifact I/O: incoming preparation now consumes the
+complete `libpkgbuild-image` authority retained by construction and passes it to
+the pure `libpkgbuild-plan` adapter.
 
-Preparation requires the new inspection to reproduce the construction receipt's
-archive digest, normalized image identity, and entry count. The inspection
-backend identity may differ: it is evidence provenance, not package truth. The
-result identity nevertheless retains the exact new receipt and incoming-package
-authority actually used for planning.
+Current preparation requires the projection to retain the exact build result,
+archive digest, normalized image identity, entry count, artifact identity, and
+manifest identity already established by construction. It selects no inspection
+backend and creates no replacement receipt.
 
 The package-local sequence is:
 
@@ -1189,7 +1188,7 @@ validate transaction action and construction binding
         ↓
 project complete installed truth through libpkgstate-plan
         ↓
-reinspect and project incoming artifact through libpkgbuild-plan
+project retained build/image authority through libpkgbuild-plan
         ↓
 admit incoming package authority through libpkgapply
         ↓
@@ -1236,48 +1235,47 @@ the target lease, admit executable lifecycle sessions, call an application
 backend, or publish installed state. It adds no scheduler, recursive
 construction, check execution, durable preparation journal, or command frontend.
 
-## Release 0.5.0 construction boundary
+## Historical release 0.5.0 construction boundary
 
-Release 0.5.0 adds one backend-neutral construction session for one exact
-catalog-backed `build` node already present in a sealed transaction program.
-The caller supplies:
+Release 0.5.0 introduced one backend-neutral construction session for one
+exact catalog-backed `build` node. Its original API accepted caller-written
+package-input subjects, tree identities, and a separately assembled build
+request. Those values were removed in 0.27.0 because they duplicated resolver
+authority and claimed a package-tree authority that no production component
+issued.
 
-1. the exact `transaction_session` and build-node identity;
-2. every exact `libpkgbuild` package-input subject and tree identity;
-3. resolver-selected build and target architectures retained by the node;
-4. one closed build policy and bounded source-acquisition policy;
-5. explicit local-source, content-store, root-view, workspace, output, and
-   artifact coordinates;
-6. concrete dependency-tree paths, interpreter identity, and numeric
-   credentials;
-7. one injected backend-neutral construction driver.
+The current request is sealed directly from the transaction's exact
+`libpkgresolve` result and selected build node. The caller supplies only one
+closed build policy and bounded acquisition policy. The admitted session then
+adds explicit local-source, content-store, root-view, workspace, output, and
+artifact coordinates; one concrete `pkgexec::resource_identity` and host path
+for every resolver-backed logical build/check input; interpreter identity;
+numeric credentials; and one injected backend-neutral construction driver.
 
 Admission proves that the selected node is a catalog-authorized build node, its
-candidate source and release agree with resolver authority, and all build/check
-inputs form a valid `libpkgbuild` input set. Each input must match the resolver's
-exact required package, release, source snapshot, and build environment. Every
-concrete dependency tree belongs to one exact requested input. Call-scoped paths
-are normalized and checked for unsafe overlap before source acquisition begins.
+candidate source and release agree with resolver authority, and every concrete
+package-input resource matches exactly one logical input already sealed by the
+build request. Missing, duplicate, aliased, and undeclared resources are
+rejected. Call-scoped paths are normalized and checked for unsafe overlap before
+source acquisition begins.
 
 The sequence is:
 
 ```text
-validate construction authority and resources
+seal the build request from transaction resolution and caller policy
+        ↓
+validate call-scoped construction resources
         ↓
 materialize the exact source snapshot through libpkgfetch
-        ↓
-translate observed digests into the complete libpkgbuild source set
-        ↓
-seal the exact build request using resolver architectures and caller policy
         ↓
 admit and execute one libpkgbuild-exec session
         ↓
 retain verified materialization, execution evidence, build result,
-artifact binding, and independent image-inspection receipt
+and the complete libpkgbuild-image admission
 ```
 
 The controller promotes `completed` only when the build result succeeded and
-independent artifact-inspection evidence is present. A backend or adapter
+the complete build/image admission is retained. A backend or adapter
 failure remains a failed build result. Materialization exceptions and driver
 contract violations remain explicit failures; they are not converted into
 synthetic success or partial authority.

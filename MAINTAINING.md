@@ -10,6 +10,24 @@ Controller-owned policy must remain visibly separate from authority results.
 Defaults that can remove packages, mutate filesystems, initialize state, or
 publish state are prohibited.
 
+## Documentation authority
+
+Current-facing documentation is normative for the current controller boundary:
+
+- `README.md` describes the current product and command surface;
+- the newest release section at the top of `DESIGN.md` describes current
+  authority composition;
+- older design sections are historical and must be labelled explicitly when a
+  later release replaced their mechanism;
+- `TESTING.md` states the current qualification contract;
+- installed manual pages describe only current observable behavior; and
+- `CHANGELOG.md` may preserve superseded behavior as release history.
+
+A historical mechanism must not remain in a current testing requirement,
+maintenance rule, manual contract, or unqualified design statement. When an
+authority moves, update the owner documentation and add a negative documentation
+contract for the retired wording in the same change.
+
 ## Dependency direction
 
 The executable directly depends on the exact libraries whose public values it
@@ -21,17 +39,19 @@ and backend-neutral execution authorities, but must not schedule dependency
 graphs or construct a Linux backend.
 
 The preparation layer may depend on the published state-plan, source-plan,
-build-plan, planner, image, and application values. It may inspect exact artifact
-bytes through an injected backend, but must not observe target paths itself,
-normalize package policy, discover runtime closure, execute lifecycle programs,
-mutate the target, or publish state.
+build-plan, planner, image, and application values. Incoming preparation must
+consume the exact `libpkgbuild-image` authority retained by construction and use
+the pure `libpkgbuild-plan` projection. It must not reopen artifact bytes,
+select an inspection backend, re-prove payload/image equality, observe target
+paths itself, normalize package policy, discover runtime closure, execute
+lifecycle programs, mutate the target, or publish state.
 
 The check layer may depend on transaction progression, construction evidence,
 `libpkgcheck`, and `libpkgcheck-exec`. Pure request admission must remain usable
 before host paths exist. Concrete resources, interpreter identity, credentials,
 and limits belong only to the admitted check session. The controller must not
-reimplement input-tree matching, resource-layout construction, process-status
-classification, or backend execution.
+reimplement logical-input/resource matching, resource-layout construction,
+process-status classification, or backend execution.
 
 The pure dispatch layer may depend on transaction progression and exact admitted
 construction, check, and effect sessions. It owns deterministic reservation,

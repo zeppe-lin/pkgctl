@@ -494,23 +494,27 @@ construction and the target-effect kernel. Release 0.5.0 established one exact
 package-construction session, and 0.4.0 closed the restart loop for one target
 mutation sequence.
 
-The executable still exposes only:
+The executable exposes only the read-only command surface:
 
 ```text
 pkgctl catalog
 pkgctl resolve
 pkgctl transaction
+pkgctl inspect-run
+pkgctl inspect-effect
 ```
 
 Every collection root, target-state binding identity, architecture, goal scope,
-and destructive convergence choice is explicit. `transaction` defaults to
-`preserve-unselected`; exact convergence requires `--converge-exact`.
+selected durable journal, and destructive convergence choice is explicit.
+`transaction` defaults to `preserve-unselected`; exact convergence requires
+`--converge-exact`. The inspection commands open only the exact existing store
+and identity supplied by the caller.
 
-There are no effect-implying CLI commands in 0.13.0. The command frontend
+There are no effect-implying CLI commands in 0.27.0. The command frontend
 executes no source acquisition, build, check, planner, lifecycle, application,
-publication, or restart authority. The library can execute or reconcile one
-caller-selected dispatch only through injected drivers, exact checkpoints, and
-explicit stores. Automatic reservation, execution loops,
+publication, restart, reconciliation, or repair authority. The library can
+execute or reconcile one caller-selected dispatch only through injected drivers,
+exact checkpoints, and explicit stores. Automatic reservation, execution loops,
 semantic-evidence discovery, resource recovery, retry policy, adaptive
 scheduling, transaction-wide rollback, journal discovery, compaction, garbage
 collection, and effectful command policy remain outside this release.

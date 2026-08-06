@@ -610,11 +610,12 @@ and the matching completed construction result.
 
 The controller projects canonical installed truth through *libpkgstate-plan*.
 For install and upgrade, it requires the exact transaction *build* node ordered
-before the target action, reinspects the retained artifact through an injected
-*libpkgimage* backend, and projects candidate, image, and artifact facts through
-*libpkgbuild-plan*. The archive digest, normalized image identity, and entry
-count must reproduce construction evidence. Inspection backend identity may
-differ.
+before the target action and consumes the complete *libpkgbuild-image* authority
+retained by the matching construction result. *libpkgbuild-plan* purely projects
+candidate, image, artifact, and manifest facts from that admitted authority. The
+projection must retain the exact build result, archive digest, normalized image,
+entry count, artifact identity, and manifest identity already established by
+construction. No inspection backend is selected.
 
 The exact *libpkgplan* operation returns either one complete package-local plan
 or a typed refusal. A refusal is terminal preparation knowledge and creates no
@@ -622,9 +623,10 @@ or a typed refusal. A refusal is terminal preparation knowledge and creates no
 *libpkgapply* request and existing one-operation *pkgctl* effect request. Removal
 never invokes incoming-artifact projection.
 
-Preparation may read exact artifact bytes, but it does not acquire the target
-lease, execute lifecycle programs, apply package files, or publish installed
-state. It has no command frontend and no durable preparation journal.
+Preparation reads no artifact bytes and performs no archive I/O. It does not
+acquire the target lease, execute lifecycle programs, apply package files, or
+publish installed state. It has no command frontend and no durable preparation
+journal.
 
 # DURABLE EFFECT ATTEMPTS
 

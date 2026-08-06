@@ -5,6 +5,33 @@ set -eu
 
 srcdir=${1:-.}
 
+readme="$srcdir/README.md"
+[ -s "$readme" ] || {
+  echo "missing current product overview: $readme" >&2
+  exit 1
+}
+for command in \
+  'pkgctl catalog' \
+  'pkgctl resolve' \
+  'pkgctl transaction' \
+  'pkgctl inspect-run' \
+  'pkgctl inspect-effect'; do
+  grep -F "$command" "$readme" >/dev/null || {
+    echo "README omits current command surface: $command" >&2
+    exit 1
+  }
+done
+grep -F 'There are no effect-implying CLI commands in 0.27.0.' \
+  "$readme" >/dev/null
+for obsolete in \
+  'The executable still exposes only:' \
+  'There are no effect-implying CLI commands in 0.13.0.'; do
+  if grep -F "$obsolete" "$readme" >/dev/null 2>&1; then
+    echo "obsolete current command surface in README: $obsolete" >&2
+    exit 1
+  fi
+done
+
 for page in "$srcdir/man/pkgctl.1.scd" \
             "$srcdir/man/pkgctl_orchestration.7.scd"; do
   [ -s "$page" ] || {
@@ -116,7 +143,9 @@ grep -F 'independent ready work may advance concurrently' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'OPERATION PREPARATION' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'typed refusal' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
-grep -F 'archive digest, normalized image identity, and entry' \
+grep -F 'consumes the complete *libpkgbuild-image* authority' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Preparation reads no artifact bytes and performs no archive I/O.' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'CANDIDATE CONSTRUCTION' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'independent archive inspection' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
@@ -126,6 +155,16 @@ grep -F 'exact durable *libpkgapply* journal' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'newly held physical target-mutation lease' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+
+for obsolete in \
+  'reinspects the retained artifact' \
+  'Preparation may read exact artifact bytes' \
+  'artifact reinspection'; do
+  if grep -R -n -F "$obsolete" "$srcdir/man" >/dev/null 2>&1; then
+    echo "obsolete artifact-reinspection authority in manuals: $obsolete" >&2
+    exit 1
+  fi
+done
 
 for obsolete in 'forbid-node' 'operation graph ordering' 'download named'; do
   if grep -R -n -F "$obsolete" "$srcdir/man" >/dev/null 2>&1; then

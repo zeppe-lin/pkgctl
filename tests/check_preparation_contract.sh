@@ -71,3 +71,42 @@ if grep -R -n -E 'prepare_operation|operation_preparation_request' \
   echo 'operation preparation must not acquire a command frontend' >&2
   exit 1
 fi
+
+
+for document in \
+  "$srcdir/README.md" \
+  "$srcdir/DESIGN.md" \
+  "$srcdir/MAINTAINING.md" \
+  "$srcdir/TESTING.md"; do
+  [ -s "$document" ] || {
+    echo "missing operation preparation documentation: $document" >&2
+    exit 1
+  }
+done
+
+grep -F 'retained build/image admission' \
+  "$srcdir/README.md" >/dev/null
+grep -F 'must not reopen artifact bytes' \
+  "$srcdir/MAINTAINING.md" >/dev/null
+grep -F \
+  'retained build/image admission projected without reopening artifact bytes' \
+  "$srcdir/TESTING.md" >/dev/null
+grep -F 'removed controller artifact I/O' \
+  "$srcdir/DESIGN.md" >/dev/null
+
+for obsolete in \
+  'reinspection retains the construction archive digest' \
+  'artifact reinspection reproducing construction archive' \
+  'It may inspect exact artifact bytes through an injected backend' \
+  'reinspect and project incoming artifact through libpkgbuild-plan' \
+  'every exact `libpkgbuild` package-input subject and tree identity' \
+  'translate observed digests into the complete libpkgbuild source set'; do
+  if grep -F "$obsolete" \
+      "$srcdir/README.md" \
+      "$srcdir/DESIGN.md" \
+      "$srcdir/MAINTAINING.md" \
+      "$srcdir/TESTING.md" >/dev/null 2>&1; then
+    echo "obsolete preparation authority remains in documentation: $obsolete" >&2
+    exit 1
+  fi
+done

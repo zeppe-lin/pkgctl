@@ -39,7 +39,7 @@ Every release must establish:
   effect authority;
 - refusal of out-of-order, duplicate, cross-transaction, stale-state, and
   indeterminate progression evidence;
-- artifact reinspection reproducing construction archive and image evidence;
+- retained build/image admission projected without reopening artifact bytes;
 - successful install and removal preparation through official adapters;
 - typed planner refusal retained without application or effect promotion;
 - removal preparation proven independent of incoming artifact authority;
@@ -478,8 +478,9 @@ The preparation suite must prove:
 - canonical installed truth is projected through `libpkgstate-plan`;
 - incoming candidate, artifact, and image facts are projected through
   `libpkgbuild-plan` and admitted through `libpkgapply`;
-- reinspection retains the construction archive digest, normalized image
-  identity, and entry count without requiring one backend identity;
+- projection retains the construction build/image authority, archive digest,
+  normalized image identity, entry count, artifact identity, and manifest
+  identity without selecting an inspection backend or reading artifact bytes;
 - caller target observations, runtime closure, normalized policy, application
   context, execution control, lifecycle order, and installation reason remain
   explicit inputs;
