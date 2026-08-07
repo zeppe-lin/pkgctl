@@ -1266,6 +1266,182 @@ template<typename Destination, typename Source>
   return "unknown";
 }
 
+std::string_view application_outcome_name(
+    pkgapply::application_attempt_outcome outcome) noexcept
+{
+  switch (outcome)
+  {
+    case pkgapply::application_attempt_outcome::precondition_refused:
+      return "precondition-refused";
+    case pkgapply::application_attempt_outcome::failed_before_target_mutation:
+      return "failed-before-target-mutation";
+    case pkgapply::application_attempt_outcome::completed:
+      return "completed";
+    case pkgapply::application_attempt_outcome::failed_fully_recovered:
+      return "failed-fully-recovered";
+    case pkgapply::application_attempt_outcome::failed_with_partial_effects:
+      return "failed-with-partial-effects";
+    case pkgapply::application_attempt_outcome::
+        effects_visible_durability_unconfirmed:
+      return "effects-visible-durability-unconfirmed";
+    case pkgapply::application_attempt_outcome::indeterminate:
+      return "indeterminate";
+  }
+  return "unknown";
+}
+
+std::string_view publication_outcome_name(
+    pkgstate::state_publication_outcome outcome) noexcept
+{
+  switch (outcome)
+  {
+    case pkgstate::state_publication_outcome::published:
+      return "published";
+    case pkgstate::state_publication_outcome::stale_expected_state:
+      return "stale-expected-state";
+    case pkgstate::state_publication_outcome::request_rejected:
+      return "request-rejected";
+    case pkgstate::state_publication_outcome::failed_before_publication:
+      return "failed-before-publication";
+    case pkgstate::state_publication_outcome::
+        published_durability_unconfirmed:
+      return "published-durability-unconfirmed";
+    case pkgstate::state_publication_outcome::indeterminate:
+      return "indeterminate";
+  }
+  return "unknown";
+}
+
+std::string_view operation_outcome_name(
+    effectful_operation_outcome outcome) noexcept
+{
+  switch (outcome)
+  {
+    case effectful_operation_outcome::lifecycle_failed_before_application:
+      return "lifecycle-failed-before-application";
+    case effectful_operation_outcome::application_not_completed:
+      return "application-not-completed";
+    case effectful_operation_outcome::lifecycle_failed_after_application:
+      return "lifecycle-failed-after-application";
+    case effectful_operation_outcome::outer_lease_lost:
+      return "outer-lease-lost";
+    case effectful_operation_outcome::state_publication_not_completed:
+      return "state-publication-not-completed";
+    case effectful_operation_outcome::state_publication_indeterminate:
+      return "state-publication-indeterminate";
+    case effectful_operation_outcome::completed:
+      return "completed";
+  }
+  return "unknown";
+}
+
+void render_captured_stderr(
+    std::string_view stage,
+    const pkgexec::execution_result& execution)
+{
+  if (!execution.standard_error() ||
+      !execution.standard_error()->material() ||
+      execution.standard_error()->material()->empty())
+    return;
+
+  const auto& material = *execution.standard_error()->material();
+  std::cerr << "pkgctl: " << stage << " stderr:\n" << material;
+  if (material.back() != '\n')
+    std::cerr << '\n';
+}
+
+void render_execution_failure(
+    std::string_view stage,
+    std::string_view diagnostic,
+    const pkgexec::execution_result& execution)
+{
+  std::cerr << "pkgctl: " << stage << " failed";
+  if (!diagnostic.empty())
+    std::cerr << ": " << diagnostic;
+  std::cerr << '\n';
+  render_captured_stderr(stage, execution);
+}
+
+void render_operation_failure(const effectful_operation_result& operation)
+{
+  std::cerr << "pkgctl: operation failed: "
+            << operation_outcome_name(operation.outcome()) << '\n';
+
+  for (const auto& lifecycle : operation.before())
+  {
+    if (!lifecycle.succeeded())
+    {
+      render_execution_failure(
+          "pre-application lifecycle",
+          lifecycle.execution().diagnostic(), lifecycle.execution());
+      return;
+    }
+  }
+
+  if (operation.application() &&
+      operation.application()->outcome() !=
+          pkgapply::application_attempt_outcome::completed)
+  {
+    std::cerr << "pkgctl: application outcome: "
+              << application_outcome_name(operation.application()->outcome())
+              << '\n';
+    return;
+  }
+
+  for (const auto& lifecycle : operation.after())
+  {
+    if (!lifecycle.succeeded())
+    {
+      render_execution_failure(
+          "post-application lifecycle",
+          lifecycle.execution().diagnostic(), lifecycle.execution());
+      return;
+    }
+  }
+
+  if (operation.publication_receipt() &&
+      operation.publication_receipt()->outcome() !=
+          pkgstate::state_publication_outcome::published)
+  {
+    std::cerr << "pkgctl: state publication outcome: "
+              << publication_outcome_name(
+                     operation.publication_receipt()->outcome())
+              << '\n';
+  }
+}
+
+void render_terminal_failure(const transaction_run_drive_result& result)
+{
+  if (result.disposition() !=
+          transaction_run_drive_disposition::stopped_after_failure ||
+      result.steps().empty())
+    return;
+
+  const auto& last = result.last();
+  if (const auto* construction = last.construction())
+  {
+    render_execution_failure(
+        "construction", construction->build().diagnostic(),
+        construction->build().execution());
+    return;
+  }
+
+  if (const auto* check = last.check())
+  {
+    const auto& execution = check->execution().execution();
+    render_execution_failure("check", execution.diagnostic(), execution);
+    return;
+  }
+
+  if (const auto* operation = last.operation())
+  {
+    if (operation->result)
+      render_operation_failure(*operation->result);
+    else
+      std::cerr << "pkgctl: operation failed without terminal result body\n";
+  }
+}
+
 void render_run_result(
     const transaction_session& transaction,
     const transaction_run_drive_result& result,
@@ -1411,12 +1587,14 @@ int execute_transaction_run(transaction_run_command command)
     const auto result = runtime->launch(
         dispatch_policy, command.nonce, drive_policy);
     render_run_result(transaction, result.drive(), true);
+    render_terminal_failure(result.drive());
     return drive_status(result.drive().disposition());
   }
 
   const auto result = runtime->drive(
       expected_admission.journal(), drive_policy);
   render_run_result(transaction, result, false);
+  render_terminal_failure(result);
   return drive_status(result.disposition());
 }
 
