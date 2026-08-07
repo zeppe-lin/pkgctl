@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -418,6 +419,49 @@ private:
   check_backend_mode mode_;
 };
 
+class prepared_temporary_check_backend final
+    : public pkgexec::execution_backend {
+public:
+  pkgexec::backend_capability_profile capabilities() const override
+  {
+    return check_capabilities();
+  }
+
+  pkgexec::execution_result execute(
+      const pkgexec::execution_request& request,
+      const pkgexec::execution_resources& resources) override
+  {
+    const auto slot = pkgexec::resource_slot::singleton(
+        pkgexec::resource_role::private_temporary_root);
+    const auto resource = request.resources().binding(slot).resource();
+    const auto& temporary = resources.materialization(resource).host_path();
+    if (!fs::is_directory(temporary) ||
+        !fs::is_directory(temporary / "home") ||
+        fs::exists(temporary / "stale"))
+      throw std::runtime_error(
+          "native check driver did not prepare a clean temporary resource");
+
+    struct stat status{};
+    if (::stat(temporary.c_str(), &status) != 0 ||
+        (status.st_mode & 0777U) != 0700U ||
+        status.st_uid != ::geteuid() || status.st_gid != ::getegid())
+      throw std::runtime_error(
+          "native check driver prepared incorrect temporary authority");
+
+    observed_ = true;
+    return pkgexec::execution_result::succeeded(
+        request, capabilities(), request.interpreter(),
+        pkgexec::stream_capture::retained("check passed\n"),
+        pkgexec::stream_capture::retained(""),
+        request.required_guarantees(), "prepared temporary fixture success");
+  }
+
+  [[nodiscard]] bool observed() const noexcept { return observed_; }
+
+private:
+  bool observed_ = false;
+};
+
 class throwing_check_backend final : public pkgexec::execution_backend {
 public:
   pkgexec::backend_capability_profile capabilities() const override
@@ -812,6 +856,30 @@ void check_successful_session_and_progression()
   CHECK(rejects(pkgctl::error_code::invalid_progression, [&] {
     (void)pkgctl::advance_check(progressed, result);
   }));
+}
+
+void check_native_driver_prepares_temporary_resource()
+{
+  test_support::temporary_directory temporary;
+  auto fixture = make_ready_check(temporary.path());
+  auto resources = resources_for(
+      fixture.construction, temporary.path() / "prepared-temporary");
+  const auto temporary_root = resources.paths.temporary_root;
+  {
+    std::ofstream stale(temporary_root / "stale");
+    stale << "stale\n";
+  }
+  auto session = admit_check(
+      fixture.progress, fixture.transaction, std::move(resources));
+
+  prepared_temporary_check_backend backend;
+  pkgctl::native_transaction_check_driver driver(backend);
+  const auto result = pkgctl::execute_transaction_check(session, driver);
+
+  CHECK(result.succeeded());
+  CHECK(backend.observed());
+  CHECK(!fs::exists(temporary_root / "stale"));
+  CHECK(fs::is_directory(temporary_root / "home"));
 }
 
 void check_failure_blocks_target()
@@ -1767,6 +1835,7 @@ int main()
 {
   try {
     check_successful_session_and_progression();
+    check_native_driver_prepares_temporary_resource();
     check_failure_blocks_target();
     check_unavailable_is_terminal_failure();
     check_admission_requires_ready_check();

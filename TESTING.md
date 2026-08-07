@@ -15,6 +15,9 @@ The final command suite must prove:
   build, or target paths; a malformed caller-owned execution root is retained
   as terminal construction evidence and the command surfaces its durable backend
   diagnostic instead of reporting only a generic failed disposition;
+- native check execution resets the exact call-scoped temporary host resource
+  and prepares `/tmp/home` before entering `libpkgcheck-exec`, while the
+  caller-owned execution root view remains untouched;
 - target observations are per-dispatch, ordinary runtime dependencies use the
   transitive resolver run-scope closure, and lifecycle execution capabilities do
   not become target-mutation identities;

@@ -96,7 +96,12 @@ public:
       const pkgcheck_exec::admitted_check_session& session) = 0;
 };
 
-/*! \brief Native composition of libpkgcheck-exec and libpkgexec. */
+/*! \brief Native composition of libpkgcheck-exec and libpkgexec.
+ *
+ * The driver resets the admitted call-scoped temporary host resource and
+ * prepares its private home directory before execution. It does not populate
+ * or mutate the caller-owned execution root view.
+ */
 class native_transaction_check_driver final : public transaction_check_driver {
 public:
   explicit native_transaction_check_driver(pkgexec::execution_backend& backend);

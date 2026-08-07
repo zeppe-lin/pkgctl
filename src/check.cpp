@@ -6,10 +6,18 @@
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
 
+#include <cerrno>
+#include <cstring>
+#include <filesystem>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace pkgctl {
 namespace {
@@ -160,6 +168,66 @@ void validate_driver_result(
       pkgexec::execution_purpose_kind::check)
     throw error(error_code::check_driver_contract_violation,
                 "check driver returned non-check execution evidence");
+}
+
+void prepare_native_check_temporary(
+    const pkgcheck_exec::admitted_check_session& session)
+{
+  namespace fs = std::filesystem;
+
+  const auto& temporary = session.paths().temporary_root;
+  std::error_code ec;
+  fs::remove_all(temporary, ec);
+  if (ec)
+    throw error(
+        error_code::check_driver_contract_violation,
+        "cannot clear native check temporary root " + temporary.string() +
+            ": " + ec.message());
+
+  fs::create_directories(temporary, ec);
+  if (ec)
+    throw error(
+        error_code::check_driver_contract_violation,
+        "cannot create native check temporary root " + temporary.string() +
+            ": " + ec.message());
+
+  const auto prepare_directory = [&](const fs::path& path, mode_t mode) {
+    const int descriptor = ::open(
+        path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    if (descriptor < 0)
+      throw error(
+          error_code::check_driver_contract_violation,
+          "cannot open native check temporary directory " + path.string() +
+              ": " + std::strerror(errno));
+
+    const auto close_descriptor = [&]() noexcept { (void)::close(descriptor); };
+    if (::fchown(
+            descriptor,
+            static_cast<uid_t>(session.identity().user_id),
+            static_cast<gid_t>(session.identity().group_id)) != 0 ||
+        ::fchmod(descriptor, mode) != 0 || ::fsync(descriptor) != 0)
+    {
+      const int saved = errno;
+      close_descriptor();
+      throw error(
+          error_code::check_driver_contract_violation,
+          "cannot prepare native check temporary directory " + path.string() +
+              ": " + std::strerror(saved));
+    }
+    close_descriptor();
+  };
+
+  prepare_directory(temporary, 0700);
+  const auto home = temporary / "home";
+  if (!fs::create_directory(home, ec) || ec)
+  {
+    const auto detail = ec ? ec.message() : std::string("path already exists");
+    throw error(
+        error_code::check_driver_contract_violation,
+        "cannot create native check home directory " + home.string() +
+            ": " + detail);
+  }
+  prepare_directory(home, 0700);
 }
 
 pkgcheck_exec::check_execution_result invoke_check_driver(
@@ -343,6 +411,7 @@ native_transaction_check_driver::execute_check(
     const pkgcheck_exec::admitted_check_session& session)
 {
   try {
+    prepare_native_check_temporary(session);
     return pkgcheck_exec::execute(session, backend_);
   } catch (const pkgcheck_exec::error& problem) {
     throw error(
