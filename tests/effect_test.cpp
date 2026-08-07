@@ -2309,7 +2309,8 @@ void check_durable_success()
 
 void check_operation_progress_rehydration()
 {
-  fixture value;
+  // Removal is operation-ready without a predecessor construction dispatch.
+  removal_fixture value;
   const auto session = pkgctl::effectful_operation_session::admit(
       effect_request(value), value.before, value.after);
   auto initial = pkgctl::transaction_progress::begin(value.transaction);

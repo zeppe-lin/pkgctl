@@ -192,6 +192,9 @@ void check_native_locator()
   test_support::write(collection / "tool" / "payload", payload);
 
   tool_source_options options;
+  // A build-scoped dependency must not enter the check resource set.
+  options.with_build_dependency = false;
+  options.check_dependencies = {"dep"};
   options.source_document =
       (collection / "tool" / "recipe.yml").generic_string();
   options.check_program = pkgsource::program(
