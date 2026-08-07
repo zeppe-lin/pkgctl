@@ -3,6 +3,8 @@
 
 #include <pkgctl/run_recovery.h>
 
+#include "run_recovery_detail.h"
+
 #include <pkgctl/error.h>
 #include <pkgctl/identity.h>
 
@@ -219,6 +221,58 @@ struct detail_run_recovery_access final {
   }
 };
 
+construction_result
+detail::rehydrate_construction_dispatch_evidence(
+    const construction_dispatch_evidence_record& evidence,
+    construction_dispatch_recovery_context context)
+{
+  validate_construction_context(evidence, context);
+
+  try
+  {
+    auto decoded = pkgbuild_exec::decode_build_execution_result(
+        evidence.encoding(), context.session.request().build(),
+        context.execution_request, context.backend);
+    validate_decoded_construction(evidence, decoded);
+    return detail_run_recovery_access::construction(
+        std::move(context), std::move(decoded), evidence.result());
+  }
+  catch (const transaction_run_evidence_error&)
+  {
+    throw;
+  }
+  catch (const std::exception& problem)
+  {
+    decode_failed("construction", problem);
+  }
+}
+
+transaction_check_result
+detail::rehydrate_check_dispatch_evidence(
+    const check_dispatch_evidence_record& evidence,
+    check_dispatch_recovery_context context)
+{
+  validate_check_context(evidence, context);
+
+  try
+  {
+    auto decoded = pkgcheck_exec::decode_check_execution_result(
+        evidence.encoding(), context.session.request().check(),
+        context.execution_request, context.backend);
+    validate_decoded_check(evidence, decoded);
+    return detail_run_recovery_access::check(
+        std::move(context), std::move(decoded), evidence.result());
+  }
+  catch (const transaction_run_evidence_error&)
+  {
+    throw;
+  }
+  catch (const std::exception& problem)
+  {
+    decode_failed("check", problem);
+  }
+}
+
 native_transaction_dispatch_recovery_context_source::
 native_transaction_dispatch_recovery_context_source(
     transaction_dispatch_session_source& sessions,
@@ -344,25 +398,8 @@ stored_transaction_dispatch_recovery_authority_source::construction(
 
   auto context = context_.construction(
       checkpoint, assessment, dispatch, *evidence);
-  validate_construction_context(*evidence, context);
-
-  try
-  {
-    auto decoded = pkgbuild_exec::decode_build_execution_result(
-        evidence->encoding(), context.session.request().build(),
-        context.execution_request, context.backend);
-    validate_decoded_construction(*evidence, decoded);
-    return detail_run_recovery_access::construction(
-        std::move(context), std::move(decoded), evidence->result());
-  }
-  catch (const transaction_run_evidence_error&)
-  {
-    throw;
-  }
-  catch (const std::exception& problem)
-  {
-    decode_failed("construction", problem);
-  }
+  return detail::rehydrate_construction_dispatch_evidence(
+      *evidence, std::move(context));
 }
 
 transaction_check_result
@@ -380,25 +417,8 @@ stored_transaction_dispatch_recovery_authority_source::check(
 
   auto context = context_.check(
       checkpoint, assessment, dispatch, *evidence);
-  validate_check_context(*evidence, context);
-
-  try
-  {
-    auto decoded = pkgcheck_exec::decode_check_execution_result(
-        evidence->encoding(), context.session.request().check(),
-        context.execution_request, context.backend);
-    validate_decoded_check(*evidence, decoded);
-    return detail_run_recovery_access::check(
-        std::move(context), std::move(decoded), evidence->result());
-  }
-  catch (const transaction_run_evidence_error&)
-  {
-    throw;
-  }
-  catch (const std::exception& problem)
-  {
-    decode_failed("check", problem);
-  }
+  return detail::rehydrate_check_dispatch_evidence(
+      *evidence, std::move(context));
 }
 
 effect_restart_checkpoint

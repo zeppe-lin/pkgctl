@@ -7,6 +7,11 @@
 #include <pkgctl/effect_store.h>
 #include <pkgctl/error.h>
 
+#include "effect_rehydration.h"
+
+#include <libpkgstate/error.h>
+#include <libpkgstate/publication_projection.h>
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -15,6 +20,27 @@
 #include <utility>
 
 namespace pkgctl {
+
+struct detail_effect_rehydration_access final {
+  static effectful_operation_result seal(
+      effectful_operation_session session,
+      effectful_operation_outcome outcome,
+      std::vector<pkgapply_exec::lifecycle_execution_result> before,
+      std::optional<pkgapply::application_receipt> application,
+      std::vector<pkgapply_exec::lifecycle_execution_result> after,
+      std::optional<pkgstate::transaction_evidence_identity> transaction,
+      std::optional<pkgstate::state_publication_request> publication_request,
+      std::optional<pkgstate::state_publication_receipt> publication_receipt,
+      std::optional<pkgstate::installed_state_snapshot_identity> reconciled)
+  {
+    return effectful_operation_result::seal(
+        std::move(session), outcome, std::move(before),
+        std::move(application), std::move(after), std::move(transaction),
+        std::move(publication_request), std::move(publication_receipt),
+        std::move(reconciled));
+  }
+};
+
 namespace {
 
 template<typename Left, typename Right>
@@ -513,50 +539,6 @@ effectful_operation_outcome publication_outcome(
   }
   throw error(error_code::driver_contract_violation,
               "state driver returned an invalid publication outcome");
-}
-
-pkgstate::snapshot resulting_snapshot(
-    const pkgstate::snapshot& expected,
-    const pkgstate::state_publication_request& request)
-{
-  if (request.expected_snapshot() != expected.identity() ||
-      request.target_binding() != expected.target_binding())
-    throw error(error_code::driver_contract_violation,
-                "publication request differs from the expected state authority");
-
-  auto packages = expected.packages();
-  for (const auto& delta : request.deltas())
-  {
-    const auto iterator = std::find_if(
-        packages.begin(), packages.end(), [&delta](const auto& package) {
-          return package.release().name() == delta.package_name();
-        });
-    switch (delta.kind())
-    {
-      case pkgstate::package_state_delta_kind::install:
-        if (iterator != packages.end() || !delta.proposed_package())
-          throw error(error_code::driver_contract_violation,
-                      "installation publication delta is not realizable");
-        packages.push_back(*delta.proposed_package());
-        break;
-      case pkgstate::package_state_delta_kind::replace:
-        if (iterator == packages.end() || !delta.expected_package() ||
-            !delta.proposed_package() ||
-            iterator->identity() != *delta.expected_package())
-          throw error(error_code::driver_contract_violation,
-                      "replacement publication delta is not realizable");
-        *iterator = *delta.proposed_package();
-        break;
-      case pkgstate::package_state_delta_kind::remove:
-        if (iterator == packages.end() || !delta.expected_package() ||
-            iterator->identity() != *delta.expected_package())
-          throw error(error_code::driver_contract_violation,
-                      "removal publication delta is not realizable");
-        packages.erase(iterator);
-        break;
-    }
-  }
-  return pkgstate::snapshot::make(expected.target_binding(), std::move(packages));
 }
 
 pkgstate::installed_state_snapshot_identity state_identity_from_string(
@@ -1209,6 +1191,43 @@ effectful_operation_result execute_effectful_operation_durable(
       std::move(publication_request), std::move(publication_receipt));
 }
 
+effectful_operation_result
+detail::rehydrate_terminal_effectful_operation(
+    effect_restart_checkpoint checkpoint)
+{
+  const auto& journal = checkpoint.record();
+  if (journal.stage() != effect_attempt_stage::terminal ||
+      !journal.terminal_outcome())
+  {
+    throw error(
+        error_code::invalid_effect_session,
+        "terminal effect rehydration requires terminal journal evidence");
+  }
+
+  std::optional<pkgstate::transaction_evidence_identity> transaction;
+  if (checkpoint.publication_request() &&
+      checkpoint.publication_request()->transaction_evidence())
+  {
+    transaction =
+        *checkpoint.publication_request()->transaction_evidence();
+  }
+  else if (journal.transaction_evidence())
+  {
+    transaction =
+        transaction_identity_from_string(*journal.transaction_evidence());
+  }
+
+  std::optional<pkgstate::installed_state_snapshot_identity> reconciled;
+  if (journal.reconciled_state())
+    reconciled = state_identity_from_string(*journal.reconciled_state());
+
+  return detail_effect_rehydration_access::seal(
+      checkpoint.session(), *journal.terminal_outcome(), checkpoint.before(),
+      checkpoint.application(), checkpoint.after(), std::move(transaction),
+      checkpoint.publication_request(), checkpoint.publication_receipt(),
+      std::move(reconciled));
+}
+
 effect_restart_result resume_effectful_operation(
     effect_restart_checkpoint checkpoint,
     transaction_effect_driver* continuation,
@@ -1262,15 +1281,8 @@ effect_restart_result resume_effectful_operation(
 
   if (assessment.disposition() == effect_restart_disposition::terminal)
   {
-    std::optional<pkgstate::installed_state_snapshot_identity> reconciled;
-    if (journal.reconciled_state())
-      reconciled = state_identity_from_string(*journal.reconciled_state());
-    auto transaction = current_transaction();
-    auto operation = effectful_operation_result::seal(
-        std::move(session), *journal.terminal_outcome(), std::move(before),
-        std::move(application), std::move(after), std::move(transaction),
-        std::move(publication_request), std::move(publication_receipt),
-        std::move(reconciled));
+    auto operation = detail::rehydrate_terminal_effectful_operation(
+        std::move(checkpoint));
     return effect_restart_result(
         effect_restart_disposition::terminal, std::move(journal),
         std::move(operation));
@@ -1314,7 +1326,20 @@ effect_restart_result resume_effectful_operation(
         request.application().target(), state.lease());
     const auto observed = state.read_state();
     const auto& expected = request.expected_state();
-    const auto resulting = resulting_snapshot(expected, *publication_request);
+    const auto resulting = [&]() -> pkgstate::snapshot {
+      try
+      {
+        return pkgstate::project_publication_request(
+            *publication_request, expected);
+      }
+      catch (const pkgstate::state_error& failure)
+      {
+        throw error(
+            error_code::driver_contract_violation,
+            std::string("publication request cannot be projected: ") +
+                failure.what());
+      }
+    }();
     if (observed.identity() == resulting.identity())
       return finish(effectful_operation_outcome::completed,
                     observed.identity());

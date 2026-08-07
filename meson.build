@@ -44,7 +44,7 @@ libpkgcatalog_acquire_dep = dependency(
 )
 libpkgstate_dep = dependency(
   'libpkgstate',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=3.1.0', '<4.0.0'],
   required: true,
   static: want_static,
 )

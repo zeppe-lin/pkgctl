@@ -46,7 +46,8 @@ for required in \
   'complete_check_dispatch' \
   'submit_operation_dispatch_result' \
   'commit_transaction_run_successor' \
-  'auto transaction = current_transaction();'; do
+  'detail::rehydrate_terminal_effectful_operation' \
+  'checkpoint.publication_request()->transaction_evidence()'; do
   grep -F "$required" "$header" "$source" "$restart_header" \
       "$restart_source" "$effect_restart" "$effect" >/dev/null || {
     echo "missing durable restart-reconciliation contract: $required" >&2
@@ -108,12 +109,12 @@ ordered_tokens "$operation_body" \
   'commit_transaction_run_successor'
 
 terminal_body=$(sed -n \
-  '/if (assessment.disposition() == effect_restart_disposition::terminal)/,/^  }/p' \
-  "$effect")
+  '/^detail::rehydrate_terminal_effectful_operation(/,/^}/p' "$effect")
 ordered_tokens "$terminal_body" \
-  'auto transaction = current_transaction();' \
-  'std::move(transaction)' \
-  'std::move(publication_request)'
+  'effect_attempt_stage::terminal' \
+  'checkpoint.publication_request()->transaction_evidence()' \
+  'detail_effect_rehydration_access::seal' \
+  'std::move(transaction)'
 
 for required_test in \
   'reconcile_reserved_dispatch_durable' \

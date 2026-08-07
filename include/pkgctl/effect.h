@@ -254,6 +254,7 @@ private:
   friend effectful_operation_result execute_effectful_operation_durable(
       effectful_operation_session, const effect_attempt_nonce&,
       transaction_effect_driver&, effect_journal_store&);
+  friend struct detail_effect_rehydration_access;
   friend effect_restart_result resume_effectful_operation(
       effect_restart_checkpoint, transaction_effect_driver*,
       transaction_effect_publication_driver*, effect_journal_store&);

@@ -1,0 +1,18 @@
+// SPDX-FileCopyrightText: 2026 Alexandr Savca
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#pragma once
+
+#include <pkgctl/run_recovery.h>
+
+namespace pkgctl::detail {
+
+[[nodiscard]] construction_result rehydrate_construction_dispatch_evidence(
+    const construction_dispatch_evidence_record& evidence,
+    construction_dispatch_recovery_context context);
+
+[[nodiscard]] transaction_check_result rehydrate_check_dispatch_evidence(
+    const check_dispatch_evidence_record& evidence,
+    check_dispatch_recovery_context context);
+
+} // namespace pkgctl::detail
