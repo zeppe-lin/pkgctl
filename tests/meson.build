@@ -30,6 +30,13 @@ if not get_option('tests').disabled()
   )
   test('run-journal', run_journal_test)
 
+  run_progress_test = executable(
+    'run-progress-test',
+    'run_progress_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('run-progress', run_progress_test)
+
   run_locator_test = executable(
     'run-locator-test',
     'run_locator_test.cpp',
@@ -151,6 +158,7 @@ if not get_option('tests').disabled()
     'run_nonce.h',
     'run_reconcile.h',
     'run_recovery.h',
+    'run_progress.h',
     'run_commit.h',
     'run_execute.h',
     'run_restart.h',
@@ -201,6 +209,13 @@ if not get_option('tests').disabled()
   test(
     'run-recovery-contract',
     run_recovery_contract,
+    args: [meson.project_source_root()],
+  )
+
+  run_progress_contract = find_program('check_run_progress_contract.sh')
+  test(
+    'run-progress-contract',
+    run_progress_contract,
     args: [meson.project_source_root()],
   )
 

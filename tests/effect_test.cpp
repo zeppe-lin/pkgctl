@@ -22,6 +22,7 @@
 #include <pkgctl/run_execute.h>
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_recovery.h>
+#include <pkgctl/run_progress.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_store.h>
 
@@ -1411,6 +1412,64 @@ private:
   std::map<std::string, std::vector<pkgctl::effect_attempt_record>> records_;
 };
 
+class operation_progress_context final
+    : public pkgctl::transaction_progress_rehydration_context_source {
+public:
+  explicit operation_progress_context(pkgctl::effect_restart_checkpoint checkpoint)
+      : checkpoint_(std::move(checkpoint))
+  {
+  }
+
+  pkgctl::construction_dispatch_recovery_context construction(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_progress&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::construction_dispatch_evidence_record&) override
+  {
+    throw std::runtime_error("unexpected construction progress context request");
+  }
+
+  pkgctl::check_dispatch_recovery_context check(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_progress&,
+      const pkgctl::transaction_dispatch&,
+      const pkgctl::check_dispatch_evidence_record&) override
+  {
+    throw std::runtime_error("unexpected check progress context request");
+  }
+
+  pkgctl::effect_restart_checkpoint operation(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_progress& partial,
+      const pkgctl::transaction_dispatch& dispatch,
+      const pkgctl::effect_attempt_record& evidence) override
+  {
+    ++calls_;
+    partial_ = partial.identity();
+    dispatch_ = dispatch.identity();
+    evidence_ = evidence.identity();
+    return checkpoint_;
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgctl::session_identity>& partial() const noexcept
+  { return partial_; }
+  const std::optional<pkgctl::session_identity>& dispatch() const noexcept
+  { return dispatch_; }
+  const std::optional<pkgctl::session_identity>& evidence() const noexcept
+  { return evidence_; }
+
+private:
+  pkgctl::effect_restart_checkpoint checkpoint_;
+  std::size_t calls_ = 0U;
+  std::optional<pkgctl::session_identity> partial_;
+  std::optional<pkgctl::session_identity> dispatch_;
+  std::optional<pkgctl::session_identity> evidence_;
+};
+
+pkgctl::transaction_dispatch_nonce dispatch_nonce(std::uint8_t marker);
+pkgctl::transaction_run_nonce dispatch_journal_nonce(std::uint8_t marker);
+
 pkgctl::effect_attempt_nonce effect_nonce(std::uint8_t marker)
 {
   pkgctl::effect_attempt_nonce::byte_array bytes{};
@@ -2246,6 +2305,69 @@ void check_durable_success()
     CHECK(decoded.terminal_outcome() == latest->terminal_outcome());
   }
   CHECK(journal.size(admission.attempt()) == 10U);
+}
+
+void check_operation_progress_rehydration()
+{
+  fixture value;
+  const auto session = pkgctl::effectful_operation_session::admit(
+      effect_request(value), value.before, value.after);
+  auto initial = pkgctl::transaction_progress::begin(value.transaction);
+  auto run = pkgctl::transaction_run::begin(
+      initial, pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, dispatch_journal_nonce(94U));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(94U));
+  CHECK(reservation.dispatch.has_value());
+  if (!reservation.dispatch)
+    return;
+  CHECK(reservation.dispatch->unit().kind() ==
+        pkgctl::transaction_unit_kind::operation);
+  auto reserved = admitted.successor(reservation.run);
+  auto started_authority = pkgctl::start_operation_dispatch(
+      reservation.run, *reservation.dispatch, session, effect_nonce(94U));
+  auto started = reserved.successor(started_authority.run);
+
+  driver actuator(value.projection, value.outer_lease, value.receipt, value.store);
+  memory_effect_journal_store journal;
+  const auto result = pkgctl::execute_effectful_operation_durable(
+      session, effect_nonce(94U), actuator, journal);
+  CHECK(result.succeeded());
+  auto completed_run = pkgctl::submit_operation_dispatch_result(
+      started_authority.run, *reservation.dispatch, result, value.store.read());
+  auto completed = started.successor(completed_run);
+
+  const auto latest = journal.load_latest(started_authority.effect_attempt.attempt());
+  CHECK(latest.has_value());
+  if (!latest)
+    return;
+  const auto checkpoint = pkgctl::effect_restart_checkpoint::make(
+      session, *latest, result.before(), result.application(), result.after(),
+      result.publication_request(), result.publication_receipt());
+  operation_progress_context context(checkpoint);
+  std::vector<std::string> evidence_trace;
+  run_execute_support::sequenced_evidence_store evidence(evidence_trace);
+  pkgctl::stored_transaction_progress_rehydration_source source(
+      value.transaction, evidence, journal, context);
+
+  const auto journal_size = journal.size(started_authority.effect_attempt.attempt());
+  const auto restored = source.rehydrate_progress(completed);
+  CHECK(restored.identity() == completed_run.progress().identity());
+  CHECK(restored.current_state().identity() == value.store.read().identity());
+  CHECK(restored.effects().size() == 1U);
+  CHECK(restored.effects().front().identity() == result.identity());
+  CHECK(context.calls() == 1U);
+  CHECK(context.partial() ==
+        std::optional<pkgctl::session_identity>(initial.identity()));
+  CHECK(context.dispatch() ==
+        std::optional<pkgctl::session_identity>(
+            reservation.dispatch->identity()));
+  CHECK(context.evidence() ==
+        std::optional<pkgctl::session_identity>(latest->identity()));
+  CHECK(journal.size(started_authority.effect_attempt.attempt()) == journal_size);
+  CHECK(evidence_trace.empty());
+  CHECK(pkgctl::rehydrate_transaction_run(completed, source).run().identity() ==
+        completed_run.identity());
 }
 
 void check_restart_boundaries()
@@ -4829,6 +4951,7 @@ int main()
   check_publication_failures();
   check_lease_loss();
   check_durable_success();
+  check_operation_progress_rehydration();
   check_restart_boundaries();
   check_publication_retry();
   check_publication_reconciliation();

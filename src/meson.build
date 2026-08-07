@@ -32,6 +32,7 @@ pkgctl_core = static_library(
     'run_advance.cpp',
     'run_reconcile.cpp',
     'run_recovery.cpp',
+    'run_progress.cpp',
     'run_commit.cpp',
     'run_drive.cpp',
     'run_evidence.cpp',
