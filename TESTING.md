@@ -179,19 +179,37 @@ program or shell script as interchangeable:
   drift. Contract tests may prove forbidden structure, but do not stand in for
   successful runtime behavior.
 
-`pkgctl:cli-run` requires the host Linux backend to establish the sealed native
-execution guarantees used by construction and checking. If the backend returns
-exact `backend_unsupported` evidence naming only host-dependent guarantees, the
-integration test exits 77 and Meson records a skip. A skip is **not** successful
-vertical qualification: before release, this scenario must also pass on a host
-that can establish the full guarantee set. Missing invariant guarantees such as
-closed environment, fixed credentials, or complete stream capture remain test
-failures rather than environmental skips.
+`pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
+admitted, the command checks that the selected Linux backend can establish the
+exact execution guarantees implied by the transaction's build, check, and
+lifecycle nodes. Capability absence is control-plane unavailability: the command
+refuses before retaining the initial command universe or writing a run/evidence
+journal. It must not manufacture a package construction/check failure from an
+unavailable actuator. The same test supplies construction/check and lifecycle
+root views separately and proves that non-supervisor construction/check
+credentials are rejected before evidence retention. This preserves the two
+execution authority domains without claiming an unsupported credential
+transition.
 
-Meson exposes the corresponding `unit`, `integration`, `header`, and `contract`
-suites. `tests/run-direct.sh` is the source-tree qualification path and must link
-the complete current CLI, including command-only dependencies, before invoking
-the integration and contract layers.
+When the test process lacks the required delegated or privileged Linux authority,
+`pkgctl:cli-run` prints the missing guarantees and relevant capability probes,
+proves that no transaction evidence was retained, then exits 77. Meson records a
+skip. A skip is **not** successful vertical qualification. For release
+qualification run:
+
+```sh
+PKGCTL_REQUIRE_NATIVE_INTEGRATION=1 \
+  meson test --suite integration-privileged --print-errorlogs
+```
+
+In that mode capability unavailability is a hard failure, so release automation
+cannot accidentally count a skipped native actuator as proof. The test must pass
+on a context that can establish the complete sealed profile.
+
+Meson exposes `unit`, `integration`, `integration-privileged`, `header`, and
+`contract` suites. `tests/run-direct.sh` is the source-tree qualification path
+and must link the complete current CLI, including command-only dependencies,
+before invoking the integration and contract layers.
 
 ## Release 0.29.0 recovery qualification
 

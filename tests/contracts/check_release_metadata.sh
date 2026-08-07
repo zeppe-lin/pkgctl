@@ -47,7 +47,7 @@ require_dependency_range libpkgresolve '>=2.0.0' '<3.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
 require_dependency_range libpkgapply-posix '>=3.1.0' '<4.0.0'
 require_dependency_range libpkgcatalog-codec '>=3.0.0' '<4.0.0'
-require_dependency_range libpkgexec-linux '>=0.5.1' '<1.0.0'
+require_dependency_range libpkgexec-linux '>=0.5.2' '<1.0.0'
 
 grep -F '## 0.35.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
@@ -78,7 +78,7 @@ for contract in \
   'libpkgimage >= 0.4.0, < 1.0.0' \
   'libpkgplan >= 0.3.0, < 1.0.0' \
   'libpkgexec >= 1.4.0, < 2.0.0' \
-  'libpkgexec-linux >= 0.5.1, < 1.0.0' \
+  'libpkgexec-linux >= 0.5.2, < 1.0.0' \
   'libpkgapply >= 3.0.0, < 4.0.0' \
   'libpkgapply-posix >= 3.1.0, < 4.0.0' \
   'libpkgapply-exec >= 2.0.0, < 3.0.0' \

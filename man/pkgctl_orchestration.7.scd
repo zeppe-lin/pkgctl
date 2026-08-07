@@ -33,7 +33,15 @@ closure rooted at that package, not transaction graph storage order or SCC
 cohort representation. Application mutation/observation identities remain
 separate from lifecycle process-execution capability identity.
 
-All runtime namespaces, build root, and target root must already exist. One
+Construction/check execution and lifecycle execution also remain separate
+command authority domains. Their existing root views and explicit numeric
+credential sets are supplied independently. The current native Linux backend
+admits only the invoking supervisor's credentials; a relevant mismatch is
+control-plane refusal before run admission. No fakeroot, logical ownership
+virtualization, or implicit credential transition is provided.
+
+All runtime namespaces, construction/check root, lifecycle root, and target root
+must already exist. One
 invocation performs at most the positive *--max-steps* drive policy. It starts
 no daemon, discovers no journal, performs no unbounded loop, timer retry,
 implicit replanning, rollback, repair, cleanup, compaction, or garbage

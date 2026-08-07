@@ -29,11 +29,23 @@ explicit catalog/state request + --start/--resume nonce
             at most --max-steps advances
 ```
 
-Start acquires and composes exactly once, retains the original catalog and state
-snapshots, then admits the run. Resume requires those retained values and
-recomposes the same transaction identity without collection reacquisition or
-live-state replanning. An already admitted run is refused by start; a missing
-run is refused by resume.
+Start acquires and composes exactly once, then proves that the selected native
+Linux backend can establish the guarantees required by the transaction's build,
+check, and lifecycle nodes. Capability absence is a control-plane refusal: no
+initial command universe or run/effect evidence is retained. Only after that
+preflight does start retain the original catalog and state snapshots and admit
+the run. Resume requires those retained values and recomposes the same
+transaction identity without collection reacquisition or live-state replanning.
+An already admitted run is refused by start; a missing run is refused by resume.
+
+Construction/check execution and lifecycle execution remain separate command
+authority domains. The CLI therefore accepts distinct existing root views and
+distinct explicit numeric credential sets for them; choosing the same values is
+a caller decision rather than controller policy. The current native Linux
+backend admits only the supervisor's current credentials, so preflight refuses
+a transaction whose relevant explicit credential set differs. `pkgctl` does not
+claim fakeroot, logical ownership virtualization, or a credential transition
+that the build/package owners do not model.
 
 The command-private body store implements both restart-body source and durable
 body sink. Each lifecycle result, application receipt, publication request, and

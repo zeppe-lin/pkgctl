@@ -33,12 +33,16 @@ collection=$root/collection
 state=$root/state
 runtime=$root/runtime
 build=$root/build
+lifecycle=$root/lifecycle
 target=$root/target
 cp -R "$fixture_collection" "$collection"
 binding=$($state_fixture "$state")
 uid=$(id -u)
 gid=$(id -g)
 groups=$(id -G | tr ' ' '\n' | sort -nu)
+build_uid=$uid
+build_gid=$gid
+build_groups=$groups
 
 run_command()
 {
@@ -54,15 +58,23 @@ run_command()
     "$intent" "$nonce" \
     --runtime-root "$runtime" \
     --build-root "$build" \
+    --lifecycle-root "$lifecycle" \
     --target-root "$target" \
     --interpreter "$interpreter" \
-    --user-id "$uid" \
-    --group-id "$gid" \
+    --build-user-id "$build_uid" \
+    --build-group-id "$build_gid" \
+    --lifecycle-user-id "$uid" \
+    --lifecycle-group-id "$gid" \
     --source-date-epoch 0 \
     --max-steps "$maximum_steps"
+  for group in $build_groups; do
+    if [ "$group" != "$build_gid" ]; then
+      set -- "$@" --build-supplementary-group "$group"
+    fi
+  done
   for group in $groups; do
     if [ "$group" != "$gid" ]; then
-      set -- "$@" --supplementary-group "$group"
+      set -- "$@" --lifecycle-supplementary-group "$group"
     fi
   done
   # The fixture emits these five option/value pairs as one trusted shell word
@@ -159,9 +171,10 @@ require_contains zero-bound-stderr "$root/zero-bound.err" \
   'maximum step count must be greater than zero'
 require_absent zero-bound-runtime "$runtime"
 require_absent zero-bound-build "$build"
+require_absent zero-bound-lifecycle "$lifecycle"
 require_absent zero-bound-target "$target"
 
-mkdir -p "$runtime" "$build" "$target"
+mkdir -p "$runtime" "$build" "$lifecycle" "$target"
 for directory in \
   command-evidence \
   run \
@@ -188,34 +201,56 @@ initial_state=$($state_inspect_fixture "$state")
 printf '%s\n' "$initial_state" >"$root/initial-state.out"
 require_contains initial-state "$root/initial-state.out" 'packages 0'
 
+"$root_view_fixture" "$lifecycle"
+
+current_build_uid=$build_uid
+if [ "$uid" -eq 0 ]; then
+  build_uid=65534
+else
+  build_uid=0
+fi
+credential_nonce=$(printf '%064d' 7)
+capture_run noncurrent-build-credentials 1 --start "$credential_nonce" 1
+require_contains noncurrent-build-credentials-stderr \
+  "$root/noncurrent-build-credentials.err" \
+  'construction/check credentials must match the native supervisor'
+require_equal noncurrent-build-credentials-state "$initial_state" \
+  "$($state_inspect_fixture "$state")"
+if find "$runtime/command-evidence" "$runtime/run" "$runtime/evidence" \
+    "$runtime/effects" -type f -print -quit | grep . >/dev/null; then
+  fail 'non-current build credentials retained transaction evidence before refusal'
+fi
+build_uid=$current_build_uid
+
 broken_build=$root/broken-build
 mkdir "$broken_build"
 build=$broken_build
 broken_nonce=$(printf '%064d' 8)
 capture_run malformed-root 1 --start "$broken_nonce" 1
+if grep -F 'native execution unavailable before transaction execution;' \
+    "$root/malformed-root.err" >/dev/null; then
+  require_equal unsupported-native-state "$initial_state" \
+    "$($state_inspect_fixture "$state")"
+  require_absent unsupported-native-target "$target/usr/bin/pkgctl-fixture"
+  if find "$runtime/command-evidence" "$runtime/run" "$runtime/evidence" \
+      "$runtime/effects" -type f -print -quit | grep . >/dev/null; then
+    fail 'unsupported native execution retained transaction evidence before refusal'
+  fi
+  printf '%s\n' \
+    'pkgctl:cli-run: native execution preflight is unavailable in this process context' \
+    >&2
+  dump_file 'native execution preflight' "$root/malformed-root.err"
+  if [ "${PKGCTL_REQUIRE_NATIVE_INTEGRATION:-0}" = 1 ]; then
+    fail 'release qualification requires the privileged native CLI integration path'
+  fi
+  exit 77
+fi
 require_contains malformed-root "$root/malformed-root.out" \
   'disposition stopped-after-failure'
 require_contains malformed-root "$root/malformed-root.out" 'durable-steps 1'
 require_contains malformed-root "$root/malformed-root.out" 'failed yes'
 require_contains malformed-root-stderr "$root/malformed-root.err" \
   'pkgctl: construction failed:'
-if grep -F 'Linux backend cannot establish required guarantees:' \
-    "$root/malformed-root.err" >/dev/null; then
-  for invariant in \
-    closed-environment \
-    fixed-credentials \
-    complete-stdout-capture \
-    complete-stderr-capture; do
-    if grep -F " $invariant" "$root/malformed-root.err" >/dev/null; then
-      fail "Linux backend omitted invariant guarantee: $invariant"
-    fi
-  done
-  printf '%s\n' \
-    'pkgctl:cli-run: host cannot establish the sealed native execution guarantees' \
-    >&2
-  dump_file 'unsupported native execution profile' "$root/malformed-root.err"
-  exit 77
-fi
 require_contains malformed-root-stderr "$root/malformed-root.err" \
   'open root resource destination'
 require_equal malformed-root-state "$initial_state" \

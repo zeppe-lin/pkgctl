@@ -29,6 +29,7 @@ for required in \
   'application_journals_.load_active(' \
   'pkgstate::posix::canonical_generation_store::open_existing(' \
   'native_posix_transaction_run_runtime::from_directory_fds(' \
+  'require_native_execution_preflight(' \
   'transaction_run_drive_policy::make(command.maximum_steps)' \
   'runtime_path(command, "command-evidence")' \
   'runtime_path(command, "effect-bodies")' \
@@ -78,10 +79,60 @@ grep -F "'cli-run'" "$tests_meson" >/dev/null || {
   echo 'bounded run command has no process-level integration test' >&2
   exit 1
 }
+grep -F "suite: 'integration-privileged'" "$tests_meson" >/dev/null || {
+  echo 'native mutating CLI test is not isolated as privileged integration' >&2
+  exit 1
+}
+grep -F 'PKGCTL_REQUIRE_NATIVE_INTEGRATION' "$integration" >/dev/null || {
+  echo 'privileged CLI integration has no release-required mode' >&2
+  exit 1
+}
+for authority in \
+  '--build-root' \
+  '--lifecycle-root' \
+  '--build-user-id' \
+  '--build-group-id' \
+  '--build-supplementary-group' \
+  '--lifecycle-user-id' \
+  '--lifecycle-group-id' \
+  '--lifecycle-supplementary-group'; do
+  grep -F -- "$authority" "$options" "$integration" >/dev/null || {
+    echo "missing split run authority: $authority" >&2
+    exit 1
+  }
+done
+for obsolete in '--user-id' '--group-id' '--supplementary-group'; do
+  if grep -F -- "$obsolete" "$options" "$srcdir/man/pkgctl.1.scd" \
+      "$integration" >/dev/null 2>&1; then
+    echo "obsolete shared execution authority remains: $obsolete" >&2
+    exit 1
+  fi
+done
+grep -F 'construction/check credentials must match the native supervisor' \
+    "$command" "$integration" >/dev/null || {
+  echo 'construction/check supervisor-credential refusal is not qualified' >&2
+  exit 1
+}
+grep -F 'lifecycle credentials must match the native supervisor' \
+    "$command" >/dev/null || {
+  echo 'lifecycle supervisor-credential refusal missing' >&2
+  exit 1
+}
+preflight_line=$(grep -n -F 'require_native_execution_preflight(' \
+  "$command" | head -n 1 | cut -d: -f1)
+retain_line=$(grep -n -F 'universes.retain(command.nonce, transaction)' \
+  "$command" | head -n 1 | cut -d: -f1)
+[ -n "$preflight_line" ] && [ -n "$retain_line" ] && \
+    [ "$preflight_line" -lt "$retain_line" ] || {
+  echo 'native execution preflight does not precede command-universe retention' >&2
+  exit 1
+}
 for required_test in \
   'disposition step-limit-reached' \
   'durable-steps 1' \
   'exact transaction run is already admitted; use --resume' \
+  'native execution unavailable before transaction execution;' \
+  'unsupported native execution retained transaction evidence before refusal' \
   'rm -rf "$collection"' \
   'origin resumed' \
   'disposition completed' \

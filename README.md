@@ -7,8 +7,10 @@ semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
 Release 0.35.0 closes the functional package-management chain with one
-bounded native transaction command. `pkgctl run --start` retains the exact
-catalog/state universe before admitting one explicit run nonce; `--resume`
+bounded native transaction command. Before fresh-run retention or admission,
+`pkgctl run` proves that the selected native Linux backend can establish the
+execution guarantees implied by the transaction. `--start` then retains the
+exact catalog/state universe before admitting one explicit run nonce; `--resume`
 requires that retained universe and the exact admitted journal. Both enter only
 through `native_posix_transaction_run_runtime` and perform at most the explicit
 `--max-steps` bound.
@@ -20,9 +22,16 @@ reacquires collections, substitutes current state for historical state, scans
 for journals, or silently replans. Target observations are live only for the
 current operation dispatch.
 
-All authority remains explicit: existing runtime, build, and target roots; one
-inspected interpreter; numeric credentials; source-date epoch; retained
-installed-package trees; canonical state binding; and a caller-issued run
+Construction/check and lifecycle execution keep separate existing root views
+and explicit numeric credential sets. Supplying the same roots or credentials
+is an explicit caller policy, not an authority collapse inside the controller.
+The current Linux backend admits only the invoking supervisor's credentials;
+`pkgctl` refuses incompatible explicit credentials before run admission rather
+than pretending to provide fakeroot or ownership virtualization.
+
+All authority remains explicit: existing runtime, construction/check, lifecycle,
+and target roots; one inspected interpreter; numeric credentials; source-date
+epoch; retained installed-package trees; canonical state binding; and a caller-issued run
 nonce. The command creates no namespace, starts no daemon, waits on no timer,
 loops beyond the bound, retries implicitly, rolls back, repairs, cleans up, or
 collects history. Package management is now functionally closed; remaining work
@@ -608,8 +617,11 @@ and identity supplied by the caller.
 
 `pkgctl run` is the sole effect-implying command in 0.35.0. It composes one
 sealed transaction and advances one exact durable run under the caller's
-positive bound. `--start` and `--resume` are deliberately distinct; neither can
-silently become the other. The command exposes no unbounded executor, daemon,
+positive bound. Native execution capability absence is rejected as control-plane
+unavailability before a fresh transaction is retained or admitted; it is not
+recorded as a package build/check failure. `--start` and `--resume` are
+deliberately distinct; neither can silently become the other. The command exposes
+no unbounded executor, daemon,
 implicit retry, adaptive scheduler, transaction-wide rollback, journal scan,
 store initialization, repair, compaction, or garbage collection.
 

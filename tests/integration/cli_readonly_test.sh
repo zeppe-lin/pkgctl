@@ -83,6 +83,17 @@ catalog=$($pkgctl catalog --collection "core=$collection")
 printf '%s\n' "$catalog" | grep -F 'session.kind=catalog' >/dev/null
 printf '%s\n' "$catalog" | grep -F 'catalog.candidates=3' >/dev/null
 
+if $pkgctl catalog --collection "core=$collection" --lifecycle-root "$root/ignored" \
+    >"$root/run-only.out" 2>"$root/run-only.err"; then
+  echo 'catalog unexpectedly accepted run-only lifecycle authority' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F 'run authority options are valid only for run' \
+  "$root/run-only.err" >/dev/null
+[ ! -e "$root/ignored" ]
+
 invalid_collection=$root/invalid-collection
 mkdir -p "$invalid_collection/broken"
 cat >"$invalid_collection/broken/recipe.yml" <<'YAML'

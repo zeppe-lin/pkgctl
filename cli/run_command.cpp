@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
+#include <grp.h>
 #include <filesystem>
 #include <iostream>
 #include <limits>
@@ -1118,6 +1119,213 @@ private:
   return command.runtime_root / std::string(name);
 }
 
+[[nodiscard]] std::vector<std::uint64_t> current_supplementary_groups()
+{
+  const int count = ::getgroups(0, nullptr);
+  if (count < 0)
+    fail_io("cannot inspect current supplementary groups");
+  std::vector<gid_t> native(static_cast<std::size_t>(count));
+  if (count > 0 && ::getgroups(count, native.data()) < 0)
+    fail_io("cannot inspect current supplementary groups");
+  std::vector<std::uint64_t> result;
+  result.reserve(native.size());
+  for (const auto group : native)
+    result.push_back(static_cast<std::uint64_t>(group));
+  std::sort(result.begin(), result.end());
+  result.erase(std::unique(result.begin(), result.end()), result.end());
+  result.erase(std::remove(
+      result.begin(), result.end(), static_cast<std::uint64_t>(::getgid())),
+      result.end());
+  return result;
+}
+
+[[nodiscard]] bool current_credentials(
+    const pkgexec::credential_policy& credentials)
+{
+  return credentials.user_id() == static_cast<std::uint64_t>(::getuid()) &&
+      credentials.group_id() == static_cast<std::uint64_t>(::getgid()) &&
+      credentials.supplementary_groups() == current_supplementary_groups();
+}
+
+struct native_execution_scope final {
+  bool construction_or_check = false;
+  bool lifecycle = false;
+};
+
+[[nodiscard]] native_execution_scope native_execution_scopes(
+    const pkgtransaction::transaction_program& program)
+{
+  native_execution_scope result;
+  for (const auto& node : program.nodes())
+  {
+    switch (node.action())
+    {
+      case pkgtransaction::transaction_action_kind::build:
+      case pkgtransaction::transaction_action_kind::check:
+        result.construction_or_check = true;
+        break;
+      case pkgtransaction::transaction_action_kind::lifecycle:
+        result.lifecycle = true;
+        break;
+      case pkgtransaction::transaction_action_kind::install:
+      case pkgtransaction::transaction_action_kind::upgrade:
+      case pkgtransaction::transaction_action_kind::retain:
+      case pkgtransaction::transaction_action_kind::remove:
+        break;
+    }
+  }
+  return result;
+}
+
+[[nodiscard]] std::vector<pkgexec::execution_guarantee>
+native_execution_requirements(
+    const pkgtransaction::transaction_program& program)
+{
+  bool requires_execution = false;
+  bool requires_read_only_resources = false;
+  for (const auto& node : program.nodes())
+  {
+    switch (node.action())
+    {
+      case pkgtransaction::transaction_action_kind::build:
+      case pkgtransaction::transaction_action_kind::check:
+        requires_execution = true;
+        requires_read_only_resources = true;
+        break;
+      case pkgtransaction::transaction_action_kind::lifecycle:
+        requires_execution = true;
+        break;
+      case pkgtransaction::transaction_action_kind::install:
+      case pkgtransaction::transaction_action_kind::upgrade:
+      case pkgtransaction::transaction_action_kind::retain:
+      case pkgtransaction::transaction_action_kind::remove:
+        break;
+    }
+  }
+
+  if (!requires_execution)
+    return {};
+
+  std::vector<pkgexec::execution_guarantee> required{
+      pkgexec::execution_guarantee::exact_interpreter,
+      pkgexec::execution_guarantee::closed_environment,
+      pkgexec::execution_guarantee::root_view,
+      pkgexec::execution_guarantee::writable_resources,
+      pkgexec::execution_guarantee::fixed_credentials,
+      pkgexec::execution_guarantee::network_denied,
+      pkgexec::execution_guarantee::complete_stdout_capture,
+      pkgexec::execution_guarantee::complete_stderr_capture,
+      pkgexec::execution_guarantee::cleanup_verified,
+  };
+  if (requires_read_only_resources)
+    required.push_back(pkgexec::execution_guarantee::read_only_resources);
+  std::sort(required.begin(), required.end());
+  return required;
+}
+
+[[nodiscard]] bool relevant_native_capability(
+    pkgexec_linux::capability_kind capability) noexcept
+{
+  switch (capability)
+  {
+    case pkgexec_linux::capability_kind::closed_environment:
+    case pkgexec_linux::capability_kind::current_root_view:
+    case pkgexec_linux::capability_kind::current_credentials:
+    case pkgexec_linux::capability_kind::writable_resources:
+    case pkgexec_linux::capability_kind::complete_stream_capture:
+    case pkgexec_linux::capability_kind::process_group_containment:
+    case pkgexec_linux::capability_kind::descriptor_execution:
+    case pkgexec_linux::capability_kind::mount_namespace:
+    case pkgexec_linux::capability_kind::private_mount_propagation:
+    case pkgexec_linux::capability_kind::openat2:
+    case pkgexec_linux::capability_kind::open_tree:
+    case pkgexec_linux::capability_kind::move_mount:
+    case pkgexec_linux::capability_kind::mount_setattr:
+    case pkgexec_linux::capability_kind::chroot:
+    case pkgexec_linux::capability_kind::capability_drop:
+    case pkgexec_linux::capability_kind::network_namespace:
+      return true;
+    case pkgexec_linux::capability_kind::process_supervision:
+    case pkgexec_linux::capability_kind::no_new_privileges:
+    case pkgexec_linux::capability_kind::close_range:
+    case pkgexec_linux::capability_kind::pidfd:
+    case pkgexec_linux::capability_kind::pidfd_cancellation:
+    case pkgexec_linux::capability_kind::user_namespace:
+    case pkgexec_linux::capability_kind::pid_namespace:
+    case pkgexec_linux::capability_kind::landlock:
+    case pkgexec_linux::capability_kind::cgroup_v2:
+    case pkgexec_linux::capability_kind::loopback_configuration:
+    case pkgexec_linux::capability_kind::address_space_limit:
+    case pkgexec_linux::capability_kind::file_size_limit:
+    case pkgexec_linux::capability_kind::open_files_limit:
+      return false;
+  }
+  return false;
+}
+
+void require_native_execution_preflight(
+    const pkgtransaction::transaction_program& program,
+    const pkgexec_linux::capability_report& report,
+    const pkgexec::credential_policy& build_credentials,
+    const pkgexec::credential_policy& lifecycle_credentials)
+{
+  const auto required = native_execution_requirements(program);
+  const auto scopes = native_execution_scopes(program);
+  if (required.empty())
+    return;
+
+  std::vector<pkgexec::execution_guarantee> missing;
+  const auto& available = report.profile().guarantees();
+  for (const auto guarantee : required)
+  {
+    if (!std::binary_search(available.begin(), available.end(), guarantee))
+      missing.push_back(guarantee);
+  }
+
+  std::vector<std::string> missing_authorities;
+  if (scopes.construction_or_check && !current_credentials(build_credentials))
+  {
+    missing_authorities.push_back(
+        "construction/check credentials must match the native supervisor");
+  }
+  if (scopes.lifecycle && !current_credentials(lifecycle_credentials))
+  {
+    missing_authorities.push_back(
+        "lifecycle credentials must match the native supervisor");
+  }
+
+  if (missing.empty() && missing_authorities.empty())
+    return;
+
+  std::string message =
+      "native execution unavailable before transaction execution";
+  if (!missing.empty())
+  {
+    message += "; missing guarantees:";
+    for (const auto guarantee : missing)
+      message += " " + std::string(pkgexec::to_string(guarantee));
+  }
+  for (const auto& authority : missing_authorities)
+    message += "\n  " + authority;
+
+  for (const auto& observation : report.observations())
+  {
+    if (observation.state() == pkgexec_linux::capability_state::available ||
+        !relevant_native_capability(observation.capability()))
+      continue;
+    message += "\n  ";
+    message += pkgexec_linux::to_string(observation.capability());
+    message += "=";
+    message += pkgexec_linux::to_string(observation.state());
+    if (!observation.diagnostic().empty())
+    {
+      message += ": ";
+      message += observation.diagnostic();
+    }
+  }
+  throw std::runtime_error(message);
+}
+
 template<typename Destination, typename Source>
 [[nodiscard]] Destination translate_identity(const Source& source)
 {
@@ -1191,10 +1399,11 @@ template<typename Destination, typename Source>
       [&]() {
         std::vector<std::string> lifecycle_fields{
             transaction.identity().hex(), command.interpreter.string(),
-            std::to_string(command.user_id), std::to_string(command.group_id),
-            command.build_root.string(), command.target_root.string(),
+            std::to_string(command.lifecycle_credentials.user_id()),
+            std::to_string(command.lifecycle_credentials.group_id()),
+            command.lifecycle_root.string(), command.target_root.string(),
             execution_capabilities.identity().hex()};
-        for (const auto group : command.supplementary_groups)
+        for (const auto group : command.lifecycle_credentials.supplementary_groups())
           lifecycle_fields.push_back("supplementary:" + std::to_string(group));
         return derived_digest_identity<pkgapply::lifecycle_executor_identity>(
             "pkgctl/native-command-lifecycle-executor/1", lifecycle_fields);
@@ -1221,10 +1430,12 @@ template<typename Destination, typename Source>
               pkgbuild::environment_policy::hermetic(
                   1U, 0022, command.source_date_epoch)),
           pkgfetch::acquisition_policy::defaults(),
-          {interpreter.identity(), command.user_id, command.group_id,
-           command.supplementary_groups},
-          {interpreter.identity(), command.user_id, command.group_id,
-           command.supplementary_groups},
+          {interpreter.identity(), command.build_credentials.user_id(),
+           command.build_credentials.group_id(),
+           command.build_credentials.supplementary_groups()},
+          {interpreter.identity(), command.build_credentials.user_id(),
+           command.build_credentials.group_id(),
+           command.build_credentials.supplementary_groups()},
           pkgexec::resource_limits::make(),
           pkgbuild::artifact_compression::none,
       });
@@ -1240,11 +1451,12 @@ template<typename Destination, typename Source>
       transaction,
       {
           execution_root_identity(binding),
-          command.build_root,
+          command.lifecycle_root,
           command.target_root,
           runtime_path(command, "lifecycle-sessions"),
-          {interpreter.identity(), command.user_id, command.group_id,
-           command.supplementary_groups},
+          {interpreter.identity(), command.lifecycle_credentials.user_id(),
+           command.lifecycle_credentials.group_id(),
+           command.lifecycle_credentials.supplementary_groups()},
       });
 }
 
@@ -1484,17 +1696,14 @@ int execute_transaction_run(transaction_run_command command)
 {
   (void)open_directory(command.runtime_root);
   (void)open_directory(command.build_root);
+  (void)open_directory(command.lifecycle_root);
   auto target_root = open_directory(command.target_root);
 
   command_universe_store universes(
       runtime_path(command, "command-evidence"));
   transaction_session transaction = [&]() {
     if (command.intent == transaction_run_command_intent::start)
-    {
-      auto composed = compose_transaction(command.transaction);
-      universes.retain(command.nonce, composed);
-      return composed;
-    }
+      return compose_transaction(command.transaction);
     auto retained = universes.load(command.nonce);
     auto composed = recompose_transaction(
         command.transaction, std::move(retained.catalog),
@@ -1513,6 +1722,9 @@ int execute_transaction_run(transaction_run_command command)
   auto interpreter = pkgexec_linux::interpreter_binding::inspect(
       command.interpreter);
   auto execution_backend = pkgexec_linux::isolated_backend::make({interpreter});
+  require_native_execution_preflight(
+      transaction.program(), execution_backend.report(),
+      command.build_credentials, command.lifecycle_credentials);
   const auto execution_capabilities = execution_backend.capabilities();
   auto application_target = command_application_target(
       command, transaction, binding, execution_capabilities);
@@ -1568,6 +1780,8 @@ int execute_transaction_run(transaction_run_command command)
   if (command.intent == transaction_run_command_intent::resume && !existing)
     throw std::runtime_error(
         "exact transaction run is not admitted; use --start");
+  if (command.intent == transaction_run_command_intent::start)
+    universes.retain(command.nonce, transaction);
 
   auto configuration = native_transaction_run_runtime_configuration::make(
       transaction, command_sessions(command, binding, interpreter),

@@ -29,9 +29,13 @@ _resolution-options_ [*--converge-exact*]
 Version 0.35.0 retains the native catalog, resolution, transaction, and exact
 durable run/effect inspection commands and adds one bounded mutating command.
 *run* composes or recomposes one exact transaction, enters through the native
-runtime, and performs at most the positive *--max-steps* bound. *--start*
-retains the original catalog and state universe before admission; *--resume*
-requires that retained universe and the exact admitted journal.
+runtime, and performs at most the positive *--max-steps* bound. Before a fresh
+run is retained or admitted, the command proves that the selected native Linux
+backend can establish the execution guarantees implied by the transaction.
+Capability absence is reported as control-plane unavailability rather than a
+package build/check failure. *--start* then retains the original catalog and
+state universe before admission; *--resume* requires that retained universe and
+the exact admitted journal.
 
 The command does not initialize or enumerate stores, discover journals, replan
 a resumed transaction from live catalog/state, loop without a bound, sleep,
@@ -206,7 +210,13 @@ The following are also required:
 	*completed*. None is created, enumerated, repaired, or cleaned.
 
 *--build-root* _path_
-	Existing construction and lifecycle execution root view.
+	Existing construction/check execution root view. The command never creates or
+	populates it.
+
+*--lifecycle-root* _path_
+	Existing lifecycle execution root view. It is independent from the
+	construction/check root; supplying the same physical root is an explicit
+	caller policy, not a controller assumption.
 
 *--target-root* _path_
 	Existing managed target root.
@@ -214,14 +224,30 @@ The following are also required:
 *--interpreter* _path_
 	Exact interpreter inspected and admitted by *libpkgexec-linux*.
 
-*--user-id* _number_
-	Explicit numeric execution user identity.
+*--build-user-id* _number_
+	Explicit numeric construction/check execution user identity.
 
-*--group-id* _number_
-	Explicit numeric execution primary group identity.
+*--build-group-id* _number_
+	Explicit numeric construction/check execution primary group identity.
 
-*--supplementary-group* _number_
-	Add one explicit supplementary group. May be repeated.
+*--build-supplementary-group* _number_
+	Add one explicit construction/check supplementary group. May be repeated.
+
+*--lifecycle-user-id* _number_
+	Explicit numeric lifecycle execution user identity.
+
+*--lifecycle-group-id* _number_
+	Explicit numeric lifecycle execution primary group identity.
+
+*--lifecycle-supplementary-group* _number_
+	Add one explicit lifecycle supplementary group. May be repeated.
+
+The current native Linux backend admits only the invoking supervisor's numeric
+credentials. For every execution scope present in the transaction, the
+corresponding explicit credential set must therefore equal that supervisor
+identity. Construction/check and lifecycle credentials remain separate command
+authorities; *pkgctl* does not imply fakeroot, ownership virtualization, or a
+credential transition that the backend cannot establish.
 
 *--source-date-epoch* _number_
 	Explicit non-negative hermetic construction epoch.

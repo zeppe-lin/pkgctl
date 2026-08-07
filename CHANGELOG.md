@@ -3,9 +3,13 @@
 ### Bounded native transaction command
 
 - Adds `pkgctl run`, the first and only effect-implying frontend in this
-  release line. `--start` admits one explicit run nonce; `--resume` requires
-  that exact retained universe and exact admitted journal. Both perform at
-  most the positive `--max-steps` bound through the reviewed native runtime.
+  release line. Before fresh-run retention or admission, the command proves
+  that the selected native Linux backend can establish the execution guarantees
+  implied by the transaction; actuator unavailability is refused as control
+  state rather than recorded as package failure. `--start` admits one explicit
+  run nonce; `--resume` requires that exact retained universe and exact admitted
+  journal. Both perform at most the positive `--max-steps` bound through the
+  reviewed native runtime.
 - Retains the original catalog snapshot and canonical state snapshot as one
   immutable command-universe object before run admission. Resume decodes those
   owner formats and recomposes the same transaction identity; it never
@@ -30,12 +34,23 @@
   automatic rollback, journal discovery, ambient configuration, or hidden
   replanning. Step-limit completion is successful and explicitly resumable;
   failed, externally blocked, and quiescent-incomplete states remain failures.
+- Keeps construction/check execution and lifecycle execution as separate command
+  authority domains with independent existing root views and explicit credential
+  sets. The current Linux backend admits only supervisor credentials; incompatible
+  explicit credentials are refused before transaction admission rather than
+  reclassified as package failure. No fakeroot or ownership virtualization is
+  implied.
+- Organizes qualification by semantic role and adds a privileged process-level
+  `pkgctl run` start/resume test. Capability-unavailable hosts may skip that
+  vertical scenario in ordinary development runs, but release qualification
+  requires `PKGCTL_REQUIRE_NATIVE_INTEGRATION=1` and treats such a skip as a
+  hard failure.
 
 ### Dependency contract
 
 - libpkgapply-posix >= 3.1.0, < 4.0.0
 - libpkgcatalog-codec >= 3.0.0, < 4.0.0 (CLI only)
-- libpkgexec-linux >= 0.5.1, < 1.0.0 (CLI only)
+- libpkgexec-linux >= 0.5.2, < 1.0.0 (CLI only)
 
 ## 0.34.0 - 2026-08-07
 

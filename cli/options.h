@@ -45,11 +45,11 @@ struct transaction_run_command final {
   transaction_run_nonce nonce;
   std::filesystem::path runtime_root;
   std::filesystem::path build_root;
+  std::filesystem::path lifecycle_root;
   std::filesystem::path target_root;
   std::filesystem::path interpreter;
-  std::uint64_t user_id;
-  std::uint64_t group_id;
-  std::vector<std::uint64_t> supplementary_groups;
+  pkgexec::credential_policy build_credentials;
+  pkgexec::credential_policy lifecycle_credentials;
   std::uint64_t source_date_epoch;
   std::size_t maximum_steps;
   std::vector<installed_tree_option> installed_trees;
