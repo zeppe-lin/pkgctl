@@ -26,6 +26,7 @@
 #include <pkgctl/run_journal_codec.h>
 #include <pkgctl/run_inspect.h>
 #include <pkgctl/run_launch.h>
+#include <pkgctl/run_locator.h>
 #include <pkgctl/run_native.h>
 #include <pkgctl/run_nonce.h>
 #include <pkgctl/run_reconcile.h>

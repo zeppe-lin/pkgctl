@@ -1,3 +1,29 @@
+## Release 0.31.0 native locator qualification
+
+The native locator suite must prove:
+
+- the same journal and dispatch reproduce the same construction or check
+  session across reserved and started run records;
+- path scope depends on the stable run journal, not the changing record head;
+- catalog source coordinates are accepted only under the exact retained
+  acquisition specification and native direct-package layout;
+- catalog-selected inputs reuse exactly one successful predecessor
+  construction's package-output resource and path;
+- installed-selected inputs consult the caller-owned retained-package source and
+  reject a foreign installed package identity or invalid host path;
+- check source, package output, and package inputs reuse exact resources retained
+  by the successful construction;
+- the check source path is obtained from the build adapter's pure prepared-path
+  projection;
+- locating a session creates, removes, scans, stats, chmods, materializes,
+  executes, journals, or advances nothing;
+- configuration rejects overlapping writable and root-view domains; and
+- no command surface or backend composition is introduced.
+
+The source-contract pass protects the negative boundary. Runtime tests must
+exercise both predecessor and installed-package input branches and compare fresh
+and restart session identities.
+
 ## Release 0.30.0 shared-session recovery qualification
 
 The shared-session suite must prove:

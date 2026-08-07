@@ -21,7 +21,7 @@ for command in \
     exit 1
   }
 done
-grep -F 'There are no effect-implying CLI commands in 0.30.0.' \
+grep -F 'There are no effect-implying CLI commands in 0.31.0.' \
   "$readme" >/dev/null
 for obsolete in \
   'The executable still exposes only:' \
@@ -98,6 +98,12 @@ grep -F 'resumes the current head; retrying after completion returns completed t
 grep -F 'DURABLE CONSTRUCTION AND CHECK EVIDENCE' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.28.0 commits construction and check evidence' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'NATIVE CONSTRUCTION AND CHECK SESSION LOCATION' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.31.0 implements one private native' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Exact transaction-progress rehydration is the next' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'SHARED CONSTRUCTION AND CHECK SESSION AUTHORITY' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null

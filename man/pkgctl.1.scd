@@ -23,7 +23,7 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.30.0 retains the native catalog, resolution, transaction, and exact
+Version 0.31.0 retains the native catalog, resolution, transaction, and exact
 durable run/effect inspection commands. The command surface remains read-only.
 The controller library now persists exact construction/check execution evidence
 between started dispatch ownership and terminal run retirement, but no command
@@ -53,6 +53,15 @@ called by a library client; it does not reopen artifact bytes. All
 executable commands remain read-only: they never initialize or publish state,
 materialize sources, build packages, inspect artifacts, plan package changes,
 execute lifecycle programs, or apply mutations.
+
+Version 0.31.0 changes no command syntax. The controller library now provides
+one private native construction/check session locator. It derives exact source,
+predecessor or retained-installed-package resources, workspaces, package-output,
+artifact, and check-temporary coordinates from sealed transaction authority,
+exact progress, one run journal, one dispatch, and explicit configuration. The
+locator observes and mutates no host path. Progress rehydration, operation
+execution authority, final backend composition, and a mutating command remain
+absent.
 
 Version 0.30.0 changes no command syntax. Fresh construction/check execution
 and restart recovery now share one deterministic admitted-session source. The

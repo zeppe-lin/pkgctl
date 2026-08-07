@@ -61,6 +61,7 @@ struct tool_source_options final {
   bool with_build_dependency = true;
   std::vector<std::string> check_dependencies;
   std::optional<pkgsource::program> check_program;
+  std::string source_document = "tool/recipe.yml";
 };
 
 inline pkgsource::source_snapshot tool_source(
@@ -93,7 +94,7 @@ inline pkgsource::source_snapshot tool_source(
   }
 
   return seal_source(
-      source_origin("tool/recipe.yml"),
+      source_origin(std::move(options.source_document)),
       recipe_declaration(
           package_release(
               package_reference("tool"), std::move(options.version), 1),
@@ -128,10 +129,14 @@ inline pkgsource::source_snapshot tool_source(
   return tool_source(digest, std::move(options));
 }
 
-inline pkgsource::source_snapshot package_source(std::string name)
+inline pkgsource::source_snapshot package_source(
+    std::string name,
+    std::optional<std::string> source_document = std::nullopt)
 {
   using namespace pkgsource;
-  const auto origin = name + "/recipe.yml";
+  const auto origin = source_document
+      ? std::move(*source_document)
+      : name + "/recipe.yml";
   return seal_source(
       source_origin(origin),
       recipe_declaration(
@@ -151,9 +156,108 @@ inline pkgsource::source_snapshot dependency_source()
   return package_source("dep");
 }
 
+inline pkgstate::sha256_digest_bytes state_bytes_from_hex(
+    std::string_view hex)
+{
+  if (hex.size() != 64U)
+    throw std::runtime_error("state fixture digest must contain 64 hex digits");
+  const auto digit = [](char value) -> std::uint8_t {
+    if (value >= '0' && value <= '9')
+      return static_cast<std::uint8_t>(value - '0');
+    if (value >= 'a' && value <= 'f')
+      return static_cast<std::uint8_t>(value - 'a' + 10);
+    throw std::runtime_error("state fixture digest contains a non-hex digit");
+  };
+
+  pkgstate::sha256_digest_bytes result{};
+  for (std::size_t index = 0; index < result.size(); ++index)
+    result[index] = static_cast<std::uint8_t>(
+        (digit(hex[index * 2U]) << 4U) | digit(hex[index * 2U + 1U]));
+  return result;
+}
+
+template<typename Identity>
+inline Identity imported_state_identity(std::string_view hex)
+{
+  return Identity::from_sha256(state_bytes_from_hex(hex));
+}
+
+template<typename Identity>
+inline Identity fixture_state_identity(std::uint8_t value)
+{
+  pkgstate::sha256_digest_bytes bytes{};
+  bytes.fill(value);
+  return Identity::from_sha256(bytes);
+}
+
+inline pkgstate::installed_package installed_package(
+    const pkgsource::source_snapshot& source,
+    pkgstate::state_target_binding binding,
+    std::uint8_t seed = 30U)
+{
+  const auto& recipe = source.recipe();
+  std::vector<pkgstate::architecture_reference> declared_build;
+  for (const auto& value : recipe.architectures().build())
+    declared_build.emplace_back(value.name());
+  std::vector<pkgstate::architecture_reference> declared_target;
+  for (const auto& value : recipe.architectures().target())
+    declared_target.emplace_back(value.name());
+
+  pkgstate::package_release release(
+      imported_state_identity<pkgstate::package_release_identity>(
+          recipe.release().identity().hex()),
+      pkgstate::package_reference(recipe.release().package().name()),
+      recipe.release().version(), recipe.release().release());
+  auto source_record = pkgstate::package_source_record::make(
+      std::move(release),
+      pkgstate::package_metadata(
+          recipe.metadata().summary(), recipe.metadata().description(),
+          recipe.metadata().homepage(), recipe.metadata().licenses()),
+      {}, {}, {},
+      pkgstate::architecture_binding::make(
+          std::move(declared_build), std::move(declared_target),
+          pkgstate::architecture_reference("x86_64"),
+          pkgstate::architecture_reference("x86_64")),
+      {},
+      imported_state_identity<pkgstate::source_snapshot_identity>(
+          source.identity().hex()));
+  auto control = pkgstate::installed_control::make(
+      source_record, pkgstate::installation_reason::explicit_request(),
+      pkgstate::build_provenance(
+          source_record.identity(),
+          fixture_state_identity<pkgstate::build_request_identity>(seed),
+          fixture_state_identity<pkgstate::build_input_set_identity>(seed + 1U),
+          fixture_state_identity<pkgstate::environment_policy_identity>(
+              seed + 2U),
+          fixture_state_identity<pkgstate::build_policy_identity>(seed + 3U),
+          fixture_state_identity<pkgstate::build_result_identity>(seed + 4U),
+          fixture_state_identity<pkgstate::payload_manifest_identity>(
+              seed + 5U),
+          fixture_state_identity<pkgstate::build_artifact_identity>(seed + 6U),
+          fixture_state_identity<pkgstate::artifact_content_identity>(
+              seed + 7U),
+          fixture_state_identity<pkgstate::artifact_binding_identity>(
+              seed + 8U),
+          fixture_state_identity<pkgstate::execution_evidence_identity>(
+              seed + 9U),
+          fixture_state_identity<pkgstate::build_image_identity>(seed + 10U),
+          fixture_state_identity<pkgstate::artifact_image_identity>(
+              seed + 11U),
+          fixture_state_identity<pkgstate::artifact_inspection_identity>(
+              seed + 12U)));
+  return pkgstate::installed_package::make(
+      pkgstate::installation_receipt::make(
+          std::move(control), std::move(binding), {},
+          fixture_state_identity<pkgstate::operation_plan_identity>(
+              seed + 13U),
+          fixture_state_identity<pkgstate::application_evidence_identity>(
+              seed + 14U)));
+}
+
 inline pkgcatalog::catalog_snapshot catalog_snapshot(
     const pkgsource::source_snapshot& source,
-    std::vector<pkgsource::source_snapshot> dependencies)
+    std::vector<pkgsource::source_snapshot> dependencies,
+    fs::path collection_root = "/collection")
 {
   std::vector<pkgsource::source_snapshot> entries;
   entries.reserve(dependencies.size() + 1U);
@@ -164,7 +268,7 @@ inline pkgcatalog::catalog_snapshot catalog_snapshot(
   pkgcatalog::collection_declaration declaration(
       pkgcatalog::collection_reference("core"),
       pkgcatalog::collection_provenance(
-          "/collection", std::nullopt,
+          collection_root.generic_string(), std::nullopt,
           pkgsource::declaration_provenance(
               "<test>", "collections[0]", 1, 1)),
       std::move(entries));
@@ -177,10 +281,12 @@ inline pkgcatalog::catalog_snapshot catalog_snapshot(
 
 inline pkgcatalog::catalog_snapshot catalog_snapshot(
     const pkgsource::source_snapshot& source,
-    const pkgsource::source_snapshot& dependency)
+    const pkgsource::source_snapshot& dependency,
+    fs::path collection_root = "/collection")
 {
   return catalog_snapshot(
-      source, std::vector<pkgsource::source_snapshot>{dependency});
+      source, std::vector<pkgsource::source_snapshot>{dependency},
+      std::move(collection_root));
 }
 
 inline pkgctl::transaction_session transaction_session(
@@ -190,12 +296,14 @@ inline pkgctl::transaction_session transaction_session(
     const fs::path& state_path,
     bool include_target = false,
     bool include_unrelated_dependency = false,
-    bool include_check = false)
+    bool include_check = false,
+    fs::path collection_root = "/collection")
 {
-  auto catalog = catalog_snapshot(source, std::move(dependencies));
+  auto catalog = catalog_snapshot(
+      source, std::move(dependencies), collection_root);
   std::vector<pkgcatalog::acquire::collection_specification> specifications;
   specifications.emplace_back(
-      0, pkgcatalog::collection_reference("core"), fs::path("/collection"),
+      0, pkgcatalog::collection_reference("core"), collection_root,
       std::nullopt,
       pkgsource::declaration_provenance(
           "<test>", "collections[0]", 1, 1));
@@ -251,12 +359,14 @@ inline pkgctl::transaction_session transaction_session(
     const fs::path& state_path,
     bool include_target = false,
     bool include_unrelated_dependency = false,
-    bool include_check = false)
+    bool include_check = false,
+    fs::path collection_root = "/collection")
 {
   return transaction_session(
       source, std::vector<pkgsource::source_snapshot>{dependency},
       installed, state_path, include_target,
-      include_unrelated_dependency, include_check);
+      include_unrelated_dependency, include_check,
+      std::move(collection_root));
 }
 
 inline const pkgtransaction::transaction_node& build_node(

@@ -412,6 +412,36 @@ This boundary performs no record discovery, semantic reconstruction, resource
 realization, backend selection, process adoption, retry policy, scheduling,
 cleanup, compaction, garbage collection, or command action.
 
+# NATIVE CONSTRUCTION AND CHECK SESSION LOCATION
+
+Version 0.31.0 implements one private native
+*transaction_dispatch_session_source*. It consumes the already sealed
+transaction and exact current progress together with one durable run journal,
+one dispatch, explicit configured roots and execution policy, and a
+caller-owned retained-installed-package tree source.
+
+For a catalog subject, the retained source document is accepted only when it is
+an absolute native *recipe.yml* coordinate directly beneath the exact collection
+root retained by acquisition authority. For catalog-selected inputs, exactly one
+successful predecessor construction must supply the package-output resource and
+path. For installed-selected inputs, the caller's source must return a tree for
+the exact installed package identity. No package authority is inferred from a
+pathname or digest.
+
+Construction session, package-output, artifact, and check-temporary coordinates
+are derived beneath disjoint configured roots from the stable journal and
+dispatch identities. A reserved record and its started successor therefore
+reproduce the same session. Check sessions reuse source, output, and input
+resources from the successful predecessor construction. The build adapter's
+pure prepared-path projection owns the staged source coordinate.
+
+Location performs no filesystem observation or mutation, source
+materialization, backend construction, execution, evidence decoding, journal
+I/O, or progress advancement. It is not a target-profile parser and does not
+open stores or choose backends. Version 0.31.0 changes no command syntax and
+adds no mutating command. Exact transaction-progress rehydration is the next
+unimplemented controller provider.
+
 # SHARED CONSTRUCTION AND CHECK SESSION AUTHORITY
 
 Version 0.30.0 makes one deterministic session source authoritative for both

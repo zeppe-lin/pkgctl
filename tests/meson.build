@@ -30,6 +30,13 @@ if not get_option('tests').disabled()
   )
   test('run-journal', run_journal_test)
 
+  run_locator_test = executable(
+    'run-locator-test',
+    'run_locator_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('run-locator', run_locator_test)
+
   request_test = executable(
     'request-test',
     'request_test.cpp',
@@ -139,6 +146,7 @@ if not get_option('tests').disabled()
     'run_journal_codec.h',
     'run_inspect.h',
     'run_launch.h',
+    'run_locator.h',
     'run_native.h',
     'run_nonce.h',
     'run_reconcile.h',
@@ -204,6 +212,13 @@ if not get_option('tests').disabled()
 
   run_authority_contract = find_program('check_run_authority_contract.sh')
   test('run-authority-contract', run_authority_contract, args: [meson.project_source_root()])
+
+  run_locator_contract = find_program('check_run_locator_contract.sh')
+  test(
+    'run-locator-contract',
+    run_locator_contract,
+    args: [meson.project_source_root()],
+  )
 
   run_advance_contract = find_program('check_run_advance_contract.sh')
   test('run-advance-contract', run_advance_contract, args: [meson.project_source_root()])

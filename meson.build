@@ -4,7 +4,7 @@
 project(
   'pkgctl',
   'cpp',
-  version: '0.30.0',
+  version: '0.31.0',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.2.0',
   default_options: [
@@ -80,7 +80,7 @@ libpkgbuild_dep = dependency(
 )
 libpkgbuild_exec_dep = dependency(
   'libpkgbuild-exec',
-  version: ['>=2.1.0', '<3.0.0'],
+  version: ['>=2.2.0', '<3.0.0'],
   required: true,
   static: want_static,
 )

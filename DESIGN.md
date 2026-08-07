@@ -13,6 +13,60 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.31.0 native session/resource locator boundary
+
+The shared session seam now has one native controller-private implementation.
+It does not discover package semantics from the host. It translates already
+sealed transaction authority into exact call-scoped physical coordinates:
+
+```text
+transaction + exact progress + journal + dispatch
+                         |
+                         v
+            native session/resource locator
+              /                     \
+             v                       v
+catalog predecessor resource   retained installed tree
+             \                       /
+              v                     v
+          exact construction/check session
+```
+
+For a catalog construction subject, the locator matches the candidate's
+collection to the exact acquisition specification retained by the transaction.
+The source document must be an absolute native `recipe.yml` coordinate directly
+beneath that collection root. The source origin remains diagnostic provenance;
+only its agreement with the explicit acquisition authority permits the physical
+path projection.
+
+Each catalog-selected build input must have exactly one successful predecessor
+construction in the current progress. The locator reuses that construction's
+exact package-output resource identity and path. Each installed-selected input
+is requested from a caller-owned `retained_installed_package_tree_source`; the
+returned package identity must equal the selected installed authority. No
+package tree is reconstructed from release, source, artifact, or digest values.
+
+Writable paths are derived beneath explicit disjoint configured roots from the
+stable run-journal and dispatch identities. The journal, rather than the current
+record identity, scopes the path so a reserved dispatch and its started restart
+checkpoint reproduce one session. The locator does not inspect path existence,
+create or remove directories, materialize source bytes, select or construct a
+backend, execute work, read or write a journal, or advance progress.
+
+Check realization consumes the successful predecessor construction. It reuses
+its exact source-tree, package-output, and package-input resource identities.
+The staged source host path comes from
+`libpkgbuild-exec::project_prepared_paths()`; `pkgctl` does not own the
+adapter's `source`/`work`/`tmp` vocabulary. Check admission seals the canonical
+execution request through the pure adapter projection.
+
+This is one bounded provider, not a final target profile and not a new library.
+The next controller closure is a concrete
+`transaction_progress_rehydration_source` over the exact transaction, canonical
+state, construction/check evidence, and effect journals. Operation authority,
+archive lookup, final backend composition, and a mutating command remain later
+steps in that order.
+
 ## Release 0.30.0 shared session and pure recovery projection boundary
 
 Fresh construction/check execution and restart recovery must not receive

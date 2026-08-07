@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.30.0
+version=0.31.0
 
 require_line()
 {
@@ -20,13 +20,13 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 30;'
+  'inline constexpr unsigned version_minor = 31;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.30.0";'
+  'inline constexpr const char* version_string = "0.31.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 30);'
+  'static_assert(pkgctl::version_minor == 31);'
 
 require_dependency_range()
 {
@@ -40,19 +40,19 @@ require_dependency_range()
     }
 }
 
-require_dependency_range libpkgbuild-exec '>=2.1.0' '<3.0.0'
+require_dependency_range libpkgbuild-exec '>=2.2.0' '<3.0.0'
 require_dependency_range libpkgcheck-exec '>=0.4.0' '<1.0.0'
 require_dependency_range libpkgresolve '>=2.0.0' '<3.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
 
-grep -F '## 0.30.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.30.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.30.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.31.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.31.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.31.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
-grep -F 'Shared construction/check session authority' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'pure canonical execution-request projections' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'deterministic construction/check session source' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Version 0.30.0 makes one deterministic session source authoritative' \
+grep -F 'Native construction/check session locator' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'caller-owned retained-package tree source' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'journal and dispatch identities' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Version 0.31.0 implements one private native' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 for contract in \
@@ -67,7 +67,7 @@ for contract in \
   'libpkgstate-apply >= 3.0.0, < 4.0.0' \
   'libpkgfetch >= 1.0.0, < 2.0.0' \
   'libpkgbuild >= 3.0.0, < 4.0.0' \
-  'libpkgbuild-exec >= 2.1.0, < 3.0.0' \
+  'libpkgbuild-exec >= 2.2.0, < 3.0.0' \
   'libpkgbuild-image >= 1.0.0, < 2.0.0' \
   'libpkgbuild-plan >= 1.0.0, < 2.0.0' \
   'libpkgimage >= 0.4.0, < 1.0.0' \

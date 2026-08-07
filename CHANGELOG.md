@@ -1,3 +1,37 @@
+## 0.31.0 - 2026-08-07
+
+### Native construction/check session locator
+
+- Adds one controller-private deterministic session/resource locator for native
+  construction and check dispatches. The same journal and dispatch authority
+  yields the same admitted session before execution and after restart.
+- Corroborates each catalog source coordinate against the exact acquisition
+  specification and native one-package-directory layout; a diagnostic source
+  origin alone is never promoted into filesystem authority.
+- Resolves catalog-selected build inputs only from successful predecessor
+  constructions retained in exact transaction progress. Installed-selected
+  inputs are borrowed through a caller-owned retained-package tree source and
+  must name the exact installed package authority.
+- Allocates construction sessions, package outputs, artifacts, and check
+  temporary roots beneath explicit configured domains using only the stable run
+  journal and dispatch identities. Location performs no filesystem observation
+  or mutation, source materialization, backend construction, execution, journal
+  I/O, or progress advancement.
+- Reuses the build adapter's pure prepared-path projection for the staged source
+  tree consumed by checks and reuses the exact subordinate resource identities
+  already retained by successful construction evidence.
+- Makes check admission consume the pure canonical execution-request projection
+  directly; no effectful preparation is invoked to establish request authority.
+- Adds no progress rehydration provider, operation-execution provider, archive
+  source, final target/runtime profile, scheduler, retry policy, or mutating
+  command. The next controller closure is exact transaction-progress
+  rehydration over the existing durable authorities.
+
+### Dependency contract
+
+- libpkgbuild-exec >= 2.2.0, < 3.0.0
+- libpkgcheck-exec >= 0.4.0, < 1.0.0
+
 ## 0.30.0 - 2026-08-07
 
 ### Shared construction/check session authority
