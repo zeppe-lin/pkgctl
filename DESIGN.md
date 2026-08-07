@@ -1767,7 +1767,8 @@ snapshot. Automatic continuation is conservative:
   resolution because lifecycle programs may be non-idempotent;
 - application intent requires the caller to supply the exact durable
   `libpkgapply::application_journal_record` belonging to the request;
-- completed application evidence permits continuation into post lifecycle;
+- completed application evidence permits continuation into post lifecycle and
+  the receipt-named historical application journal is not restart authority;
 - publication intent requires authoritative installed-state rereading;
 - an exact prior state permits retry of the retained publication request;
 - an exact resulting state permits terminal reconciliation without a second

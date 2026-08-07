@@ -29,6 +29,7 @@ for required in \
   'public transaction_operation_session_sink' \
   'PKGCTL-OPERATION-OBSERVATIONS-1' \
   'retained.attempt_session()' \
+  'record.stage() == effect_attempt_stage::application_intent' \
   'application_journals_.load_active(' \
   'pkgstate::posix::canonical_generation_store::open_existing(' \
   'native_posix_transaction_run_runtime::from_directory_fds(' \
@@ -56,6 +57,7 @@ for forbidden in \
   'std::thread' \
   'std::async' \
   'getenv(' \
+  'application_journals_.load(' \
   'latest_' \
   'list_'; do
   if grep -F "$forbidden" "$command" >/dev/null 2>&1; then

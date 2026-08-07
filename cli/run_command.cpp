@@ -574,16 +574,7 @@ public:
       result.publication_receipt = std::move(body);
     }
 
-    if (record.application() && record.application()->journal())
-    {
-      const auto journal = pkgapply::application_journal_identity::parse(
-          *record.application()->journal());
-      result.application_journal = application_journals_.load(journal);
-      if (!result.application_journal)
-        throw std::runtime_error(
-            "effect journal names an absent application journal");
-    }
-    else if (record.stage() == effect_attempt_stage::application_intent)
+    if (record.stage() == effect_attempt_stage::application_intent)
     {
       result.application_journal = application_journals_.load_active(
           session.request().application().identity());

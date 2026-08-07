@@ -18,9 +18,12 @@
   publication receipts in a private immutable command store before an effect
   journal may name them. Bodies use their owning codecs and are validated again
   by the existing restart checkpoint.
-- Uses `libpkgapply-posix` 3.1.0 direct active-request lookup to recover one
-  interrupted application journal without scanning a journal directory or
-  moving application-storage policy into the controller.
+- Uses `libpkgapply-posix` 3.1.0 direct active-request lookup only to recover
+  an unresolved application-intent journal, without scanning a journal
+  directory or moving application-storage policy into the controller. Later
+  application/terminal history is reconstructed from its retained receipt and
+  does not inject the receipt-named historical application journal as restart
+  authority.
 - Requires explicit existing runtime, build, and target roots; an inspected
   interpreter; numeric credentials; a hermetic source-date epoch; and any
   retained installed-package trees. Every runtime namespace must already

@@ -9,8 +9,9 @@ The final command suite must prove:
   an existing journal, while resume requires both the retained universe and
   that exact journal and reproduces the same transaction identity;
 - effect bodies are durably retained through owner codecs before journal records
-  name them, and interrupted application recovery uses direct active-request
-  lookup rather than enumeration;
+  name them, interrupted application recovery uses direct active-request lookup
+  rather than enumeration, and later application/terminal replay does not feed
+  a receipt-named historical application journal back into the restart checkpoint;
 - runtime namespaces are existing-only and no parse refusal creates runtime,
   build, or target paths; a malformed caller-owned execution root is retained
   as terminal construction evidence and the command surfaces its durable backend
