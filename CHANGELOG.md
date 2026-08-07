@@ -2,8 +2,8 @@
 
 ### Native target and runtime composition
 
-- Adds one stable native POSIX composition root for an exact sealed
-  transaction. It owns the selected run, construction/check evidence, and
+- Adds `native_posix_transaction_run_runtime`, one stable native POSIX
+  composition root for an exact sealed transaction. It owns the selected run, construction/check evidence, and
   effect stores together with the native session locator, operation authority,
   archive map, exact progress rehydrator, restart chain, dispatch nonce
   projection, and construction/check/effect drivers.
