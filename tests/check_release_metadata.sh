@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.34.0
+version=0.35.0
 
 require_line()
 {
@@ -20,13 +20,13 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 34;'
+  'inline constexpr unsigned version_minor = 35;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.34.0";'
+  'inline constexpr const char* version_string = "0.35.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 34);'
+  'static_assert(pkgctl::version_minor == 35);'
 
 require_dependency_range()
 {
@@ -45,15 +45,18 @@ require_dependency_range libpkgbuild-exec '>=2.2.0' '<3.0.0'
 require_dependency_range libpkgcheck-exec '>=0.4.0' '<1.0.0'
 require_dependency_range libpkgresolve '>=2.0.0' '<3.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
+require_dependency_range libpkgapply-posix '>=3.1.0' '<4.0.0'
+require_dependency_range libpkgcatalog-codec '>=3.0.0' '<4.0.0'
+require_dependency_range libpkgexec-linux '>=0.5.0' '<1.0.0'
 
-grep -F '## 0.34.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.34.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.34.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.35.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.35.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
-grep -F 'Native target and runtime composition' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'native_posix_transaction_run_runtime' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'explicit durable run-intent nonce' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Version 0.34.0 provides *native_posix_transaction_run_runtime*' \
+grep -F 'Bounded native transaction command' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F '`pkgctl run`' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'immutable command-universe object' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Version 0.35.0 exposes *pkgctl run*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 for contract in \
@@ -61,6 +64,7 @@ for contract in \
   'libpkgsource-yaml >= 1.0.0, < 2.0.0' \
   'libpkgsource-plan >= 1.0.0, < 2.0.0' \
   'libpkgcatalog >= 3.0.0, < 4.0.0' \
+  'libpkgcatalog-codec >= 3.0.0, < 4.0.0' \
   'libpkgcatalog-acquire >= 3.0.0, < 4.0.0' \
   'libpkgstate >= 3.1.0, < 4.0.0' \
   'libpkgstate-posix >= 3.0.0, < 4.0.0' \
@@ -74,8 +78,9 @@ for contract in \
   'libpkgimage >= 0.4.0, < 1.0.0' \
   'libpkgplan >= 0.3.0, < 1.0.0' \
   'libpkgexec >= 1.4.0, < 2.0.0' \
+  'libpkgexec-linux >= 0.5.0, < 1.0.0' \
   'libpkgapply >= 3.0.0, < 4.0.0' \
-  'libpkgapply-posix >= 3.0.0, < 4.0.0' \
+  'libpkgapply-posix >= 3.1.0, < 4.0.0' \
   'libpkgapply-exec >= 2.0.0, < 3.0.0' \
   'libpkgresolve >= 2.0.0, < 3.0.0' \
   'libpkgtransaction >= 2.1.0, < 3.0.0' \

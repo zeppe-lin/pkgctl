@@ -1,3 +1,42 @@
+## 0.35.0 - 2026-08-07
+
+### Bounded native transaction command
+
+- Adds `pkgctl run`, the first and only effect-implying frontend in this
+  release line. `--start` admits one explicit run nonce; `--resume` requires
+  that exact retained universe and exact admitted journal. Both perform at
+  most the positive `--max-steps` bound through the reviewed native runtime.
+- Retains the original catalog snapshot and canonical state snapshot as one
+  immutable command-universe object before run admission. Resume decodes those
+  owner formats and recomposes the same transaction identity; it never
+  reacquires collections or replans against a newer live state epoch.
+- Retains lifecycle results, application receipts, publication requests, and
+  publication receipts in a private immutable command store before an effect
+  journal may name them. Bodies use their owning codecs and are validated again
+  by the existing restart checkpoint.
+- Uses `libpkgapply-posix` 3.1.0 direct active-request lookup to recover one
+  interrupted application journal without scanning a journal directory or
+  moving application-storage policy into the controller.
+- Requires explicit existing runtime, build, and target roots; an inspected
+  interpreter; numeric credentials; a hermetic source-date epoch; and any
+  retained installed-package trees. Every runtime namespace must already
+  exist. The command initializes, enumerates, discovers, repairs, cleans, or
+  garbage-collects none of them.
+- Observes the target only for the current operation dispatch, derives ordinary
+  runtime dependencies from the exact transitive resolver run-scope closure,
+  and keeps application mutation identity separate from lifecycle execution
+  capability identity.
+- Adds no daemon, scheduler, timer, implicit retry, unbounded run loop,
+  automatic rollback, journal discovery, ambient configuration, or hidden
+  replanning. Step-limit completion is successful and explicitly resumable;
+  failed, externally blocked, and quiescent-incomplete states remain failures.
+
+### Dependency contract
+
+- libpkgapply-posix >= 3.1.0, < 4.0.0
+- libpkgcatalog-codec >= 3.0.0, < 4.0.0 (CLI only)
+- libpkgexec-linux >= 0.5.0, < 1.0.0 (CLI only)
+
 ## 0.34.0 - 2026-08-07
 
 ### Native target and runtime composition

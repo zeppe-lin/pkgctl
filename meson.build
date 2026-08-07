@@ -4,7 +4,7 @@
 project(
   'pkgctl',
   'cpp',
-  version: '0.34.0',
+  version: '0.35.0',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.2.0',
   default_options: [
@@ -32,6 +32,12 @@ libpkgsource_yaml_dep = dependency(
 )
 libpkgcatalog_dep = dependency(
   'libpkgcatalog',
+  version: ['>=3.0.0', '<4.0.0'],
+  required: true,
+  static: want_static,
+)
+libpkgcatalog_codec_dep = dependency(
+  'libpkgcatalog-codec',
   version: ['>=3.0.0', '<4.0.0'],
   required: true,
   static: want_static,
@@ -120,6 +126,12 @@ libpkgexec_dep = dependency(
   required: true,
   static: want_static,
 )
+libpkgexec_linux_dep = dependency(
+  'libpkgexec-linux',
+  version: ['>=0.5.0', '<1.0.0'],
+  required: true,
+  static: want_static,
+)
 libpkgapply_dep = dependency(
   'libpkgapply',
   version: ['>=3.0.0', '<4.0.0'],
@@ -128,7 +140,7 @@ libpkgapply_dep = dependency(
 )
 libpkgapply_posix_dep = dependency(
   'libpkgapply-posix',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=3.1.0', '<4.0.0'],
   required: true,
   static: want_static,
 )

@@ -50,7 +50,8 @@ for required in \
   'native construction/check storage overlaps lifecycle execution' \
   'native_transaction_dispatch_session_source sessions_' \
   'native_transaction_operation_authority_source operations_' \
-  'explicit_transaction_effect_archive_source archives_' \
+  'std::unique_ptr<explicit_transaction_effect_archive_source> owned_archives_' \
+  'transaction_effect_archive_source* archives_' \
   'native_transaction_progress_rehydration_context_source progress_context_' \
   'detail::native_construction_recovery_context(' \
   'detail::native_check_recovery_context(' \
@@ -74,7 +75,8 @@ for token in \
   'effects_(posix_effect_journal_store::from_directory_fd' \
   'sessions_(configuration_.sessions(), authorities.installed_packages)' \
   'operations_(' \
-  'archives_(explicit_transaction_effect_archive_source::make' \
+  'owned_archives_(' \
+  'archives_(' \
   'progress_context_(' \
   'progress_(' \
   'engine_('; do
@@ -159,9 +161,14 @@ for forbidden in \
   fi
 done
 
+grep -F 'native_posix_transaction_run_runtime::from_directory_fds(' \
+  "$srcdir/cli/run_command.cpp" >/dev/null || {
+  echo 'bounded run command does not enter through the reviewed native runtime' >&2
+  exit 1
+}
 if grep -R -n -E \
-    'posix_transaction_run_runtime|native_posix_transaction_run_runtime|run_runtime' \
+    'launch_transaction_run[[:space:]]*\(|drive_transaction_run[[:space:]]*\(' \
     "$srcdir/cli" >/dev/null 2>&1; then
-  echo 'transaction-run runtime must not acquire a command frontend' >&2
+  echo 'command frontend bypasses the native runtime root' >&2
   exit 1
 fi

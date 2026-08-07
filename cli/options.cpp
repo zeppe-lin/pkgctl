@@ -22,6 +22,7 @@ enum class command_kind {
   catalog,
   resolve,
   transaction,
+  run,
   inspect_run,
   inspect_effect,
 };
@@ -48,6 +49,18 @@ struct raw_options final {
   std::vector<pkgresolve::resolution_goal> goals;
   bool prefer_catalog = false;
   bool converge_exact = false;
+  std::optional<transaction_run_command_intent> run_intent;
+  std::optional<std::string> run_nonce;
+  std::optional<std::string> runtime_root;
+  std::optional<std::string> build_root_path;
+  std::optional<std::string> target_root_path;
+  std::optional<std::string> interpreter;
+  std::optional<std::uint64_t> user_id;
+  std::optional<std::uint64_t> group_id;
+  std::vector<std::uint64_t> supplementary_groups;
+  std::optional<std::uint64_t> source_date_epoch;
+  std::optional<std::uint64_t> maximum_steps;
+  std::vector<installed_tree_option> installed_trees;
 };
 
 [[noreturn]] void fail(const std::string& message)
@@ -72,25 +85,26 @@ std::pair<std::string, std::string> assignment(
   return {value.substr(0, equals), value.substr(equals + 1)};
 }
 
-std::uint64_t decimal(const std::string& value)
+std::uint64_t decimal(const std::string& value, const std::string& description,
+                      bool allow_zero = false)
 {
   if (value.empty())
-    fail("empty document byte limit");
+    fail("empty " + description);
   if (value.size() > 1U && value.front() == '0')
-    fail("document byte limit is not canonical decimal");
+    fail(description + " is not canonical decimal");
 
   std::uint64_t result = 0;
   for (const char character : value)
   {
     if (character < '0' || character > '9')
-      fail("document byte limit is not canonical decimal");
+      fail(description + " is not canonical decimal");
     const std::uint64_t digit = static_cast<unsigned>(character - '0');
     if (result > (std::numeric_limits<std::uint64_t>::max() - digit) / 10U)
-      fail("document byte limit is too large");
+      fail(description + " is too large");
     result = result * 10U + digit;
   }
-  if (result == 0)
-    fail("document byte limit must be greater than zero");
+  if (!allow_zero && result == 0)
+    fail(description + " must be greater than zero");
   return result;
 }
 
@@ -142,6 +156,7 @@ command_kind parse_kind(std::string_view value)
   if (value == "catalog") return command_kind::catalog;
   if (value == "resolve") return command_kind::resolve;
   if (value == "transaction") return command_kind::transaction;
+  if (value == "run") return command_kind::run;
   if (value == "inspect-run") return command_kind::inspect_run;
   if (value == "inspect-effect") return command_kind::inspect_effect;
   fail("unknown command: " + std::string(value));
@@ -227,6 +242,39 @@ effect_inspection_command parse_effect_inspection(int argc, char** argv)
   }
 }
 
+installed_tree_option installed_tree(std::string value)
+{
+  const auto [package_text, resource_and_path] = assignment(
+      std::move(value), "--installed-tree");
+  const std::size_t comma = resource_and_path.find(',');
+  if (comma == std::string::npos || comma == 0U ||
+      comma + 1U == resource_and_path.size())
+    fail("--installed-tree requires PACKAGE_ID=RESOURCE_SHA256,PATH");
+  try
+  {
+    return installed_tree_option{
+        pkgstate::installed_package_identity::parse(package_text),
+        pkgexec::resource_identity::from_sha256(
+            resource_and_path.substr(0U, comma)),
+        resource_and_path.substr(comma + 1U)};
+  }
+  catch (const std::exception& problem)
+  {
+    fail(std::string("invalid --installed-tree: ") + problem.what());
+  }
+}
+
+void set_run_intent(raw_options& parsed,
+                    transaction_run_command_intent intent,
+                    std::string nonce,
+                    const std::string& option)
+{
+  if (parsed.run_intent)
+    fail("--start and --resume are mutually exclusive");
+  parsed.run_intent = intent;
+  set_once(parsed.run_nonce, std::move(nonce), option);
+}
+
 raw_options parse_raw(command_kind kind, int argc, char** argv)
 {
   raw_options parsed;
@@ -257,7 +305,7 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
     if (argument == "--max-document-bytes")
     {
       parsed.max_document_bytes = decimal(
-          require_value(argc, argv, index, argument));
+          require_value(argc, argv, index, argument), "document byte limit");
       continue;
     }
     if (argument == "--canonical-store")
@@ -328,6 +376,84 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
       parsed.converge_exact = true;
       continue;
     }
+    if (argument == "--start")
+    {
+      set_run_intent(parsed, transaction_run_command_intent::start,
+                     require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    if (argument == "--resume")
+    {
+      set_run_intent(parsed, transaction_run_command_intent::resume,
+                     require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    if (argument == "--runtime-root")
+    {
+      set_once(parsed.runtime_root,
+               require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    if (argument == "--build-root")
+    {
+      set_once(parsed.build_root_path,
+               require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    if (argument == "--target-root")
+    {
+      set_once(parsed.target_root_path,
+               require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    if (argument == "--interpreter")
+    {
+      set_once(parsed.interpreter,
+               require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    if (argument == "--user-id")
+    {
+      if (parsed.user_id) fail("--user-id specified more than once");
+      parsed.user_id = decimal(
+          require_value(argc, argv, index, argument), "user id", true);
+      continue;
+    }
+    if (argument == "--group-id")
+    {
+      if (parsed.group_id) fail("--group-id specified more than once");
+      parsed.group_id = decimal(
+          require_value(argc, argv, index, argument), "group id", true);
+      continue;
+    }
+    if (argument == "--supplementary-group")
+    {
+      parsed.supplementary_groups.push_back(decimal(
+          require_value(argc, argv, index, argument),
+          "supplementary group id", true));
+      continue;
+    }
+    if (argument == "--source-date-epoch")
+    {
+      if (parsed.source_date_epoch)
+        fail("--source-date-epoch specified more than once");
+      parsed.source_date_epoch = decimal(
+          require_value(argc, argv, index, argument), "source date epoch", true);
+      continue;
+    }
+    if (argument == "--max-steps")
+    {
+      if (parsed.maximum_steps) fail("--max-steps specified more than once");
+      parsed.maximum_steps = decimal(
+          require_value(argc, argv, index, argument), "maximum step count");
+      continue;
+    }
+    if (argument == "--installed-tree")
+    {
+      parsed.installed_trees.push_back(installed_tree(
+          require_value(argc, argv, index, argument)));
+      continue;
+    }
     fail("unknown option: " + argument);
   }
 
@@ -367,9 +493,31 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
       fail("both architecture options are required");
     if (parsed.goals.empty())
       fail("at least one --goal is required");
-    if (kind != command_kind::transaction && parsed.converge_exact)
-      fail("--converge-exact is valid only for transaction");
+    if (kind != command_kind::transaction && kind != command_kind::run &&
+        parsed.converge_exact)
+      fail("--converge-exact is valid only for transaction or run");
   }
+
+  const bool has_run_options = parsed.run_intent || parsed.run_nonce ||
+      parsed.runtime_root || parsed.build_root_path || parsed.target_root_path ||
+      parsed.interpreter || parsed.user_id || parsed.group_id ||
+      !parsed.supplementary_groups.empty() || parsed.source_date_epoch ||
+      parsed.maximum_steps || !parsed.installed_trees.empty();
+  if (kind == command_kind::run)
+  {
+    if (!parsed.run_intent || !parsed.run_nonce || !parsed.runtime_root ||
+        !parsed.build_root_path || !parsed.target_root_path ||
+        !parsed.interpreter || !parsed.user_id.has_value() ||
+        !parsed.group_id.has_value() ||
+        !parsed.source_date_epoch.has_value() || !parsed.maximum_steps)
+      fail("run requires intent, roots, interpreter, credentials, epoch, and bound");
+    if (*parsed.maximum_steps >
+        static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
+      fail("maximum step count is too large for this platform");
+  }
+  else if (has_run_options)
+    fail("run authority options are valid only for run");
+
   return parsed;
 }
 
@@ -440,11 +588,29 @@ command parse_command(int argc, char** argv)
   resolution_request resolution = resolution_from(parsed);
   if (kind == command_kind::resolve)
     return resolution;
-  return transaction_request::make(
+  transaction_request transaction = transaction_request::make(
       std::move(resolution),
       parsed.converge_exact
           ? pkgtransaction::convergence_policy::converge_exact()
           : pkgtransaction::convergence_policy::preserve_unselected());
+  if (kind == command_kind::transaction)
+    return transaction;
+  try
+  {
+    return transaction_run_command{
+        std::move(transaction), *parsed.run_intent,
+        transaction_run_nonce::from_hex(std::move(*parsed.run_nonce)),
+        std::move(*parsed.runtime_root), std::move(*parsed.build_root_path),
+        std::move(*parsed.target_root_path), std::move(*parsed.interpreter),
+        *parsed.user_id, *parsed.group_id,
+        std::move(parsed.supplementary_groups), *parsed.source_date_epoch,
+        static_cast<std::size_t>(*parsed.maximum_steps),
+        std::move(parsed.installed_trees)};
+  }
+  catch (const std::exception& problem)
+  {
+    fail(std::string("invalid run authority: ") + problem.what());
+  }
 }
 
 std::string help_text()
@@ -453,10 +619,11 @@ std::string help_text()
   pkgctl catalog OPTIONS
   pkgctl resolve OPTIONS --goal SCOPE=SUBJECT [--goal ...]
   pkgctl transaction OPTIONS --goal SCOPE=SUBJECT [--goal ...]
+  pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] RUN-OPTIONS
   pkgctl inspect-run --run-store PATH --journal SHA256
   pkgctl inspect-effect --effect-store PATH --attempt SHA256
 
-Read and compose native package authorities without mutation.
+Inspect, compose, or boundedly execute native package authorities.
 
 Catalog options:
   --collection NAME=ROOT          explicit collection; order is precedence
@@ -485,6 +652,20 @@ Transaction options:
   --converge-exact                remove installed packages outside the exact
                                   selected target closure; never the default
 
+Run options:
+  --start SHA256                  admit a new explicit run intent
+  --resume SHA256                 resume exactly that retained run intent
+  --runtime-root PATH             existing private runtime hierarchy
+  --build-root PATH               existing construction/lifecycle root view
+  --target-root PATH              existing managed target root
+  --interpreter PATH              exact inspected interpreter
+  --user-id N                     explicit execution user id
+  --group-id N                    explicit execution group id
+  --supplementary-group N         repeatable supplementary group id
+  --source-date-epoch N           hermetic construction epoch
+  --max-steps N                   positive bound for this invocation
+  --installed-tree P=R,PATH       retained installed package/resource tree
+
 Run inspection options:
   --run-store PATH                existing POSIX transaction-run store
   --journal SHA256                exact lowercase journal identity
@@ -497,10 +678,11 @@ Global options:
   -h, --help
   -V, --version
 
-The commands are read-only. pkgctl does not initialize state, run stores, or
-effect stores,
-build packages, open artifacts, plan filesystem changes, execute lifecycle
-programs, apply mutations, or publish installed state in this release.
+The catalog, resolve, transaction, and inspection commands are read-only.
+The run command mutates only through one explicitly retained native runtime and
+performs at most --max-steps controller advances. It never initializes or scans
+stores, replans a resumed transaction from live catalog/state, loops without a
+bound, retries on a timer, cleans up, rolls back, or discovers a journal.
 )";
 }
 

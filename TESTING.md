@@ -1,3 +1,27 @@
+## Release 0.35.0 bounded native command qualification
+
+The final command suite must prove:
+
+- `--start` and `--resume` are mutually exclusive and require one explicit
+  lowercase run nonce, existing roots, inspected interpreter, numeric
+  credentials, source-date epoch, and positive step bound;
+- start retains the original catalog/state universe before admission and refuses
+  an existing journal, while resume requires both the retained universe and
+  that exact journal and reproduces the same transaction identity;
+- effect bodies are durably retained through owner codecs before journal records
+  name them, and interrupted application recovery uses direct active-request
+  lookup rather than enumeration;
+- runtime namespaces are existing-only and no parse refusal creates runtime,
+  build, or target paths;
+- target observations are per-dispatch, ordinary runtime dependencies use the
+  transitive resolver run-scope closure, and lifecycle execution capabilities do
+  not become target-mutation identities;
+- one invocation executes no more than `--max-steps`, with no implicit loop,
+  sleep, retry, scheduler, repair, rollback, cleanup, compaction, or discovery;
+- the existing read-only commands remain byte-stable sensors; and
+- a complete private-prefix shared/static Meson build passes under ASan and
+  UBSan before tagging.
+
 ## Release 0.34.0 native target/runtime composition qualification
 
 The native runtime suite must prove:

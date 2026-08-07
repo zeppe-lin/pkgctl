@@ -58,8 +58,8 @@ for forbidden in \
 done
 
 if grep -R -n -E \
-    'transaction_progress|advance_construction|advance_check|advance_effect' \
+    'advance_construction[[:space:]]*\(|advance_check[[:space:]]*\(|advance_effect[[:space:]]*\(' \
     "$srcdir/cli" >/dev/null 2>&1; then
-  echo 'transaction progression must not acquire a command frontend' >&2
+  echo 'command frontend must not bypass the reviewed run runtime' >&2
   exit 1
 fi

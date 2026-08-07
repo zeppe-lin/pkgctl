@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "options.h"
+#include "run_command.h"
 
 #include <pkgctl/controller.h>
 #include <pkgctl/effect_inspect.h>
@@ -78,7 +79,7 @@ const char* run_journal_error_name(
 
 int execute(pkgctl::cli::command command)
 {
-  std::visit([](auto request) {
+  return std::visit([](auto request) -> int {
     using request_type = std::decay_t<decltype(request)>;
     if constexpr (std::is_same_v<request_type, pkgctl::catalog_request>)
       std::cout << pkgctl::render_report(
@@ -91,6 +92,10 @@ int execute(pkgctl::cli::command command)
                                       pkgctl::transaction_request>)
       std::cout << pkgctl::render_report(
           pkgctl::compose_transaction(std::move(request)));
+    else if constexpr (std::is_same_v<
+                           request_type,
+                           pkgctl::cli::transaction_run_command>)
+      return pkgctl::cli::execute_transaction_run(std::move(request));
     else if constexpr (std::is_same_v<
                            request_type,
                            pkgctl::cli::run_inspection_command>)
@@ -108,8 +113,8 @@ int execute(pkgctl::cli::command command)
           std::move(request.attempt), store);
       std::cout << pkgctl::render_report(inspection);
     }
+    return EXIT_SUCCESS;
   }, std::move(command));
-  return EXIT_SUCCESS;
 }
 
 } // namespace

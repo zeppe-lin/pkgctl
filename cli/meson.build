@@ -3,8 +3,13 @@
 
 pkgctl_exe = executable(
   'pkgctl',
-  ['main.cpp', 'options.cpp'],
-  dependencies: [pkgctl_core_dep, libpkgsource_yaml_dep],
+  ['main.cpp', 'options.cpp', 'run_command.cpp'],
+  dependencies: [
+    pkgctl_core_dep,
+    libpkgsource_yaml_dep,
+    libpkgcatalog_codec_dep,
+    libpkgexec_linux_dep,
+  ],
   install: true,
   install_dir: get_option('bindir'),
 )

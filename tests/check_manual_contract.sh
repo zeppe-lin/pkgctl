@@ -14,6 +14,7 @@ for command in \
   'pkgctl catalog' \
   'pkgctl resolve' \
   'pkgctl transaction' \
+  'pkgctl run' \
   'pkgctl inspect-run' \
   'pkgctl inspect-effect'; do
   grep -F "$command" "$readme" >/dev/null || {
@@ -21,7 +22,7 @@ for command in \
     exit 1
   }
 done
-grep -F 'There are no effect-implying CLI commands in 0.34.0.' \
+grep -F '`pkgctl run` is the sole effect-implying command in 0.35.0.' \
   "$readme" >/dev/null
 for obsolete in \
   'The executable still exposes only:' \
@@ -40,6 +41,14 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
+grep -F 'Version 0.35.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '*pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_' \
+  "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '# RUN OPTIONS' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'BOUNDED NATIVE TRANSACTION COMMAND' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.35.0 exposes *pkgctl run*' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.21.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.21.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F '*--converge-exact*' "$srcdir/man/pkgctl.1.scd" >/dev/null
@@ -68,8 +77,6 @@ grep -F 'does not require write access and cannot' \
 grep -F 'The canonical state store is opened with *open_existing*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'One target-mutation lease must remain held' \
-  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
-grep -F 'exposes no effect-implying command' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'TRANSACTION PROGRESSION' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null

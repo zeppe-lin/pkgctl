@@ -44,6 +44,13 @@ printf '%s\n' "$core_block" | grep -F 'libpkgsource_yaml_dep' >/dev/null &&
 
 grep -F 'dependencies: pkgctl_core_authority_deps,' "$core_meson" >/dev/null ||
   fail 'controller core does not use its reviewed dependency closure'
-grep -F 'dependencies: [pkgctl_core_dep, libpkgsource_yaml_dep],' \
-  "$cli_meson" >/dev/null ||
+cli_block=$(sed -n '/^  dependencies: \[/,/^  \],/p' "$cli_meson")
+printf '%s\n' "$cli_block" | grep -F 'libpkgsource_yaml_dep' >/dev/null ||
   fail 'CLI does not declare the YAML adapter as a direct dependency'
+for dependency in libpkgcatalog_codec_dep libpkgexec_linux_dep; do
+  printf '%s\n' "$cli_block" | grep -F "$dependency" >/dev/null ||
+    fail "CLI does not declare its native run dependency: $dependency"
+  if printf '%s\n' "$core_block" | grep -F "$dependency" >/dev/null; then
+    fail "CLI-only native run dependency leaked into controller core: $dependency"
+  fi
+done

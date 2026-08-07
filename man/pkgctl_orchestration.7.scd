@@ -10,6 +10,36 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+# BOUNDED NATIVE TRANSACTION COMMAND
+
+Version 0.35.0 exposes *pkgctl run*, one narrow command over the existing native
+runtime. *--start* composes from the explicit collection and canonical-state
+request, immutably retains that catalog/state universe, and then admits one
+caller-issued run nonce. *--resume* requires the retained universe and exact
+admitted journal, decodes the owner formats, and recomposes the same transaction
+identity. It does not reacquire collections or substitute current state for the
+historical epoch.
+
+The command-private effect-body store is both durable sink and restart source.
+Lifecycle results, application receipts, publication requests, and publication
+receipts are retained through their owner codecs before an effect journal may
+name them. Application-intent restart uses the direct
+*libpkgapply-posix* active-request index; no directory scan or controller-owned
+application-journal format is introduced.
+
+Target observations are acquired only for the current operation dispatch.
+Runtime dependency authority is the exact transitive resolver *run*-scope
+closure rooted at that package, not transaction graph storage order or SCC
+cohort representation. Application mutation/observation identities remain
+separate from lifecycle process-execution capability identity.
+
+All runtime namespaces, build root, and target root must already exist. One
+invocation performs at most the positive *--max-steps* drive policy. It starts
+no daemon, discovers no journal, performs no unbounded loop, timer retry,
+implicit replanning, rollback, repair, cleanup, compaction, or garbage
+collection. This is the final functional package-management boundary; the next
+work is coordinated qualification and publication.
+
 # NATIVE TARGET AND RUNTIME COMPOSITION
 
 Version 0.34.0 provides *native_posix_transaction_run_runtime*, the stable
@@ -40,9 +70,10 @@ are reopened through the same native operation authority and canonical
 checkpoint validation.
 
 Every launch requires an explicit durable run-intent nonce and a positive bound.
-The runtime does not select backends or credentials, freeze target observations,
-schedule, retry, wait, clean up, compact, collect history, or expose a mutating
-command. The executable remains read-only.
+The runtime does not itself select backends or credentials, freeze target
+observations, schedule, retry, wait, clean up, compact, or collect history.
+Version 0.35.0 supplies those explicit command authorities without moving them
+into this composition root.
 
 # NATIVE OPERATION AUTHORITY
 
@@ -946,10 +977,12 @@ publication mechanics.
 
 # COMMAND BOUNDARY
 
-Release 0.8.0 exposes no effect-implying command. *catalog*, *resolve*, and
-*transaction* remain read-only. Install, update, removal, multi-package
-scheduling, recursive construction, planning, and recovery policy require
-later explicit command contracts.
+Release 0.35.0 exposes exactly one effect-implying command: *run*. *catalog*,
+*resolve*, *transaction*, *inspect-run*, and *inspect-effect* remain read-only.
+The command may realize the sealed multi-package transaction through the native
+runtime, but only under explicit start/resume identity and one positive step
+bound. There is no daemon, ambient configuration, unbounded executor, journal
+discovery, implicit retry, automatic rollback, or maintenance policy.
 
 # REPORTS
 

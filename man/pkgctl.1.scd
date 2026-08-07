@@ -2,7 +2,7 @@ PKGCTL(1)
 
 # NAME
 
-pkgctl - inspect native package resolution and transaction authority
+pkgctl - inspect or boundedly execute native package authority
 
 # SYNOPSIS
 
@@ -10,8 +10,11 @@ pkgctl - inspect native package resolution and transaction authority
 
 *pkgctl* *resolve* _catalog-options_ _state-options_ _resolution-options_
 
-*pkgctl* *transaction* _catalog-options_ _state-options_
+*pkgctl* *transaction* _catalog-options_ _state-options_ \
 _resolution-options_ [*--converge-exact*]
+
+*pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_ \
+[*--converge-exact*] _run-options_
 
 *pkgctl* *inspect-run* *--run-store* _path_ *--journal* _identity_
 
@@ -23,38 +26,30 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.34.0 retains the native catalog, resolution, transaction, and exact
-durable run/effect inspection commands. The command surface remains read-only.
-The controller library now composes one complete native runtime for a sealed
-transaction from explicit existing store namespaces, deterministic
-construction/check sessions, live operation authority, exact archive mapping,
-progress rehydration, restart recovery, and caller-selected backends. No command
-creates, discovers, executes, or mutates through that runtime.
+Version 0.35.0 retains the native catalog, resolution, transaction, and exact
+durable run/effect inspection commands and adds one bounded mutating command.
+*run* composes or recomposes one exact transaction, enters through the native
+runtime, and performs at most the positive *--max-steps* bound. *--start*
+retains the original catalog and state universe before admission; *--resume*
+requires that retained universe and the exact admitted journal.
+
+The command does not initialize or enumerate stores, discover journals, replan
+a resumed transaction from live catalog/state, loop without a bound, sleep,
+retry implicitly, schedule workers, roll back, repair, clean up, compact, or
+collect history. Effect restart bodies are retained in owner encodings before
+controller journals reference them. Interrupted application recovery uses the
+direct *libpkgapply-posix* active-request index.
 
 Version 0.21.0 introduced the exact durable effect-attempt inspection command
 alongside the existing run-inspection command; both remain read-only sensors.
 
-The controller library also defines exact one-candidate construction,
-transaction progression, immutable dispatch ownership, durable transaction-run
-journals, one-dispatch write-ahead execution, exact check
-request/session/result, one-operation preparation, single-operation effect,
-conservative restart, one-dispatch restart reconciliation, exact
-caller-supplied run-authority handoffs, durable initial run admission,
-restart-safe bounded transaction launch, read-only durable run and
-effect-attempt inspection, one bounded transaction-run advancement call, and
-bounded serial driving. The *inspect-run* and *inspect-effect* commands expose
-only the existing durable sensors; no effect-implying command is exposed.
-Progression reports every graph-ready construction, check, or operation unit.
-Library clients may advance one durable journal by reconciling retained ownership
-or, only when the run is quiescent, reserving and realizing one canonical
-policy-allowed unit through injected authorities, drivers, and stores. No
-scheduler, worker, unbounded executor, or mutating command is provided.
-Preparation consumes retained build/image admission and the pure
-build-plan projection to seal package-local plan/application handoffs when
-called by a library client; it does not reopen artifact bytes. All
-executable commands remain read-only: they never initialize or publish state,
-materialize sources, build packages, inspect artifacts, plan package changes,
-execute lifecycle programs, or apply mutations.
+The controller library defines exact construction, check, operation,
+progression, dispatch, journal, restart, and bounded-drive authorities. The
+*inspect-run* and *inspect-effect* commands remain read-only sensors. *run* is
+the sole effect-implying frontend and may realize only the already sealed native
+transaction through those reviewed authorities. It does not bypass progression,
+call the single-dispatch advancement functions directly, or own package-source,
+resolver, planner, application, execution, or state semantics.
 
 Version 0.31.0 changes no command syntax. The controller library now provides
 one private native construction/check session locator. It derives exact source,
@@ -112,6 +107,12 @@ and the read-only command surface is unchanged.
 	program. The default convergence policy preserves all unselected installed
 	packages.
 
+*run*
+	Start or resume one exact durable transaction run through the native runtime.
+	The command may build, check, execute lifecycle programs, apply package
+	changes, and publish installed state, but only beneath the explicit positive
+	step bound and explicit authority supplied on the command line.
+
 *inspect-run*
 	Open one explicitly named existing POSIX transaction-run store, inspect one
 	exact journal head, and print the deterministic durable-run report. The
@@ -136,7 +137,7 @@ and the read-only command surface is unchanged.
 
 # STATE OPTIONS
 
-The following options are all required by *resolve* and *transaction*:
+The following options are all required by *resolve*, *transaction*, and *run*:
 
 *--canonical-store* _path_
 	Open the existing canonical generation store at the absolute _path_. Missing
@@ -181,6 +182,59 @@ The following options are all required by *resolve* and *transaction*:
 	Treat the selected target closure as complete and compose removals for other
 	installed packages. This destructive policy is never enabled by default.
 
+# RUN OPTIONS
+
+Exactly one of the following is required:
+
+*--start* _identity_
+	Admit one new run with the exact lowercase SHA-256 nonce. If that run is
+	already admitted, the command refuses and requires *--resume*.
+
+*--resume* _identity_
+	Resume the exact retained run nonce. The immutable command universe and
+	admitted journal must both already exist.
+
+The following are also required:
+
+*--runtime-root* _path_
+	Existing absolute private runtime hierarchy. The command requires these
+	pre-created children: *run*, *evidence*, *effects*, *target-locks*,
+	*command-evidence*, *effect-bodies*, *content*,
+	*construction-sessions*, *package-outputs*, *artifacts*,
+	*check-temporary*, *lifecycle-sessions*, *application-journals*,
+	*application-checkpoints*, *payload*, *capture*, *rejected*, and
+	*completed*. None is created, enumerated, repaired, or cleaned.
+
+*--build-root* _path_
+	Existing construction and lifecycle execution root view.
+
+*--target-root* _path_
+	Existing managed target root.
+
+*--interpreter* _path_
+	Exact interpreter inspected and admitted by *libpkgexec-linux*.
+
+*--user-id* _number_
+	Explicit numeric execution user identity.
+
+*--group-id* _number_
+	Explicit numeric execution primary group identity.
+
+*--supplementary-group* _number_
+	Add one explicit supplementary group. May be repeated.
+
+*--source-date-epoch* _number_
+	Explicit non-negative hermetic construction epoch.
+
+*--max-steps* _number_
+	Positive maximum number of controller advances in this invocation. Reaching
+	the bound is successful and the same nonce may later be resumed.
+
+*--installed-tree* _package=resource,path_
+	Bind one exact retained installed-package identity and logical resource
+	identity to an absolute package tree. May be repeated. No installed tree is
+	discovered by scanning the target.
+
 # RUN INSPECTION OPTIONS
 
 *--run-store* _path_
@@ -203,16 +257,20 @@ The following options are all required by *resolve* and *transaction*:
 
 The output is a deterministic line-oriented diagnostic report containing exact
 controller-session and subordinate authority identities plus normalized
-summaries. It is not a persistent state format or a versioned IPC protocol.
+summaries. *run* reports the transaction, journal, committed record, sequence,
+start/resume origin, drive disposition, step counts, and terminal progress. It is not a persistent state format or a versioned IPC protocol.
 
 # EXIT STATUS
 
 *0*
-	The requested read-only authority composition completed.
+	The requested read-only composition completed, the run completed, or the
+	explicit run step bound was reached.
 
 *1*
-	An acquisition, source, catalog, state, resolution, transaction, run-journal,
-	effect-journal, or controller authority refused or failed.
+	An acquisition, source, catalog, state, resolution, transaction, runtime,
+	run-journal, effect-journal, backend, or controller authority refused or
+	failed; this includes failed, externally blocked, or quiescent-incomplete
+	runs.
 
 *2*
 	The command line is invalid or incomplete.

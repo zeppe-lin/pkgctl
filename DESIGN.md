@@ -13,6 +13,46 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.35.0 bounded native command boundary
+
+The final functional closure is one command, not a new semantic subsystem:
+
+```text
+explicit catalog/state request + --start/--resume nonce
+             + existing native roots and credentials
+                         |
+           immutable command-universe evidence
+           owner-encoded effect restart bodies
+                         |
+       native_posix_transaction_run_runtime
+                         |
+            at most --max-steps advances
+```
+
+Start acquires and composes exactly once, retains the original catalog and state
+snapshots, then admits the run. Resume requires those retained values and
+recomposes the same transaction identity without collection reacquisition or
+live-state replanning. An already admitted run is refused by start; a missing
+run is refused by resume.
+
+The command-private body store implements both restart-body source and durable
+body sink. Each lifecycle result, application receipt, publication request, and
+publication receipt is owner-encoded and immutably retained before the effect
+journal records its identity. Application intent uses the direct
+`libpkgapply-posix` active-request index, so recovery needs no directory scan or
+controller-owned application format.
+
+The live operation authority observes only the exact current dispatch. Runtime
+dependency identity is the transitive resolver run-scope closure rooted at the
+acted package, not transaction SCC-cohort storage. Application target identity
+and lifecycle process capability remain independent authority domains.
+
+The runtime hierarchy is explicit and existing-only. The command creates no
+store or workspace namespace, discovers no journal, loops no more than the
+positive invocation bound, retries no timer, rolls back no side effects, and
+performs no repair, cleanup, compaction, or garbage collection. This closes the
+functional architecture; subsequent work is qualification and publication.
+
 ## Release 0.34.0 native target/runtime composition boundary
 
 The controller now has one stable native composition root instead of requiring

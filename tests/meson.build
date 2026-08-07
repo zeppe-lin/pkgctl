@@ -298,6 +298,13 @@ if not get_option('tests').disabled()
     args: [meson.project_source_root()],
   )
 
+  run_command_contract = find_program('check_run_command_contract.sh')
+  test(
+    'run-command-contract',
+    run_command_contract,
+    args: [meson.project_source_root()],
+  )
+
   run_inspect_contract = find_program('check_run_inspect_contract.sh')
   test('run-inspect-contract', run_inspect_contract, args: [meson.project_source_root()])
 
