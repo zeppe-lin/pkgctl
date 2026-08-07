@@ -171,6 +171,8 @@ struct native_transaction_run_runtime_authorities final {
   retained_installed_package_tree_source& installed_packages;
   transaction_operation_specification_source& operation_specifications;
   transaction_effect_restart_body_source& effect_restart_bodies;
+  transaction_effect_archive_source* archives = nullptr;
+  transaction_effect_body_sink* effect_bodies = nullptr;
 };
 
 /*! \brief Explicit selected physical mechanisms for one native runtime. */

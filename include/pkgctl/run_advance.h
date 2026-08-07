@@ -45,6 +45,7 @@ struct transaction_run_advance_authorities final {
 struct transaction_effect_execution_drivers final {
   std::unique_ptr<transaction_effect_driver> continuation;
   std::unique_ptr<transaction_effect_state_observer> resulting_state;
+  transaction_effect_body_sink* bodies = nullptr;
 };
 
 /*! \brief Call-scoped authorities selected for one retained operation. */
@@ -52,6 +53,7 @@ struct transaction_effect_recovery_drivers final {
   std::unique_ptr<transaction_effect_driver> continuation;
   std::unique_ptr<transaction_effect_state_observer> resulting_state;
   std::unique_ptr<transaction_effect_publication_driver> publication;
+  transaction_effect_body_sink* bodies = nullptr;
 };
 
 /*! \brief Caller-owned source of exact per-dispatch physical authority.

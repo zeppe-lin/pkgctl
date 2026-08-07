@@ -114,7 +114,8 @@ public:
 private:
   friend effect_restart_result resume_effectful_operation(
       effect_restart_checkpoint, transaction_effect_driver*,
-      transaction_effect_publication_driver*, effect_journal_store&);
+      transaction_effect_publication_driver*, effect_journal_store&,
+      transaction_effect_body_sink*);
   effect_restart_result(
       effect_restart_disposition disposition,
       effect_attempt_record journal,
@@ -143,13 +144,15 @@ private:
     effect_restart_checkpoint checkpoint,
     transaction_effect_driver* continuation,
     transaction_effect_publication_driver* publication,
-    effect_journal_store& journal_store);
+    effect_journal_store& journal_store,
+    transaction_effect_body_sink* bodies = nullptr);
 
 /*! \brief Continue under explicit continuation and publication authority. */
 [[nodiscard]] effect_restart_result resume_effectful_operation(
     effect_restart_checkpoint checkpoint,
     transaction_effect_driver& continuation,
     transaction_effect_publication_driver& publication,
-    effect_journal_store& journal_store);
+    effect_journal_store& journal_store,
+    transaction_effect_body_sink* bodies = nullptr);
 
 } // namespace pkgctl

@@ -91,7 +91,8 @@ public:
       pkgapply::application_backend& application_backend,
       pkgexec::execution_backend& lifecycle_backend,
       pkgstate::canonical_store& state_store,
-      transaction_effect_archive_source& archives);
+      transaction_effect_archive_source& archives,
+      transaction_effect_body_sink* bodies = nullptr);
 
   posix_transaction_effect_driver_source(
       const posix_transaction_effect_driver_source&) = delete;

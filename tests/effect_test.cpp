@@ -1414,6 +1414,64 @@ private:
   std::map<std::string, std::vector<pkgctl::effect_attempt_record>> records_;
 };
 
+class recording_effect_body_sink final
+    : public pkgctl::transaction_effect_body_sink {
+public:
+  void retain_lifecycle(
+      const pkgapply_exec::lifecycle_execution_result&) override
+  {
+    ++lifecycle_;
+  }
+
+  void retain_application(
+      const pkgapply::package_application_request&,
+      const pkgapply::application_receipt&) override
+  {
+    ++applications_;
+  }
+
+  void retain_publication_request(
+      const pkgstate::state_publication_request& request) override
+  {
+    publication_request_ = request.identity();
+    ++publication_requests_;
+  }
+
+  void retain_publication_receipt(
+      const pkgstate::state_publication_request& request,
+      const pkgstate::state_publication_receipt&) override
+  {
+    publication_receipt_matches_request_ =
+        publication_request_.has_value() &&
+        *publication_request_ == request.identity();
+    ++publication_receipts_;
+  }
+
+  std::size_t lifecycle() const noexcept { return lifecycle_; }
+  std::size_t applications() const noexcept { return applications_; }
+  std::size_t publication_requests() const noexcept
+  {
+    return publication_requests_;
+  }
+  std::size_t publication_receipts() const noexcept
+  {
+    return publication_receipts_;
+  }
+  bool publication_receipt_matches_request() const noexcept
+  {
+    return publication_receipt_matches_request_;
+  }
+
+private:
+  std::size_t lifecycle_ = 0U;
+  std::size_t applications_ = 0U;
+  std::size_t publication_requests_ = 0U;
+  std::size_t publication_receipts_ = 0U;
+  std::optional<pkgstate::state_publication_request_identity>
+      publication_request_;
+  bool publication_receipt_matches_request_ = false;
+};
+
 class operation_progress_context final
     : public pkgctl::transaction_progress_rehydration_context_source {
 public:
@@ -2286,9 +2344,16 @@ void check_durable_success()
   driver actuator(value.projection, value.outer_lease,
                   value.receipt, value.store);
   memory_effect_journal_store journal;
+  recording_effect_body_sink bodies;
   const auto result = pkgctl::execute_effectful_operation_durable(
-      session, effect_nonce(1), actuator, journal);
+      session, effect_nonce(1), actuator, journal, &bodies);
   CHECK(result.succeeded());
+  CHECK(bodies.lifecycle() ==
+        result.before().size() + result.after().size());
+  CHECK(bodies.applications() == 1U);
+  CHECK(bodies.publication_requests() == 1U);
+  CHECK(bodies.publication_receipts() == 1U);
+  CHECK(bodies.publication_receipt_matches_request());
   const auto admission = pkgctl::effect_attempt_record::admit(
       session.identity(), session.before().size(), session.after().size(),
       effect_nonce(1));

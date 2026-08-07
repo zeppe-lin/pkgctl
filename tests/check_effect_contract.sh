@@ -19,6 +19,7 @@ source="$srcdir/src/effect.cpp"
 for required in \
   'class effectful_operation_request final' \
   'class effectful_operation_session final' \
+  'class transaction_effect_body_sink' \
   'class transaction_effect_driver' \
   'class transaction_effect_state_observer' \
   'class transaction_effect_publication_driver' \

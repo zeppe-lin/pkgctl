@@ -117,7 +117,29 @@ private:
   session_identity identity_;
 };
 
-/*! \brief Physical continuation authority borrowed by the effect controller. */
+/*! \brief Durable owner for subordinate effect bodies named by the journal.
+ *
+ * The controller journal retains only exact identities and terminal facts. A
+ * command that promises automatic restart supplies one sink that durably
+ * retains each owner-encoded body before the journal is allowed to reference
+ * it. The sink does not execute effects or choose restart policy.
+ */
+class transaction_effect_body_sink {
+public:
+  virtual ~transaction_effect_body_sink() = default;
+
+  virtual void retain_lifecycle(
+      const pkgapply_exec::lifecycle_execution_result& result) = 0;
+  virtual void retain_application(
+      const pkgapply::package_application_request& request,
+      const pkgapply::application_receipt& receipt) = 0;
+  virtual void retain_publication_request(
+      const pkgstate::state_publication_request& request) = 0;
+  virtual void retain_publication_receipt(
+      const pkgstate::state_publication_request& request,
+      const pkgstate::state_publication_receipt& receipt) = 0;
+};
+
 class transaction_effect_driver {
 public:
   virtual ~transaction_effect_driver() = default;
@@ -253,11 +275,13 @@ private:
       effectful_operation_session, transaction_effect_driver&);
   friend effectful_operation_result execute_effectful_operation_durable(
       effectful_operation_session, const effect_attempt_nonce&,
-      transaction_effect_driver&, effect_journal_store&);
+      transaction_effect_driver&, effect_journal_store&,
+      transaction_effect_body_sink*);
   friend struct detail_effect_rehydration_access;
   friend effect_restart_result resume_effectful_operation(
       effect_restart_checkpoint, transaction_effect_driver*,
-      transaction_effect_publication_driver*, effect_journal_store&);
+      transaction_effect_publication_driver*, effect_journal_store&,
+      transaction_effect_body_sink*);
 
   [[nodiscard]] static effectful_operation_result seal(
       effectful_operation_session session,
@@ -307,6 +331,7 @@ private:
     effectful_operation_session session,
     const effect_attempt_nonce& nonce,
     transaction_effect_driver& driver,
-    effect_journal_store& journal_store);
+    effect_journal_store& journal_store,
+    transaction_effect_body_sink* bodies = nullptr);
 
 } // namespace pkgctl

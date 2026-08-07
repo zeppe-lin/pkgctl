@@ -178,7 +178,8 @@ reconcile_operation_dispatch_durable(
     transaction_effect_state_observer* resulting_state,
     transaction_effect_publication_driver* publication,
     effect_journal_store& effect_store,
-    transaction_run_journal_store& run_store)
+    transaction_run_journal_store& run_store,
+    transaction_effect_body_sink* bodies)
 {
   const auto& dispatch_assessment = require_assessment(
       checkpoint, dispatch,
@@ -206,7 +207,8 @@ reconcile_operation_dispatch_durable(
 
   const auto target = effect_checkpoint.session().request().application().target();
   auto effect = resume_effectful_operation(
-      std::move(effect_checkpoint), continuation, publication, effect_store);
+      std::move(effect_checkpoint), continuation, publication, effect_store,
+      bodies);
   if (!effect.operation())
   {
     if (!effect.external_resolution_required())

@@ -306,11 +306,12 @@ public:
       pkgapply::application_backend& application_backend,
       pkgexec::execution_backend& lifecycle_backend,
       pkgstate::canonical_store& state_store,
-      transaction_effect_archive_source& archives)
+      transaction_effect_archive_source& archives,
+      transaction_effect_body_sink* bodies)
       : lock_directory_fd_(lock_directory_fd),
         application_backend_(application_backend),
         lifecycle_backend_(lifecycle_backend), state_store_(state_store),
-        archives_(archives)
+        archives_(archives), bodies_(bodies)
   {
   }
 
@@ -334,6 +335,11 @@ public:
         application_backend_, lifecycle_backend_, state_store_);
   }
 
+  transaction_effect_body_sink* bodies() const noexcept
+  {
+    return bodies_;
+  }
+
   std::shared_ptr<observation_runtime> acquire_observation(
       const effectful_operation_session& session)
   {
@@ -349,6 +355,7 @@ private:
   pkgexec::execution_backend& lifecycle_backend_;
   pkgstate::canonical_store& state_store_;
   transaction_effect_archive_source& archives_;
+  transaction_effect_body_sink* bodies_;
 };
 
 std::unique_ptr<posix_transaction_effect_driver_source>
@@ -357,12 +364,13 @@ posix_transaction_effect_driver_source::from_lock_directory_fd(
     pkgapply::application_backend& application_backend,
     pkgexec::execution_backend& lifecycle_backend,
     pkgstate::canonical_store& state_store,
-    transaction_effect_archive_source& archives)
+    transaction_effect_archive_source& archives,
+    transaction_effect_body_sink* bodies)
 {
   fd_owner retained(duplicate_lock_directory(lock_directory_fd));
   auto state = std::make_unique<implementation>(
       retained.release(), application_backend, lifecycle_backend,
-      state_store, archives);
+      state_store, archives, bodies);
   return std::unique_ptr<posix_transaction_effect_driver_source>(
       new posix_transaction_effect_driver_source(std::move(state)));
 }
@@ -391,7 +399,8 @@ posix_transaction_effect_driver_source::acquire_execution_drivers(
   return transaction_effect_execution_drivers{
       std::make_unique<owned_native_continuation>(runtime),
       std::make_unique<owned_continuation_state_observer>(
-          std::move(runtime))};
+          std::move(runtime)),
+      state_->bodies()};
 }
 
 transaction_effect_recovery_drivers
@@ -444,6 +453,7 @@ posix_transaction_effect_driver_source::acquire_recovery_drivers(
         std::make_unique<owned_native_state_observer>(
             std::move(runtime));
   }
+  drivers.bodies = state_->bodies();
   return drivers;
 }
 

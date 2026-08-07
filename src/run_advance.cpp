@@ -304,7 +304,8 @@ transaction_run_advance_result reconcile_active(
       auto value = reconcile_operation_dispatch_durable(
           handoff.checkpoint(), handoff.dispatch(), *recovery,
           acquired.continuation.get(), acquired.resulting_state.get(),
-          acquired.publication.get(), require_effect_store(stores), stores.runs);
+          acquired.publication.get(), require_effect_store(stores), stores.runs,
+          acquired.bodies);
       const auto disposition = value.run_advanced
           ? transaction_run_advance_disposition::reconciled_operation
           : transaction_run_advance_disposition::external_resolution_required;
@@ -443,7 +444,8 @@ transaction_run_advance_result execute_reserved(
       auto value = execute_operation_dispatch_durable(
           handoff.record(), handoff.run(), handoff.dispatch(),
           authority->session, authority->nonce, *acquired.continuation,
-          *acquired.resulting_state, require_effect_store(stores), stores.runs);
+          *acquired.resulting_state, require_effect_store(stores), stores.runs,
+          acquired.bodies);
       transaction_run_operation_advance_evidence evidence{
           value.admission, value.result, std::nullopt};
       return detail_transaction_run_advance_access::make(

@@ -328,7 +328,8 @@ public:
       transaction_operation_execution_authority_source& operation_execution,
       transaction_operation_recovery_authority_source& operation_recovery,
       transaction_effect_archive_source& archives,
-      transaction_run_runtime_backends backends)
+      transaction_run_runtime_backends backends,
+      transaction_effect_body_sink* effect_bodies)
       : runs_(runs), evidence_(evidence), effects_(effects), progress_(progress),
         execution_(sessions, operation_execution),
         recovery_context_(
@@ -339,7 +340,7 @@ public:
         operation_(
             posix_transaction_effect_driver_source::from_lock_directory_fd(
                 target_lock_directory_fd, backends.application,
-                backends.lifecycle, backends.state, archives))
+                backends.lifecycle, backends.state, archives, effect_bodies))
   {
   }
 
@@ -486,7 +487,7 @@ public:
             runs_, evidence_, effects_, target_lock_directory_fd,
             authorities_.progress, authorities_.sessions,
             authorities_.operation_execution, authorities_.operation_recovery,
-            authorities_.archives, backends)
+            authorities_.archives, backends, nullptr)
   {
   }
 
@@ -580,8 +581,14 @@ public:
         operations_(
             configuration_.operations(), authorities.operation_specifications,
             effects_, authorities.effect_restart_bodies),
-        archives_(explicit_transaction_effect_archive_source::make(
-            backends.archive, configuration_.archives())),
+        owned_archives_(authorities.archives == nullptr
+                ? std::make_unique<explicit_transaction_effect_archive_source>(
+                      explicit_transaction_effect_archive_source::make(
+                          backends.archive, configuration_.archives()))
+                : nullptr),
+        archives_(authorities.archives != nullptr
+                ? authorities.archives
+                : owned_archives_.get()),
         progress_context_(
             sessions_, backends.construction, backends.check, operations_),
         progress_(
@@ -589,9 +596,10 @@ public:
             progress_context_),
         engine_(
             runs_, evidence_, effects_, target_lock_directory_fd, progress_,
-            sessions_, operations_, operations_, archives_,
+            sessions_, operations_, operations_, *archives_,
             {backends.construction, backends.check, backends.application,
-             backends.lifecycle, backends.state})
+             backends.lifecycle, backends.state},
+            authorities.effect_bodies)
   {
   }
 
@@ -620,7 +628,8 @@ private:
   posix_effect_journal_store effects_;
   native_transaction_dispatch_session_source sessions_;
   native_transaction_operation_authority_source operations_;
-  explicit_transaction_effect_archive_source archives_;
+  std::unique_ptr<explicit_transaction_effect_archive_source> owned_archives_;
+  transaction_effect_archive_source* archives_;
   native_transaction_progress_rehydration_context_source progress_context_;
   stored_transaction_progress_rehydration_source progress_;
   transaction_run_runtime_engine engine_;

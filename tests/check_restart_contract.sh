@@ -28,6 +28,11 @@ for required in \
   'effect_attempt_record::seal_terminal' \
   'effect_attempt_record::validate_successor_of' \
   'execute_effectful_operation_durable' \
+  'transaction_effect_body_sink' \
+  'bodies->retain_lifecycle(result)' \
+  'bodies->retain_application(request.application(), application)' \
+  'bodies->retain_publication_request(publication_request)' \
+  'bodies->retain_publication_receipt(' \
   'resume_effectful_operation' \
   'effect_restart_requires_continuation_driver' \
   'effect_restart_requires_publication_driver' \
@@ -91,6 +96,18 @@ check_order execute_effectful_operation_durable \
   journal.begin_after 'driver.execute_lifecycle(session.after'
 check_order execute_effectful_operation_durable \
   journal.begin_publication driver.publish_state
+
+check_order execute_effectful_operation_durable \
+  'bodies->retain_lifecycle(result)' 'journal.complete_before(result)'
+check_order execute_effectful_operation_durable \
+  'bodies->retain_application(request.application(), application)' \
+  'journal.complete_application(application)'
+check_order execute_effectful_operation_durable \
+  'bodies->retain_publication_request(publication_request)' \
+  'journal.begin_publication(transaction, publication_request)'
+check_order execute_effectful_operation_durable \
+  'bodies->retain_publication_receipt(' \
+  'journal.complete_publication(publication_receipt)'
 
 for forbidden in \
   'libpkgexec-linux' \

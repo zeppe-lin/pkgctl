@@ -82,7 +82,8 @@ execute_operation_dispatch_durable(
     transaction_effect_driver& continuation,
     transaction_effect_state_observer& resulting_state,
     effect_journal_store& effect_store,
-    transaction_run_journal_store& run_store)
+    transaction_run_journal_store& run_store,
+    transaction_effect_body_sink* bodies)
 {
   auto started = commit_operation_dispatch_start(
       current_record, std::move(run), dispatch, session, nonce,
@@ -109,7 +110,7 @@ execute_operation_dispatch_durable(
   }
 
   auto result = execute_effectful_operation_durable(
-      session, nonce, continuation, effect_store);
+      session, nonce, continuation, effect_store, bodies);
 
   std::optional<pkgstate::snapshot> observed_state;
   if (result.succeeded())

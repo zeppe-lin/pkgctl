@@ -95,6 +95,7 @@ execute_operation_dispatch_durable(
     transaction_effect_driver& continuation,
     transaction_effect_state_observer& resulting_state,
     effect_journal_store& effect_store,
-    transaction_run_journal_store& run_store);
+    transaction_run_journal_store& run_store,
+    transaction_effect_body_sink* bodies = nullptr);
 
 } // namespace pkgctl
