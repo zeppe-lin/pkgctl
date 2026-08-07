@@ -6,6 +6,29 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.33.0 supplies native fresh-operation and restart authority without
+actuating the target. One replayable per-dispatch specification source supplies
+exact target and planning authority plus explicit lifecycle execution order for
+the current operation, while fixed transaction/lifecycle configuration supplies
+coordinates and credentials. The existing effect boundary validates the order
+against the exact lifecycle-node set attached by transaction phase edges; graph
+storage order is not treated as execution precedence. The native source prepares
+through the existing owner boundaries, admits deterministic lifecycle sessions
+beneath stable journal and dispatch coordinates, and issues a mechanical attempt
+nonce for one exact reserved head.
+
+Restart reconstructs the same session, selects the exact run-retained latest
+effect record, and asks a caller-owned body source for semantic values the
+effect journal deliberately records only by identity. The existing restart
+checkpoint validates those bodies. Incoming archives are resolved only through
+an explicit incoming-authority-to-path map and opened with the exact retained
+archive digest through a caller-selected image backend.
+
+The implementation performs no target observation, execution, mutation,
+journal append, state read, discovery, retry, scheduling, or command actuation.
+The executable remains read-only. Stable native target/runtime composition and
+one narrow mutating command remain the next two controller closures.
+
 Release 0.32.0 supplies exact semantic transaction-progress rehydration.
 One store-backed source begins from the sealed transaction, selects only
 completed dispatch history, and replays each terminal fact when its graph unit

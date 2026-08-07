@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.32.0
+version=0.33.0
 
 require_line()
 {
@@ -20,13 +20,13 @@ require_line "$srcdir/meson.build" "  version: '$version',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 32;'
+  'inline constexpr unsigned version_minor = 33;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.32.0";'
+  'inline constexpr const char* version_string = "0.33.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 32);'
+  'static_assert(pkgctl::version_minor == 33);'
 
 require_dependency_range()
 {
@@ -46,14 +46,14 @@ require_dependency_range libpkgcheck-exec '>=0.4.0' '<1.0.0'
 require_dependency_range libpkgresolve '>=2.0.0' '<3.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
 
-grep -F '## 0.32.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Release 0.32.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.32.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '## 0.33.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.33.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.33.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
-grep -F 'Exact transaction-progress rehydration' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'project_publication_request()' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Reserved, started, released' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Version 0.32.0 implements one store-backed' \
+grep -F 'Native operation execution and recovery authority' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'effect_restart_checkpoint::make()' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'explicit replayable archive source' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Version 0.33.0 implements one native operation' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 for contract in \

@@ -1,3 +1,43 @@
+## 0.33.0 - 2026-08-07
+
+### Native operation execution and recovery authority
+
+- Adds one replayable per-dispatch operation-specification source plus one fixed
+  transaction/lifecycle configuration. The source supplies exact target context,
+  execution control, target observations, package policy, runtime closure and
+  installation reason where the current operation kind requires them; the fixed
+  configuration supplies lifecycle root views, paths, and credentials.
+- Prepares each fresh operation through the existing state, build-plan,
+  planner, application, and effect boundaries. Install and upgrade consume the
+  exact successful predecessor construction already retained by transaction
+  progress; removal consumes no incoming artifact authority.
+- Requires the replayable per-dispatch specification to supply explicit
+  lifecycle execution order. The existing effect boundary validates that the
+  order contains exactly the lifecycle nodes attached to the action by sealed
+  transaction phase edges; deterministic graph storage is never promoted into
+  execution precedence. Lifecycle programs come only from `libpkgapply-exec`,
+  and call-scoped sessions are admitted beneath stable run-journal and dispatch
+  identities. Repeated acquisition against one durable head reproduces the same
+  operation session and mechanical attempt nonce.
+- Implements operation restart from the same reconstructed session, the exact
+  run-retained effect-attempt identity, the latest effect-journal record, and
+  caller-owned subordinate restart bodies. The existing
+  `effect_restart_checkpoint::make()` validator remains authoritative for every
+  lifecycle, application, publication, and application-journal body.
+- Adds an explicit replayable archive source mapping one admitted incoming
+  package authority to one absolute retained archive path and one
+  caller-selected `libpkgimage` backend. Opening asserts the exact archive
+  digest already retained by incoming authority; no directory scan or filename
+  inference exists.
+- Performs no target observation, mutation, execution, effect-journal append,
+  canonical-state read, backend selection, credential discovery, retry,
+  scheduling, or command actuation. Stable target/runtime composition and the
+  first narrow mutating command remain later bounded releases.
+
+### Dependency contract
+
+- No dependency floor changes.
+
 ## 0.32.0 - 2026-08-07
 
 ### Exact transaction-progress rehydration
