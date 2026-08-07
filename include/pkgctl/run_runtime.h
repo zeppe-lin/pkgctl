@@ -6,9 +6,17 @@
  */
 #pragma once
 
+#include <cstdint>
+#include <filesystem>
 #include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #include <pkgctl/run_launch.h>
+#include <pkgctl/run_locator.h>
+#include <pkgctl/run_operation.h>
+#include <pkgctl/run_progress.h>
 #include <pkgctl/run_recovery.h>
 #include <pkgctl/run_native.h>
 #include <pkgctl/run_nonce.h>
@@ -91,6 +99,143 @@ public:
 private:
   class implementation;
   explicit posix_transaction_run_runtime(
+      std::unique_ptr<implementation> state);
+
+  std::unique_ptr<implementation> state_;
+};
+
+/*! \brief Four existing POSIX namespaces selected for native run control. */
+struct native_transaction_run_runtime_paths final {
+  std::filesystem::path run_store;
+  std::filesystem::path evidence_store;
+  std::filesystem::path effect_store;
+  std::filesystem::path target_lock_store;
+};
+
+/*! \brief Stable failure classes for native runtime composition. */
+enum class native_transaction_run_runtime_error_code : std::uint8_t {
+  invalid_configuration = 1,
+  directory_open_failed = 2,
+  directory_invalid = 3,
+  directory_overlap = 4,
+};
+
+/*! \brief Refused roots, descriptors, or cross-bound native authority. */
+class native_transaction_run_runtime_error final : public std::runtime_error {
+public:
+  native_transaction_run_runtime_error(
+      native_transaction_run_runtime_error_code code,
+      int system_error,
+      std::string message);
+
+  [[nodiscard]] native_transaction_run_runtime_error_code code() const noexcept;
+  [[nodiscard]] int system_error() const noexcept;
+
+private:
+  native_transaction_run_runtime_error_code code_;
+  int system_error_;
+};
+
+/*! \brief Complete fixed semantic/mechanical configuration for one transaction. */
+class native_transaction_run_runtime_configuration final {
+public:
+  [[nodiscard]] static native_transaction_run_runtime_configuration make(
+      transaction_session transaction,
+      native_transaction_session_configuration sessions,
+      native_transaction_operation_configuration operations,
+      std::vector<retained_transaction_effect_archive> archives);
+
+  [[nodiscard]] const transaction_session& transaction() const noexcept;
+  [[nodiscard]] const native_transaction_session_configuration&
+  sessions() const noexcept;
+  [[nodiscard]] const native_transaction_operation_configuration&
+  operations() const noexcept;
+  [[nodiscard]] const std::vector<retained_transaction_effect_archive>&
+  archives() const noexcept;
+
+private:
+  native_transaction_run_runtime_configuration(
+      transaction_session transaction,
+      native_transaction_session_configuration sessions,
+      native_transaction_operation_configuration operations,
+      std::vector<retained_transaction_effect_archive> archives);
+
+  transaction_session transaction_;
+  native_transaction_session_configuration sessions_;
+  native_transaction_operation_configuration operations_;
+  std::vector<retained_transaction_effect_archive> archives_;
+};
+
+/*! \brief Live semantic owners bound into one native composition root. */
+struct native_transaction_run_runtime_authorities final {
+  retained_installed_package_tree_source& installed_packages;
+  transaction_operation_specification_source& operation_specifications;
+  transaction_effect_restart_body_source& effect_restart_bodies;
+};
+
+/*! \brief Explicit selected physical mechanisms for one native runtime. */
+struct native_transaction_run_runtime_backends final {
+  pkgexec::execution_backend& construction;
+  pkgexec::execution_backend& check;
+  pkgapply::application_backend& application;
+  pkgexec::execution_backend& lifecycle;
+  pkgstate::canonical_store& state;
+  pkgimage::archive_backend& archive;
+};
+
+/*! \brief Stable native composition root for one sealed transaction.
+ *
+ * The root opens or duplicates four existing POSIX namespaces and owns the
+ * concrete native session locator, operation authority, archive map, semantic
+ * progress rehydrator, restart chain, and effect drivers over explicitly
+ * selected backends.  Live operation sensing and subordinate restart bodies
+ * remain borrowed from their semantic owners and must outlive the runtime.
+ *
+ * No directory is initialized, no backend is selected implicitly, and no
+ * transaction is launched until launch() receives an explicit durable user
+ * run-intent nonce and positive drive bound.
+ */
+class native_posix_transaction_run_runtime final {
+public:
+  [[nodiscard]] static std::unique_ptr<native_posix_transaction_run_runtime>
+  open(
+      native_transaction_run_runtime_paths paths,
+      native_transaction_run_runtime_configuration configuration,
+      native_transaction_run_runtime_authorities authorities,
+      native_transaction_run_runtime_backends backends);
+
+  [[nodiscard]] static std::unique_ptr<native_posix_transaction_run_runtime>
+  from_directory_fds(
+      int run_store_directory_fd,
+      int evidence_store_directory_fd,
+      int effect_store_directory_fd,
+      int target_lock_directory_fd,
+      native_transaction_run_runtime_configuration configuration,
+      native_transaction_run_runtime_authorities authorities,
+      native_transaction_run_runtime_backends backends);
+
+  native_posix_transaction_run_runtime(
+      const native_posix_transaction_run_runtime&) = delete;
+  native_posix_transaction_run_runtime& operator=(
+      const native_posix_transaction_run_runtime&) = delete;
+  native_posix_transaction_run_runtime(
+      native_posix_transaction_run_runtime&&) = delete;
+  native_posix_transaction_run_runtime& operator=(
+      native_posix_transaction_run_runtime&&) = delete;
+  ~native_posix_transaction_run_runtime();
+
+  [[nodiscard]] transaction_run_launch_result launch(
+      transaction_dispatch_policy dispatch_policy,
+      transaction_run_nonce run_nonce,
+      transaction_run_drive_policy drive_policy);
+
+  [[nodiscard]] transaction_run_drive_result drive(
+      session_identity journal,
+      transaction_run_drive_policy drive_policy);
+
+private:
+  class implementation;
+  explicit native_posix_transaction_run_runtime(
       std::unique_ptr<implementation> state);
 
   std::unique_ptr<implementation> state_;

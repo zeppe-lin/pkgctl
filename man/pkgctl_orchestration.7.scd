@@ -10,6 +10,40 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+# NATIVE TARGET AND RUNTIME COMPOSITION
+
+Version 0.34.0 provides *native_posix_transaction_run_runtime*, the stable
+native composition root for one sealed transaction. It owns the POSIX
+transaction-run, construction/check evidence, and effect stores; the native
+construction/check locator; native operation execution and restart authority;
+explicit archive mapping; exact progress rehydration; restart composition;
+construction, check, and effect drivers; and canonical dispatch nonce
+projection.
+
+The caller supplies four existing disjoint POSIX namespaces, fixed
+construction/check and lifecycle coordinates, retained installed-package tree
+authority, live per-dispatch operation specifications, subordinate effect
+restart bodies, selected physical backends, and canonical state. Path-based
+opening requires absolute normalized existing directories and uses final-component no-follow
+directory semantics. Descriptor-based opening rejects aliases by filesystem
+identity. No store or directory is initialized, discovered, scanned, or
+created.
+
+Construction/check and lifecycle execution retain separate typed root-view
+authorities. If they deliberately name the same host path, their identities
+must agree. Build/check writable roots must not overlap lifecycle execution,
+target, or lifecycle session authority. Construction/check sessions depend on
+exact semantic
+progress rather than caller run intent, allowing completed evidence to be
+rehydrated through the same locator and backend profile. Terminal operations
+are reopened through the same native operation authority and canonical
+checkpoint validation.
+
+Every launch requires an explicit durable run-intent nonce and a positive bound.
+The runtime does not select backends or credentials, freeze target observations,
+schedule, retry, wait, clean up, compact, collect history, or expose a mutating
+command. The executable remains read-only.
+
 # NATIVE OPERATION AUTHORITY
 
 Version 0.33.0 implements one native operation execution and recovery source

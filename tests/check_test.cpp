@@ -164,6 +164,14 @@ public:
     throw std::runtime_error("unexpected construction execution authority request");
   }
 
+  pkgctl::construction_session construction(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_progress&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected construction session authority request");
+  }
+
   pkgctl::transaction_check_session check(
       const pkgctl::transaction_run_journal_record& record,
       const pkgctl::transaction_run& run,
@@ -172,6 +180,18 @@ public:
     ++calls_;
     record_ = record.identity();
     run_ = run.identity();
+    dispatch_ = dispatch.identity();
+    return session_;
+  }
+
+  pkgctl::transaction_check_session check(
+      const pkgctl::transaction_run_journal_record& record,
+      const pkgctl::transaction_progress& progress,
+      const pkgctl::transaction_dispatch& dispatch) override
+  {
+    ++calls_;
+    record_ = record.identity();
+    run_ = progress.identity();
     dispatch_ = dispatch.identity();
     return session_;
   }

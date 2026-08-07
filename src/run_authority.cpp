@@ -221,7 +221,7 @@ composed_transaction_dispatch_execution_authority_source::construction(
     const transaction_run& run,
     const transaction_dispatch& dispatch)
 {
-  return sessions_.construction(record, run, dispatch);
+  return sessions_.construction(record, run.progress(), dispatch);
 }
 
 transaction_check_session
@@ -230,7 +230,7 @@ composed_transaction_dispatch_execution_authority_source::check(
     const transaction_run& run,
     const transaction_dispatch& dispatch)
 {
-  return sessions_.check(record, run, dispatch);
+  return sessions_.check(record, run.progress(), dispatch);
 }
 
 operation_dispatch_execution_authority

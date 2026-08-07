@@ -128,12 +128,12 @@ public:
 
   [[nodiscard]] construction_session construction(
       const transaction_run_journal_record& record,
-      const transaction_run& run,
+      const transaction_progress& progress,
       const transaction_dispatch& dispatch) override;
 
   [[nodiscard]] transaction_check_session check(
       const transaction_run_journal_record& record,
-      const transaction_run& run,
+      const transaction_progress& progress,
       const transaction_dispatch& dispatch) override;
 
 private:

@@ -5014,12 +5014,12 @@ public:
 
   pkgctl::native_transaction_operation_specification operation(
       const pkgctl::transaction_run_journal_record& record,
-      const pkgctl::transaction_run& run,
+      const pkgctl::transaction_progress& progress,
       const pkgctl::transaction_dispatch& dispatch) override
   {
     ++calls_;
     record_ = record.identity();
-    run_ = run.identity();
+    run_ = progress.identity();
     dispatch_ = dispatch.identity();
     return specification_;
   }
@@ -5100,7 +5100,8 @@ void check_native_operation_authority_source()
   CHECK(specifications.record() ==
         std::optional<pkgctl::session_identity>(reserved.identity()));
   CHECK(specifications.run() ==
-        std::optional<pkgctl::session_identity>(reservation.run.identity()));
+        std::optional<pkgctl::session_identity>(
+            reservation.run.progress().identity()));
   CHECK(specifications.dispatch() ==
         std::optional<pkgctl::session_identity>(
             reservation.dispatch->identity()));

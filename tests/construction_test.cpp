@@ -375,12 +375,32 @@ public:
     return session_;
   }
 
+  pkgctl::construction_session construction(
+      const pkgctl::transaction_run_journal_record& record,
+      const pkgctl::transaction_progress& progress,
+      const pkgctl::transaction_dispatch& dispatch) override
+  {
+    ++calls_;
+    record_ = record.identity();
+    run_ = progress.identity();
+    dispatch_ = dispatch.identity();
+    return session_;
+  }
+
   pkgctl::transaction_check_session check(
       const pkgctl::transaction_run_journal_record&,
       const pkgctl::transaction_run&,
       const pkgctl::transaction_dispatch&) override
   {
     throw std::runtime_error("unexpected check execution authority request");
+  }
+
+  pkgctl::transaction_check_session check(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_progress&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    throw std::runtime_error("unexpected check session authority request");
   }
 
   pkgctl::operation_dispatch_execution_authority operation(
@@ -640,6 +660,128 @@ public:
 private:
   std::size_t calls_ = 0U;
 };
+
+class refusing_native_installed_package_source final
+    : public pkgctl::retained_installed_package_tree_source {
+public:
+  pkgctl::retained_installed_package_tree locate(
+      const pkgstate::installed_package&) override
+  {
+    ++calls_;
+    throw std::runtime_error(
+        "native construction runtime requested an installed package tree");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  std::size_t calls_ = 0U;
+};
+
+class unreachable_native_operation_specification_source final
+    : public pkgctl::transaction_operation_specification_source {
+public:
+  pkgctl::native_transaction_operation_specification operation(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_progress&,
+      const pkgctl::transaction_dispatch&) override
+  {
+    ++calls_;
+    throw std::runtime_error(
+        "native construction runtime requested operation sensing");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  std::size_t calls_ = 0U;
+};
+
+class unreachable_native_effect_restart_body_source final
+    : public pkgctl::transaction_effect_restart_body_source {
+public:
+  pkgctl::transaction_effect_restart_bodies load(
+      const pkgctl::effectful_operation_session&,
+      const pkgctl::effect_attempt_record&) override
+  {
+    ++calls_;
+    throw std::runtime_error(
+        "native construction runtime requested effect restart bodies");
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+
+private:
+  std::size_t calls_ = 0U;
+};
+
+pkgapply_exec::lifecycle_execution_identity
+native_runtime_lifecycle_execution_identity()
+{
+  return {
+      pkgexec::interpreter_identity::from_sha256(std::string(64U, '6')),
+      static_cast<std::uint64_t>(::geteuid()),
+      static_cast<std::uint64_t>(::getegid()),
+      {},
+  };
+}
+
+pkgctl::native_transaction_session_configuration
+native_runtime_session_configuration(const std::filesystem::path& root)
+{
+  const auto root_view = root / "execution-root";
+  std::filesystem::create_directories(root_view);
+  return pkgctl::native_transaction_session_configuration::make(
+      {
+          root / "content",
+          root / "construction-sessions",
+          root / "package-outputs",
+          root / "artifacts",
+          root / "check-temporary",
+          pkgexec::root_view_identity::from_sha256(std::string(64U, '5')),
+          root_view,
+      },
+      {
+          pkgbuild::build_policy::make(
+              pkgbuild::environment_policy::hermetic(
+                  2, 0022, 1700000000)),
+          pkgfetch::acquisition_policy::defaults(),
+          {
+              pkgexec::interpreter_identity::from_sha256(
+                  std::string(64U, '4')),
+              static_cast<std::uint64_t>(::geteuid()),
+              static_cast<std::uint64_t>(::getegid()),
+              {},
+          },
+          {
+              pkgexec::interpreter_identity::from_sha256(
+                  std::string(64U, '3')),
+              static_cast<std::uint64_t>(::geteuid()),
+              static_cast<std::uint64_t>(::getegid()),
+              {},
+          },
+          pkgexec::resource_limits::make(),
+          pkgbuild::artifact_compression::none,
+      });
+}
+
+pkgctl::native_transaction_operation_configuration
+native_runtime_operation_configuration(
+    const pkgctl::transaction_session& transaction,
+    const std::filesystem::path& root)
+{
+  const auto execution_root = root / "lifecycle-execution-root";
+  std::filesystem::create_directories(execution_root);
+  return pkgctl::native_transaction_operation_configuration::make(
+      transaction,
+      {
+          pkgexec::root_view_identity::from_sha256(std::string(64U, '7')),
+          execution_root,
+          root / "target",
+          root / "lifecycle-sessions",
+          native_runtime_lifecycle_execution_identity(),
+      });
+}
 
 class unreachable_runtime_application_backend final
     : public pkgapply::application_backend {
@@ -2697,6 +2839,203 @@ void check_posix_transaction_run_runtime()
   CHECK(run_descriptor_refused);
 }
 
+void check_native_posix_transaction_run_runtime()
+{
+  test_support::temporary_directory temporary;
+  const auto root = temporary.path();
+  const auto state_path = root / "state";
+  const auto collection = root / "collection";
+  std::filesystem::create_directories(collection / "tool");
+  test_support::initialize_state(state_path);
+  pkgstate::posix::canonical_generation_store state_store(
+      state_path, test_support::binding());
+
+  const std::string payload = "native runtime construction payload\n";
+  test_support::write(collection / "tool" / "payload", payload);
+  tool_source_options source_options;
+  source_options.with_build_dependency = false;
+  source_options.source_document =
+      (collection / "tool" / "recipe.yml").generic_string();
+  auto transaction = transaction_session(
+      tool_source(sha256_text(payload), std::move(source_options)), {},
+      state_store.read(), state_path, false, false, false, collection);
+
+  const auto authority_root = root / "native-authority";
+  auto session_configuration =
+      native_runtime_session_configuration(authority_root);
+  auto operation_configuration = native_runtime_operation_configuration(
+      transaction, authority_root);
+  bool contradictory_root_refused = false;
+  try
+  {
+    auto contradictory_operation =
+        pkgctl::native_transaction_operation_configuration::make(
+            transaction,
+            {
+                pkgexec::root_view_identity::from_sha256(
+                    std::string(64U, '7')),
+                session_configuration.roots().root_view_path,
+                authority_root / "contradictory-target",
+                authority_root / "contradictory-lifecycle-sessions",
+                native_runtime_lifecycle_execution_identity(),
+            });
+    (void)pkgctl::native_transaction_run_runtime_configuration::make(
+        transaction, session_configuration,
+        std::move(contradictory_operation), {});
+  }
+  catch (const pkgctl::native_transaction_run_runtime_error& problem)
+  {
+    contradictory_root_refused = problem.code() ==
+        pkgctl::native_transaction_run_runtime_error_code::
+            invalid_configuration;
+  }
+  CHECK(contradictory_root_refused);
+
+  bool mutable_overlap_refused = false;
+  try
+  {
+    auto overlapping_operation =
+        pkgctl::native_transaction_operation_configuration::make(
+            transaction,
+            {
+                pkgexec::root_view_identity::from_sha256(
+                    std::string(64U, '8')),
+                authority_root / "content" / "lifecycle-execution",
+                authority_root / "overlap-target",
+                authority_root / "overlap-lifecycle-sessions",
+                native_runtime_lifecycle_execution_identity(),
+            });
+    (void)pkgctl::native_transaction_run_runtime_configuration::make(
+        transaction, session_configuration,
+        std::move(overlapping_operation), {});
+  }
+  catch (const pkgctl::native_transaction_run_runtime_error& problem)
+  {
+    mutable_overlap_refused = problem.code() ==
+        pkgctl::native_transaction_run_runtime_error_code::
+            invalid_configuration;
+  }
+  CHECK(mutable_overlap_refused);
+
+  auto configuration =
+      pkgctl::native_transaction_run_runtime_configuration::make(
+          transaction, session_configuration, operation_configuration, {});
+
+  refusing_native_installed_package_source installed_packages;
+  unreachable_native_operation_specification_source operation_specifications;
+  unreachable_native_effect_restart_body_source effect_restart_bodies;
+  fixture_backend execution_backend(backend_mode::succeed);
+  unreachable_runtime_application_backend application_backend;
+  pkgimage::libarchive_backend archive_backend;
+
+  const auto run_path = root / "run-store";
+  const auto selected_run_path = root / "run-store-selected";
+  const auto evidence_path = root / "evidence-store";
+  const auto selected_evidence_path = root / "evidence-store-selected";
+  const auto effect_path = root / "effect-store";
+  const auto lock_path = root / "target-locks";
+  std::filesystem::create_directory(run_path);
+  std::filesystem::create_directory(evidence_path);
+  std::filesystem::create_directory(effect_path);
+  std::filesystem::create_directory(lock_path);
+
+  bool overlap_refused = false;
+  try
+  {
+    (void)pkgctl::native_posix_transaction_run_runtime::open(
+        {run_path, run_path, effect_path, lock_path}, configuration,
+        {installed_packages, operation_specifications, effect_restart_bodies},
+        {execution_backend, execution_backend, application_backend,
+         execution_backend, state_store, archive_backend});
+  }
+  catch (const pkgctl::native_transaction_run_runtime_error& problem)
+  {
+    overlap_refused = problem.code() ==
+        pkgctl::native_transaction_run_runtime_error_code::directory_overlap;
+  }
+  CHECK(overlap_refused);
+
+  bool descriptor_alias_refused = false;
+  const int run_fd = open_runtime_directory(run_path);
+  const int effect_fd = open_runtime_directory(effect_path);
+  const int lock_fd = open_runtime_directory(lock_path);
+  try
+  {
+    (void)pkgctl::native_posix_transaction_run_runtime::from_directory_fds(
+        run_fd, run_fd, effect_fd, lock_fd, configuration,
+        {installed_packages, operation_specifications, effect_restart_bodies},
+        {execution_backend, execution_backend, application_backend,
+         execution_backend, state_store, archive_backend});
+  }
+  catch (const pkgctl::native_transaction_run_runtime_error& problem)
+  {
+    descriptor_alias_refused = problem.code() ==
+        pkgctl::native_transaction_run_runtime_error_code::directory_overlap;
+  }
+  CHECK(::close(run_fd) == 0);
+  CHECK(::close(effect_fd) == 0);
+  CHECK(::close(lock_fd) == 0);
+  CHECK(descriptor_alias_refused);
+
+  auto runtime = pkgctl::native_posix_transaction_run_runtime::open(
+      {run_path, evidence_path, effect_path, lock_path},
+      std::move(configuration),
+      {installed_packages, operation_specifications, effect_restart_bodies},
+      {execution_backend, execution_backend, application_backend,
+       execution_backend, state_store, archive_backend});
+
+  std::filesystem::rename(run_path, selected_run_path);
+  std::filesystem::create_directory(run_path);
+  std::filesystem::rename(evidence_path, selected_evidence_path);
+  std::filesystem::create_directory(evidence_path);
+
+  const auto result = runtime->launch(
+      pkgctl::transaction_dispatch_policy::make(1U, 1U),
+      journal_nonce(212U), pkgctl::transaction_run_drive_policy::make(1U));
+  CHECK(result.origin() == pkgctl::transaction_run_launch_origin::admitted);
+  CHECK(result.admission_committed());
+  CHECK(result.drive().disposition() ==
+        pkgctl::transaction_run_drive_disposition::completed);
+  CHECK(result.run().progress().complete());
+  CHECK(result.record().sequence() == 3U);
+  CHECK(result.record().nonce() == journal_nonce(212U));
+  CHECK(result.drive().steps().size() == 1U);
+  CHECK(result.drive().steps().front().disposition() ==
+        pkgctl::transaction_run_advance_disposition::executed_construction);
+  CHECK(installed_packages.calls() == 0U);
+  CHECK(operation_specifications.calls() == 0U);
+  CHECK(effect_restart_bodies.calls() == 0U);
+  CHECK(directory_entry_count(selected_run_path) >= 4U);
+  CHECK(directory_entry_count(run_path) == 0U);
+  CHECK(directory_entry_count(selected_evidence_path) >= 3U);
+  CHECK(directory_entry_count(evidence_path) == 0U);
+  CHECK(directory_entry_count(effect_path) == 0U);
+  CHECK(directory_entry_count(lock_path) == 0U);
+
+  std::size_t artifacts = 0U;
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(
+           authority_root / "artifacts"))
+    if (entry.is_regular_file() && entry.path().extension() == ".tar")
+      ++artifacts;
+  CHECK(artifacts == 1U);
+
+  const auto completed = runtime->drive(
+      result.record().journal(),
+      pkgctl::transaction_run_drive_policy::make(1U));
+  CHECK(completed.disposition() ==
+        pkgctl::transaction_run_drive_disposition::completed);
+  CHECK(completed.steps().size() == 1U);
+  CHECK(completed.steps().front().disposition() ==
+        pkgctl::transaction_run_advance_disposition::quiescent);
+  CHECK(completed.record().identity() == result.record().identity());
+  CHECK(completed.run().progress().identity() ==
+        result.run().progress().identity());
+  CHECK(installed_packages.calls() == 0U);
+  CHECK(operation_specifications.calls() == 0U);
+  CHECK(effect_restart_bodies.calls() == 0U);
+}
+
+
 void check_durable_transaction_run_admission()
 {
   test_support::temporary_directory temporary;
@@ -3303,6 +3642,7 @@ int main()
     check_canonical_transaction_dispatch_nonce_authority();
     check_posix_transaction_run_runtime_recovery();
     check_posix_transaction_run_runtime();
+    check_native_posix_transaction_run_runtime();
     check_durable_transaction_run_admission();
     check_bounded_serial_transaction_drive();
     check_restart_safe_transaction_launch();

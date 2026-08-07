@@ -6,6 +6,33 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Release 0.34.0 closes native target/runtime composition without adding a
+command policy. `native_posix_transaction_run_runtime` owns the complete
+mechanical lifetime chain for one sealed transaction: three durable stores,
+one target-lock authority, native construction/check session location, native
+operation execution and restart authority, explicit archive mapping, exact
+progress rehydration, restart reconstruction, native drivers, and canonical
+dispatch nonce projection.
+
+The caller supplies four existing disjoint POSIX namespaces, explicit and
+independent construction/check and lifecycle configuration, one explicit
+durable run-intent nonce per
+launch, live per-dispatch operation specifications, retained installed-package
+trees, subordinate effect-restart bodies, and already selected physical
+backends. The root opens or duplicates the named directories and binds those
+authorities. It does not initialize or scan stores, discover paths or
+credentials, select a backend, freeze target observations across operations,
+generate user intent, schedule, retry, or clean up.
+
+Construction/check authority and completed-history replay now share exact
+semantic progress rather than the wider caller run identity. A completed
+construction can therefore be reopened from the same retained evidence through
+the same deterministic session locator and selected backend profile. Operation
+replay likewise uses the same native operation authority and canonical restart
+checkpoint. The executable remains read-only; the next and final functional
+closure is one narrow mutating transaction command, followed by coordinated
+release hardening rather than another architecture round.
+
 Release 0.33.0 supplies native fresh-operation and restart authority without
 actuating the target. One replayable per-dispatch specification source supplies
 exact target and planning authority plus explicit lifecycle execution order for
@@ -26,8 +53,9 @@ archive digest through a caller-selected image backend.
 
 The implementation performs no target observation, execution, mutation,
 journal append, state read, discovery, retry, scheduling, or command actuation.
-The executable remains read-only. Stable native target/runtime composition and
-one narrow mutating command remain the next two controller closures.
+At that boundary the executable remained read-only and native runtime
+composition was still external; Release 0.34.0 closes that composition. One
+narrow mutating command remains.
 
 Release 0.32.0 supplies exact semantic transaction-progress rehydration.
 One store-backed source begins from the sealed transaction, selects only
@@ -46,9 +74,9 @@ current state, completion, and failure state must reproduce the durable run
 record exactly.
 
 The implementation performs no execution, continuation, append, publication,
-retry, repair, target observation, or filesystem mutation. Operation execution
-authority, replayable archive lookup, final target/runtime composition, and one
-narrow mutating command remain the next bounded releases.
+retry, repair, target observation, or filesystem mutation. Releases 0.33.0 and
+0.34.0 subsequently close operation/archive authority and native runtime
+composition. One narrow mutating command remains.
 
 Release 0.31.0 supplies the first native implementation of the shared construction/check session authority.
 It derives exact admitted sessions from retained transaction, progress, journal,
@@ -582,7 +610,7 @@ selected durable journal, and destructive convergence choice is explicit.
 `--converge-exact`. The inspection commands open only the exact existing store
 and identity supplied by the caller.
 
-There are no effect-implying CLI commands in 0.32.0. The command frontend
+There are no effect-implying CLI commands in 0.34.0. The command frontend
 executes no source acquisition, build, check, planner, lifecycle, application,
 publication, restart, reconciliation, or repair authority. The library can
 execute or reconcile one caller-selected dispatch only through injected drivers,

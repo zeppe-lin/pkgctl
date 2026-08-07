@@ -1,3 +1,40 @@
+## 0.34.0 - 2026-08-07
+
+### Native target and runtime composition
+
+- Adds one stable native POSIX composition root for an exact sealed
+  transaction. It owns the selected run, construction/check evidence, and
+  effect stores together with the native session locator, operation authority,
+  archive map, exact progress rehydrator, restart chain, dispatch nonce
+  projection, and construction/check/effect drivers.
+- Accepts four explicit existing POSIX namespaces either as absolute paths or
+  directory descriptors. Path opening is existing-only, final-component no-follow, and
+  directory-typed; all four namespaces must be disjoint by normalized path and
+  by retained device/inode authority. The runtime creates or discovers no
+  namespace.
+- Keeps construction/check root-view authority distinct from lifecycle
+  execution-root authority while validating shared-path identity consistently.
+  Build/check writable roots may overlap neither lifecycle execution nor target
+  or lifecycle-session authority.
+- Reuses one semantic progress input for fresh, restart, and completed-history
+  projection. Construction/check session realization now depends on exact
+  transaction progress rather than caller run intent, and completed operation
+  replay passes through the same native operation authority and canonical
+  checkpoint validation.
+- Keeps live per-dispatch operation specifications, installed-package resource
+  retention, subordinate effect-restart bodies, and all selected physical
+  backends with their owning callers. The composition root wires these
+  authorities; it does not freeze target observations, discover credentials,
+  choose backends, or become a new target profile.
+- Requires an explicit durable run-intent nonce for every launch and retains the
+  existing positive bounded-drive contract. It exposes no mutating command,
+  scheduler, retry policy, worker, journal discovery, store initialization,
+  cleanup, compaction, or garbage collection.
+
+### Dependency contract
+
+- No dependency floor changes.
+
 ## 0.33.0 - 2026-08-07
 
 ### Native operation execution and recovery authority

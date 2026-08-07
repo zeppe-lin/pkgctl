@@ -42,7 +42,10 @@ for required in \
   'detail_run_recovery_access' \
   'pkgfetch::materialize(' \
   'pkgbuild_exec::seal_execution_request(' \
-  'pkgcheck_exec::seal_execution_request('; do
+  'pkgcheck_exec::seal_execution_request(' \
+  'detail::native_construction_recovery_context(' \
+  'detail::native_check_recovery_context(' \
+  'checkpoint.run().progress()'; do
   grep -F "$required" "$header" "$source" \
       "$srcdir/include/pkgctl/run_evidence.h" >/dev/null || {
     echo "missing evidence recovery contract: $required" >&2

@@ -24,11 +24,14 @@ for required in \
   'public transaction_operation_execution_authority_source' \
   'public transaction_operation_recovery_authority_source' \
   'class explicit_transaction_effect_archive_source final' \
+  'const transaction_progress& progress' \
   'specifications_.operation' \
   'specification.lifecycle()' \
   'native_operation_preparation_driver' \
   'effect_restart_checkpoint::make' \
   'effects_.load_latest' \
+  'native_transaction_operation_authority_source::rehydrate' \
+  'evidence.stage() != effect_attempt_stage::terminal' \
   'record.journal().hex()' \
   'dispatch.identity().hex()' \
   'incoming.image().receipt().archive_digest()'; do
@@ -89,7 +92,7 @@ for forbidden in \
   fi
 done
 
-# No command exists before target/runtime composition and run intent are closed.
+# Runtime composition is closed here, but no mutating command exists yet.
 ! grep -R -q 'run_operation' "$root/cli"
 ! grep -E -q '(^|[[:space:]])(run|apply|install|upgrade|remove)([[:space:]]|$)' \
   "$root/cli/main.cpp"

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -eu
 
-root=$1
+root=${1:-.}
 header=$root/include/pkgctl/run_locator.h
 source=$root/src/run_locator.cpp
 check_source=$root/src/check.cpp
@@ -19,6 +19,8 @@ grep -q 'native_transaction_session_configuration' "$header"
 grep -q 'record.journal().hex()' "$source"
 grep -q 'dispatch.identity().hex()' "$source"
 grep -q 'project_prepared_paths' "$source"
+grep -q 'const transaction_progress& progress' "$header"
+grep -q 'progress.transaction()' "$source"
 grep -q 'require_predecessor_construction' "$source"
 grep -q 'installed_packages.locate' "$source"
 grep -q 'pkgcheck_exec::seal_execution_request' "$check_source"

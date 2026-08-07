@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -eu
 
-root=$1
+root=${1:-.}
 header=$root/include/pkgctl/run_progress.h
 source=$root/src/run_progress.cpp
 fail(){ echo "run-progress-contract: $*" >&2; exit 1; }

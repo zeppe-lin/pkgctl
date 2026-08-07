@@ -353,7 +353,7 @@ native_transaction_dispatch_session_source(
 construction_session
 native_transaction_dispatch_session_source::construction(
     const transaction_run_journal_record& record,
-    const transaction_run& run,
+    const transaction_progress& progress,
     const transaction_dispatch& dispatch)
 {
   if (dispatch.unit().kind() != transaction_unit_kind::construction)
@@ -365,7 +365,7 @@ native_transaction_dispatch_session_source::construction(
     const auto& roots = configuration_.roots();
     const auto& policy = configuration_.policy();
     auto request = construction_request::make(
-        run.progress().transaction(), dispatch.unit().primary_node(),
+        progress.transaction(), dispatch.unit().primary_node(),
         policy.build, policy.acquisition);
     const auto scope = dispatch_scope(record, dispatch);
     construction_paths paths{
@@ -381,7 +381,7 @@ native_transaction_dispatch_session_source::construction(
         },
     };
     auto inputs = construction_input_resources(
-        request, run.progress(), installed_packages_);
+        request, progress, installed_packages_);
     return construction_session::admit(
         std::move(request), std::move(paths), std::move(inputs),
         policy.construction_execution, policy.compression);
@@ -398,7 +398,7 @@ native_transaction_dispatch_session_source::construction(
 transaction_check_session
 native_transaction_dispatch_session_source::check(
     const transaction_run_journal_record& record,
-    const transaction_run& run,
+    const transaction_progress& progress,
     const transaction_dispatch& dispatch)
 {
   if (dispatch.unit().kind() != transaction_unit_kind::check)
@@ -410,7 +410,7 @@ native_transaction_dispatch_session_source::check(
     const auto& roots = configuration_.roots();
     const auto& policy = configuration_.policy();
     auto request = transaction_check_request::make(
-        run.progress(), dispatch.unit().primary_node());
+        progress, dispatch.unit().primary_node());
     const auto& construction = request.construction();
     const auto admitted = rebuild_admitted_build_session(construction);
     const auto prepared_paths =

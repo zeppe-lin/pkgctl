@@ -48,7 +48,12 @@ reconciliation changes must consume exact caller-rehydrated evidence, validate
 the retained attempt before storage, delegate operation continuation to the
 effect restart authority, and leave the committed run unchanged when external
 resolution is required. Never turn a journal identity into semantic evidence or
-rerun a terminal effect merely because its final run append was lost.
+rerun a terminal effect merely because its final run append was lost. Native
+runtime-composition changes must keep wiring separate from semantic ownership:
+live operation observations, retained installed resources, restart bodies,
+selected backends, and explicit run intent remain caller authority. Do not
+cache target facts across operations, infer paths or credentials, initialize
+stores, or add command policy while changing the composition root.
 
 Use SPDX headers:
 

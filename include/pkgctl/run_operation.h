@@ -156,7 +156,7 @@ public:
 
   [[nodiscard]] virtual native_transaction_operation_specification operation(
       const transaction_run_journal_record& record,
-      const transaction_run& run,
+      const transaction_progress& progress,
       const transaction_dispatch& dispatch) = 0;
 };
 
@@ -201,11 +201,22 @@ public:
       const transaction_dispatch_restart_assessment& assessment,
       const transaction_dispatch& dispatch) override;
 
+  /*! \brief Reconstruct one exact terminal operation for progress replay. */
+  [[nodiscard]] effect_restart_checkpoint rehydrate(
+      const transaction_run_journal_record& record,
+      const transaction_progress& progress,
+      const transaction_dispatch& dispatch,
+      const effect_attempt_record& evidence);
+
 private:
   [[nodiscard]] effectful_operation_session session(
       const transaction_run_journal_record& record,
-      const transaction_run& run,
+      const transaction_progress& progress,
       const transaction_dispatch& dispatch) const;
+
+  [[nodiscard]] effect_restart_checkpoint checkpoint(
+      effectful_operation_session session,
+      const effect_attempt_record& record);
 
   native_transaction_operation_configuration configuration_;
   transaction_operation_specification_source& specifications_;

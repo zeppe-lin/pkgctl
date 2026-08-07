@@ -13,6 +13,61 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.34.0 native target/runtime composition boundary
+
+The controller now has one stable native composition root instead of requiring
+an outer caller to manually retain every intermediate adapter lifetime:
+
+```text
+sealed transaction + fixed roots/lifecycle configuration
+        + four existing POSIX namespaces
+        + live semantic owner sources
+        + selected physical backends
+                         |
+       native_posix_transaction_run_runtime
+                         |
+      bounded launch or exact-journal drive
+```
+
+The root owns the POSIX run, construction/check evidence, and effect stores; the
+native construction/check locator; native operation and archive authority; the
+native completed-progress context; store-backed progress rehydration; restart
+authority; construction/check/effect drivers; and canonical dispatch nonce
+projection. Member lifetime follows that dependency order, so no adapter
+outlives a store or authority it uses.
+
+Composition is not semantic ownership. Retained installed-package trees, live
+per-dispatch operation specifications, and subordinate effect-restart bodies
+remain borrowed from their owners. In particular, operation observations are
+requested against the exact progress of the current dispatch; they are not
+captured once for a transaction and allowed to become stale after earlier
+operations mutate the target. Backends, credentials, roots, archive coordinates,
+and state storage are explicit inputs rather than discovered policy.
+
+Construction/check resource authority now consumes exact semantic progress
+rather than the wider `transaction_run`. Caller run intent has no bearing on a
+source tree, package-input resource, root view, or check workspace. The durable
+run identity remains required separately where it actually owns effect-attempt
+nonce and journal history. This split lets the native progress rehydrator replay
+completed construction/check evidence through the same locator and backend
+profile used by fresh and restarted work. Terminal operations are reopened by
+the same native operation authority and canonical checkpoint validator.
+
+Path-based construction opens four existing absolute, normalized directories
+with final-component no-follow directory semantics, then delegates to the descriptor-based
+factory. Normalized path overlap is refused before opening; aliased descriptors
+are refused by device/inode identity. No directory is created, initialized,
+scanned, inferred, or selected. Build/check writable roots must remain disjoint from lifecycle execution,
+target, and lifecycle-session authority. Construction/check and lifecycle root
+views remain independent typed authorities; when they deliberately use the same
+host path, their identities must agree.
+
+Every launch still requires an explicit durable run-intent nonce and a positive
+drive bound. This release adds no CLI command, target discovery, backend
+selection, scheduling, retry, waiting, worker, cleanup, compaction, or garbage
+collection. The next functional boundary is the single narrow mutating command;
+after that, work moves to one coordinated qualification and publication sweep.
+
 ## Release 0.33.0 native operation authority boundary
 
 Operation authority is now one exact translation from sealed transaction and

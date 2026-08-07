@@ -102,21 +102,24 @@ must not discover paths, observe or mutate the target, execute effects, append
 journals, read canonical state, choose backends or credentials, retry, schedule,
 or expose a command.
 
-The POSIX transaction-run runtime layer may own only mechanical lifetime and
-wiring authority. It may retain caller-opened run-store, construction/check
-evidence-store, effect-store, and target-lock directory descriptors; construct
-the corresponding stores and
-native driver adapters; own stateless dispatch nonce derivation from an exact
-committed head; and delegate one bounded launch or exact-journal drive. Each
-launch must receive an explicit caller run nonce because that value selects
-caller intent and must not be inferred from transaction semantics. The runtime
-must continue to borrow semantic rehydration, execution and recovery sources,
-archive lookup, backends, and canonical state. It may not discover paths or
-journals, initialize stores, generate or persist run intent, issue semantic
-evidence, select credentials or backends, retry, wait, schedule, clean up, or
-add a
-frontend command. Descriptor-anchored authority must remain valid if the
-original pathname is renamed or replaced.
+The native POSIX transaction-run runtime layer owns mechanical lifetime and
+wiring authority for one sealed transaction. It may retain caller-selected
+run-store, construction/check evidence-store, effect-store, and target-lock
+directories; construct the concrete native session, operation, archive,
+progress-rehydration, recovery, driver, and dispatch-nonce chain; and delegate
+one bounded launch or exact-journal drive. Each launch must receive an explicit
+caller run nonce because that value selects caller intent and must not be
+inferred from transaction semantics.
+
+The runtime must continue to borrow semantic owner inputs: retained installed
+package trees, live per-dispatch operation specifications, subordinate restart
+bodies, selected backends, and canonical state. It must not freeze target facts
+for later operations, discover paths or journals, initialize stores, generate
+or persist run intent, invent semantic evidence, select credentials or
+backends, retry, wait, schedule, clean up, or add a frontend command.
+Descriptor-anchored authority must remain valid if the original pathname is
+renamed or replaced, and all four runtime namespaces must be disjoint both by
+selected path and retained filesystem identity.
 
 Fresh and recovered construction/check work must derive from one shared
 deterministic session source. Do not introduce a second recovery-only session,

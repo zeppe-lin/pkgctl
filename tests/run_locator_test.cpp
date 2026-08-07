@@ -237,9 +237,9 @@ void check_native_locator()
   auto reserved_record = record.successor(reservation.run);
 
   auto session = locator.construction(
-      reserved_record, reservation.run, dispatch);
+      reserved_record, reservation.run.progress(), dispatch);
   auto repeated = locator.construction(
-      reserved_record, reservation.run, dispatch);
+      reserved_record, reservation.run.progress(), dispatch);
   CHECK(session.identity() == repeated.identity());
   CHECK(session.request().build_node() == dispatch.unit().primary_node());
   CHECK(session.paths().local_source_root == collection / "tool");
@@ -263,7 +263,7 @@ void check_native_locator()
       reservation.run, dispatch, session);
   auto started_record = reserved_record.successor(started_run);
   auto recovered = locator.construction(
-      started_record, started_run, dispatch);
+      started_record, started_run.progress(), dispatch);
   CHECK(recovered.identity() == session.identity());
   CHECK(recovered.paths().build.session_root ==
         session.paths().build.session_root);
@@ -289,9 +289,9 @@ void check_native_locator()
   auto reserved_check_record = check_record.successor(check_reservation.run);
 
   auto check_session = locator.check(
-      reserved_check_record, check_reservation.run, check_dispatch);
+      reserved_check_record, check_reservation.run.progress(), check_dispatch);
   auto repeated_check = locator.check(
-      reserved_check_record, check_reservation.run, check_dispatch);
+      reserved_check_record, check_reservation.run.progress(), check_dispatch);
   CHECK(check_session.identity() == repeated_check.identity());
   CHECK(!fs::exists(
       check_session.execution_session().paths().temporary_root));
@@ -326,7 +326,7 @@ void check_native_locator()
   auto started_check_record = reserved_check_record.successor(
       started_check_run);
   auto recovered_check = locator.check(
-      started_check_record, started_check_run, check_dispatch);
+      started_check_record, started_check_run.progress(), check_dispatch);
   CHECK(recovered_check.identity() == check_session.identity());
 }
 
@@ -379,7 +379,7 @@ void check_installed_input_location()
   CHECK(node != nullptr && node->package().name() == "tool");
 
   auto session = locator.construction(
-      record.successor(reservation.run), reservation.run, dispatch);
+      record.successor(reservation.run), reservation.run.progress(), dispatch);
   CHECK(installed_packages.calls() == 1U);
   CHECK(session.package_inputs().size() == 1U);
   CHECK(session.package_inputs().front().resource == retained_resource);
@@ -395,7 +395,7 @@ void check_installed_input_location()
   bool foreign_rejected = false;
   try {
     (void)foreign_locator.construction(
-        record.successor(reservation.run), reservation.run, dispatch);
+        record.successor(reservation.run), reservation.run.progress(), dispatch);
   } catch (const pkgctl::native_session_locator_error& problem) {
     foreign_rejected = problem.code() ==
         pkgctl::native_session_locator_error_code::installed_resource_mismatch;
@@ -410,7 +410,7 @@ void check_installed_input_location()
   bool root_path_rejected = false;
   try {
     (void)root_path_locator.construction(
-        record.successor(reservation.run), reservation.run, dispatch);
+        record.successor(reservation.run), reservation.run.progress(), dispatch);
   } catch (const pkgctl::native_session_locator_error& problem) {
     root_path_rejected = problem.code() ==
         pkgctl::native_session_locator_error_code::invalid_resource_path;
@@ -456,7 +456,7 @@ void check_source_coordinate_rejection()
   bool rejected = false;
   try {
     (void)locator.construction(
-        record.successor(reservation.run), reservation.run,
+        record.successor(reservation.run), reservation.run.progress(),
         *reservation.dispatch);
   } catch (const pkgctl::native_session_locator_error& problem) {
     rejected = problem.code() ==

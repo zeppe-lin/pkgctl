@@ -51,7 +51,8 @@ public:
  * Implementations select explicit paths and call-scoped resources but do not
  * execute the dispatch.  The same source may be consulted for fresh execution
  * and restart recovery; it must therefore reproduce the same session identity
- * from the same durable record, run, and dispatch.
+ * from the same durable record, semantic progress, and dispatch.  User run
+ * intent is deliberately outside construction/check resource authority.
  */
 class transaction_dispatch_session_source {
 public:
@@ -59,12 +60,12 @@ public:
 
   [[nodiscard]] virtual construction_session construction(
       const transaction_run_journal_record& record,
-      const transaction_run& run,
+      const transaction_progress& progress,
       const transaction_dispatch& dispatch) = 0;
 
   [[nodiscard]] virtual transaction_check_session check(
       const transaction_run_journal_record& record,
-      const transaction_run& run,
+      const transaction_progress& progress,
       const transaction_dispatch& dispatch) = 0;
 };
 

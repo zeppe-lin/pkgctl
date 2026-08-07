@@ -408,22 +408,21 @@ native_transaction_operation_authority_source(
 effectful_operation_session
 native_transaction_operation_authority_source::session(
     const transaction_run_journal_record& record,
-    const transaction_run& run,
+    const transaction_progress& progress,
     const transaction_dispatch& dispatch) const
 {
   if (record.transaction() != configuration_.transaction().identity() ||
-      run.progress().transaction().identity() !=
-          configuration_.transaction().identity() ||
-      record.run() != run.identity())
+      progress.transaction().identity() !=
+          configuration_.transaction().identity())
     throw native_operation_authority_error(
         native_operation_authority_error_code::transaction_mismatch,
-        "native operation authority was supplied for another durable run");
+        "native operation authority was supplied for another transaction");
   if (dispatch.unit().kind() != transaction_unit_kind::operation)
     throw native_operation_authority_error(
         native_operation_authority_error_code::operation_dispatch_required,
         "native operation authority requires an operation dispatch");
 
-  auto specification = specifications_.operation(record, run, dispatch);
+  auto specification = specifications_.operation(record, progress, dispatch);
   validate_specification(
       configuration_.transaction(), specification,
       dispatch.unit().primary_node());
@@ -433,7 +432,7 @@ native_transaction_operation_authority_source::session(
     native_operation_preparation_driver driver;
     auto prepared = prepare_operation(
         preparation_request(
-            run.progress(), specification, specification.lifecycle()),
+            progress, specification, specification.lifecycle()),
         driver);
     if (!prepared.prepared() || !prepared.effect() || !prepared.application())
     {
@@ -480,7 +479,11 @@ native_transaction_operation_authority_source::operation(
     const transaction_run& run,
     const transaction_dispatch& dispatch)
 {
-  auto value = session(record, run, dispatch);
+  if (record.run() != run.identity())
+    throw native_operation_authority_error(
+        native_operation_authority_error_code::transaction_mismatch,
+        "native operation authority was supplied for another durable run");
+  auto value = session(record, run.progress(), dispatch);
   auto nonce = operation_nonce(record, run, dispatch, value);
   return {std::move(value), std::move(nonce)};
 }
@@ -498,7 +501,8 @@ native_transaction_operation_authority_source::operation(
         native_operation_authority_error_code::effect_attempt_mismatch,
         "restart assessment does not identify one operation attempt");
 
-  auto value = session(checkpoint.record(), checkpoint.run(), dispatch);
+  auto value = session(
+      checkpoint.record(), checkpoint.run().progress(), dispatch);
   const auto record = effects_.load_latest(*assessment.effect_attempt());
   if (!record)
     throw native_operation_authority_error(
@@ -510,11 +514,35 @@ native_transaction_operation_authority_source::operation(
         native_operation_authority_error_code::effect_attempt_mismatch,
         "effect journal attempt differs from reconstructed operation session");
 
+  return this->checkpoint(std::move(value), *record);
+}
+
+effect_restart_checkpoint
+native_transaction_operation_authority_source::rehydrate(
+    const transaction_run_journal_record& record,
+    const transaction_progress& progress,
+    const transaction_dispatch& dispatch,
+    const effect_attempt_record& evidence)
+{
+  auto value = session(record, progress, dispatch);
+  if (evidence.session() != value.identity() ||
+      evidence.stage() != effect_attempt_stage::terminal)
+    throw native_operation_authority_error(
+        native_operation_authority_error_code::effect_attempt_mismatch,
+        "terminal effect evidence differs from reconstructed operation session");
+  return checkpoint(std::move(value), evidence);
+}
+
+effect_restart_checkpoint
+native_transaction_operation_authority_source::checkpoint(
+    effectful_operation_session session,
+    const effect_attempt_record& record)
+{
   try
   {
-    auto bodies = bodies_.load(value, *record);
+    auto bodies = bodies_.load(session, record);
     return effect_restart_checkpoint::make(
-        std::move(value), *record, std::move(bodies.before),
+        std::move(session), record, std::move(bodies.before),
         std::move(bodies.application), std::move(bodies.after),
         std::move(bodies.publication_request),
         std::move(bodies.publication_receipt),

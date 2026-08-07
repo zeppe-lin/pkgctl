@@ -21,7 +21,7 @@ for command in \
     exit 1
   }
 done
-grep -F 'There are no effect-implying CLI commands in 0.32.0.' \
+grep -F 'There are no effect-implying CLI commands in 0.34.0.' \
   "$readme" >/dev/null
 for obsolete in \
   'The executable still exposes only:' \

@@ -28,8 +28,8 @@ for required in \
   'transaction_dispatch_execution_authority_source' \
   'composed_transaction_dispatch_execution_authority_source' \
   'transaction_dispatch_recovery_authority_source' \
-  'sessions_.construction(record, run, dispatch)' \
-  'sessions_.check(record, run, dispatch)' \
+  'sessions_.construction(record, run.progress(), dispatch)' \
+  'sessions_.check(record, run.progress(), dispatch)' \
   'operations_.operation(record, run, dispatch)' \
   'transaction_dispatch_execution_handoff' \
   'transaction_dispatch_recovery_handoff' \

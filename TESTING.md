@@ -1,3 +1,35 @@
+## Release 0.34.0 native target/runtime composition qualification
+
+The native runtime suite must prove:
+
+- one composition root owns the POSIX run, construction/check evidence, and
+  effect stores plus the native session, operation, archive, progress,
+  recovery, driver, and dispatch-nonce chain in dependency-safe lifetime order;
+- four path-selected namespaces are existing absolute directories, opened with
+  final-component no-follow directory authority, and refused when normalized paths overlap;
+  descriptor-selected aliases are refused by device/inode identity;
+- construction/check and lifecycle execution retain independent typed
+  root-view authority; a deliberately shared path requires one identity, while
+  build/check writable roots remain disjoint from lifecycle execution, target,
+  and lifecycle-session domains;
+- launch requires an explicit durable run-intent nonce and remains bounded by
+  one positive drive policy;
+- a construction-only transaction executes through the concrete native locator,
+  publishes durable evidence, and completes without consulting installed-tree,
+  operation-specification, restart-body, archive, application, or lifecycle
+  authority;
+- reopening that completed journal reconstructs exact progress from retained
+  evidence through the same locator and selected backend profile and returns
+  quiescent without caller-supplied replacement progress;
+- renamed store paths prove descriptor-retained authority remains attached to
+  the opened namespaces rather than later pathname lookup; and
+- source contracts reject store initialization, directory scanning, target
+  observation, backend selection, implicit credentials, unbounded loops,
+  retries, workers, cleanup, and command wiring.
+
+The full Meson suite must run under ASan and UBSan against the staged private
+prefix before release.
+
 ## Release 0.33.0 native operation-authority qualification
 
 The native operation suite must prove:
