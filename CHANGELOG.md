@@ -35,7 +35,7 @@
 
 - libpkgapply-posix >= 3.1.0, < 4.0.0
 - libpkgcatalog-codec >= 3.0.0, < 4.0.0 (CLI only)
-- libpkgexec-linux >= 0.5.0, < 1.0.0 (CLI only)
+- libpkgexec-linux >= 0.5.1, < 1.0.0 (CLI only)
 
 ## 0.34.0 - 2026-08-07
 
