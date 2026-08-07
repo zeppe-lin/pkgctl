@@ -18,7 +18,14 @@ The final command suite must prove:
   not become target-mutation identities;
 - one invocation executes no more than `--max-steps`, with no implicit loop,
   sleep, retry, scheduler, repair, rollback, cleanup, compaction, or discovery;
-- the existing read-only commands remain byte-stable sensors; and
+- the existing read-only commands remain byte-stable sensors;
+- the actual built `pkgctl` executable can start one synthetic installation,
+  stop after one durable construction step, lose access to the live collection,
+  resume the exact retained transaction to target/state completion, and report
+  the same transaction and journal identities across both processes;
+- a second start of the admitted nonce is refused, while a second resume of the
+  completed run reports zero durable work and leaves target bytes and canonical
+  state unchanged; and
 - a complete private-prefix shared/static Meson build passes under ASan and
   UBSan before tagging.
 

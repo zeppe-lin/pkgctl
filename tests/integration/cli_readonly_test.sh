@@ -128,29 +128,6 @@ exact=$($pkgctl transaction \
   --goal 'build=@base' --goal 'run=@base' --converge-exact)
 printf '%s\n' "$exact" | grep -F 'transaction.convergence=converge-exact' >/dev/null
 
-run_nonce=$(printf '%064d' 1)
-# shellcheck disable=SC2086
-if $pkgctl run \
-  --collection "core=$collection" \
-  --canonical-store "$state" $binding \
-  --build-architecture x86_64 --target-architecture x86_64 \
-  --goal 'build=@base' --goal 'run=@base' \
-  --start "$run_nonce" --runtime-root "$root/runtime" \
-  --build-root "$root/build" --target-root "$root/target" \
-  --interpreter /bin/sh --user-id 0 --group-id 0 \
-  --source-date-epoch 0 --max-steps 0 \
-  >"$root/invalid-run.out" 2>"$root/invalid-run.err"; then
-  echo 'zero-bounded run unexpectedly succeeded' >&2
-  exit 1
-else
-  [ "$?" -eq 2 ]
-fi
-grep -F 'maximum step count must be greater than zero' \
-  "$root/invalid-run.err" >/dev/null
-[ ! -e "$root/runtime" ]
-[ ! -e "$root/build" ]
-[ ! -e "$root/target" ]
-
 after=$(find "$state" -type f -print | sort | xargs sha256sum)
 [ "$before" = "$after" ]
 

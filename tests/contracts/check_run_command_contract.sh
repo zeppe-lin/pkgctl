@@ -8,8 +8,10 @@ options="$srcdir/cli/options.cpp"
 command="$srcdir/cli/run_command.cpp"
 main="$srcdir/cli/main.cpp"
 meson="$srcdir/cli/meson.build"
+tests_meson="$srcdir/tests/meson.build"
+integration="$srcdir/tests/integration/cli_run_test.sh"
 
-for file in "$options" "$command" "$main" "$meson"; do
+for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration"; do
   [ -s "$file" ] || {
     echo "missing bounded transaction command source: $file" >&2
     exit 1
@@ -72,6 +74,24 @@ grep -F 'execute_transaction_run(std::move(request))' "$main" >/dev/null || {
   echo 'CLI does not dispatch the bounded transaction command' >&2
   exit 1
 }
+grep -F "'cli-run'" "$tests_meson" >/dev/null || {
+  echo 'bounded run command has no process-level integration test' >&2
+  exit 1
+}
+for required_test in \
+  'disposition step-limit-reached' \
+  'durable-steps 1' \
+  'exact transaction run is already admitted; use --resume' \
+  'rm -rf "$collection"' \
+  'origin resumed' \
+  'disposition completed' \
+  'package fixture 1.0-1' \
+  'durable-steps 0'; do
+  grep -F "$required_test" "$integration" >/dev/null || {
+    echo "missing process-level run qualification: $required_test" >&2
+    exit 1
+  }
+done
 
 
 for documented in \

@@ -57,6 +57,11 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
 "$srcdir/tests/integration/cli_readonly_test.sh" "$tmp/pkgctl" "$tmp/state-fixture" \
   "$tmp/run-store-fixture" "$tmp/effect-store-fixture" "$version"
 
+"$srcdir/tests/integration/cli_run_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-test-interpreter" \
+  "$srcdir/tests/fixtures/collections/simple-install"
+
 for header in "$srcdir"/include/pkgctl/*.h; do
   base=$(basename "$header")
   cat >"$tmp/header.cpp" <<EOF_INNER

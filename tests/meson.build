@@ -146,6 +146,23 @@ if not get_option('tests').disabled()
     suite: 'integration',
   )
 
+  cli_run_test = find_program('integration/cli_run_test.sh')
+  test(
+    'cli-run',
+    cli_run_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_interpreter,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/simple-install',
+      ),
+    ],
+    suite: 'integration',
+  )
+
   pkgctl_headers = [
     'check.h',
     'construction.h',
