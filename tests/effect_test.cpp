@@ -5294,7 +5294,7 @@ void check_native_incoming_operation_authority_source()
   fixed_operation_specification_source specifications(
       pkgctl::native_transaction_operation_specification::install(
           construction_fixture::install_node(transaction).identity(),
-          construction_fixture::application_target(
+          application_target(
               store.read().target_binding(), target_system),
           construction_fixture::execution_control(),
           construction_fixture::empty_target_observations(target_system),
