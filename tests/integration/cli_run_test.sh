@@ -7,6 +7,18 @@ pkgctl=$1
 state_fixture=$2
 state_inspect_fixture=$3
 interpreter=$4
+case $interpreter in
+  /*)
+    ;;
+  *)
+    interpreter_dir=$(dirname "$interpreter")
+    interpreter_name=$(basename "$interpreter")
+    interpreter=$(
+      cd "$interpreter_dir"
+      printf '%s/%s\n' "$(pwd -P)" "$interpreter_name"
+    )
+    ;;
+esac
 fixture_collection=$5
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-run.XXXXXX")
 cleanup()
