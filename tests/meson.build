@@ -122,6 +122,7 @@ if not get_option('tests').disabled()
     'native-test-interpreter',
     input: 'fixtures/native_interpreter_x86_64.S',
     output: 'native-test-interpreter',
+    build_by_default: true,
     command: cpp.cmd_array() + [
       '-nostdlib',
       '-static',

@@ -92,6 +92,10 @@ grep -F 'depends: native_interpreter' "$tests_meson" >/dev/null || {
   echo 'privileged CLI integration does not build its native interpreter fixture' >&2
   exit 1
 }
+grep -F 'build_by_default: true' "$tests_meson" >/dev/null || {
+  echo 'native interpreter fixture is absent from the default test build graph' >&2
+  exit 1
+}
 grep -F 'PKGCTL_REQUIRE_NATIVE_INTEGRATION' "$integration" >/dev/null || {
   echo 'privileged CLI integration has no release-required mode' >&2
   exit 1

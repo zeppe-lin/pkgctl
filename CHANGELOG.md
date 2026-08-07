@@ -51,8 +51,9 @@
   `pkgctl run` start/resume test. Capability-unavailable hosts may skip that
   vertical scenario in ordinary development runs, but release qualification
   requires `PKGCTL_REQUIRE_NATIVE_INTEGRATION=1` and treats such a skip as a
-  hard failure. The generated static native interpreter is an explicit test
-  dependency, so clean builds cannot accidentally rely on a stale fixture.
+  hard failure. The generated static native interpreter is part of the default
+  test build graph and remains an explicit test dependency, so clean or
+  no-rebuild qualification cannot accidentally rely on a stale fixture.
 
 ### Dependency contract
 
