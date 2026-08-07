@@ -199,6 +199,23 @@ require_contains malformed-root "$root/malformed-root.out" 'durable-steps 1'
 require_contains malformed-root "$root/malformed-root.out" 'failed yes'
 require_contains malformed-root-stderr "$root/malformed-root.err" \
   'pkgctl: construction failed:'
+if grep -F 'Linux backend cannot establish required guarantees:' \
+    "$root/malformed-root.err" >/dev/null; then
+  for invariant in \
+    closed-environment \
+    fixed-credentials \
+    complete-stdout-capture \
+    complete-stderr-capture; do
+    if grep -F " $invariant" "$root/malformed-root.err" >/dev/null; then
+      fail "Linux backend omitted invariant guarantee: $invariant"
+    fi
+  done
+  printf '%s\n' \
+    'pkgctl:cli-run: host cannot establish the sealed native execution guarantees' \
+    >&2
+  dump_file 'unsupported native execution profile' "$root/malformed-root.err"
+  exit 77
+fi
 require_contains malformed-root-stderr "$root/malformed-root.err" \
   'open root resource destination'
 require_equal malformed-root-state "$initial_state" \

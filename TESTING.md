@@ -179,6 +179,15 @@ program or shell script as interchangeable:
   drift. Contract tests may prove forbidden structure, but do not stand in for
   successful runtime behavior.
 
+`pkgctl:cli-run` requires the host Linux backend to establish the sealed native
+execution guarantees used by construction and checking. If the backend returns
+exact `backend_unsupported` evidence naming only host-dependent guarantees, the
+integration test exits 77 and Meson records a skip. A skip is **not** successful
+vertical qualification: before release, this scenario must also pass on a host
+that can establish the full guarantee set. Missing invariant guarantees such as
+closed environment, fixed credentials, or complete stream capture remain test
+failures rather than environmental skips.
+
 Meson exposes the corresponding `unit`, `integration`, `header`, and `contract`
 suites. `tests/run-direct.sh` is the source-tree qualification path and must link
 the complete current CLI, including command-only dependencies, before invoking

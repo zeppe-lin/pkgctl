@@ -147,8 +147,6 @@ if not get_option('tests').disabled()
   )
 
   cli_run_test = find_program('integration/cli_run_test.sh')
-  native_root_view_fixture = find_program(
-    'fixtures/native_root_view_fixture.sh')
   test(
     'cli-run',
     cli_run_test,
@@ -161,7 +159,10 @@ if not get_option('tests').disabled()
         meson.project_source_root(),
         'tests/fixtures/collections/simple-install',
       ),
-      native_root_view_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
     ],
     suite: 'integration',
   )
