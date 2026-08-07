@@ -77,6 +77,7 @@ done
 "$srcdir/tests/check_run_authority_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_advance_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_driver_source_contract.sh" "$srcdir"
+"$srcdir/tests/check_run_operation_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_native_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_runtime_contract.sh" "$srcdir"
 "$srcdir/tests/check_run_nonce_contract.sh" "$srcdir"

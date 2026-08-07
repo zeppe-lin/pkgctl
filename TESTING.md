@@ -1,3 +1,30 @@
+## Release 0.33.0 native operation-authority qualification
+
+The native operation suite must prove:
+
+- one replayable per-dispatch specification must name the exact selected action
+  and operation kind and supply explicit lifecycle execution order; foreign,
+  incompatible, incomplete, or duplicate lifecycle authority is rejected;
+- fresh removal preparation reproduces the canonical effect request through the
+  existing preparation path;
+- equivalent durable record, run, and dispatch inputs reproduce the same
+  admitted lifecycle session and mechanical effect-attempt nonce;
+- locating operation authority creates, removes, scans, stats, opens, executes,
+  journals, publishes, or observes no host or target resource;
+- planning refusal remains a typed refusal and does not admit an effect attempt;
+- restart requires the exact run-retained effect-attempt identity and latest
+  effect-journal record before consulting subordinate body authority;
+- missing or foreign effect records and contradictory restart bodies fail
+  closed through typed errors or the canonical checkpoint validator;
+- the explicit archive map opens only an exact incoming authority, passes its
+  retained complete-archive digest to the selected backend, returns no archive
+  for an unmapped authority, and rejects duplicate or non-absolute coordinates;
+- no CLI command, backend selection, retry, scheduler, target profile, or state
+  store access enters this boundary.
+
+The full Meson suite must run under ASan and UBSan against the staged private
+prefix before release.
+
 ## Release 0.32.0 exact progress-rehydration qualification
 
 The progress suite proves that an admitted or ownership-only history performs no

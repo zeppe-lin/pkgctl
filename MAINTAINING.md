@@ -90,6 +90,18 @@ choose retries or backoff, discover resources or evidence, adopt processes,
 roll back, clean up, compact journals, collect history, or expose a mutating
 command.
 
+The native operation-authority layer may translate one exact transaction,
+progress epoch, durable record, and operation dispatch into an admitted effect
+session. It may consume one replayable per-dispatch target/planning
+specification, explicit lifecycle execution order, the exact predecessor
+construction for incoming operations, fixed lifecycle coordinates and
+credentials, the exact latest effect record, and caller-owned
+restart bodies. Replayable archives may be selected only by an explicit
+incoming-authority map and opened under the retained archive digest. This layer
+must not discover paths, observe or mutate the target, execute effects, append
+journals, read canonical state, choose backends or credentials, retry, schedule,
+or expose a command.
+
 The POSIX transaction-run runtime layer may own only mechanical lifetime and
 wiring authority. It may retain caller-opened run-store, construction/check
 evidence-store, effect-store, and target-lock directory descriptors; construct

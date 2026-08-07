@@ -3,6 +3,7 @@
 
 #include "test_support.h"
 #include "run_execute_support.h"
+#include "construction_fixture.h"
 
 #include <pkgctl/effect.h>
 #include <pkgctl/effect_journal.h>
@@ -14,6 +15,7 @@
 #include <pkgctl/preparation.h>
 #include <pkgctl/run_journal.h>
 #include <pkgctl/run_native.h>
+#include <pkgctl/run_operation.h>
 #include <pkgctl/run_journal_codec.h>
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_advance.h>
@@ -4936,6 +4938,472 @@ void check_run_authority_rehydration()
 }
 
 
+class empty_restart_body_source final
+    : public pkgctl::transaction_effect_restart_body_source {
+public:
+  pkgctl::transaction_effect_restart_bodies load(
+      const pkgctl::effectful_operation_session& session,
+      const pkgctl::effect_attempt_record& record) override
+  {
+    ++calls_;
+    session_ = session.identity();
+    record_ = record.identity();
+    return {};
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgctl::session_identity>& session() const noexcept
+  { return session_; }
+  const std::optional<pkgctl::session_identity>& record() const noexcept
+  { return record_; }
+
+private:
+  std::size_t calls_ = 0U;
+  std::optional<pkgctl::session_identity> session_;
+  std::optional<pkgctl::session_identity> record_;
+};
+
+pkgctl::native_transaction_operation_configuration removal_configuration(
+    const removal_fixture& value,
+    const std::filesystem::path& root)
+{
+  return pkgctl::native_transaction_operation_configuration::make(
+      value.transaction,
+      {pkgexec::root_view_identity::from_sha256(hex_digest(92)),
+       root / "execution", root / "target", root / "sessions",
+       test_lifecycle_execution_identity()});
+}
+
+pkgctl::native_transaction_operation_specification removal_specification(
+    const removal_fixture& value,
+    pkgplan::target_observation_set observations)
+{
+  return pkgctl::native_transaction_operation_specification::remove(
+      action_node(value.transaction,
+                  pkgtransaction::transaction_action_kind::remove)
+          .identity(),
+      value.target, execution_control(), std::move(observations), policy(),
+      operation_lifecycle_order(
+          value.transaction, pkgtransaction::transaction_action_kind::remove));
+}
+
+pkgplan::target_observation_set removal_observations(
+    const removal_fixture& value,
+    std::uint8_t marker,
+    bool present)
+{
+  std::vector<pkgplan::target_path_observation> paths;
+  if (present)
+    paths.push_back(pkgplan::target_path_observation::present(
+        pkgplan::filesystem_object_fact(
+            pkgplan::package_path::parse("tool"), planner_regular(2))));
+  return pkgplan::target_observation_set(
+      plan_identity<pkgplan::observation_set_identity>(marker),
+      value.target_system, pkgplan::fact_set_completeness::complete,
+      std::move(paths));
+}
+
+class fixed_operation_specification_source final
+    : public pkgctl::transaction_operation_specification_source {
+public:
+  explicit fixed_operation_specification_source(
+      pkgctl::native_transaction_operation_specification specification)
+      : specification_(std::move(specification))
+  {
+  }
+
+  pkgctl::native_transaction_operation_specification operation(
+      const pkgctl::transaction_run_journal_record& record,
+      const pkgctl::transaction_run& run,
+      const pkgctl::transaction_dispatch& dispatch) override
+  {
+    ++calls_;
+    record_ = record.identity();
+    run_ = run.identity();
+    dispatch_ = dispatch.identity();
+    return specification_;
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgctl::session_identity>& record() const noexcept
+  { return record_; }
+  const std::optional<pkgctl::session_identity>& run() const noexcept
+  { return run_; }
+  const std::optional<pkgctl::session_identity>& dispatch() const noexcept
+  { return dispatch_; }
+
+private:
+  pkgctl::native_transaction_operation_specification specification_;
+  std::size_t calls_ = 0U;
+  std::optional<pkgctl::session_identity> record_;
+  std::optional<pkgctl::session_identity> run_;
+  std::optional<pkgctl::session_identity> dispatch_;
+};
+
+void check_native_operation_authority_source()
+{
+  upgrade_fixture upgrade;
+  auto graph_order = operation_lifecycle_order(
+      upgrade.transaction, pkgtransaction::transaction_action_kind::upgrade);
+  auto explicit_before = graph_order.before();
+  auto explicit_after = graph_order.after();
+  std::reverse(explicit_before.begin(), explicit_before.end());
+  std::reverse(explicit_after.begin(), explicit_after.end());
+  const auto explicit_lifecycle_order = pkgctl::lifecycle_order::make(
+      explicit_before, explicit_after);
+  const auto explicit_specification =
+      pkgctl::native_transaction_operation_specification::upgrade(
+          action_node(upgrade.transaction,
+                      pkgtransaction::transaction_action_kind::upgrade)
+              .identity(),
+          upgrade.target, execution_control(),
+          pkgplan::target_observation_set(
+              plan_identity<pkgplan::observation_set_identity>(83),
+              upgrade.target_system,
+              pkgplan::fact_set_completeness::complete, {}),
+          plan_identity<pkgplan::runtime_dependency_closure_identity>(84),
+          policy(), explicit_lifecycle_order);
+  CHECK(explicit_specification.lifecycle().before() == explicit_before);
+  CHECK(explicit_specification.lifecycle().after() == explicit_after);
+
+  removal_fixture value;
+  const auto authority_root = value.temp.path() / "native-operation-authority";
+  memory_effect_journal_store effects;
+  empty_restart_body_source bodies;
+  fixed_operation_specification_source specifications(
+      removal_specification(
+          value, removal_observations(value, 80U, true)));
+  pkgctl::native_transaction_operation_authority_source source(
+      removal_configuration(value, authority_root), specifications,
+      effects, bodies);
+
+  auto run = pkgctl::transaction_run::begin(
+      pkgctl::transaction_progress::begin(value.transaction),
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, dispatch_journal_nonce(111U));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(111U));
+  CHECK(reservation.dispatch.has_value());
+  if (!reservation.dispatch)
+    return;
+  CHECK(reservation.dispatch->unit().kind() ==
+        pkgctl::transaction_unit_kind::operation);
+  auto reserved = admitted.successor(reservation.run);
+
+  const auto fresh = source.operation(
+      reserved, reservation.run, *reservation.dispatch);
+  const auto repeated = source.operation(
+      reserved, reservation.run, *reservation.dispatch);
+  CHECK(fresh.session.identity() == repeated.session.identity());
+  CHECK(fresh.nonce == repeated.nonce);
+  CHECK(specifications.calls() == 2U);
+  CHECK(specifications.record() ==
+        std::optional<pkgctl::session_identity>(reserved.identity()));
+  CHECK(specifications.run() ==
+        std::optional<pkgctl::session_identity>(reservation.run.identity()));
+  CHECK(specifications.dispatch() ==
+        std::optional<pkgctl::session_identity>(
+            reservation.dispatch->identity()));
+  CHECK(fresh.session.request().identity() == effect_request(value).identity());
+  CHECK(fresh.session.before().size() == value.before.size());
+  CHECK(fresh.session.after().size() == value.after.size());
+  CHECK(!std::filesystem::exists(authority_root));
+
+  const auto started = pkgctl::start_operation_dispatch(
+      reservation.run, *reservation.dispatch, fresh.session, fresh.nonce);
+  const auto started_record = reserved.successor(started.run);
+  CHECK(effects.append(started.effect_attempt).identity() ==
+        started.effect_attempt.identity());
+  const auto restart = pkgctl::transaction_run_restart_checkpoint::make(
+      started.run.progress(), started_record);
+  CHECK(restart.assessment().active().size() == 1U);
+  if (restart.assessment().active().empty())
+    return;
+  const auto recovered = source.operation(
+      restart, restart.assessment().active().front(), *reservation.dispatch);
+  CHECK(recovered.session().identity() == fresh.session.identity());
+  CHECK(recovered.record().identity() == started.effect_attempt.identity());
+  CHECK(bodies.calls() == 1U);
+  CHECK(specifications.calls() == 3U);
+  CHECK(specifications.record() ==
+        std::optional<pkgctl::session_identity>(started_record.identity()));
+  CHECK(bodies.session() ==
+        std::optional<pkgctl::session_identity>(fresh.session.identity()));
+  CHECK(bodies.record() ==
+        std::optional<pkgctl::session_identity>(
+            started.effect_attempt.identity()));
+  CHECK(!std::filesystem::exists(authority_root));
+
+  memory_effect_journal_store missing_effects;
+  empty_restart_body_source unused_bodies;
+  fixed_operation_specification_source missing_specifications(
+      removal_specification(
+          value, removal_observations(value, 82U, true)));
+  pkgctl::native_transaction_operation_authority_source missing(
+      removal_configuration(
+          value, value.temp.path() / "missing-operation-authority"),
+      missing_specifications, missing_effects, unused_bodies);
+  bool missing_refused = false;
+  try
+  {
+    (void)missing.operation(
+        restart, restart.assessment().active().front(),
+        *reservation.dispatch);
+  }
+  catch (const pkgctl::native_operation_authority_error& problem)
+  {
+    missing_refused = problem.code() ==
+        pkgctl::native_operation_authority_error_code::effect_attempt_missing;
+  }
+  CHECK(missing_refused);
+  CHECK(unused_bodies.calls() == 0U);
+
+  empty_restart_body_source drift_bodies;
+  fixed_operation_specification_source drift_specifications(
+      removal_specification(
+          value, removal_observations(value, 82U, true)));
+  pkgctl::native_transaction_operation_authority_source drifted(
+      removal_configuration(
+          value, value.temp.path() / "drifted-operation-authority"),
+      drift_specifications, effects, drift_bodies);
+  bool drift_refused = false;
+  try
+  {
+    (void)drifted.operation(
+        restart, restart.assessment().active().front(),
+        *reservation.dispatch);
+  }
+  catch (const pkgctl::native_operation_authority_error& problem)
+  {
+    drift_refused = problem.code() ==
+        pkgctl::native_operation_authority_error_code::effect_attempt_mismatch;
+  }
+  CHECK(drift_refused);
+  CHECK(drift_bodies.calls() == 0U);
+
+  bool overlap_refused = false;
+  try
+  {
+    (void)pkgctl::native_transaction_operation_configuration::make(
+        value.transaction,
+        {pkgexec::root_view_identity::from_sha256(hex_digest(92)),
+         authority_root / "shared", authority_root / "shared/target",
+         authority_root / "sessions", test_lifecycle_execution_identity()});
+  }
+  catch (const pkgctl::native_operation_authority_error& problem)
+  {
+    overlap_refused = problem.code() ==
+        pkgctl::native_operation_authority_error_code::invalid_configuration;
+  }
+  CHECK(overlap_refused);
+
+  empty_restart_body_source lifecycle_bodies;
+  fixed_operation_specification_source incomplete_lifecycle_specifications(
+      pkgctl::native_transaction_operation_specification::remove(
+          action_node(value.transaction,
+                      pkgtransaction::transaction_action_kind::remove)
+              .identity(),
+          value.target, execution_control(),
+          removal_observations(value, 80U, true), policy(),
+          pkgctl::lifecycle_order::make({}, {})));
+  pkgctl::native_transaction_operation_authority_source incomplete_lifecycle(
+      removal_configuration(
+          value, value.temp.path() / "incomplete-lifecycle-authority"),
+      incomplete_lifecycle_specifications, effects, lifecycle_bodies);
+  bool lifecycle_refused = false;
+  try
+  {
+    (void)incomplete_lifecycle.operation(
+        reserved, reservation.run, *reservation.dispatch);
+  }
+  catch (const pkgctl::native_operation_authority_error& problem)
+  {
+    lifecycle_refused = problem.code() ==
+        pkgctl::native_operation_authority_error_code::session_invalid;
+  }
+  CHECK(lifecycle_refused);
+
+  empty_restart_body_source refusal_bodies;
+  fixed_operation_specification_source refused_specifications(
+      removal_specification(
+          value, removal_observations(value, 81U, false)));
+  pkgctl::native_transaction_operation_authority_source refused(
+      removal_configuration(
+          value, value.temp.path() / "refused-operation-authority"),
+      refused_specifications, effects, refusal_bodies);
+  bool planning_refused = false;
+  try
+  {
+    (void)refused.operation(
+        reserved, reservation.run, *reservation.dispatch);
+  }
+  catch (const pkgctl::native_operation_authority_error& problem)
+  {
+    planning_refused = problem.code() ==
+        pkgctl::native_operation_authority_error_code::planning_refused;
+  }
+  CHECK(planning_refused);
+}
+
+void check_native_incoming_operation_authority_source()
+{
+  test_support::temporary_directory temporary;
+  test_support::initialize_state(temporary.path() / "state");
+  pkgstate::posix::canonical_generation_store store(
+      temporary.path() / "state", test_support::binding());
+
+  const std::string payload = "native operation source payload\n";
+  auto source_snapshot = construction_fixture::tool_source(
+      construction_fixture::sha256_text(payload), "1.0", false);
+  auto transaction = construction_fixture::transaction_session(
+      source_snapshot, construction_fixture::dependency_source(), store.read(),
+      temporary.path() / "state", true);
+  auto construction_session =
+      construction_fixture::construction_session_without_inputs(
+          transaction, temporary.path() / "construction");
+  test_support::write(
+      construction_session.paths().local_source_root / "payload", payload);
+  construction_fixture::fixture_backend backend(
+      construction_fixture::backend_mode::succeed);
+  pkgctl::native_construction_driver construction_driver(backend);
+  auto construction = pkgctl::execute_construction(
+      construction_session, construction_driver);
+  CHECK(construction.succeeded());
+
+  auto progress = pkgctl::transaction_progress::begin(transaction);
+  progress = pkgctl::advance_construction(
+      std::move(progress), construction);
+  CHECK(progress.status(construction_fixture::install_node(transaction).identity()) ==
+        pkgctl::transaction_node_status::ready);
+
+  auto run = pkgctl::transaction_run::begin(
+      progress, pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto admitted = pkgctl::transaction_run_journal_record::admit(
+      run, dispatch_journal_nonce(112U));
+  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(112U));
+  CHECK(reservation.dispatch.has_value());
+  if (!reservation.dispatch)
+    return;
+  CHECK(reservation.dispatch->unit().kind() ==
+        pkgctl::transaction_unit_kind::operation);
+  auto reserved = admitted.successor(reservation.run);
+
+  const auto target_system =
+      construction_fixture::plan_identity<
+          pkgplan::target_system_context_identity>(52U);
+  fixed_operation_specification_source specifications(
+      pkgctl::native_transaction_operation_specification::install(
+          construction_fixture::install_node(transaction).identity(),
+          construction_fixture::application_target(
+              store.read().target_binding(), target_system),
+          construction_fixture::execution_control(),
+          construction_fixture::empty_target_observations(target_system),
+          construction_fixture::plan_identity<
+              pkgplan::runtime_dependency_closure_identity>(53U),
+          construction_fixture::package_policy(),
+          pkgctl::lifecycle_order::make({}, {}),
+          pkgstate::installation_reason::explicit_request()));
+  memory_effect_journal_store effects;
+  empty_restart_body_source bodies;
+  const auto authority_root = temporary.path() / "incoming-operation-authority";
+  auto configuration = pkgctl::native_transaction_operation_configuration::make(
+      transaction,
+      {pkgexec::root_view_identity::from_sha256(hex_digest(93)),
+       authority_root / "execution", authority_root / "target",
+       authority_root / "sessions", test_lifecycle_execution_identity()});
+  pkgctl::native_transaction_operation_authority_source authority(
+      std::move(configuration), specifications, effects, bodies);
+
+  const auto fresh = authority.operation(
+      reserved, reservation.run, *reservation.dispatch);
+  CHECK(fresh.session.request().application().kind() ==
+        pkgplan::operation_kind::install);
+  CHECK(fresh.session.request().application().incoming() != nullptr);
+  CHECK(fresh.session.request().expected_state().identity() ==
+        progress.current_state().identity());
+  CHECK(fresh.session.before().empty());
+  CHECK(fresh.session.after().empty());
+  CHECK(!std::filesystem::exists(authority_root));
+}
+
+class recording_archive_backend final : public pkgimage::archive_backend {
+public:
+  explicit recording_archive_backend(pkgimage::inspected_package_image image)
+      : image_(std::move(image))
+  {
+  }
+
+  std::unique_ptr<pkgimage::package_archive> open(
+      const pkgimage::archive_inspection_request& request) const override
+  {
+    ++calls_;
+    request_ = request;
+    return std::make_unique<fixed_package_archive>(image_);
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgimage::archive_inspection_request>&
+  request() const noexcept { return request_; }
+
+private:
+  pkgimage::inspected_package_image image_;
+  mutable std::size_t calls_ = 0U;
+  mutable std::optional<pkgimage::archive_inspection_request> request_;
+};
+
+void check_explicit_transaction_effect_archive_source()
+{
+  fixture value;
+  recording_archive_backend backend(value.incoming.image());
+  const auto path = value.temp.path() / "retained.pkg.tar";
+  auto source = pkgctl::explicit_transaction_effect_archive_source::make(
+      backend, {{value.incoming.identity(), path}});
+  auto archive = pkgctl::acquire_transaction_effect_archive(
+      source, pkgapply::package_application_request(value.application));
+  CHECK(archive != nullptr);
+  CHECK(backend.calls() == 1U);
+  CHECK(backend.request().has_value());
+  CHECK(backend.request() && backend.request()->source == path);
+  CHECK(backend.request() && backend.request()->expected_archive_digest ==
+        std::optional<pkgimage::complete_archive_digest>(
+            value.incoming.image().receipt().archive_digest()));
+
+  recording_archive_backend absent_backend(value.incoming.image());
+  auto absent = pkgctl::explicit_transaction_effect_archive_source::make(
+      absent_backend, {});
+  CHECK(absent.open_archive(value.incoming) == nullptr);
+  CHECK(absent_backend.calls() == 0U);
+
+  bool duplicate_refused = false;
+  try
+  {
+    (void)pkgctl::explicit_transaction_effect_archive_source::make(
+        backend,
+        {{value.incoming.identity(), path},
+         {value.incoming.identity(), value.temp.path() / "other.pkg.tar"}});
+  }
+  catch (const pkgctl::native_operation_authority_error& problem)
+  {
+    duplicate_refused = problem.code() ==
+        pkgctl::native_operation_authority_error_code::invalid_configuration;
+  }
+  CHECK(duplicate_refused);
+
+  bool relative_refused = false;
+  try
+  {
+    (void)pkgctl::explicit_transaction_effect_archive_source::make(
+        backend, {{value.incoming.identity(), "relative.pkg.tar"}});
+  }
+  catch (const pkgctl::native_operation_authority_error& problem)
+  {
+    relative_refused = problem.code() ==
+        pkgctl::native_operation_authority_error_code::invalid_configuration;
+  }
+  CHECK(relative_refused);
+}
+
+
 } // namespace
 
 int main()
@@ -4961,6 +5429,9 @@ int main()
   check_durable_operation_execution();
   check_durable_operation_reconciliation();
   check_run_authority_rehydration();
+  check_native_operation_authority_source();
+  check_native_incoming_operation_authority_source();
+  check_explicit_transaction_effect_archive_source();
   check_native_effect_archive_source();
   check_native_effect_driver_source();
   check_native_effect_recovery_source();

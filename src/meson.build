@@ -27,6 +27,7 @@ pkgctl_core = static_library(
     'run_locator.cpp',
     'run_native.cpp',
     'run_nonce.cpp',
+    'run_operation.cpp',
     'run_admit.cpp',
     'run_authority.cpp',
     'run_advance.cpp',

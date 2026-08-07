@@ -10,6 +10,35 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+# NATIVE OPERATION AUTHORITY
+
+Version 0.33.0 implements one native operation execution and recovery source
+for an exact sealed transaction. A replayable per-dispatch source supplies the
+current action's target context, application execution control, planner
+observations and policy, runtime closure, explicit lifecycle execution order,
+and installation reason where required. Fixed configuration supplies lifecycle
+coordinates and credentials.
+
+Fresh authority consumes the exact current progress and predecessor
+construction and uses the existing preparation boundary. The effect boundary
+validates that the supplied lifecycle order contains exactly the nodes attached
+to the action by transaction phase edges; deterministic graph storage does not
+become execution precedence. The source then admits deterministic lifecycle
+sessions beneath the stable run-journal and dispatch identities. It issues one domain-separated mechanical effect-attempt
+nonce for the exact durable head. Restart reconstructs the same session, loads
+the exact active effect record, obtains subordinate semantic bodies from their
+owner, and invokes the canonical effect checkpoint validator.
+
+An explicit replayable archive source maps one admitted incoming authority to
+one absolute retained path and opens it through a caller-selected *libpkgimage*
+backend with the authority's exact complete-archive digest. It performs no
+archive discovery or filename inference.
+
+This boundary performs no filesystem mutation, target observation, lifecycle or
+application execution, effect-journal append, canonical-state read,
+publication, backend selection, credential discovery, retry, scheduling, or
+command actuation. The command surface remains read-only.
+
 # EXACT PROGRESS REHYDRATION
 
 Version 0.32.0 implements one store-backed

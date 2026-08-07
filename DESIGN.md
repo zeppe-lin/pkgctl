@@ -13,6 +13,48 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.33.0 native operation authority boundary
+
+Operation authority is now one exact translation from sealed transaction and
+current progress into an admitted effect session. It is not a new planner,
+application model, archive catalog, target observer, or executor:
+
+```text
+sealed transaction + exact progress + reserved dispatch
+             + replayable operation specification
+             + fixed lifecycle configuration
+                              |
+                 existing preparation authorities
+                              |
+             exact effect request + admitted lifecycle sessions
+                              |
+            fresh attempt nonce or exact restart checkpoint
+```
+
+One replayable specification is requested for the exact current dispatch and
+must name that action and operation kind. This avoids freezing future target
+observations across state-changing actions. Incoming operations require the
+exact successful predecessor construction already retained in progress. The
+specification also supplies explicit lifecycle execution order. The existing
+effect boundary validates that this order contains exactly the lifecycle nodes
+attached to the action by transaction phase edges; deterministic graph storage
+is not execution precedence. Executable lifecycle nodes come only from
+`libpkgapply-exec`. Paths are deterministic children of the stable run journal
+and dispatch identities, so fresh and restarted acquisition reproduce one
+session without touching the filesystem.
+
+Restart authority loads only the exact effect attempt retained by the run. The
+effect journal remains control memory: lifecycle results, application receipts,
+publication values, and an optional application journal are supplied by their
+owner and validated by the existing checkpoint constructor. A separate explicit
+archive map binds one incoming authority to one retained path and opens it under
+its already admitted complete-archive digest.
+
+This release does not observe or mutate a target, execute lifecycle or
+application work, append a journal, read canonical state, select backends,
+discover paths or credentials, retry, schedule, or expose a command. Target and
+runtime composition remains the next boundary.
+
 ## Release 0.32.0 exact progress-rehydration boundary
 
 Durable run records retain controller ownership and terminal identities, not a

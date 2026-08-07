@@ -156,6 +156,7 @@ if not get_option('tests').disabled()
     'run_locator.h',
     'run_native.h',
     'run_nonce.h',
+    'run_operation.h',
     'run_reconcile.h',
     'run_recovery.h',
     'run_progress.h',
@@ -244,6 +245,13 @@ if not get_option('tests').disabled()
   test(
     'run-driver-source-contract',
     run_driver_source_contract,
+    args: [meson.project_source_root()],
+  )
+
+  run_operation_contract = find_program('check_run_operation_contract.sh')
+  test(
+    'run-operation-contract',
+    run_operation_contract,
     args: [meson.project_source_root()],
   )
 
