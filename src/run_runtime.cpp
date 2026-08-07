@@ -580,7 +580,8 @@ public:
         sessions_(configuration_.sessions(), authorities.installed_packages),
         operations_(
             configuration_.operations(), authorities.operation_specifications,
-            effects_, authorities.effect_restart_bodies),
+            effects_, authorities.effect_restart_bodies,
+            authorities.operation_sessions),
         owned_archives_(authorities.archives == nullptr
                 ? std::make_unique<explicit_transaction_effect_archive_source>(
                       explicit_transaction_effect_archive_source::make(

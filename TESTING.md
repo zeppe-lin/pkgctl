@@ -18,7 +18,10 @@ The final command suite must prove:
 - native check execution resets the exact call-scoped temporary host resource
   and prepares `/tmp/home` before entering `libpkgcheck-exec`, while the
   caller-owned execution root view remains untouched;
-- target observations are per-dispatch, ordinary runtime dependencies use the
+- target observations are per-dispatch; fresh operation observations are
+  retained before effect/run journals can name the admitted session, while
+  started or completed replay reloads that exact body by attempt-session and
+  performs no fresh target observation; ordinary runtime dependencies use the
   transitive resolver run-scope closure, and lifecycle execution capabilities do
   not become target-mutation identities;
 - one invocation executes no more than `--max-steps`, with no implicit loop,

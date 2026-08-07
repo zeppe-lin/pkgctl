@@ -54,10 +54,17 @@ journal records its identity. Application intent uses the direct
 `libpkgapply-posix` active-request index, so recovery needs no directory scan or
 controller-owned application format.
 
-The live operation authority observes only the exact current dispatch. Runtime
-dependency identity is the transitive resolver run-scope closure rooted at the
-acted package, not transaction SCC-cohort storage. Application target identity
-and lifecycle process capability remain independent authority domains.
+The live operation authority observes the target only for a fresh exact current
+dispatch. Before an admitted operation session can be named by either effect or
+run journal, the command immutably retains that session's exact target
+observation set. Started and completed operation replay selects the body by the
+run-retained attempt-session identity and never re-observes a target already
+mutated by that operation. This remains per-dispatch authority: future reserved
+operations receive fresh observations rather than a transaction-wide frozen
+snapshot. Runtime dependency identity is the transitive resolver run-scope
+closure rooted at the acted package, not transaction SCC-cohort storage.
+Application target identity and lifecycle process capability remain independent
+authority domains.
 
 The runtime hierarchy is explicit and existing-only. The command creates no
 store or workspace namespace, discovers no journal, loops no more than the

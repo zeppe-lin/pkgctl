@@ -160,6 +160,25 @@ public:
       const transaction_dispatch& dispatch) = 0;
 };
 
+/*! \brief Durable owner for one admitted operation specification binding.
+ *
+ * Fresh operation authority may depend on live target facts that cannot be
+ * reproduced after the operation mutates that target. The owner therefore
+ * receives the exact specification together with the admitted session before
+ * any effect-attempt or run journal is allowed to reference the session.
+ */
+class transaction_operation_session_sink {
+public:
+  virtual ~transaction_operation_session_sink() = default;
+
+  virtual void retain(
+      const transaction_run_journal_record& record,
+      const transaction_progress& progress,
+      const transaction_dispatch& dispatch,
+      const native_transaction_operation_specification& specification,
+      const effectful_operation_session& session) = 0;
+};
+
 /*! \brief Exact subordinate values retained outside the effect journal. */
 struct transaction_effect_restart_bodies final {
   std::vector<pkgapply_exec::lifecycle_execution_result> before;
@@ -189,7 +208,8 @@ public:
       native_transaction_operation_configuration configuration,
       transaction_operation_specification_source& specifications,
       effect_journal_store& effects,
-      transaction_effect_restart_body_source& bodies);
+      transaction_effect_restart_body_source& bodies,
+      transaction_operation_session_sink* sessions = nullptr);
 
   [[nodiscard]] operation_dispatch_execution_authority operation(
       const transaction_run_journal_record& record,
@@ -212,7 +232,8 @@ private:
   [[nodiscard]] effectful_operation_session session(
       const transaction_run_journal_record& record,
       const transaction_progress& progress,
-      const transaction_dispatch& dispatch) const;
+      const transaction_dispatch& dispatch,
+      bool retain) const;
 
   [[nodiscard]] effect_restart_checkpoint checkpoint(
       effectful_operation_session session,
@@ -222,6 +243,7 @@ private:
   transaction_operation_specification_source& specifications_;
   effect_journal_store& effects_;
   transaction_effect_restart_body_source& bodies_;
+  transaction_operation_session_sink* sessions_;
 };
 
 /*! \brief Caller-retained pathname for one exact incoming authority. */

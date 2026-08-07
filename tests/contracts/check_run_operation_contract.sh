@@ -19,6 +19,7 @@ done
 for required in \
   'class native_transaction_operation_configuration final' \
   'class transaction_operation_specification_source' \
+  'class transaction_operation_session_sink' \
   'class transaction_effect_restart_body_source' \
   'class native_transaction_operation_authority_source final' \
   'public transaction_operation_execution_authority_source' \
@@ -47,6 +48,8 @@ for required_test in \
   'explicit_lifecycle_order' \
   'incomplete_lifecycle_specifications' \
   'fresh.session.identity() == repeated.session.identity()' \
+  'recording_operation_session_sink' \
+  'sessions.calls() == 2U' \
   '!std::filesystem::exists(authority_root)' \
   'effect_attempt_missing' \
   'planning_refused' \

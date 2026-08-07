@@ -26,10 +26,14 @@
   retained installed-package trees. Every runtime namespace must already
   exist. The command initializes, enumerates, discovers, repairs, cleans, or
   garbage-collects none of them.
-- Observes the target only for the current operation dispatch, derives ordinary
-  runtime dependencies from the exact transitive resolver run-scope closure,
-  and keeps application mutation identity separate from lifecycle execution
-  capability identity.
+- Observes the target only for a fresh current operation dispatch and immutably
+  retains the exact observation set before effect/run journals can name the
+  admitted session. Started and completed replay reload that body by the
+  run-retained attempt-session identity instead of re-observing a target the
+  operation may already have mutated. Future reserved operations still receive
+  fresh observations. Ordinary runtime dependencies come from the exact
+  transitive resolver run-scope closure, and application mutation identity stays
+  separate from lifecycle execution capability identity.
 - Adds no daemon, scheduler, timer, implicit retry, unbounded run loop,
   automatic rollback, journal discovery, ambient configuration, or hidden
   replanning. Step-limit completion is successful and explicitly resumable;

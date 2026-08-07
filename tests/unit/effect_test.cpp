@@ -5068,6 +5068,46 @@ pkgplan::target_observation_set removal_observations(
       std::move(paths));
 }
 
+class recording_operation_session_sink final
+    : public pkgctl::transaction_operation_session_sink {
+public:
+  void retain(
+      const pkgctl::transaction_run_journal_record& record,
+      const pkgctl::transaction_progress& progress,
+      const pkgctl::transaction_dispatch& dispatch,
+      const pkgctl::native_transaction_operation_specification& specification,
+      const pkgctl::effectful_operation_session& session) override
+  {
+    ++calls_;
+    record_ = record.identity();
+    progress_ = progress.identity();
+    dispatch_ = dispatch.identity();
+    observation_ = specification.observations().identity();
+    session_ = session.identity();
+  }
+
+  std::size_t calls() const noexcept { return calls_; }
+  const std::optional<pkgctl::session_identity>& record() const noexcept
+  { return record_; }
+  const std::optional<pkgctl::session_identity>& progress() const noexcept
+  { return progress_; }
+  const std::optional<pkgctl::session_identity>& dispatch() const noexcept
+  { return dispatch_; }
+  const std::optional<pkgplan::observation_set_identity>&
+  observation() const noexcept
+  { return observation_; }
+  const std::optional<pkgctl::session_identity>& session() const noexcept
+  { return session_; }
+
+private:
+  std::size_t calls_ = 0U;
+  std::optional<pkgctl::session_identity> record_;
+  std::optional<pkgctl::session_identity> progress_;
+  std::optional<pkgctl::session_identity> dispatch_;
+  std::optional<pkgplan::observation_set_identity> observation_;
+  std::optional<pkgctl::session_identity> session_;
+};
+
 class fixed_operation_specification_source final
     : public pkgctl::transaction_operation_specification_source {
 public:
@@ -5135,12 +5175,14 @@ void check_native_operation_authority_source()
   const auto authority_root = value.temp.path() / "native-operation-authority";
   memory_effect_journal_store effects;
   empty_restart_body_source bodies;
+  auto observations = removal_observations(value, 80U, true);
+  const auto observation_identity = observations.identity();
   fixed_operation_specification_source specifications(
-      removal_specification(
-          value, removal_observations(value, 80U, true)));
+      removal_specification(value, std::move(observations)));
+  recording_operation_session_sink sessions;
   pkgctl::native_transaction_operation_authority_source source(
       removal_configuration(value, authority_root), specifications,
-      effects, bodies);
+      effects, bodies, &sessions);
 
   auto run = pkgctl::transaction_run::begin(
       pkgctl::transaction_progress::begin(value.transaction),
@@ -5170,6 +5212,20 @@ void check_native_operation_authority_source()
   CHECK(specifications.dispatch() ==
         std::optional<pkgctl::session_identity>(
             reservation.dispatch->identity()));
+  CHECK(sessions.calls() == 2U);
+  CHECK(sessions.record() ==
+        std::optional<pkgctl::session_identity>(reserved.identity()));
+  CHECK(sessions.progress() ==
+        std::optional<pkgctl::session_identity>(
+            reservation.run.progress().identity()));
+  CHECK(sessions.dispatch() ==
+        std::optional<pkgctl::session_identity>(
+            reservation.dispatch->identity()));
+  CHECK(sessions.observation() ==
+        std::optional<pkgplan::observation_set_identity>(
+            observation_identity));
+  CHECK(sessions.session() ==
+        std::optional<pkgctl::session_identity>(fresh.session.identity()));
   CHECK(fresh.session.request().identity() == effect_request(value).identity());
   CHECK(fresh.session.before().size() == value.before.size());
   CHECK(fresh.session.after().size() == value.after.size());
@@ -5191,6 +5247,7 @@ void check_native_operation_authority_source()
   CHECK(recovered.record().identity() == started.effect_attempt.identity());
   CHECK(bodies.calls() == 1U);
   CHECK(specifications.calls() == 3U);
+  CHECK(sessions.calls() == 2U);
   CHECK(specifications.record() ==
         std::optional<pkgctl::session_identity>(started_record.identity()));
   CHECK(bodies.session() ==

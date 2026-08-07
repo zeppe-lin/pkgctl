@@ -399,9 +399,11 @@ native_transaction_operation_authority_source(
     native_transaction_operation_configuration configuration,
     transaction_operation_specification_source& specifications,
     effect_journal_store& effects,
-    transaction_effect_restart_body_source& bodies)
+    transaction_effect_restart_body_source& bodies,
+    transaction_operation_session_sink* sessions)
     : configuration_(std::move(configuration)),
-      specifications_(specifications), effects_(effects), bodies_(bodies)
+      specifications_(specifications), effects_(effects), bodies_(bodies),
+      sessions_(sessions)
 {
 }
 
@@ -409,7 +411,8 @@ effectful_operation_session
 native_transaction_operation_authority_source::session(
     const transaction_run_journal_record& record,
     const transaction_progress& progress,
-    const transaction_dispatch& dispatch) const
+    const transaction_dispatch& dispatch,
+    bool retain) const
 {
   if (record.transaction() != configuration_.transaction().identity() ||
       progress.transaction().identity() !=
@@ -458,8 +461,11 @@ native_transaction_operation_authority_source::session(
         dispatch.unit().primary_node(), prepared.effect()->lifecycle().after(),
         configuration_.lifecycle(),
         base / "after");
-    return effectful_operation_session::admit(
+    auto admitted = effectful_operation_session::admit(
         *prepared.effect(), std::move(before), std::move(after));
+    if (retain && sessions_ != nullptr)
+      sessions_->retain(record, progress, dispatch, specification, admitted);
+    return admitted;
   }
   catch (const native_operation_authority_error&)
   {
@@ -483,7 +489,7 @@ native_transaction_operation_authority_source::operation(
     throw native_operation_authority_error(
         native_operation_authority_error_code::transaction_mismatch,
         "native operation authority was supplied for another durable run");
-  auto value = session(record, run.progress(), dispatch);
+  auto value = session(record, run.progress(), dispatch, true);
   auto nonce = operation_nonce(record, run, dispatch, value);
   return {std::move(value), std::move(nonce)};
 }
@@ -502,7 +508,7 @@ native_transaction_operation_authority_source::operation(
         "restart assessment does not identify one operation attempt");
 
   auto value = session(
-      checkpoint.record(), checkpoint.run().progress(), dispatch);
+      checkpoint.record(), checkpoint.run().progress(), dispatch, false);
   const auto record = effects_.load_latest(*assessment.effect_attempt());
   if (!record)
     throw native_operation_authority_error(
@@ -524,7 +530,7 @@ native_transaction_operation_authority_source::rehydrate(
     const transaction_dispatch& dispatch,
     const effect_attempt_record& evidence)
 {
-  auto value = session(record, progress, dispatch);
+  auto value = session(record, progress, dispatch, false);
   if (evidence.session() != value.identity() ||
       evidence.stage() != effect_attempt_stage::terminal)
     throw native_operation_authority_error(

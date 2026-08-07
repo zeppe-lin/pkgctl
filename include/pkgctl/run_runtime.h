@@ -173,6 +173,7 @@ struct native_transaction_run_runtime_authorities final {
   transaction_effect_restart_body_source& effect_restart_bodies;
   transaction_effect_archive_source* archives = nullptr;
   transaction_effect_body_sink* effect_bodies = nullptr;
+  transaction_operation_session_sink* operation_sessions = nullptr;
 };
 
 /*! \brief Explicit selected physical mechanisms for one native runtime. */

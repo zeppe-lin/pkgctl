@@ -26,6 +26,9 @@ for required in \
   'class command_universe_store final' \
   'class private_effect_body_store final' \
   'class live_operation_authority final' \
+  'public transaction_operation_session_sink' \
+  'PKGCTL-OPERATION-OBSERVATIONS-1' \
+  'retained.attempt_session()' \
   'application_journals_.load_active(' \
   'pkgstate::posix::canonical_generation_store::open_existing(' \
   'native_posix_transaction_run_runtime::from_directory_fds(' \
