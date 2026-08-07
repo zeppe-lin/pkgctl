@@ -111,6 +111,27 @@ if not get_option('tests').disabled()
     dependencies: pkgctl_core_dep,
   )
 
+  state_inspect_fixture = executable(
+    'state-inspect-fixture',
+    'fixtures/state_inspect_fixture.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+
+  cpp = meson.get_compiler('cpp')
+  native_interpreter = custom_target(
+    'native-test-interpreter',
+    input: 'fixtures/native_interpreter_x86_64.S',
+    output: 'native-test-interpreter',
+    command: cpp.cmd_array() + [
+      '-nostdlib',
+      '-static',
+      '-Wl,-e,_start',
+      '@INPUT@',
+      '-o',
+      '@OUTPUT@',
+    ],
+  )
+
   cli_readonly_test = find_program('integration/cli_readonly_test.sh')
   test(
     'cli-readonly',

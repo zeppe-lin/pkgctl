@@ -1,0 +1,6 @@
+format: zeppe-lin.profiles/1
+
+profiles:
+  base:
+    members:
+      - package: fixture

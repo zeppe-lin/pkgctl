@@ -33,12 +33,16 @@ for test_source in check_test construction_test dispatch_test run_journal_test r
   "$tmp/$test_source"
 done
 
-for fixture in state_fixture run_store_fixture effect_store_fixture; do
+for fixture in state_fixture state_inspect_fixture run_store_fixture effect_store_fixture; do
   name=$(printf '%s\n' "${fixture%_fixture}" | tr '_' '-')
   # shellcheck disable=SC2086
   "$cxx" $flags "$srcdir/tests/fixtures/$fixture.cpp" $objects $core_libs \
     -o "$tmp/$name-fixture"
 done
+
+"$cxx" -nostdlib -static -Wl,-e,_start \
+  "$srcdir/tests/fixtures/native_interpreter_x86_64.S" \
+  -o "$tmp/native-test-interpreter"
 
 # shellcheck disable=SC2086
 "$cxx" $flags $cli_cflags \
