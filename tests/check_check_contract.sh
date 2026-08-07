@@ -31,7 +31,7 @@ for required in \
   'request.construction().identity()' \
   'session.execution_request()' \
   'pkgcheck_exec::admitted_check_session::admit' \
-  'pkgcheck_exec::prepare'; do
+  'pkgcheck_exec::seal_execution_request'; do
   grep -F "$required" "$header" "$source" "$progression" >/dev/null || {
     echo "missing transaction check contract: $required" >&2
     exit 1
@@ -52,6 +52,7 @@ for forbidden in \
   'pkgapply_exec::execute' \
   'execute_construction(' \
   'prepare_operation(' \
+  'pkgcheck_exec::prepare' \
   'ready_units().front' \
   'pkgmk' \
   'pkgman'; do

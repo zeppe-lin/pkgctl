@@ -287,14 +287,15 @@ transaction_check_session transaction_check_session::admit(
         std::move(resources.package), std::move(resources.inputs),
         std::move(resources.paths), std::move(resources.execution_identity),
         std::move(resources.limits));
-    auto prepared = pkgcheck_exec::prepare(execution_session);
+    auto execution_request =
+        pkgcheck_exec::seal_execution_request(execution_session);
 
     auto identity = make_session_identity(
         "pkgctl/transaction-check-session/1",
-        session_identity_fields(request, execution_session, prepared.request));
+        session_identity_fields(request, execution_session, execution_request));
     return transaction_check_session(
         std::move(request), std::move(execution_session),
-        prepared.request.identity(), std::move(identity));
+        execution_request.identity(), std::move(identity));
   } catch (const pkgcheck_exec::error& problem) {
     throw error(
         error_code::invalid_check_session,
