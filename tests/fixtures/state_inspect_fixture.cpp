@@ -16,7 +16,7 @@ int main(int argc, char** argv)
   const auto store = pkgstate::posix::canonical_generation_store::open_existing(
       argv[1], test_support::binding());
   const auto state = store.read();
-  std::cout << "snapshot " << state.identity().hex() << '\n'
+  std::cout << "snapshot " << state.identity().string() << '\n'
             << "packages " << state.size() << '\n';
   for (const auto& package : state.packages())
   {
