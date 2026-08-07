@@ -164,6 +164,7 @@ if not get_option('tests').disabled()
         'tests/fixtures/native_root_view_fixture.sh',
       ),
     ],
+    depends: native_interpreter,
     suite: 'integration-privileged',
   )
 

@@ -88,6 +88,10 @@ grep -F "suite: 'integration-privileged'" "$tests_meson" >/dev/null || {
   echo 'native mutating CLI test is not isolated as privileged integration' >&2
   exit 1
 }
+grep -F 'depends: native_interpreter' "$tests_meson" >/dev/null || {
+  echo 'privileged CLI integration does not build its native interpreter fixture' >&2
+  exit 1
+}
 grep -F 'PKGCTL_REQUIRE_NATIVE_INTEGRATION' "$integration" >/dev/null || {
   echo 'privileged CLI integration has no release-required mode' >&2
   exit 1

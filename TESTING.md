@@ -208,7 +208,10 @@ PKGCTL_REQUIRE_NATIVE_INTEGRATION=1 \
 
 In that mode capability unavailability is a hard failure, so release automation
 cannot accidentally count a skipped native actuator as proof. The test must pass
-on a context that can establish the complete sealed profile.
+on a context that can establish the complete sealed profile. The generated static
+`native-test-interpreter` is an explicit Meson dependency of this test, so a
+clean build cannot depend on a fixture left behind by an earlier qualification
+run.
 
 Meson exposes `unit`, `integration`, `integration-privileged`, `header`, and
 `contract` suites. `tests/run-direct.sh` is the source-tree qualification path
