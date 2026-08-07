@@ -2544,6 +2544,24 @@ void check_restart_boundaries()
     CHECK(latest && pkgctl::assess_effect_restart(*latest).disposition() ==
                         pkgctl::effect_restart_disposition::
                             external_resolution_required);
+    CHECK(actuator.lifecycle_results().size() == 1U);
+    if (latest && actuator.lifecycle_results().size() == 1U)
+    {
+      bool refused_historical_application_journal = false;
+      try
+      {
+        (void)pkgctl::effect_restart_checkpoint::make(
+            session, *latest,
+            {actuator.lifecycle_results().front()}, value.receipt, {},
+            std::nullopt, std::nullopt, application_restart_journal(value));
+      }
+      catch (const pkgctl::error& failure)
+      {
+        refused_historical_application_journal =
+            failure.code() == pkgctl::error_code::invalid_effect_session;
+      }
+      CHECK(refused_historical_application_journal);
+    }
   }
 }
 
