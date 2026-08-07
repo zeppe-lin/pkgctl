@@ -20,6 +20,7 @@ case $interpreter in
     ;;
 esac
 fixture_collection=$5
+root_view_fixture=$6
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-run.XXXXXX")
 cleanup()
 {
@@ -186,6 +187,26 @@ done
 initial_state=$($state_inspect_fixture "$state")
 printf '%s\n' "$initial_state" >"$root/initial-state.out"
 require_contains initial-state "$root/initial-state.out" 'packages 0'
+
+broken_build=$root/broken-build
+mkdir "$broken_build"
+build=$broken_build
+broken_nonce=$(printf '%064d' 8)
+capture_run malformed-root 1 --start "$broken_nonce" 1
+require_contains malformed-root "$root/malformed-root.out" \
+  'disposition stopped-after-failure'
+require_contains malformed-root "$root/malformed-root.out" 'durable-steps 1'
+require_contains malformed-root "$root/malformed-root.out" 'failed yes'
+require_contains malformed-root-stderr "$root/malformed-root.err" \
+  'pkgctl: construction failed:'
+require_contains malformed-root-stderr "$root/malformed-root.err" \
+  'open root resource destination'
+require_equal malformed-root-state "$initial_state" \
+  "$($state_inspect_fixture "$state")"
+require_absent malformed-root-target "$target/usr/bin/pkgctl-fixture"
+
+build=$root/build
+"$root_view_fixture" "$build"
 
 run_nonce=$(printf '%064d' 1)
 capture_run start 0 --start "$run_nonce" 1

@@ -17,3 +17,9 @@ root.
 
 The C++ fixture executables create or inspect owner-defined durable formats;
 they do not duplicate those formats in shell.
+
+`native_root_view_fixture.sh` creates only the stable logical mount
+destinations required by the native build, check, and lifecycle adapters. The
+root view itself remains caller-owned fiction: the production Linux backend is
+expected to reject missing destinations rather than silently populate them.
+Scenario-specific dependency input leaves are not invented by this fixture.

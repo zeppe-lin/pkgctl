@@ -60,7 +60,8 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
 "$srcdir/tests/integration/cli_run_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" \
-  "$srcdir/tests/fixtures/collections/simple-install"
+  "$srcdir/tests/fixtures/collections/simple-install" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
 for header in "$srcdir"/include/pkgctl/*.h; do
   base=$(basename "$header")
