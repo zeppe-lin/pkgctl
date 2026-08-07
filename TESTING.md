@@ -148,6 +148,30 @@ The shared-session suite must prove:
 
 # pkgctl testing
 
+## Qualification roles
+
+The test tree separates four kinds of evidence instead of treating every test
+program or shell script as interchangeable:
+
+- `tests/unit/` contains in-process semantic and model tests. These should carry
+  combinatorial state-machine and authority edge cases without pretending to be
+  operator-boundary qualification.
+- `tests/fixtures/` contains deterministic fiction and helper executables used
+  only to establish test authority. A fixture is not a production backend and
+  must not replace the production path under test.
+- `tests/integration/` invokes the built `pkgctl` executable through its actual
+  command-line boundary and verifies observable durable state, target effects,
+  restart behavior, output, and exit status. Help-text greps are discoverability
+  checks, not substitutes for these tests.
+- `tests/contracts/` rejects source, dependency, boundary, release, and test-layout
+  drift. Contract tests may prove forbidden structure, but do not stand in for
+  successful runtime behavior.
+
+Meson exposes the corresponding `unit`, `integration`, `header`, and `contract`
+suites. `tests/run-direct.sh` is the source-tree qualification path and must link
+the complete current CLI, including command-only dependencies, before invoking
+the integration and contract layers.
+
 ## Release 0.29.0 recovery qualification
 
 The evidence-backed recovery suite must prove:
@@ -280,8 +304,8 @@ Every release must establish:
 - exact terminal effect-result identity after journal rehydration, independent
   of argument evaluation order;
 - no driver or run append when effect restart requires external resolution;
-- proof that all exposed CLI commands remain read-only, including exact run and
-  effect inspection;
+- proof that read-only CLI commands remain sensors, `run` remains the sole
+  effect-implying frontend, and exact run/effect inspection performs no mutation;
 - release, source, manual, shell, and patch-hygiene contracts.
 - caller-configured POSIX transaction runtimes duplicate and retain exact run,
   effect, and target-lock directory authorities while borrowing semantic,

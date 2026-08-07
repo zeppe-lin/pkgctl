@@ -13,11 +13,12 @@ for compiler in g++ clang++; do
   CXX="$compiler" "$srcdir/tests/run-direct.sh"
 done
 
-for script in "$srcdir"/ci/*.sh "$srcdir"/tests/*.sh; do
+find "$srcdir/ci" "$srcdir/tests" -type f -name '*.sh' -print |
+while IFS= read -r script; do
   sh -n "$script"
 done
 
-"$srcdir/tests/check_release_metadata.sh" "$srcdir"
+"$srcdir/tests/contracts/check_release_metadata.sh" "$srcdir"
 
 git -C "$srcdir" diff --check
 git -C "$srcdir" show --check --oneline HEAD >/dev/null
