@@ -1,3 +1,35 @@
+## 0.32.0 - 2026-08-07
+
+### Exact transaction-progress rehydration
+
+- Adds one production `transaction_progress_rehydration_source` that begins from
+  the sealed transaction and replays only completed durable dispatches when
+  their exact graph unit becomes ready. Reserved, started, released, and
+  indeterminate ownership never becomes semantic progress.
+- Selects construction and check evidence by exact run journal, dispatch, and
+  attempt identities, then decodes it through the existing owner codecs under
+  caller-supplied complete semantic bodies. Durable identities are never
+  promoted into requests, materializations, backend profiles, or results.
+- Rehydrates completed operations only from an exact terminal effect record and
+  a validated checkpoint. The pure terminal path performs no continuation,
+  journal append, target observation, publication, or retry.
+- Advances successful operation state through the state owner's pure
+  `project_publication_request()` projection rather than duplicating package
+  delta semantics or reopening canonical storage.
+- Requires the reconstructed progress identity, current state epoch, completion,
+  and failure flags to reproduce the durable run record exactly. Missing,
+  foreign, contradictory, or graph-unresolvable evidence fails closed.
+- Adds no operation-execution authority, replayable archive provider, backend or
+  credential composition, run-intent policy, scheduler, retry loop, repair, or
+  mutating command. The next closure is native operation/effect-recovery
+  authority over the existing effect boundary.
+
+### Dependency contract
+
+- libpkgstate >= 3.1.0, < 4.0.0
+- libpkgbuild-exec >= 2.2.0, < 3.0.0
+- libpkgcheck-exec >= 0.4.0, < 1.0.0
+
 ## 0.31.0 - 2026-08-07
 
 ### Native construction/check session locator

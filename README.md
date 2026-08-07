@@ -6,26 +6,31 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Release 0.31.0 supplies the first native implementation of the shared
-construction/check session authority. One private deterministic locator derives
-exact admitted sessions from the retained transaction, progress, durable run
-journal, dispatch, explicit native roots and policy, and a caller-owned retained
-installed-package tree source.
+Release 0.32.0 supplies exact semantic transaction-progress rehydration.
+One store-backed source begins from the sealed transaction, selects only
+completed dispatch history, and replays each terminal fact when its graph unit
+becomes ready. Construction and check evidence is selected by exact journal,
+dispatch, and attempt identities and decoded through the existing owner codecs
+under caller-owned complete bodies. Completed operations reopen only from exact
+terminal effect evidence.
 
-Catalog source paths are accepted only when the retained recipe coordinate is
-directly corroborated by the exact acquisition specification. Catalog-selected
-build inputs reuse successful predecessor construction resources; installed
-inputs borrow one exact retained tree. Construction and check paths are derived
-from stable journal and dispatch identities. The locator performs no filesystem
-observation or mutation, source materialization, backend construction,
-execution, journal I/O, or progress advancement.
+Successful publication advances the immutable state epoch through
+`libpkgstate::project_publication_request()`. The controller neither copies
+state-delta rules nor reads canonical storage to reconstruct a historical
+epoch. Reserved, started, released, and indeterminate dispatches remain control
+ownership rather than semantic facts. The reconstructed progress identity,
+current state, completion, and failure state must reproduce the durable run
+record exactly.
 
-Checks reuse the exact source, package-output, and package-input resources
-retained by successful construction. The staged source path comes from the
-build adapter's pure path projection rather than copied private path vocabulary.
-The command surface remains read-only. Exact progress rehydration, operation
-execution authority, replayable archive lookup, final target/runtime
-composition, and run-intent command policy remain subsequent bounded closures.
+The implementation performs no execution, continuation, append, publication,
+retry, repair, target observation, or filesystem mutation. Operation execution
+authority, replayable archive lookup, final target/runtime composition, and one
+narrow mutating command remain the next bounded releases.
+
+Release 0.31.0 supplies the first native implementation of the shared construction/check session authority.
+It derives exact admitted sessions from retained transaction, progress, journal,
+dispatch, explicit roots and policy, and retained predecessor or installed
+package resources without filesystem observation or mutation.
 
 Release 0.29.0 closes the semantic half of construction/check restart
 recovery without moving authority into the durable store. The runtime selects
@@ -554,7 +559,7 @@ selected durable journal, and destructive convergence choice is explicit.
 `--converge-exact`. The inspection commands open only the exact existing store
 and identity supplied by the caller.
 
-There are no effect-implying CLI commands in 0.31.0. The command frontend
+There are no effect-implying CLI commands in 0.32.0. The command frontend
 executes no source acquisition, build, check, planner, lifecycle, application,
 publication, restart, reconciliation, or repair authority. The library can
 execute or reconcile one caller-selected dispatch only through injected drivers,

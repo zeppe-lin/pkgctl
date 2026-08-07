@@ -1,3 +1,23 @@
+## Release 0.32.0 exact progress-rehydration qualification
+
+The progress suite proves that an admitted or ownership-only history performs no
+evidence lookup and reproduces the initial progress exactly. Completed
+construction evidence is selected by exact journal, dispatch, and attempt,
+decoded under caller-owned bodies, and reproduces the same progress after store
+reopen. Missing evidence fails with a typed error before context authority is
+consulted.
+
+The effect suite proves that an exact terminal checkpoint can reconstruct the
+canonical operation result without appending, continuing, observing state, or
+publishing. A completed operation history then reproduces the exact progress
+and resulting state while leaving the effect journal unchanged. Source
+contracts reject execution, resume, append, publication, canonical-state reads,
+and filesystem effects from the progress provider.
+
+The state-owner qualification independently tests install, replacement, and
+removal projection plus stale and foreign authority refusal. Strict compilation
+and release contracts require libpkgstate 3.1.0 or later.
+
 ## Release 0.31.0 native locator qualification
 
 The native locator suite must prove:

@@ -13,6 +13,44 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.32.0 exact progress-rehydration boundary
+
+Durable run records retain controller ownership and terminal identities, not a
+second semantic package model. The production rehydrator reconstructs one exact
+`transaction_progress` by replaying completed durable dispatches over the
+sealed transaction graph:
+
+```text
+sealed transaction + completed run history
+                    |
+        exact typed evidence selection
+          /          |          \
+ construction      check      terminal effect
+ owner codec       owner codec   checkpoint
+          \          |          /
+            graph-ordered progress replay
+                    |
+       exact durable progress/state identity
+```
+
+Construction and check records are selected by journal, dispatch, and attempt
+identity. Their complete semantic bodies remain caller authority and are
+validated before the existing canonical decoders run. Operation history must
+name one exact terminal effect record; pure terminal reconstruction cannot
+continue physical work or consult a target. Successful state transition uses
+the public pure `libpkgstate` publication projection.
+
+Only completed dispatches become facts. Reserved, started, released, or
+nonterminal effect records remain unresolved control history. Replay follows the
+transaction graph rather than journal vector order, and the final progress
+identity, current-state epoch, complete flag, and failed flag must equal the
+durable record. Any missing, foreign, contradictory, or unresolvable evidence
+fails closed.
+
+This release closes historical semantic reconstruction only. It adds no fresh
+operation authority, archive lookup, backend composition, retry, repair, target
+profile, run-intent policy, or command actuation.
+
 ## Release 0.31.0 native session/resource locator boundary
 
 The shared session seam now has one native controller-private implementation.

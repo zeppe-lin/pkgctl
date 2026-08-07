@@ -21,7 +21,7 @@ for command in \
     exit 1
   }
 done
-grep -F 'There are no effect-implying CLI commands in 0.31.0.' \
+grep -F 'There are no effect-implying CLI commands in 0.32.0.' \
   "$readme" >/dev/null
 for obsolete in \
   'The executable still exposes only:' \
@@ -101,7 +101,7 @@ grep -F 'Version 0.28.0 commits construction and check evidence' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'NATIVE CONSTRUCTION AND CHECK SESSION LOCATION' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
-grep -F 'Version 0.31.0 implements one private native' \
+grep -F 'Version 0.32.0 implements one store-backed' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Exact transaction-progress rehydration is the next' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null

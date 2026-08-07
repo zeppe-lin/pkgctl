@@ -10,6 +10,23 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+# EXACT PROGRESS REHYDRATION
+
+Version 0.32.0 implements one store-backed
+*transaction_progress_rehydration_source*. It begins from the sealed
+transaction and replays only completed durable dispatches when their exact graph
+unit becomes ready. Construction and check records are selected by journal,
+dispatch, and attempt identity and decoded by their owning codecs under
+caller-supplied complete bodies. Completed operations require one exact terminal
+effect record and validated checkpoint.
+
+Successful operation state is derived by the pure *libpkgstate* publication
+projection. Rehydration does not read canonical state, continue execution,
+append journals, publish, retry, repair, scan paths, or mutate the target.
+Reserved, started, released, and nonterminal histories remain unresolved control
+ownership. The final semantic progress and state epoch must reproduce the durable
+run record exactly.
+
 # READ-ONLY PIPELINE
 
 Version 0.21.0 retains the read-only command pipeline introduced in 0.2.0:
