@@ -214,6 +214,17 @@ enabled and an explicit Meson dependency of this test. Clean qualification can
 therefore run tests without a rebuild step and cannot depend on a fixture left
 behind by an earlier build tree.
 
+`pkgctl:cli-run-removal` extends that same privileged boundary through exact
+convergence. It first establishes one real installed package, then composes a
+build-only goal with `--converge-exact` and requires an explicit removal node.
+The run must remove the target object, publish package absence, and retain a
+terminal operation effect with completed application evidence whose operation
+dispatch names that exact removal node. The mutable source collection is then
+removed and a repeated resume must consume retained run authority, perform zero
+durable steps, and leave both target and state unchanged. This is
+controller/application/state composition evidence; it does not replace the
+lower semantic, POSIX, or publication-adapter suites.
+
 Meson exposes `unit`, `integration`, `integration-privileged`, `header`, and
 `contract` suites. `tests/run-direct.sh` is the source-tree qualification path
 and must link the complete current CLI, including command-only dependencies,

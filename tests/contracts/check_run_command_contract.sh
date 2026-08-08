@@ -10,8 +10,10 @@ main="$srcdir/cli/main.cpp"
 meson="$srcdir/cli/meson.build"
 tests_meson="$srcdir/tests/meson.build"
 integration="$srcdir/tests/integration/cli_run_test.sh"
+removal_integration="$srcdir/tests/integration/cli_run_removal_test.sh"
 
-for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration"; do
+for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration" \
+            "$removal_integration"; do
   [ -s "$file" ] || {
     echo "missing bounded transaction command source: $file" >&2
     exit 1
@@ -84,6 +86,10 @@ grep -F "'cli-run'" "$tests_meson" >/dev/null || {
   echo 'bounded run command has no process-level integration test' >&2
   exit 1
 }
+grep -F "'cli-run-removal'" "$tests_meson" >/dev/null || {
+  echo 'bounded run command has no removal process-level integration test' >&2
+  exit 1
+}
 grep -F "suite: 'integration-privileged'" "$tests_meson" >/dev/null || {
   echo 'native mutating CLI test is not isolated as privileged integration' >&2
   exit 1
@@ -153,6 +159,23 @@ for required_test in \
   'durable-steps 0'; do
   grep -F "$required_test" "$integration" >/dev/null || {
     echo "missing process-level run qualification: $required_test" >&2
+    exit 1
+  }
+done
+
+for required_removal_test in \
+  '--converge-exact' \
+  "--goal 'build=fixture'" \
+  'action=remove' \
+  'rm -rf "$collection"' \
+  'effect.application-outcome=completed' \
+  'effect.application-completed-evidence=' \
+  'effect.publication-outcome=published' \
+  'effect.terminal-outcome=completed' \
+  'packages 0' \
+  'durable-steps 0'; do
+  grep -F -- "$required_removal_test" "$removal_integration" >/dev/null || {
+    echo "missing process-level removal qualification: $required_removal_test" >&2
     exit 1
   }
 done

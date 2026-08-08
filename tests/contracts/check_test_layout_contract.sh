@@ -33,6 +33,7 @@ for path in \
   'fixtures/state_fixture.cpp' \
   'fixtures/native_root_view_fixture.sh' \
   'integration/cli_readonly_test.sh' \
+  'integration/cli_run_removal_test.sh' \
   'contracts/check_test_layout_contract.sh'; do
   grep -F "$path" "$meson" "$srcdir/tests/run-direct.sh" >/dev/null || {
     echo "qualification wiring omits categorized test source: $path" >&2
