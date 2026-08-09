@@ -25,6 +25,11 @@ The final command suite must prove:
   performs no fresh target observation; ordinary runtime dependencies use the
   transitive resolver run-scope closure, and lifecycle execution capabilities do
   not become target-mutation identities;
+- operation preparation preserves caller-owned normalized path policy through
+  real upgrade planning into the sealed application request; a protected
+  incoming path can retain observed state, stage the incoming object for
+  reconciliation, and relinquish operated-package ownership without the
+  controller inventing or rewriting policy;
 - one invocation executes no more than `--max-steps`, with no implicit loop,
   sleep, retry, scheduler, repair, rollback, cleanup, compaction, or discovery;
 - the existing read-only commands remain byte-stable sensors;

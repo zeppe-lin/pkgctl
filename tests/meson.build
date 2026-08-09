@@ -16,6 +16,13 @@ if not get_option('tests').disabled()
   )
   test('construction', construction_test, suite: 'unit')
 
+  preparation_policy_test = executable(
+    'preparation-policy-test',
+    'unit/preparation_policy_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('preparation-policy', preparation_policy_test, suite: 'unit')
+
   dispatch_test = executable(
     'dispatch-test',
     'unit/dispatch_test.cpp',

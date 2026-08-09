@@ -193,7 +193,8 @@ inline Identity fixture_state_identity(std::uint8_t value)
 inline pkgstate::installed_package installed_package(
     const pkgsource::source_snapshot& source,
     pkgstate::state_target_binding binding,
-    std::uint8_t seed = 30U)
+    std::uint8_t seed = 30U,
+    std::vector<pkgstate::owned_entry> manifest = {})
 {
   const auto& recipe = source.recipe();
   std::vector<pkgstate::architecture_reference> declared_build;
@@ -247,7 +248,7 @@ inline pkgstate::installed_package installed_package(
               seed + 12U)));
   return pkgstate::installed_package::make(
       pkgstate::installation_receipt::make(
-          std::move(control), std::move(binding), {},
+          std::move(control), std::move(binding), std::move(manifest),
           fixture_state_identity<pkgstate::operation_plan_identity>(
               seed + 13U),
           fixture_state_identity<pkgstate::application_evidence_identity>(
@@ -297,7 +298,9 @@ inline pkgctl::transaction_session transaction_session(
     bool include_target = false,
     bool include_unrelated_dependency = false,
     bool include_check = false,
-    fs::path collection_root = "/collection")
+    fs::path collection_root = "/collection",
+    pkgresolve::resolution_policy resolver_policy =
+        pkgresolve::resolution_policy())
 {
   auto catalog = catalog_snapshot(
       source, std::move(dependencies), collection_root);
@@ -333,7 +336,6 @@ inline pkgctl::transaction_session transaction_session(
   pkgresolve::architecture_context architectures(
       pkgsource::architecture_reference("x86_64"),
       pkgsource::architecture_reference("x86_64"));
-  pkgresolve::resolution_policy resolver_policy;
   auto controller_request = pkgctl::resolution_request::make(
       catalog_request,
       pkgctl::state_location::make(state_path, installed.target_binding()),
@@ -360,13 +362,15 @@ inline pkgctl::transaction_session transaction_session(
     bool include_target = false,
     bool include_unrelated_dependency = false,
     bool include_check = false,
-    fs::path collection_root = "/collection")
+    fs::path collection_root = "/collection",
+    pkgresolve::resolution_policy resolver_policy =
+        pkgresolve::resolution_policy())
 {
   return transaction_session(
       source, std::vector<pkgsource::source_snapshot>{dependency},
       installed, state_path, include_target,
       include_unrelated_dependency, include_check,
-      std::move(collection_root));
+      std::move(collection_root), std::move(resolver_policy));
 }
 
 inline const pkgtransaction::transaction_node& build_node(
