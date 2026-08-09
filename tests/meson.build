@@ -133,6 +133,33 @@ if not get_option('tests').disabled()
     ],
   )
 
+  application_intent_interrupt_fixture = executable(
+    'application-intent-interrupt-fixture',
+    'fixtures/application_intent_interrupt_fixture.cpp',
+  )
+
+  application_intent_interrupt_probe = executable(
+    'application-intent-interrupt-probe',
+    'fixtures/application_intent_interrupt_probe.cpp',
+  )
+
+  application_intent_interrupt_fixture_test = find_program(
+    'integration/application_intent_interrupt_fixture_test.sh',
+  )
+  test(
+    'application-intent-interrupt-fixture',
+    application_intent_interrupt_fixture_test,
+    args: [
+      application_intent_interrupt_fixture,
+      application_intent_interrupt_probe,
+    ],
+    depends: [
+      application_intent_interrupt_fixture,
+      application_intent_interrupt_probe,
+    ],
+    suite: 'integration',
+  )
+
   cli_readonly_test = find_program('integration/cli_readonly_test.sh')
   test(
     'cli-readonly',
@@ -188,6 +215,31 @@ if not get_option('tests').disabled()
       ),
     ],
     depends: native_interpreter,
+    suite: 'integration-privileged',
+  )
+
+  cli_run_application_restart_test = find_program(
+    'integration/cli_run_application_restart_test.sh',
+  )
+  test(
+    'cli-run-application-restart',
+    cli_run_application_restart_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_interpreter,
+      application_intent_interrupt_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/simple-install',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [native_interpreter, application_intent_interrupt_fixture],
     suite: 'integration-privileged',
   )
 

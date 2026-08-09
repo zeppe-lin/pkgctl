@@ -225,6 +225,29 @@ durable steps, and leave both target and state unchanged. This is
 controller/application/state composition evidence; it does not replace the
 lower semantic, POSIX, or publication-adapter suites.
 
+`pkgctl:cli-run-application-restart` qualifies a real process death inside the
+operation effect. A test-only ptrace supervisor follows only the `pkgctl`
+process and kills it immediately after the application-journal directory
+successfully synchronizes the first durable active-request index. At that
+point the controller effect remains at `application_intent`, the subordinate
+`libpkgapply` journal is durable, and no target mutation has started. No
+production stop-at-stage option or fault hook is introduced. The supervisor
+itself has an ordinary integration test with a two-sync probe: an initial
+directory synchronization occurs before any active reference exists, then the
+probe atomically publishes and synchronizes a valid active reference. Untraced
+the probe must cross that second synchronization; traced it must retain the
+reference but die before its post-sync marker.
+
+The restarted command must first refuse when the exact retained operation
+observation body is temporarily absent, without advancing either run or effect
+journal. Restoring those immutable bytes must let the same nonce resume after
+the live collection is removed, consume the exact pre-crash application journal,
+complete target mutation and state publication, and retain that journal identity
+in terminal effect evidence. Finally, corrupting the active application-journal
+locator after terminal completion must not affect a repeated zero-step resume;
+subordinate application-journal authority is consulted only while the owning
+effect stage is `application_intent`.
+
 Meson exposes `unit`, `integration`, `integration-privileged`, `header`, and
 `contract` suites. `tests/run-direct.sh` is the source-tree qualification path
 and must link the complete current CLI, including command-only dependencies,

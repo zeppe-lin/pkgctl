@@ -44,6 +44,16 @@ done
   "$srcdir/tests/fixtures/native_interpreter_x86_64.S" \
   -o "$tmp/native-test-interpreter"
 
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/application_intent_interrupt_fixture.cpp" \
+  -o "$tmp/application-intent-interrupt-fixture"
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/application_intent_interrupt_probe.cpp" \
+  -o "$tmp/application-intent-interrupt-probe"
+"$srcdir/tests/integration/application_intent_interrupt_fixture_test.sh" \
+  "$tmp/application-intent-interrupt-fixture" \
+  "$tmp/application-intent-interrupt-probe"
+
 # shellcheck disable=SC2086
 "$cxx" $flags $cli_cflags \
   "$srcdir/cli/main.cpp" "$srcdir/cli/options.cpp" \
@@ -66,6 +76,12 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
 "$srcdir/tests/integration/cli_run_removal_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" \
+  "$srcdir/tests/fixtures/collections/simple-install" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
+"$srcdir/tests/integration/cli_run_application_restart_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-test-interpreter" "$tmp/application-intent-interrupt-fixture" \
   "$srcdir/tests/fixtures/collections/simple-install" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 

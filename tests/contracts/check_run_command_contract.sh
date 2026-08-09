@@ -11,9 +11,11 @@ meson="$srcdir/cli/meson.build"
 tests_meson="$srcdir/tests/meson.build"
 integration="$srcdir/tests/integration/cli_run_test.sh"
 removal_integration="$srcdir/tests/integration/cli_run_removal_test.sh"
+restart_integration="$srcdir/tests/integration/cli_run_application_restart_test.sh"
+interrupt_fixture="$srcdir/tests/fixtures/application_intent_interrupt_fixture.cpp"
 
 for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration" \
-            "$removal_integration"; do
+            "$removal_integration" "$restart_integration" "$interrupt_fixture"; do
   [ -s "$file" ] || {
     echo "missing bounded transaction command source: $file" >&2
     exit 1
@@ -88,6 +90,10 @@ grep -F "'cli-run'" "$tests_meson" >/dev/null || {
 }
 grep -F "'cli-run-removal'" "$tests_meson" >/dev/null || {
   echo 'bounded run command has no removal process-level integration test' >&2
+  exit 1
+}
+grep -F "'cli-run-application-restart'" "$tests_meson" >/dev/null || {
+  echo 'bounded run command has no application-restart process-level integration test' >&2
   exit 1
 }
 grep -F "suite: 'integration-privileged'" "$tests_meson" >/dev/null || {
@@ -179,6 +185,40 @@ for required_removal_test in \
     exit 1
   }
 done
+
+for required_restart_test in \
+  'effect.stage=application-intent' \
+  'effect.disposition=resume-application' \
+  'active-request-v1-sha256-*.ref' \
+  'operation-observations-*.bin' \
+  'private run object is absent:' \
+  'missing-observation-run-record' \
+  'effect.application-journal=$application_journal' \
+  'not-an-application-journal-identity' \
+  'durable-steps 0'; do
+  grep -F -- "$required_restart_test" "$restart_integration" >/dev/null || {
+    echo "missing process-level application-restart qualification: $required_restart_test" >&2
+    exit 1
+  }
+done
+
+for required_interrupt in \
+  'PTRACE_TRACEME' \
+  'PTRACE_SYSCALL' \
+  'SYS_fsync' \
+  'active-request-v1-sha256-' \
+  'SIGKILL'; do
+  grep -F "$required_interrupt" "$interrupt_fixture" >/dev/null || {
+    echo "missing external application-intent interruption mechanism: $required_interrupt" >&2
+    exit 1
+  }
+done
+
+if grep -R -F 'PTRACE_' "$srcdir/cli" "$srcdir/src" "$srcdir/include" \
+    >/dev/null 2>&1; then
+  echo 'production controller contains a test-process ptrace hook' >&2
+  exit 1
+fi
 
 
 for documented in \
