@@ -46,11 +46,11 @@ fail()
 
 dump_file()
 {
-  label=$1
-  file=$2
-  printf '%s\n' "--- $label ---" >&2
-  if [ -s "$file" ]; then
-    cat "$file" >&2
+  dump_label=$1
+  dump_path=$2
+  printf '%s\n' "--- $dump_label ---" >&2
+  if [ -s "$dump_path" ]; then
+    cat "$dump_path" >&2
   else
     printf '%s\n' '<empty>' >&2
   fi
@@ -58,70 +58,71 @@ dump_file()
 
 require_contains()
 {
-  label=$1
-  file=$2
-  expected=$3
-  if ! grep -F "$expected" "$file" >/dev/null; then
+  contains_label=$1
+  contains_path=$2
+  contains_expected=$3
+  if ! grep -F "$contains_expected" "$contains_path" >/dev/null; then
     printf '%s\n' \
-      "pkgctl:cli-run-lifecycle-resolution: $label: missing expected text: $expected" \
+      "pkgctl:cli-run-lifecycle-resolution: $contains_label: missing expected text: $contains_expected" \
       >&2
-    dump_file "$label" "$file"
+    dump_file "$contains_label" "$contains_path"
     exit 1
   fi
 }
 
 require_not_contains()
 {
-  label=$1
-  file=$2
-  unexpected=$3
-  if grep -F "$unexpected" "$file" >/dev/null; then
+  not_contains_label=$1
+  not_contains_path=$2
+  not_contains_unexpected=$3
+  if grep -F "$not_contains_unexpected" "$not_contains_path" >/dev/null; then
     printf '%s\n' \
-      "pkgctl:cli-run-lifecycle-resolution: $label: unexpected text: $unexpected" \
+      "pkgctl:cli-run-lifecycle-resolution: $not_contains_label: unexpected text: $not_contains_unexpected" \
       >&2
-    dump_file "$label" "$file"
+    dump_file "$not_contains_label" "$not_contains_path"
     exit 1
   fi
 }
 
 require_equal()
 {
-  label=$1
-  expected=$2
-  actual=$3
-  if [ "$expected" != "$actual" ]; then
+  equal_label=$1
+  equal_expected=$2
+  equal_actual=$3
+  if [ "$equal_expected" != "$equal_actual" ]; then
     printf '%s\n' \
-      "pkgctl:cli-run-lifecycle-resolution: $label: values differ" >&2
-    printf '%s\n' "expected: $expected" >&2
-    printf '%s\n' "actual:   $actual" >&2
+      "pkgctl:cli-run-lifecycle-resolution: $equal_label: values differ" >&2
+    printf '%s\n' "expected: $equal_expected" >&2
+    printf '%s\n' "actual:   $equal_actual" >&2
     exit 1
   fi
 }
 
 require_absent()
 {
-  label=$1
-  path=$2
-  [ ! -e "$path" ] || fail "$label: unexpected path exists: $path"
+  absent_label=$1
+  absent_path=$2
+  [ ! -e "$absent_path" ] || \
+    fail "$absent_label: unexpected path exists: $absent_path"
 }
 
 require_empty_directory()
 {
-  label=$1
-  directory=$2
-  if find "$directory" -mindepth 1 -maxdepth 1 -print -quit | grep . >/dev/null; then
-    fail "$label: expected empty directory: $directory"
+  empty_label=$1
+  empty_directory=$2
+  if find "$empty_directory" -mindepth 1 -maxdepth 1 -print -quit | grep . >/dev/null; then
+    fail "$empty_label: expected empty directory: $empty_directory"
   fi
 }
 
 single_file()
 {
-  label=$1
-  directory=$2
-  pattern=$3
-  set -- "$directory"/$pattern
+  single_label=$1
+  single_directory=$2
+  single_pattern=$3
+  set -- "$single_directory"/$single_pattern
   [ "$#" -eq 1 ] && [ -e "$1" ] || \
-    fail "$label: expected exactly one path matching $directory/$pattern"
+    fail "$single_label: expected exactly one path matching $single_directory/$single_pattern"
   printf '%s\n' "$1"
 }
 
