@@ -38,14 +38,20 @@ for path in \
   'fixtures/publication_intent_interrupt_probe.cpp' \
   'fixtures/publication_terminal_interrupt_fixture.cpp' \
   'fixtures/publication_terminal_interrupt_probe.cpp' \
+  'fixtures/lifecycle_intent_interrupt_fixture.cpp' \
+  'fixtures/lifecycle_intent_interrupt_probe.cpp' \
+  'fixtures/collections/lifecycle-pre-install' \
+  'fixtures/collections/lifecycle-post-install' \
   'integration/application_intent_interrupt_fixture_test.sh' \
   'integration/publication_intent_interrupt_fixture_test.sh' \
   'integration/publication_terminal_interrupt_fixture_test.sh' \
+  'integration/lifecycle_intent_interrupt_fixture_test.sh' \
   'integration/cli_readonly_test.sh' \
   'integration/cli_run_removal_test.sh' \
   'integration/cli_run_application_restart_test.sh' \
   'integration/cli_run_publication_restart_test.sh' \
   'integration/cli_run_publication_terminal_restart_test.sh' \
+  'integration/cli_run_lifecycle_resolution_test.sh' \
   'contracts/check_test_layout_contract.sh'; do
   grep -F "$path" "$meson" "$srcdir/tests/run-direct.sh" >/dev/null || {
     echo "qualification wiring omits categorized test source: $path" >&2

@@ -987,3 +987,36 @@ qualifies the ptrace boundary independently: an unrelated state selection is
 followed by an effect-head replacement and effect-directory synchronization;
 the supervisor must kill after that synchronization and before the next
 userspace marker.
+
+## Lifecycle-intent process restart
+
+The privileged `pkgctl:cli-run-lifecycle-resolution` vertical qualifies the
+existing conservative restart policy at both lifecycle intent stages without
+adding a subordinate lifecycle journal or automatic replay rule.
+
+The pre-install case interrupts immediately after the durable
+`before_lifecycle_intent` effect head is synchronized and before lifecycle
+execution is entered. The target and canonical state must remain untouched.
+Resume must report `external-resolution-required`, append zero durable steps,
+create no lifecycle execution session, and preserve the exact run/effect heads.
+
+The post-install case uses a package with only post-install lifecycle. It
+interrupts immediately after the durable `after_lifecycle_intent` head is
+synchronized. At that point application evidence and target bytes are already
+present while canonical state publication has not begun. Resume must again
+report `external-resolution-required`, append zero durable steps, leave target
+bytes and canonical state unchanged, and create no lifecycle execution session.
+
+Both cases remove the live collection before resume and repeat the resume. The
+controller therefore demonstrates that this stop is derived from retained
+historical authority and remains stable; it neither re-resolves the package nor
+speculatively executes the ambiguous external action.
+
+The non-privileged `pkgctl:lifecycle-intent-interrupt-fixture` probe qualifies
+the interruption mechanism independently. The supervisor counts only successful
+`.tmp-effect-head-* -> <64-hex>.pjeh` replacements followed by successful
+`fsync()` of the exact watched effect-store directory. It kills after the
+second durable head for `before-lifecycle-intent` and after the fourth for
+`after-lifecycle-intent`. The probe proves the requested head is durable while
+the next userspace marker has not executed; the CLI test separately proves the
+semantic stage represented by that head.

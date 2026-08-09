@@ -163,6 +163,16 @@ if not get_option('tests').disabled()
     'fixtures/publication_terminal_interrupt_probe.cpp',
   )
 
+  lifecycle_intent_interrupt_fixture = executable(
+    'lifecycle-intent-interrupt-fixture',
+    'fixtures/lifecycle_intent_interrupt_fixture.cpp',
+  )
+
+  lifecycle_intent_interrupt_probe = executable(
+    'lifecycle-intent-interrupt-probe',
+    'fixtures/lifecycle_intent_interrupt_probe.cpp',
+  )
+
   application_intent_interrupt_fixture_test = find_program(
     'integration/application_intent_interrupt_fixture_test.sh',
   )
@@ -210,6 +220,23 @@ if not get_option('tests').disabled()
     depends: [
       publication_terminal_interrupt_fixture,
       publication_terminal_interrupt_probe,
+    ],
+    suite: 'integration',
+  )
+
+  lifecycle_intent_interrupt_fixture_test = find_program(
+    'integration/lifecycle_intent_interrupt_fixture_test.sh',
+  )
+  test(
+    'lifecycle-intent-interrupt-fixture',
+    lifecycle_intent_interrupt_fixture_test,
+    args: [
+      lifecycle_intent_interrupt_fixture,
+      lifecycle_intent_interrupt_probe,
+    ],
+    depends: [
+      lifecycle_intent_interrupt_fixture,
+      lifecycle_intent_interrupt_probe,
     ],
     suite: 'integration',
   )
@@ -344,6 +371,35 @@ if not get_option('tests').disabled()
       ),
     ],
     depends: [native_interpreter, publication_terminal_interrupt_fixture],
+    suite: 'integration-privileged',
+  )
+
+  cli_run_lifecycle_resolution_test = find_program(
+    'integration/cli_run_lifecycle_resolution_test.sh',
+  )
+  test(
+    'cli-run-lifecycle-resolution',
+    cli_run_lifecycle_resolution_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_interpreter,
+      lifecycle_intent_interrupt_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/lifecycle-pre-install',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/lifecycle-post-install',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [native_interpreter, lifecycle_intent_interrupt_fixture],
     suite: 'integration-privileged',
   )
 

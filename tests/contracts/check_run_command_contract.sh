@@ -14,11 +14,14 @@ removal_integration="$srcdir/tests/integration/cli_run_removal_test.sh"
 restart_integration="$srcdir/tests/integration/cli_run_application_restart_test.sh"
 publication_terminal_integration="$srcdir/tests/integration/cli_run_publication_terminal_restart_test.sh"
 publication_terminal_fixture="$srcdir/tests/fixtures/publication_terminal_interrupt_fixture.cpp"
+lifecycle_resolution_integration="$srcdir/tests/integration/cli_run_lifecycle_resolution_test.sh"
+lifecycle_interrupt_fixture="$srcdir/tests/fixtures/lifecycle_intent_interrupt_fixture.cpp"
 interrupt_fixture="$srcdir/tests/fixtures/application_intent_interrupt_fixture.cpp"
 
 for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration" \
             "$removal_integration" "$restart_integration" "$publication_terminal_integration" \
-            "$publication_terminal_fixture" "$interrupt_fixture"; do
+            "$publication_terminal_fixture" "$lifecycle_resolution_integration" \
+            "$lifecycle_interrupt_fixture" "$interrupt_fixture"; do
   [ -s "$file" ] || {
     echo "missing bounded transaction command source: $file" >&2
     exit 1
@@ -234,6 +237,38 @@ for required_publication_terminal_interrupt in \
   'SIGKILL'; do
   grep -F "$required_publication_terminal_interrupt" "$publication_terminal_fixture" >/dev/null || {
     echo "missing external publication-terminal interruption mechanism: $required_publication_terminal_interrupt" >&2
+    exit 1
+  }
+done
+
+for required_lifecycle_resolution in \
+  'expected_stage=before-lifecycle-intent' \
+  'expected_stage=after-lifecycle-intent' \
+  'effect.stage=$expected_stage' \
+  'effect.disposition=external-resolution-required' \
+  'effect.automatically-continuable=false' \
+  'disposition external-resolution-required' \
+  'durable-steps 0' \
+  'lifecycle-sessions' \
+  'rm -rf "$collection"' \
+  'repeat-resume'; do
+  grep -F -- "$required_lifecycle_resolution" "$lifecycle_resolution_integration" >/dev/null || {
+    echo "missing process-level lifecycle-resolution qualification: $required_lifecycle_resolution" >&2
+    exit 1
+  }
+done
+
+for required_lifecycle_interrupt in \
+  'PTRACE_TRACEME' \
+  'PTRACE_SYSCALL' \
+  'SYS_renameat' \
+  'SYS_fsync' \
+  '.tmp-effect-head-' \
+  'before-lifecycle-intent' \
+  'after-lifecycle-intent' \
+  'SIGKILL'; do
+  grep -F "$required_lifecycle_interrupt" "$lifecycle_interrupt_fixture" >/dev/null || {
+    echo "missing external lifecycle-intent interruption mechanism: $required_lifecycle_interrupt" >&2
     exit 1
   }
 done

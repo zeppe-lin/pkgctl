@@ -7,6 +7,12 @@ operator-facing executable boundary.
 source package, no dependencies, no sources, no checks, and no lifecycle
 programs. Its payload is `/usr/bin/pkgctl-fixture` with fixed bytes.
 
+`collections/lifecycle-pre-install` and
+`collections/lifecycle-post-install` keep that same payload while adding exactly
+one lifecycle declaration on the named side of application. They exist only to
+qualify controller restart authority at a durable lifecycle intent; the process
+is interrupted before either lifecycle program is entered.
+
 `native_interpreter_x86_64.S` is a test-only static Linux x86-64 executable. It
 validates the `INTERPRETER -c PROGRAM pkgexec` invocation made by
 `libpkgexec-linux` and writes exactly the payload declared by the fixture

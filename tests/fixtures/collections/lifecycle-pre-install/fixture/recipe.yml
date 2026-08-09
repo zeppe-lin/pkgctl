@@ -1,0 +1,33 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: fixture
+  version: 1.0
+  release: 1
+  summary: native CLI pre-install lifecycle fixture
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  {}
+
+sources: []
+
+build:
+  language: posix-shell
+  script: |
+    mkdir -p "$PKG_DESTDIR/usr/bin"
+    printf 'pkgctl integration fixture\n' >"$PKG_DESTDIR/usr/bin/pkgctl-fixture"
+    chmod 0755 "$PKG_DESTDIR/usr/bin/pkgctl-fixture"
+
+lifecycle:
+  pre-install:
+    language: posix-shell
+    script: |
+      printf 'pre-install ran\n' >"$ZEPPE_LIN_TARGET_ROOT/pre-install-ran"
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64

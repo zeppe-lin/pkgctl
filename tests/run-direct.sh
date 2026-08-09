@@ -74,6 +74,16 @@ done
   "$tmp/publication-terminal-interrupt-fixture" \
   "$tmp/publication-terminal-interrupt-probe"
 
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/lifecycle_intent_interrupt_fixture.cpp" \
+  -o "$tmp/lifecycle-intent-interrupt-fixture"
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/lifecycle_intent_interrupt_probe.cpp" \
+  -o "$tmp/lifecycle-intent-interrupt-probe"
+"$srcdir/tests/integration/lifecycle_intent_interrupt_fixture_test.sh" \
+  "$tmp/lifecycle-intent-interrupt-fixture" \
+  "$tmp/lifecycle-intent-interrupt-probe"
+
 # shellcheck disable=SC2086
 "$cxx" $flags $cli_cflags \
   "$srcdir/cli/main.cpp" "$srcdir/cli/options.cpp" \
@@ -115,6 +125,13 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" "$tmp/publication-terminal-interrupt-fixture" \
   "$srcdir/tests/fixtures/collections/simple-install" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
+"$srcdir/tests/integration/cli_run_lifecycle_resolution_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-test-interpreter" "$tmp/lifecycle-intent-interrupt-fixture" \
+  "$srcdir/tests/fixtures/collections/lifecycle-pre-install" \
+  "$srcdir/tests/fixtures/collections/lifecycle-post-install" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
 for header in "$srcdir"/include/pkgctl/*.h; do
