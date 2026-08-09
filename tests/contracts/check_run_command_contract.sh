@@ -242,6 +242,9 @@ for required_publication_terminal_interrupt in \
 done
 
 for required_lifecycle_resolution in \
+  "'lifecycle:pre-install=fixture'" \
+  "'lifecycle:post-install=fixture'" \
+  '--goal "$lifecycle_goal"' \
   'expected_stage=before-lifecycle-intent' \
   'expected_stage=after-lifecycle-intent' \
   'effect.stage=$expected_stage' \

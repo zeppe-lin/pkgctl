@@ -129,6 +129,7 @@ initialize_case()
 {
   case_name=$1
   fixture_collection=$2
+  lifecycle_goal=$3
   case_root=$root/$case_name
   collection=$case_root/collection
   state=$case_root/state
@@ -177,6 +178,7 @@ run_command()
     --build-architecture x86_64 \
     --target-architecture x86_64 \
     --goal 'run=@base' \
+    --goal "$lifecycle_goal" \
     "$intent" "$nonce" \
     --runtime-root "$runtime" \
     --build-root "$build" \
@@ -215,6 +217,7 @@ run_interrupted_command()
     --build-architecture x86_64 \
     --target-architecture x86_64 \
     --goal 'run=@base' \
+    --goal "$lifecycle_goal" \
     "$intent" "$nonce" \
     --runtime-root "$runtime" \
     --build-root "$build" \
@@ -325,7 +328,8 @@ check_records_unchanged()
 
 qualify_pre_lifecycle()
 {
-  initialize_case before-lifecycle-intent "$pre_collection_fixture"
+  initialize_case before-lifecycle-intent "$pre_collection_fixture" \
+    'lifecycle:pre-install=fixture'
   expected_stage=before-lifecycle-intent
   initial_state=$($state_inspect_fixture "$state")
   printf '%s\n' "$initial_state" >"$case_root/initial-state.out"
@@ -387,7 +391,8 @@ qualify_pre_lifecycle()
 
 qualify_post_lifecycle()
 {
-  initialize_case after-lifecycle-intent "$post_collection_fixture"
+  initialize_case after-lifecycle-intent "$post_collection_fixture" \
+    'lifecycle:post-install=fixture'
   expected_stage=after-lifecycle-intent
   initial_state=$($state_inspect_fixture "$state")
   printf '%s\n' "$initial_state" >"$case_root/initial-state.out"

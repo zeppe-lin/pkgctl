@@ -994,6 +994,15 @@ The privileged `pkgctl:cli-run-lifecycle-resolution` vertical qualifies the
 existing conservative restart policy at both lifecycle intent stages without
 adding a subordinate lifecycle journal or automatic replay rule.
 
+The CLI fixture requests lifecycle authority explicitly in addition to its
+normal run goal: `lifecycle:pre-install=fixture` for the pre-install case and
+`lifecycle:post-install=fixture` for the post-install case. This is required by
+the transaction boundary: `libpkgtransaction` creates lifecycle nodes only from
+explicit lifecycle-scoped resolution goals and does not infer executable work
+merely because a selected recipe declares a lifecycle program. Start and resume
+therefore carry the same typed lifecycle goal, while resume still recomposes from
+the retained command universe rather than rediscovering live collection bytes.
+
 The pre-install case interrupts immediately after the durable
 `before_lifecycle_intent` effect head is synchronized and before lifecycle
 execution is entered. The target and canonical state must remain untouched.
