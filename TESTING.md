@@ -1013,10 +1013,13 @@ historical authority and remains stable; it neither re-resolves the package nor
 speculatively executes the ambiguous external action.
 
 The non-privileged `pkgctl:lifecycle-intent-interrupt-fixture` probe qualifies
-the interruption mechanism independently. The supervisor counts only successful
+the interruption mechanism independently. The supervisor observes only successful
 `.tmp-effect-head-* -> <64-hex>.pjeh` replacements followed by successful
-`fsync()` of the exact watched effect-store directory. It kills after the
-second durable head for `before-lifecycle-intent` and after the fourth for
-`after-lifecycle-intent`. The probe proves the requested head is durable while
-the next userspace marker has not executed; the CLI test separately proves the
-semantic stage represented by that head.
+`fsync()` of the exact watched effect-store directory. It counts distinct durable
+record identities per effect head, so an intentional idempotent republication of
+the same admitted record does not advance the interruption boundary. It kills
+after the second distinct durable record for `before-lifecycle-intent` and after
+the fourth for `after-lifecycle-intent`. The probe explicitly republishes its
+first record before advancing, proving that duplicate durable head publication is
+ignored. The CLI test separately proves the semantic stage represented by the
+selected head.

@@ -24,14 +24,14 @@ void create_empty(int directory, const std::string& name)
   static_cast<void>(::close(fd));
 }
 
-void publish_head(int effects, unsigned int index)
+void publish_head(int effects, unsigned int record_index)
 {
-  const char digit = static_cast<char>('a' + index - 1U);
-  const std::string identity(64U, digit);
+  const std::string attempt(64U, 'a');
+  const char record_digit = static_cast<char>('a' + record_index - 1U);
+  const std::string record(64U, record_digit);
   const std::string temporary = ".tmp-effect-head-" +
-      std::to_string(static_cast<unsigned long long>(::getpid())) + "-" +
-      std::to_string(index) + "-" + identity;
-  const std::string head = identity + ".pjeh";
+      std::to_string(static_cast<unsigned long long>(::getpid())) + "-" + record;
+  const std::string head = attempt + ".pjeh";
   create_empty(effects, temporary);
   if (::renameat(effects, temporary.c_str(), effects, head.c_str()) != 0 ||
       ::fsync(effects) != 0)
@@ -55,10 +55,11 @@ int main(int argc, char** argv)
   if (effects < 0 || markers < 0)
     return EXIT_FAILURE;
 
-  for (unsigned int index = 1U; index <= 5U; ++index)
+  constexpr unsigned int publications[] = {1U, 1U, 2U, 3U, 4U};
+  for (unsigned int index = 0U; index < 5U; ++index)
   {
-    publish_head(effects, index);
-    create_empty(markers, "after-head-" + std::to_string(index));
+    publish_head(effects, publications[index]);
+    create_empty(markers, "after-head-" + std::to_string(index + 1U));
   }
   create_empty(markers, "completed");
   return EXIT_SUCCESS;

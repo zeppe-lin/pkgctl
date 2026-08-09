@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <map>
 #include <string>
 #include <string_view>
 
@@ -95,7 +96,9 @@ constexpr std::size_t maximum_remote_path = 512U;
 [[nodiscard]] bool head_rename_in_directory(
     pid_t child,
     const struct user_regs_struct& registers,
-    const struct stat& directory)
+    const struct stat& directory,
+    std::string& record_name,
+    std::string& head_name)
 {
   if (registers.orig_rax != SYS_renameat ||
       !same_directory(child, registers.rdi, directory) ||
@@ -104,9 +107,14 @@ constexpr std::size_t maximum_remote_path = 512U;
 
   std::string old_name;
   std::string new_name;
-  return read_remote_string(child, registers.rsi, old_name) &&
-      read_remote_string(child, registers.r10, new_name) &&
-      effect_head_temporary_name(old_name) && effect_head_name(new_name);
+  if (!read_remote_string(child, registers.rsi, old_name) ||
+      !read_remote_string(child, registers.r10, new_name) ||
+      !effect_head_temporary_name(old_name) || !effect_head_name(new_name))
+    return false;
+
+  record_name = old_name;
+  head_name = new_name;
+  return true;
 }
 
 [[nodiscard]] bool resume_trace(pid_t child, int signal)
@@ -136,7 +144,7 @@ constexpr std::size_t maximum_remote_path = 512U;
   return EXIT_SUCCESS;
 }
 
-[[nodiscard]] std::size_t requested_head_commit(std::string_view mode)
+[[nodiscard]] std::size_t requested_distinct_record(std::string_view mode)
 {
   if (mode == "before-lifecycle-intent")
     return 2U;
@@ -144,6 +152,11 @@ constexpr std::size_t maximum_remote_path = 512U;
     return 4U;
   return 0U;
 }
+
+struct durable_head_state final {
+  std::string record_name;
+  std::size_t distinct_records = 0U;
+};
 } // namespace
 
 int main(int argc, char** argv)
@@ -158,8 +171,8 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;
   }
 
-  const std::size_t requested_commit = requested_head_commit(argv[1]);
-  if (requested_commit == 0U)
+  const std::size_t requested_record = requested_distinct_record(argv[1]);
+  if (requested_record == 0U)
   {
     std::cerr << "lifecycle-intent-interrupt-fixture: unknown mode\n";
     return EXIT_FAILURE;
@@ -243,7 +256,11 @@ int main(int argc, char** argv)
   bool active_effect_sync = false;
   bool head_published = false;
   long long active_syscall = -1;
-  std::size_t committed_heads = 0U;
+  std::string active_record_name;
+  std::string active_head_name;
+  std::string published_record_name;
+  std::string published_head_name;
+  std::map<std::string, durable_head_state> durable_heads;
 
   if (!resume_trace(child, 0))
     return harness_failure_status;
@@ -282,9 +299,12 @@ int main(int argc, char** argv)
         active_syscall = static_cast<long long>(registers.orig_rax);
         active_head_rename = false;
         active_effect_sync = false;
+        active_record_name.clear();
+        active_head_name.clear();
         if (active_syscall == SYS_renameat)
-          active_head_rename =
-              head_rename_in_directory(child, registers, effect_status);
+          active_head_rename = head_rename_in_directory(
+              child, registers, effect_status, active_record_name,
+              active_head_name);
         else if (active_syscall == SYS_fsync && head_published)
           active_effect_sync =
               same_directory(child, registers.rdi, effect_status);
@@ -293,12 +313,21 @@ int main(int argc, char** argv)
       {
         const auto result = static_cast<long long>(registers.rax);
         if (active_syscall == SYS_renameat && active_head_rename && result == 0)
+        {
           head_published = true;
+          published_record_name = active_record_name;
+          published_head_name = active_head_name;
+        }
         else if (active_syscall == SYS_fsync && active_effect_sync && result == 0)
         {
           head_published = false;
-          ++committed_heads;
-          if (committed_heads == requested_commit)
+          auto& durable = durable_heads[published_head_name];
+          if (durable.record_name != published_record_name)
+          {
+            durable.record_name = published_record_name;
+            ++durable.distinct_records;
+          }
+          if (durable.distinct_records == requested_record)
           {
             const int killed = kill_at_boundary(child, status);
             static_cast<void>(::close(effect_fd));

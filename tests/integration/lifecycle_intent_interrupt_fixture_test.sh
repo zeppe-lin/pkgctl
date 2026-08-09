@@ -60,5 +60,5 @@ run_interrupted()
   [ ! -e "$markers/completed" ] || fail "$mode allowed probe completion"
 }
 
-run_interrupted before-lifecycle-intent 2 1 2
-run_interrupted after-lifecycle-intent 4 3 4
+run_interrupted before-lifecycle-intent 1 2 3
+run_interrupted after-lifecycle-intent 1 4 5
