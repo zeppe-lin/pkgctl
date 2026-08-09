@@ -248,6 +248,29 @@ locator after terminal completion must not affect a repeated zero-step resume;
 subordinate application-journal authority is consulted only while the owning
 effect stage is `application_intent`.
 
+`pkgctl:cli-run-publication-restart` qualifies the next recoverable effect
+boundary. Its test-only ptrace supervisor recognizes only the canonical POSIX
+state selector replacement `renameat(current.tmp.*, current)` on the exact
+opened canonical-store directory. The independent ordinary integration probe
+contains an unrelated rename before that selector replacement and a marker
+after it, then proves both interruption modes: `before-selection` must leave the
+old selector plus the unselected temporary, while `after-selection` must expose
+the new selector but still kill before the next userspace action.
+
+The privileged vertical runs both physical crash outcomes while the controller
+effect is durably at `publication_intent`. In both cases application evidence is
+already terminal, target bytes are already installed, transaction evidence and
+the exact publication request are retained, and no publication receipt exists.
+Removing that exact retained publication-request body must make resume refuse
+without advancing the run or effect journal even when the live canonical state
+already equals the requested result. After restoring it, the live collection is
+absent and the historical active application-journal locator is deliberately
+poisoned: restart must not re-enter application. If selection had not happened,
+restart republishes the retained request and records a real publication receipt;
+if selection had already happened, restart recognizes the resulting snapshot,
+seals the effect with reconciled-state evidence, and must not fabricate or repeat
+a publication receipt.
+
 Meson exposes `unit`, `integration`, `integration-privileged`, `header`, and
 `contract` suites. `tests/run-direct.sh` is the source-tree qualification path
 and must link the complete current CLI, including command-only dependencies,

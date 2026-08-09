@@ -96,6 +96,10 @@ grep -F "'cli-run-application-restart'" "$tests_meson" >/dev/null || {
   echo 'bounded run command has no application-restart process-level integration test' >&2
   exit 1
 }
+grep -F "'cli-run-publication-restart'" "$tests_meson" >/dev/null || {
+  echo 'bounded run command has no publication-restart process-level integration test' >&2
+  exit 1
+}
 grep -F "suite: 'integration-privileged'" "$tests_meson" >/dev/null || {
   echo 'native mutating CLI test is not isolated as privileged integration' >&2
   exit 1
