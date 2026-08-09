@@ -971,3 +971,19 @@ replaced by a shared object while claiming a fully static result.
 Published mboxes are independently applied to the supplied base bundle. Final
 trees and stable patch-ID columns must match, and each replayed commit boundary
 must pass its applicable tests.
+
+## Publication-terminal process restart
+
+The privileged `pkgctl:cli-run-publication-terminal-restart` vertical kills the
+controller only after the state selector has been replaced and the subsequent
+`publication_terminal` effect-journal head has been durably synchronized. The
+restart must consume the exact retained publication request and receipt, seal
+the effect terminal without application or publication replay, and remain a
+zero-step operation on repeated resume. Removing the retained publication
+receipt before restart must fail without advancing either durable journal.
+
+The non-privileged `pkgctl:publication-terminal-interrupt-fixture` probe
+qualifies the ptrace boundary independently: an unrelated state selection is
+followed by an effect-head replacement and effect-directory synchronization;
+the supervisor must kill after that synchronization and before the next
+userspace marker.

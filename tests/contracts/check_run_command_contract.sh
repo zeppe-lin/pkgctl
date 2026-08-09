@@ -12,10 +12,13 @@ tests_meson="$srcdir/tests/meson.build"
 integration="$srcdir/tests/integration/cli_run_test.sh"
 removal_integration="$srcdir/tests/integration/cli_run_removal_test.sh"
 restart_integration="$srcdir/tests/integration/cli_run_application_restart_test.sh"
+publication_terminal_integration="$srcdir/tests/integration/cli_run_publication_terminal_restart_test.sh"
+publication_terminal_fixture="$srcdir/tests/fixtures/publication_terminal_interrupt_fixture.cpp"
 interrupt_fixture="$srcdir/tests/fixtures/application_intent_interrupt_fixture.cpp"
 
 for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration" \
-            "$removal_integration" "$restart_integration" "$interrupt_fixture"; do
+            "$removal_integration" "$restart_integration" "$publication_terminal_integration" \
+            "$publication_terminal_fixture" "$interrupt_fixture"; do
   [ -s "$file" ] || {
     echo "missing bounded transaction command source: $file" >&2
     exit 1
@@ -202,6 +205,35 @@ for required_restart_test in \
   'durable-steps 0'; do
   grep -F -- "$required_restart_test" "$restart_integration" >/dev/null || {
     echo "missing process-level application-restart qualification: $required_restart_test" >&2
+    exit 1
+  }
+done
+
+for required_publication_terminal in \
+  'effect.stage=publication-terminal' \
+  'effect.disposition=seal-terminal' \
+  'publication-receipt-*.bin' \
+  'private run object is absent:' \
+  'missing-receipt-effect-record' \
+  'not-an-application-journal-identity' \
+  'state-not-republished' \
+  'durable-steps 0'; do
+  grep -F -- "$required_publication_terminal" "$publication_terminal_integration" >/dev/null || {
+    echo "missing process-level publication-terminal restart qualification: $required_publication_terminal" >&2
+    exit 1
+  }
+done
+
+for required_publication_terminal_interrupt in \
+  'PTRACE_TRACEME' \
+  'PTRACE_SYSCALL' \
+  'SYS_renameat' \
+  'SYS_fsync' \
+  '.tmp-effect-head-' \
+  '.pjeh' \
+  'SIGKILL'; do
+  grep -F "$required_publication_terminal_interrupt" "$publication_terminal_fixture" >/dev/null || {
+    echo "missing external publication-terminal interruption mechanism: $required_publication_terminal_interrupt" >&2
     exit 1
   }
 done

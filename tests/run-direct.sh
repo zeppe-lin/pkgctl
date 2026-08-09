@@ -64,6 +64,16 @@ done
   "$tmp/publication-intent-interrupt-fixture" \
   "$tmp/publication-intent-interrupt-probe"
 
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/publication_terminal_interrupt_fixture.cpp" \
+  -o "$tmp/publication-terminal-interrupt-fixture"
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/publication_terminal_interrupt_probe.cpp" \
+  -o "$tmp/publication-terminal-interrupt-probe"
+"$srcdir/tests/integration/publication_terminal_interrupt_fixture_test.sh" \
+  "$tmp/publication-terminal-interrupt-fixture" \
+  "$tmp/publication-terminal-interrupt-probe"
+
 # shellcheck disable=SC2086
 "$cxx" $flags $cli_cflags \
   "$srcdir/cli/main.cpp" "$srcdir/cli/options.cpp" \
@@ -98,6 +108,12 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
 "$srcdir/tests/integration/cli_run_publication_restart_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" "$tmp/publication-intent-interrupt-fixture" \
+  "$srcdir/tests/fixtures/collections/simple-install" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
+"$srcdir/tests/integration/cli_run_publication_terminal_restart_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-test-interpreter" "$tmp/publication-terminal-interrupt-fixture" \
   "$srcdir/tests/fixtures/collections/simple-install" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 

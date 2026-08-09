@@ -153,6 +153,16 @@ if not get_option('tests').disabled()
     'fixtures/publication_intent_interrupt_probe.cpp',
   )
 
+  publication_terminal_interrupt_fixture = executable(
+    'publication-terminal-interrupt-fixture',
+    'fixtures/publication_terminal_interrupt_fixture.cpp',
+  )
+
+  publication_terminal_interrupt_probe = executable(
+    'publication-terminal-interrupt-probe',
+    'fixtures/publication_terminal_interrupt_probe.cpp',
+  )
+
   application_intent_interrupt_fixture_test = find_program(
     'integration/application_intent_interrupt_fixture_test.sh',
   )
@@ -183,6 +193,23 @@ if not get_option('tests').disabled()
     depends: [
       publication_intent_interrupt_fixture,
       publication_intent_interrupt_probe,
+    ],
+    suite: 'integration',
+  )
+
+  publication_terminal_interrupt_fixture_test = find_program(
+    'integration/publication_terminal_interrupt_fixture_test.sh',
+  )
+  test(
+    'publication-terminal-interrupt-fixture',
+    publication_terminal_interrupt_fixture_test,
+    args: [
+      publication_terminal_interrupt_fixture,
+      publication_terminal_interrupt_probe,
+    ],
+    depends: [
+      publication_terminal_interrupt_fixture,
+      publication_terminal_interrupt_probe,
     ],
     suite: 'integration',
   )
@@ -292,6 +319,31 @@ if not get_option('tests').disabled()
       ),
     ],
     depends: [native_interpreter, publication_intent_interrupt_fixture],
+    suite: 'integration-privileged',
+  )
+
+  cli_run_publication_terminal_restart_test = find_program(
+    'integration/cli_run_publication_terminal_restart_test.sh',
+  )
+  test(
+    'cli-run-publication-terminal-restart',
+    cli_run_publication_terminal_restart_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_interpreter,
+      publication_terminal_interrupt_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/simple-install',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [native_interpreter, publication_terminal_interrupt_fixture],
     suite: 'integration-privileged',
   )
 
