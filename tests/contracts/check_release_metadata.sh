@@ -44,7 +44,7 @@ require_dependency_range libpkgstate '>=3.1.0' '<4.0.0'
 require_dependency_range libpkgfetch '>=2.0.0' '<3.0.0'
 require_dependency_range libpkgbuild-exec '>=2.2.0' '<3.0.0'
 require_dependency_range libpkgcheck-exec '>=0.4.0' '<1.0.0'
-require_dependency_range libpkgresolve '>=2.0.0' '<3.0.0'
+require_dependency_range libpkgresolve '>=3.0.0' '<4.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
 require_dependency_range libpkgapply-posix '>=3.1.0' '<4.0.0'
 require_dependency_range libpkgcatalog-codec '>=3.0.0' '<4.0.0'
@@ -83,8 +83,8 @@ for contract in \
   'libpkgapply >= 3.0.0, < 4.0.0' \
   'libpkgapply-posix >= 3.1.0, < 4.0.0' \
   'libpkgapply-exec >= 2.0.0, < 3.0.0' \
-  'libpkgresolve >= 2.0.0, < 3.0.0' \
-  'libpkgtransaction >= 2.1.0, < 3.0.0' \
+  'libpkgresolve >= 3.0.0, < 4.0.0' \
+  'libpkgtransaction >= 3.0.0, < 4.0.0' \
   'libpkgcheck >= 0.2.0, < 1.0.0' \
   'libpkgcheck-exec >= 0.4.0, < 1.0.0'; do
   grep -F "$contract" "$srcdir/CHANGELOG.md" >/dev/null || {

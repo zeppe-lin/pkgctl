@@ -342,8 +342,8 @@
 - libpkgapply >= 3.0.0, < 4.0.0
 - libpkgapply-posix >= 3.0.0, < 4.0.0
 - libpkgapply-exec >= 2.0.0, < 3.0.0
-- libpkgresolve >= 2.0.0, < 3.0.0
-- libpkgtransaction >= 2.1.0, < 3.0.0
+- libpkgresolve >= 3.0.0, < 4.0.0
+- libpkgtransaction >= 3.0.0, < 4.0.0
 - libpkgcheck >= 0.2.0, < 1.0.0
 - libpkgcheck-exec >= 0.3.0, < 1.0.0
 
