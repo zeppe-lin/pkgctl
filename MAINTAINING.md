@@ -32,7 +32,11 @@ contract for the retired wording in the same change.
 
 The executable directly depends on the exact libraries whose public values it
 uses. The internal `pkgctl-core` library is not installed and does not publish a
-second package-management API.
+second package-management API. A direct provider SONAME transition must be
+reflected in both Meson and direct pkg-config qualification rather than relying
+on a transitive consumer to reject the old generation. Shared release
+qualification must prove the expected direct ELF dependency for providers whose
+effectful API the controller calls, including `libpkgfetch`.
 
 The construction layer may depend on source, fetch, build, build-exec, image,
 and backend-neutral execution authorities, but must not schedule dependency

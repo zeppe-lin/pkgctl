@@ -57,6 +57,7 @@
 
 ### Dependency contract
 
+- libpkgfetch >= 2.0.0, < 3.0.0
 - libpkgapply-posix >= 3.1.0, < 4.0.0
 - libpkgcatalog-codec >= 3.0.0, < 4.0.0 (CLI only)
 - libpkgexec-linux >= 0.5.2, < 1.0.0 (CLI only)

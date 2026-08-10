@@ -644,4 +644,16 @@ if not get_option('tests').disabled()
 
   release_metadata = find_program('contracts/check_release_metadata.sh')
   test('release-metadata', release_metadata, args: [meson.project_source_root()], suite: 'contract')
+
+  if not want_static
+    fetch_generation_contract = find_program(
+      'contracts/check_fetch_generation_contract.sh',
+    )
+    test(
+      'fetch-generation-contract',
+      fetch_generation_contract,
+      args: [pkgctl_exe],
+      suite: 'contract',
+    )
+  endif
 endif

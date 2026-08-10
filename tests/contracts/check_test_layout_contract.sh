@@ -52,12 +52,23 @@ for path in \
   'integration/cli_run_publication_restart_test.sh' \
   'integration/cli_run_publication_terminal_restart_test.sh' \
   'integration/cli_run_lifecycle_resolution_test.sh' \
-  'contracts/check_test_layout_contract.sh'; do
+  'contracts/check_test_layout_contract.sh' \
+  'contracts/check_fetch_generation_contract.sh'; do
   grep -F "$path" "$meson" "$srcdir/tests/run-direct.sh" >/dev/null || {
     echo "qualification wiring omits categorized test source: $path" >&2
     exit 1
   }
 done
+
+[ -x "$srcdir/tests/contracts/check_fetch_generation_contract.sh" ] || {
+  echo 'missing executable fetch-generation contract' >&2
+  exit 1
+}
+
+grep -F "'fetch-generation-contract'" "$meson" >/dev/null || {
+  echo 'Meson omits fetch-generation contract' >&2
+  exit 1
+}
 
 [ -s "$srcdir/tests/support/construction_fixture.h" ] || {
   echo 'missing categorized shared construction fixture' >&2

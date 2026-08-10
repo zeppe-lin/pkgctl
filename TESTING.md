@@ -39,7 +39,9 @@ The final command suite must prove:
   the same transaction and journal identities across both processes;
 - a second start of the admitted nonce is refused, while a second resume of the
   completed run reports zero durable work and leaves target bytes and canonical
-  state unchanged; and
+  state unchanged;
+- a shared build records a direct `libpkgfetch.so.2` ELF dependency and the
+  direct compiler qualification refuses fetch generations outside 2.x; and
 - a complete private-prefix shared/static Meson build passes under ASan and
   UBSan before tagging.
 

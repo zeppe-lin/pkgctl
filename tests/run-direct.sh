@@ -11,6 +11,7 @@ trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
 cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
 pkg-config --exists \
+  'libpkgfetch >= 2.0.0' 'libpkgfetch < 3.0.0' \
   'libpkgbuild-exec >= 2.2.0' 'libpkgbuild-exec < 3.0.0' \
   'libpkgcheck-exec >= 0.4.0' 'libpkgcheck-exec < 1.0.0'
 core_cflags=$(pkg-config --cflags $core_modules)
@@ -145,5 +146,12 @@ EOF_INNER
 done
 
 for contract in "$srcdir"/tests/contracts/*.sh; do
-  "$contract" "$srcdir"
+  case $(basename "$contract") in
+    check_fetch_generation_contract.sh)
+      "$contract" "$tmp/pkgctl"
+      ;;
+    *)
+      "$contract" "$srcdir"
+      ;;
+  esac
 done
