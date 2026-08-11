@@ -60,6 +60,16 @@ grep -F 'pkgexec::resource_role::build_input_tree, "checked-package"' \
   echo 'package-pipeline backend does not consume the constructed package during check' >&2
   exit 1
 }
+
+grep -F 'pkgsource::requirement_scope::check()' "$test_source" >/dev/null || {
+  echo 'package-pipeline request does not explicitly ask for check authority' >&2
+  exit 1
+}
+grep -F 'pkgsource::package_reference("tool")' "$test_source" >/dev/null || {
+  echo 'package-pipeline check goal is not bound to the tool package' >&2
+  exit 1
+}
+
 grep -F 'tool.session().paths().build.artifact_path' \
   "$test_source" >/dev/null || {
   echo 'package-pipeline application does not reopen the exact constructed artifact' >&2

@@ -125,6 +125,21 @@ void create_pipeline_collection(const fs::path& root)
   test_support::write(root / "tool" / "files/source.txt", tool_source);
 }
 
+pkgctl::resolution_request pipeline_resolution_request(
+    const fs::path& collection,
+    const fs::path& state)
+{
+  const auto base = test_support::resolution_request(collection, state);
+  auto goals = base.goals();
+  goals.emplace_back(
+      pkgsource::requirement_scope::check(),
+      pkgsource::requirement_subject(pkgsource::package_reference("tool")),
+      "<pipeline-check>");
+  return pkgctl::resolution_request::make(
+      base.catalog(), base.state(), base.architectures(), std::move(goals),
+      base.policy());
+}
+
 const pkgtransaction::transaction_node& node_for(
     const pkgctl::transaction_session& transaction,
     pkgtransaction::transaction_action_kind action,
@@ -133,7 +148,19 @@ const pkgtransaction::transaction_node& node_for(
   for (const auto& node : transaction.program().nodes())
     if (node.action() == action && node.package().name() == package)
       return node;
-  throw std::runtime_error("pipeline transaction lacks requested node");
+
+  std::string message = "pipeline transaction lacks requested node: ";
+  message += pkgtransaction::to_string(action);
+  message += ":";
+  message += package;
+  message += "; actual nodes:";
+  for (const auto& node : transaction.program().nodes()) {
+    message += " ";
+    message += pkgtransaction::to_string(node.action());
+    message += ":";
+    message += node.package().name();
+  }
+  throw std::runtime_error(std::move(message));
 }
 
 pkgctl::transaction_run_nonce journal_nonce(std::uint8_t marker)
@@ -441,7 +468,7 @@ void check_package_pipeline()
       test_support::catalog_request(collection));
   CHECK(catalog.catalog().candidates().size() == 2U);
 
-  auto resolution_request = test_support::resolution_request(collection, state);
+  auto resolution_request = pipeline_resolution_request(collection, state);
   const auto resolution = pkgctl::resolve_packages(resolution_request);
   CHECK(resolution.resolution().selections().size() >= 2U);
 
