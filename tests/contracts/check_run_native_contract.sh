@@ -108,7 +108,7 @@ for required_test in \
   'archive_missing' \
   'archive_image_mismatch' \
   'archive_receipt_mismatch' \
-  'target_mutation_lease_error_code::lock_busy' \
+  'transaction_effect_authority_unavailable' \
   'drivers.continuation.reset()' \
   'drivers.resulting_state.reset()' \
   'check_native_effect_recovery_source' \
@@ -121,6 +121,21 @@ for required_test in \
     exit 1
   }
 done
+
+native_source_test=$(sed -n \
+  '/void check_native_effect_driver_source()/,/^}/p' "$test_source")
+printf '%s\n' "$native_source_test" | \
+  grep -F 'catch (const pkgctl::transaction_effect_authority_unavailable&)' \
+    >/dev/null || {
+  echo 'native effect-runtime unit does not observe translated contention' >&2
+  exit 1
+}
+if printf '%s\n' "$native_source_test" | \
+    grep -F 'catch (const pkgapply::posix::target_mutation_lease_error&' \
+      >/dev/null 2>&1; then
+  echo 'native effect-runtime unit still expects POSIX lock contention to leak' >&2
+  exit 1
+fi
 
 for required_doc in \
   'Caller-configured POSIX per-dispatch effect runtime' \

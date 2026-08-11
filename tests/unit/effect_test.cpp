@@ -3548,10 +3548,9 @@ void check_native_effect_driver_source()
   {
     (void)source->acquire_execution_drivers(handoff);
   }
-  catch (const pkgapply::posix::target_mutation_lease_error& problem)
+  catch (const pkgctl::transaction_effect_authority_unavailable&)
   {
-    busy = problem.code() ==
-        pkgapply::posix::target_mutation_lease_error_code::lock_busy;
+    busy = true;
   }
   CHECK(busy);
 
@@ -3562,10 +3561,9 @@ void check_native_effect_driver_source()
   {
     (void)source->acquire_execution_drivers(handoff);
   }
-  catch (const pkgapply::posix::target_mutation_lease_error& problem)
+  catch (const pkgctl::transaction_effect_authority_unavailable&)
   {
-    busy = problem.code() ==
-        pkgapply::posix::target_mutation_lease_error_code::lock_busy;
+    busy = true;
   }
   CHECK(busy);
   drivers.resulting_state.reset();
