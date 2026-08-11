@@ -13,6 +13,10 @@ cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
 pkg-config --exists \
   'libpkgfetch >= 2.0.0' 'libpkgfetch < 3.0.0' \
   'libpkgbuild-exec >= 2.2.0' 'libpkgbuild-exec < 3.0.0' \
+  'libpkgexec >= 2.0.0' 'libpkgexec < 3.0.0' \
+  'libpkgexec-linux >= 0.6.0' 'libpkgexec-linux < 1.0.0' \
+  'libpkgresolve >= 3.0.0' 'libpkgresolve < 4.0.0' \
+  'libpkgtransaction >= 3.0.0' 'libpkgtransaction < 4.0.0' \
   'libpkgcheck-exec >= 0.4.0' 'libpkgcheck-exec < 1.0.0'
 core_cflags=$(pkg-config --cflags $core_modules)
 core_libs=$(pkg-config --libs $core_modules)
@@ -33,6 +37,12 @@ for test_source in check_test construction_test dispatch_test run_journal_test r
     -o "$tmp/$test_source"
   "$tmp/$test_source"
 done
+
+# The non-CLI vertical campaign must also survive the direct compiler path.
+# shellcheck disable=SC2086
+"$cxx" $flags "$srcdir/tests/integration/package_pipeline_test.cpp" \
+  $objects $core_libs -o "$tmp/package-pipeline-test"
+"$tmp/package-pipeline-test"
 
 for fixture in state_fixture state_inspect_fixture run_store_fixture effect_store_fixture; do
   name=$(printf '%s\n' "${fixture%_fixture}" | tr '_' '-')

@@ -46,12 +46,14 @@ for path in \
   'integration/publication_intent_interrupt_fixture_test.sh' \
   'integration/publication_terminal_interrupt_fixture_test.sh' \
   'integration/lifecycle_intent_interrupt_fixture_test.sh' \
+  'integration/package_pipeline_test.cpp' \
   'integration/cli_readonly_test.sh' \
   'integration/cli_run_removal_test.sh' \
   'integration/cli_run_application_restart_test.sh' \
   'integration/cli_run_publication_restart_test.sh' \
   'integration/cli_run_publication_terminal_restart_test.sh' \
   'integration/cli_run_lifecycle_resolution_test.sh' \
+  'contracts/check_package_pipeline_contract.sh' \
   'contracts/check_test_layout_contract.sh' \
   'contracts/check_fetch_generation_contract.sh'; do
   grep -F "$path" "$meson" "$srcdir/tests/run-direct.sh" >/dev/null || {

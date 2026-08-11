@@ -65,6 +65,13 @@ if not get_option('tests').disabled()
   )
   test('session', session_test, suite: 'unit')
 
+  package_pipeline_test = executable(
+    'package-pipeline-test',
+    'integration/package_pipeline_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('package-pipeline', package_pipeline_test, suite: 'integration')
+
   effect_journal_test = executable(
     'effect-journal-test',
     'unit/effect_journal_test.cpp',
@@ -463,6 +470,16 @@ if not get_option('tests').disabled()
     )
     test('public-header-' + header, header_test, suite: 'header')
   endforeach
+
+  package_pipeline_contract = find_program(
+    'contracts/check_package_pipeline_contract.sh',
+  )
+  test(
+    'package-pipeline-contract',
+    package_pipeline_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
 
   construction_contract = find_program('contracts/check_construction_contract.sh')
   test('construction-contract', construction_contract, args: [meson.project_source_root()], suite: 'contract')

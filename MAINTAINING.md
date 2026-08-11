@@ -10,6 +10,23 @@ Controller-owned policy must remain visibly separate from authority results.
 Defaults that can remove packages, mutate filesystems, initialize state, or
 publish state are prohibited.
 
+## Pre-frontend vertical qualification
+
+A new effect-implying frontend must not be the first integration test of an
+already-library-owned package lifecycle. Before extending the command surface,
+compose the existing controller core in-process against disposable collection,
+state, content, build, package-output, and artifact roots. Keep acquisition,
+resolution, transaction ordering, fetching, build admission, package/image
+sealing, progression, and operation preparation real. Replace only the external
+process actuator when determinism or privilege requires it, and make that fake
+consume the exact resources prepared by the real adapters.
+
+When a dependent build is under test, obtain its concrete package-input resource
+through the native session locator from successful predecessor construction
+evidence. Do not manufacture a semantically equivalent directory or bypass the
+transaction graph in the fixture. A green CLI is evidence about the frontend; it
+must not be used as the primary proof that lower package authority composes.
+
 ## Documentation authority
 
 Current-facing documentation is normative for the current controller boundary:
@@ -62,7 +79,7 @@ construction, check, and effect sessions. It owns deterministic reservation,
 bounded in-flight capacity, caller attempt nonces, and immutable ownership
 records. It must not execute a driver, create a backend, allocate resource paths,
 construct new transaction edges, or infer success from reservation state.
-Check-scoped package inputs require `libpkgtransaction >= 2.1.0` so exact input
+Check-scoped package inputs require `libpkgtransaction >= 3.0.0` so exact input
 authority precedes the construction that seals it.
 
 The single-dispatch execution layer may compose the pure dispatch functions with

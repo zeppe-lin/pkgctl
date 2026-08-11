@@ -110,6 +110,12 @@ for contract in \
   }
 done
 
+count=$(grep -c '^- libpkg' "$temporary.deps")
+[ "$count" -eq 26 ] || {
+  echo "current 0.35 dependency ledger contains $count libpkg entries, expected 26" >&2
+  exit 1
+}
+
 # Historical release facts are immutable. 0.27 predates resolver/transaction 3.
 awk '
   /^## 0\.27\.0 / { current = 1; next }

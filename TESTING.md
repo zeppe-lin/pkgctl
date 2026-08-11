@@ -1,3 +1,25 @@
+## Library-level package campaign qualification
+
+Before a user-facing construction command is extended, the non-CLI integration
+suite must compose the production controller core through a disposable package
+campaign. The campaign must acquire real YAML collection authority, resolve and
+compose the dependency graph, prove that a predecessor build becomes ready before
+its dependent build, materialize declared local sources through `libpkgfetch`,
+and execute both constructions through `libpkgbuild-exec`. Only process execution
+may be replaced by a deterministic test backend; that backend must consume the
+real staged source tree and the dependent build must consume the exact predecessor
+package-output resource selected by the native session locator.
+
+Successful construction must produce a real package archive plus retained
+`libpkgbuild-image` authority. The same transaction progression must then become
+planner-ready and pass through `libpkgbuild-plan`, `libpkgstate-plan`,
+`libpkgplan`, and `libpkgapply` request sealing. This campaign is deliberately
+non-CLI and non-privileged: command parsing and namespace capability are not
+allowed to be the first place where library composition defects are discovered.
+Future package/rootfs work should extend this campaign through disposable target
+application, canonical state publication, and package verification before adding
+the corresponding frontend behavior.
+
 ## Release 0.35.0 bounded native command qualification
 
 The final command suite must prove:
