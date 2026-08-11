@@ -279,8 +279,13 @@ retained exact receipt body is not enough authority for automatic continuation.
 dependency-build failure must fail that node and block its dependent build, check,
 and target operation without publishing package state. A definitive package-check
 failure must retain successful construction evidence, fail the check, block target
-application, and likewise publish no package state. These are transaction
-progression assertions, not frontend exit-code tests.
+application, and likewise publish no package state. Each case must also be launched
+through `native_posix_transaction_run_runtime`, destroy that runtime, and reopen the
+failed journal. Rehydration must preserve the stopped failure without another build
+or check execution and without consulting operation specifications, archive
+authority, effect bodies, target mutation, or canonical publication. These are
+transaction progression and durable runtime assertions, not frontend exit-code
+tests.
 
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the

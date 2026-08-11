@@ -57,16 +57,20 @@ Fault qualification must cross durable owner boundaries rather than inject a
 controller shortcut. Definitive build and check failures must be produced by the
 injected execution backend and committed through ordinary construction/check
 completion so transaction progression owns which dependent work becomes blocked.
-Application and publication interruption must occur by refusing an exact effect
-journal append after the subordinate side effect has reached the selected durable
-boundary. Restart must reopen retained run/effect/application authority and enter
-the production reconciliation path. When the subordinate application journal is
-already terminal and the exact receipt body was durably retained before the lost
-controller append, tests must prove that controller authority adopts that terminal
-receipt without either a fresh application or an application resume. When only a
-resumable subordinate journal exists, the ordinary resume path remains required.
-Already-selected canonical state must be observed rather than published a second
-time.
+The same failures must cross the stable native runtime composition root: reopen the
+failed journal through a newly constructed runtime, prove the stopped result is
+rehydrated from durable evidence, and prove no failed actuator is rerun and no
+operation specification, archive, effect-body, target, or state-publication
+authority is consulted. Application and publication interruption must occur by
+refusing an exact effect journal append after the subordinate side effect has
+reached the selected durable boundary. Restart must reopen retained
+run/effect/application authority and enter the production reconciliation path.
+When the subordinate application journal is already terminal and the exact receipt
+body was durably retained before the lost controller append, tests must prove that
+controller authority adopts that terminal receipt without either a fresh
+application or an application resume. When only a resumable subordinate journal
+exists, the ordinary resume path remains required. Already-selected canonical
+state must be observed rather than published a second time.
 
 Qualification may directly compose a downstream library family that `pkgctl`
 does not yet own in production, but that seam must remain test-only until the

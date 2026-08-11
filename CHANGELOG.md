@@ -75,7 +75,9 @@
   application resume, reconstruct the journal-bound historical state
   projection under fresh target exclusion, and continue to publication. A
   separate mode proves definitive dependency-build and package-check failures block
-  dependent target work and publish no package state.
+  dependent target work and publish no package state; those same failures cross
+  the native runtime, survive destroy/reopen from durable evidence, and neither
+  rerun the failed execution actuator nor acquire operation/archive authority.
 - Drives the same package transaction through the production
   `native_posix_transaction_run_runtime` composition root, including real
   application and canonical publication. The integration test then destroys and

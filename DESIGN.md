@@ -56,8 +56,12 @@ serves it again when a newly constructed runtime rehydrates the completed
 journal; subordinate terminal bodies are likewise supplied by the caller-owned
 restart-body source. Reopening therefore reproduces completed progress and stops
 quiescent without acquiring the incoming archive or mutating target/state a
-second time. This qualifies runtime wiring before another CLI option is allowed
-to become its first consumer.
+second time. The same composition root also owns the build/check failure
+containment campaign: a definitive failure commits ordinary subordinate evidence,
+stops dependent progression, and a newly constructed runtime rehydrates that
+stopped journal without rerunning construction/check or crossing into operation,
+archive, effect-body, target, or publication authority. This qualifies runtime
+wiring before another CLI option is allowed to become its first consumer.
 
 ## Release 0.35.0 bounded native command boundary
 

@@ -36,6 +36,15 @@ for evidence in \
   'return delegate_.publication_state_projection();' \
   'check_pipeline_build_failure' \
   'check_pipeline_check_failure' \
+  'check_native_runtime_pre_operation_failure' \
+  'pkgctl::native_posix_transaction_run_runtime::open' \
+  'pkgctl::transaction_run_drive_disposition::stopped_after_failure' \
+  'backend.build_calls() == expected_build_calls' \
+  'backend.check_calls() == expected_check_calls' \
+  'operations.operation_calls() == 0U' \
+  'operations.archive_calls() == 0U' \
+  'reopened.record().identity() == failed_record' \
+  'pkgctl::transaction_run_advance_disposition::quiescent' \
   'run.progress().failed()' \
   'transaction_node_status::blocked'; do
   grep -F "$evidence" "$test_source" >/dev/null || {

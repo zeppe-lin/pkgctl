@@ -47,10 +47,12 @@ build/check failure matrix: a completed POSIX application whose exact receipt bo
 was durably retained is adopted into the controller journal rather than applied or
 resumed again, already-selected canonical state is reconciled without duplicate
 publication, and definitive construction/check failures block dependent work
-before target mutation. The campaign also launches the sealed transaction through
-`native_posix_transaction_run_runtime`, then destroys and reopens that runtime
-over the same durable journals to prove completed operation observations and
-effect bodies replay without a second archive acquisition or mutation. Only the
+before target mutation. The campaign also launches successful and failed sealed
+transactions through `native_posix_transaction_run_runtime`. It destroys and
+reopens the successful runtime to prove completed operation observations and
+effect bodies replay without a second archive acquisition or mutation, and
+reopens failed build/check journals to prove stop-after-failure rehydration
+without rerunning the actuator or acquiring operation/archive authority. Only the
 external process actuator is replaced. This test composition does not make
 reconciliation a production `pkgctl` dependency.
 
