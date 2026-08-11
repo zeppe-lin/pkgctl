@@ -10,14 +10,17 @@
   run nonce; `--resume` requires that exact retained universe and exact admitted
   journal while refusing a second semantic transaction request. Both perform at
   most the positive `--max-steps` bound through the reviewed native runtime.
-- Upgrades immutable command evidence to schema v2. Before run admission it
-  retains the complete start-only transaction inputs together with the original
+- Upgrades immutable command evidence to schema v3. Before run admission it
+  retains the complete start-only transaction inputs, the exact admitted
+  construction/check/lifecycle backend capability profiles, and the original
   owner-encoded catalog and canonical-state snapshots. Resume supplies only the
-  current canonical-store pathname plus live runtime/actuator authority; the
-  retained state snapshot supplies target binding, and retained collection,
-  architecture, goal, resolution-policy, and convergence semantics recompose the
-  same transaction identity. Re-declaring those start-only semantics on resume is
-  a usage error. The schema v1 evidence format has no compatibility decoder.
+  current canonical-store pathname plus live runtime/actuator authority; retained
+  state supplies target binding and retained transaction semantics recompose the same
+  transaction identity. Historical execution evidence is validated against retained
+  profiles, while current backend/credential preflight is required only for scopes
+  that can still execute. Completed or externally blocked runs therefore do not
+  re-prove unused actuator authority. Re-declaring start-only semantics is a usage
+  error, and schemas v1/v2 have no compatibility decoder.
 - Retains lifecycle results, application receipts, publication requests, and
   publication receipts in a private immutable command store before an effect
   journal may name them. Bodies use their owning codecs and are validated again

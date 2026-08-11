@@ -269,11 +269,11 @@ class native_transaction_progress_rehydration_context_source final
 public:
   native_transaction_progress_rehydration_context_source(
       transaction_dispatch_session_source& sessions,
-      pkgexec::execution_backend& construction_backend,
-      pkgexec::execution_backend& check_backend,
+      pkgexec::backend_capability_profile construction_backend,
+      pkgexec::backend_capability_profile check_backend,
       native_transaction_operation_authority_source& operations)
-      : sessions_(sessions), construction_backend_(construction_backend),
-        check_backend_(check_backend), operations_(operations)
+      : sessions_(sessions), construction_backend_(std::move(construction_backend)),
+        check_backend_(std::move(check_backend)), operations_(operations)
   {
   }
 
@@ -311,8 +311,8 @@ public:
 
 private:
   transaction_dispatch_session_source& sessions_;
-  pkgexec::execution_backend& construction_backend_;
-  pkgexec::execution_backend& check_backend_;
+  pkgexec::backend_capability_profile construction_backend_;
+  pkgexec::backend_capability_profile check_backend_;
   native_transaction_operation_authority_source& operations_;
 };
 
@@ -328,13 +328,15 @@ public:
       transaction_operation_execution_authority_source& operation_execution,
       transaction_operation_recovery_authority_source& operation_recovery,
       transaction_effect_archive_source& archives,
+      pkgexec::backend_capability_profile construction_recovery_backend,
+      pkgexec::backend_capability_profile check_recovery_backend,
       transaction_run_runtime_backends backends,
       transaction_effect_body_sink* effect_bodies)
       : runs_(runs), evidence_(evidence), effects_(effects), progress_(progress),
         execution_(sessions, operation_execution),
         recovery_context_(
-            sessions, backends.construction, backends.check,
-            operation_recovery),
+            sessions, std::move(construction_recovery_backend),
+            std::move(check_recovery_backend), operation_recovery),
         recovery_(evidence_, recovery_context_),
         construction_(backends.construction), check_(backends.check),
         operation_(
@@ -487,7 +489,8 @@ public:
             runs_, evidence_, effects_, target_lock_directory_fd,
             authorities_.progress, authorities_.sessions,
             authorities_.operation_execution, authorities_.operation_recovery,
-            authorities_.archives, backends, nullptr)
+            authorities_.archives, backends.construction.capabilities(),
+            backends.check.capabilities(), backends, nullptr)
   {
   }
 
@@ -590,14 +593,24 @@ public:
         archives_(authorities.archives != nullptr
                 ? authorities.archives
                 : owned_archives_.get()),
+        construction_recovery_backend_(
+            authorities.construction_recovery_backend != nullptr
+                ? *authorities.construction_recovery_backend
+                : backends.construction.capabilities()),
+        check_recovery_backend_(
+            authorities.check_recovery_backend != nullptr
+                ? *authorities.check_recovery_backend
+                : backends.check.capabilities()),
         progress_context_(
-            sessions_, backends.construction, backends.check, operations_),
+            sessions_, construction_recovery_backend_, check_recovery_backend_,
+            operations_),
         progress_(
             configuration_.transaction(), evidence_, effects_,
             progress_context_),
         engine_(
             runs_, evidence_, effects_, target_lock_directory_fd, progress_,
             sessions_, operations_, operations_, *archives_,
+            construction_recovery_backend_, check_recovery_backend_,
             {backends.construction, backends.check, backends.application,
              backends.lifecycle, backends.state},
             authorities.effect_bodies)
@@ -631,6 +644,8 @@ private:
   native_transaction_operation_authority_source operations_;
   std::unique_ptr<explicit_transaction_effect_archive_source> owned_archives_;
   transaction_effect_archive_source* archives_;
+  pkgexec::backend_capability_profile construction_recovery_backend_;
+  pkgexec::backend_capability_profile check_recovery_backend_;
   native_transaction_progress_rehydration_context_source progress_context_;
   stored_transaction_progress_rehydration_source progress_;
   transaction_run_runtime_engine engine_;

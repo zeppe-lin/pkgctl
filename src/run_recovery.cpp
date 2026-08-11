@@ -280,10 +280,9 @@ detail::native_construction_recovery_context(
     const transaction_dispatch& dispatch,
     const construction_dispatch_evidence_record& evidence,
     transaction_dispatch_session_source& sessions,
-    pkgexec::execution_backend& selected_backend)
+    pkgexec::backend_capability_profile backend)
 {
   auto session = sessions.construction(record, progress, dispatch);
-  auto backend = selected_backend.capabilities();
   const auto& request = session.request();
   if (session.identity() != evidence.attempt_session() ||
       request.identity() != evidence.controller_request() ||
@@ -325,10 +324,9 @@ check_dispatch_recovery_context detail::native_check_recovery_context(
     const transaction_dispatch& dispatch,
     const check_dispatch_evidence_record& evidence,
     transaction_dispatch_session_source& sessions,
-    pkgexec::execution_backend& selected_backend)
+    pkgexec::backend_capability_profile backend)
 {
   auto session = sessions.check(record, progress, dispatch);
-  auto backend = selected_backend.capabilities();
   const auto& request = session.request();
   if (session.identity() != evidence.attempt_session() ||
       request.identity() != evidence.controller_request() ||
@@ -353,11 +351,11 @@ check_dispatch_recovery_context detail::native_check_recovery_context(
 native_transaction_dispatch_recovery_context_source::
 native_transaction_dispatch_recovery_context_source(
     transaction_dispatch_session_source& sessions,
-    pkgexec::execution_backend& construction_backend,
-    pkgexec::execution_backend& check_backend,
+    pkgexec::backend_capability_profile construction_backend,
+    pkgexec::backend_capability_profile check_backend,
     transaction_operation_recovery_authority_source& operations)
-    : sessions_(sessions), construction_backend_(construction_backend),
-      check_backend_(check_backend), operations_(operations)
+    : sessions_(sessions), construction_backend_(std::move(construction_backend)),
+      check_backend_(std::move(check_backend)), operations_(operations)
 {
 }
 

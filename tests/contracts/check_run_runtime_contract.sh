@@ -52,6 +52,10 @@ for required in \
   'native_transaction_operation_authority_source operations_' \
   'std::unique_ptr<explicit_transaction_effect_archive_source> owned_archives_' \
   'transaction_effect_archive_source* archives_' \
+  'construction_recovery_backend' \
+  'check_recovery_backend' \
+  'pkgexec::backend_capability_profile construction_recovery_backend_' \
+  'pkgexec::backend_capability_profile check_recovery_backend_' \
   'native_transaction_progress_rehydration_context_source progress_context_' \
   'detail::native_construction_recovery_context(' \
   'detail::native_check_recovery_context(' \
@@ -77,6 +81,8 @@ for token in \
   'operations_(' \
   'owned_archives_(' \
   'archives_(' \
+  'construction_recovery_backend_(' \
+  'check_recovery_backend_(' \
   'progress_context_(' \
   'progress_(' \
   'engine_('; do

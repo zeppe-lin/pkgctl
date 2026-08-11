@@ -4,6 +4,8 @@
 #include "run_command.h"
 
 #include <pkgctl/controller.h>
+#include <pkgctl/effect_restart.h>
+#include <pkgctl/effect_store.h>
 #include <pkgctl/preparation.h>
 #include <pkgctl/run_runtime.h>
 #include <pkgctl/run_store.h>
@@ -53,9 +55,9 @@ namespace {
 
 constexpr std::size_t maximum_private_object_size = 1024U * 1024U * 1024U;
 constexpr std::string_view command_universe_magic =
-    "PKGCTL-COMMAND-UNIVERSE-2";
+    "PKGCTL-COMMAND-UNIVERSE-3";
 constexpr std::string_view command_universe_checksum_domain =
-    "pkgctl/command-universe/2";
+    "pkgctl/command-universe/3";
 
 class fd_guard final {
 public:
@@ -314,6 +316,100 @@ void append_bytes(
   return make_session_identity(std::string(domain), {body}).hex();
 }
 
+[[nodiscard]] std::size_t read_count(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset,
+    std::string_view description);
+
+[[nodiscard]] std::uint64_t execution_guarantee_tag(
+    pkgexec::execution_guarantee guarantee)
+{
+  switch (guarantee)
+  {
+    case pkgexec::execution_guarantee::exact_interpreter: return 1U;
+    case pkgexec::execution_guarantee::closed_environment: return 2U;
+    case pkgexec::execution_guarantee::root_view: return 3U;
+    case pkgexec::execution_guarantee::read_only_resources: return 4U;
+    case pkgexec::execution_guarantee::writable_resources: return 5U;
+    case pkgexec::execution_guarantee::fixed_credentials: return 6U;
+    case pkgexec::execution_guarantee::network_denied: return 7U;
+    case pkgexec::execution_guarantee::loopback_isolated: return 8U;
+    case pkgexec::execution_guarantee::resource_limits: return 9U;
+    case pkgexec::execution_guarantee::cancellation: return 10U;
+    case pkgexec::execution_guarantee::complete_stdout_capture: return 11U;
+    case pkgexec::execution_guarantee::complete_stderr_capture: return 12U;
+    case pkgexec::execution_guarantee::cleanup_verified: return 13U;
+    case pkgexec::execution_guarantee::cpu_time_limit: return 14U;
+    case pkgexec::execution_guarantee::address_space_limit: return 15U;
+    case pkgexec::execution_guarantee::file_size_limit: return 16U;
+    case pkgexec::execution_guarantee::open_files_limit: return 17U;
+    case pkgexec::execution_guarantee::process_count_limit: return 18U;
+  }
+  throw std::runtime_error(
+      "retained backend profile has an unknown execution guarantee");
+}
+
+[[nodiscard]] pkgexec::execution_guarantee read_execution_guarantee(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset)
+{
+  switch (read_u64(bytes, offset))
+  {
+    case 1U: return pkgexec::execution_guarantee::exact_interpreter;
+    case 2U: return pkgexec::execution_guarantee::closed_environment;
+    case 3U: return pkgexec::execution_guarantee::root_view;
+    case 4U: return pkgexec::execution_guarantee::read_only_resources;
+    case 5U: return pkgexec::execution_guarantee::writable_resources;
+    case 6U: return pkgexec::execution_guarantee::fixed_credentials;
+    case 7U: return pkgexec::execution_guarantee::network_denied;
+    case 8U: return pkgexec::execution_guarantee::loopback_isolated;
+    case 9U: return pkgexec::execution_guarantee::resource_limits;
+    case 10U: return pkgexec::execution_guarantee::cancellation;
+    case 11U: return pkgexec::execution_guarantee::complete_stdout_capture;
+    case 12U: return pkgexec::execution_guarantee::complete_stderr_capture;
+    case 13U: return pkgexec::execution_guarantee::cleanup_verified;
+    case 14U: return pkgexec::execution_guarantee::cpu_time_limit;
+    case 15U: return pkgexec::execution_guarantee::address_space_limit;
+    case 16U: return pkgexec::execution_guarantee::file_size_limit;
+    case 17U: return pkgexec::execution_guarantee::open_files_limit;
+    case 18U: return pkgexec::execution_guarantee::process_count_limit;
+    default:
+      throw std::runtime_error(
+          "private run execution-guarantee tag is invalid");
+  }
+}
+
+void append_backend_profile(
+    std::vector<std::uint8_t>& output,
+    const pkgexec::backend_capability_profile& profile)
+{
+  append_text(output, profile.backend().hex());
+  append_u64(output, profile.guarantees().size());
+  for (const auto guarantee : profile.guarantees())
+    append_u64(output, execution_guarantee_tag(guarantee));
+  append_text(output, profile.identity().hex());
+}
+
+[[nodiscard]] pkgexec::backend_capability_profile read_backend_profile(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset)
+{
+  auto backend = pkgexec::backend_identity::from_sha256(read_text(bytes, offset));
+  const auto count = read_count(bytes, offset, "backend guarantee");
+  std::vector<pkgexec::execution_guarantee> guarantees;
+  guarantees.reserve(count);
+  for (std::size_t index = 0U; index < count; ++index)
+    guarantees.push_back(read_execution_guarantee(bytes, offset));
+  auto profile = pkgexec::backend_capability_profile::seal(
+      std::move(backend), std::move(guarantees));
+  const auto retained_identity =
+      pkgexec::backend_capability_profile_identity::from_sha256(
+          read_text(bytes, offset));
+  if (profile.identity() != retained_identity)
+    throw std::runtime_error(
+        "private run backend profile identity is invalid");
+  return profile;
+}
 
 void append_command_optional_text(
     std::vector<std::uint8_t>& output,
@@ -621,11 +717,18 @@ void append_transaction_request_inputs(
       std::move(resolution), std::move(convergence));
 }
 
+struct retained_native_execution_profiles final {
+  pkgexec::backend_capability_profile construction;
+  pkgexec::backend_capability_profile check;
+  pkgexec::backend_capability_profile lifecycle;
+};
+
 struct retained_command_universe final {
   session_identity transaction;
   transaction_request request;
   pkgcatalog::catalog_snapshot catalog;
   pkgstate::snapshot state;
+  retained_native_execution_profiles execution_profiles;
 };
 
 class command_universe_store final {
@@ -637,7 +740,8 @@ public:
 
   void retain(
       const transaction_run_nonce& nonce,
-      const transaction_session& transaction)
+      const transaction_session& transaction,
+      const retained_native_execution_profiles& execution_profiles)
   {
     const auto catalog = pkgcatalog::encode_catalog_snapshot(
         transaction.resolution().catalog().catalog());
@@ -651,6 +755,9 @@ public:
     append_bytes(bytes, catalog);
     append_bytes(bytes, state);
     append_bytes(bytes, request);
+    append_backend_profile(bytes, execution_profiles.construction);
+    append_backend_profile(bytes, execution_profiles.check);
+    append_backend_profile(bytes, execution_profiles.lifecycle);
     append_text(bytes, checksum(command_universe_checksum_domain, bytes));
     retain_immutable(
         directory_.get(), name(nonce), bytes, "command-universe");
@@ -668,6 +775,9 @@ public:
     const auto catalog_encoding = read_bytes(bytes, offset);
     const auto state_encoding = read_bytes(bytes, offset);
     const auto request_encoding = read_bytes(bytes, offset);
+    retained_native_execution_profiles execution_profiles{
+        read_backend_profile(bytes, offset), read_backend_profile(bytes, offset),
+        read_backend_profile(bytes, offset)};
     const auto checksum_offset = offset;
     const auto expected_checksum = read_text(bytes, offset);
     if (offset != bytes.size())
@@ -688,8 +798,8 @@ public:
         state.target_binding());
     if (request_offset != request_encoding.size())
       throw std::runtime_error("command universe request has trailing bytes");
-    return {
-        transaction, std::move(request), std::move(catalog), std::move(state)};
+    return {transaction, std::move(request), std::move(catalog),
+            std::move(state), std::move(execution_profiles)};
   }
 
 private:
@@ -1692,62 +1802,193 @@ private:
 }
 
 struct native_execution_scope final {
-  bool construction_or_check = false;
+  bool construction = false;
+  bool check = false;
   bool lifecycle = false;
+
+  [[nodiscard]] bool any() const noexcept
+  {
+    return construction || check || lifecycle;
+  }
 };
+
+void include_native_execution_scope(
+    native_execution_scope& scopes,
+    pkgtransaction::transaction_action_kind action)
+{
+  switch (action)
+  {
+    case pkgtransaction::transaction_action_kind::build:
+      scopes.construction = true;
+      return;
+    case pkgtransaction::transaction_action_kind::check:
+      scopes.check = true;
+      return;
+    case pkgtransaction::transaction_action_kind::lifecycle:
+      scopes.lifecycle = true;
+      return;
+    case pkgtransaction::transaction_action_kind::install:
+    case pkgtransaction::transaction_action_kind::upgrade:
+    case pkgtransaction::transaction_action_kind::retain:
+    case pkgtransaction::transaction_action_kind::remove:
+      return;
+  }
+}
 
 [[nodiscard]] native_execution_scope native_execution_scopes(
     const pkgtransaction::transaction_program& program)
 {
   native_execution_scope result;
   for (const auto& node : program.nodes())
+    include_native_execution_scope(result, node.action());
+  return result;
+}
+
+[[nodiscard]] bool contains_node(
+    const std::vector<pkgtransaction::transaction_node_identity>& nodes,
+    const pkgtransaction::transaction_node_identity& needle)
+{
+  return std::find(nodes.begin(), nodes.end(), needle) != nodes.end();
+}
+
+void include_unit_nodes(
+    std::vector<pkgtransaction::transaction_node_identity>& result,
+    const ready_transaction_unit& unit)
+{
+  for (const auto& node : unit.members())
   {
-    switch (node.action())
+    if (!contains_node(result, node))
+      result.push_back(node);
+  }
+}
+
+[[nodiscard]] bool effect_recovery_stops_run(
+    const effect_attempt_record& record)
+{
+  const auto assessment = assess_effect_restart(record);
+  if (!assessment.automatically_continuable())
+    return true;
+
+  if (assessment.disposition() == effect_restart_disposition::terminal)
+  {
+    return record.terminal_outcome() !=
+        std::optional<effectful_operation_outcome>(
+            effectful_operation_outcome::completed);
+  }
+
+  if (assessment.disposition() != effect_restart_disposition::seal_terminal)
+    return false;
+
+  switch (record.stage())
+  {
+    case effect_attempt_stage::before_lifecycle_terminal:
+      return !record.before().back().succeeded();
+    case effect_attempt_stage::application_terminal:
+      return record.application()->outcome() !=
+          pkgapply::application_attempt_outcome::completed;
+    case effect_attempt_stage::after_lifecycle_terminal:
+      return !record.after().back().succeeded();
+    case effect_attempt_stage::publication_terminal:
+      return record.publication()->outcome() !=
+          pkgstate::state_publication_outcome::published;
+    case effect_attempt_stage::admitted:
+    case effect_attempt_stage::before_lifecycle_intent:
+    case effect_attempt_stage::application_intent:
+    case effect_attempt_stage::after_lifecycle_intent:
+    case effect_attempt_stage::publication_intent:
+    case effect_attempt_stage::terminal:
+      break;
+  }
+  throw std::runtime_error(
+      "seal-terminal effect assessment has an invalid journal stage");
+}
+
+[[nodiscard]] bool effect_recovery_may_execute_lifecycle(
+    const effect_attempt_record& record)
+{
+  const auto disposition = assess_effect_restart(record).disposition();
+  switch (disposition)
+  {
+    case effect_restart_disposition::continue_before_lifecycle:
+    case effect_restart_disposition::start_application:
+    case effect_restart_disposition::resume_application:
+    case effect_restart_disposition::continue_after_application:
+    case effect_restart_disposition::continue_after_lifecycle:
+      return record.before().size() < record.before_total() ||
+          record.after().size() < record.after_total();
+    case effect_restart_disposition::start_publication:
+    case effect_restart_disposition::reconcile_publication:
+    case effect_restart_disposition::seal_terminal:
+    case effect_restart_disposition::terminal:
+    case effect_restart_disposition::external_resolution_required:
+      return false;
+  }
+  return false;
+}
+
+[[nodiscard]] native_execution_scope resume_native_execution_scopes(
+    const pkgtransaction::transaction_program& program,
+    const transaction_run_journal_record& record,
+    const effect_journal_store& effects)
+{
+  if (record.complete() || record.failed() || record.stopped())
+    return {};
+
+  native_execution_scope result;
+  std::vector<pkgtransaction::transaction_node_identity> owned;
+  for (const auto& retained : record.dispatches())
+  {
+    if (retained.state() != transaction_dispatch_state::completed &&
+        retained.state() != transaction_dispatch_state::started)
     {
-      case pkgtransaction::transaction_action_kind::build:
-      case pkgtransaction::transaction_action_kind::check:
-        result.construction_or_check = true;
-        break;
-      case pkgtransaction::transaction_action_kind::lifecycle:
-        result.lifecycle = true;
-        break;
-      case pkgtransaction::transaction_action_kind::install:
-      case pkgtransaction::transaction_action_kind::upgrade:
-      case pkgtransaction::transaction_action_kind::retain:
-      case pkgtransaction::transaction_action_kind::remove:
-        break;
+      continue;
     }
+
+    include_unit_nodes(owned, retained.dispatch().unit());
+    if (retained.state() != transaction_dispatch_state::started ||
+        retained.dispatch().unit().kind() != transaction_unit_kind::operation)
+    {
+      continue;
+    }
+
+    if (!retained.observations().empty())
+      return {};
+
+    if (!retained.effect_attempt())
+    {
+      for (const auto& member : retained.dispatch().unit().members())
+      {
+        const auto* node = program.find(member);
+        if (node == nullptr)
+          throw std::runtime_error(
+              "retained operation dispatch names an unknown transaction node");
+        include_native_execution_scope(result, node->action());
+      }
+      continue;
+    }
+
+    const auto effect = effects.load_latest(*retained.effect_attempt());
+    if (!effect)
+      throw std::runtime_error(
+          "started operation dispatch lacks retained effect evidence");
+    if (effect_recovery_stops_run(*effect))
+      return {};
+    if (effect_recovery_may_execute_lifecycle(*effect))
+      result.lifecycle = true;
+  }
+
+  for (const auto& node : program.nodes())
+  {
+    if (!contains_node(owned, node.identity()))
+      include_native_execution_scope(result, node.action());
   }
   return result;
 }
 
 [[nodiscard]] std::vector<pkgexec::execution_guarantee>
-native_execution_requirements(
-    const pkgtransaction::transaction_program& program)
+native_execution_requirements(const native_execution_scope& scopes)
 {
-  bool requires_execution = false;
-  bool requires_read_only_resources = false;
-  for (const auto& node : program.nodes())
-  {
-    switch (node.action())
-    {
-      case pkgtransaction::transaction_action_kind::build:
-      case pkgtransaction::transaction_action_kind::check:
-        requires_execution = true;
-        requires_read_only_resources = true;
-        break;
-      case pkgtransaction::transaction_action_kind::lifecycle:
-        requires_execution = true;
-        break;
-      case pkgtransaction::transaction_action_kind::install:
-      case pkgtransaction::transaction_action_kind::upgrade:
-      case pkgtransaction::transaction_action_kind::retain:
-      case pkgtransaction::transaction_action_kind::remove:
-        break;
-    }
-  }
-
-  if (!requires_execution)
+  if (!scopes.any())
     return {};
 
   std::vector<pkgexec::execution_guarantee> required{
@@ -1761,7 +2002,7 @@ native_execution_requirements(
       pkgexec::execution_guarantee::complete_stderr_capture,
       pkgexec::execution_guarantee::cleanup_verified,
   };
-  if (requires_read_only_resources)
+  if (scopes.construction || scopes.check)
     required.push_back(pkgexec::execution_guarantee::read_only_resources);
   std::sort(required.begin(), required.end());
   return required;
@@ -1808,13 +2049,13 @@ native_execution_requirements(
 }
 
 void require_native_execution_preflight(
-    const pkgtransaction::transaction_program& program,
+    const native_execution_scope& scopes,
     const pkgexec_linux::capability_report& report,
     const pkgexec::credential_policy& build_credentials,
-    const pkgexec::credential_policy& lifecycle_credentials)
+    const pkgexec::credential_policy& lifecycle_credentials,
+    const retained_native_execution_profiles* retained_profiles = nullptr)
 {
-  const auto required = native_execution_requirements(program);
-  const auto scopes = native_execution_scopes(program);
+  const auto required = native_execution_requirements(scopes);
   if (required.empty())
     return;
 
@@ -1827,7 +2068,8 @@ void require_native_execution_preflight(
   }
 
   std::vector<std::string> missing_authorities;
-  if (scopes.construction_or_check && !current_credentials(build_credentials))
+  if ((scopes.construction || scopes.check) &&
+      !current_credentials(build_credentials))
   {
     missing_authorities.push_back(
         "construction/check credentials must match the native supervisor");
@@ -1836,6 +2078,26 @@ void require_native_execution_preflight(
   {
     missing_authorities.push_back(
         "lifecycle credentials must match the native supervisor");
+  }
+
+  if (retained_profiles != nullptr)
+  {
+    const auto& current = report.profile();
+    if (scopes.construction && current != retained_profiles->construction)
+    {
+      missing_authorities.push_back(
+          "construction backend capability profile differs from admitted run authority");
+    }
+    if (scopes.check && current != retained_profiles->check)
+    {
+      missing_authorities.push_back(
+          "check backend capability profile differs from admitted run authority");
+    }
+    if (scopes.lifecycle && current != retained_profiles->lifecycle)
+    {
+      missing_authorities.push_back(
+          "lifecycle backend capability profile differs from admitted run authority");
+    }
   }
 
   if (missing.empty() && missing_authorities.empty())
@@ -2248,6 +2510,7 @@ int execute_transaction_run(transaction_run_command command)
 
   command_universe_store universes(
       runtime_path(command, "command-evidence"));
+  std::optional<retained_command_universe> retained_universe;
   transaction_session transaction = [&]() {
     if (command.intent == transaction_run_command_intent::start)
     {
@@ -2259,30 +2522,19 @@ int execute_transaction_run(transaction_run_command command)
     if (command.transaction)
       throw std::runtime_error(
           "resumed run carries duplicate transaction authority");
-    auto retained = universes.load(command.nonce, command.canonical_store);
+    retained_universe.emplace(
+        universes.load(command.nonce, command.canonical_store));
     auto composed = recompose_transaction(
-        std::move(retained.request), std::move(retained.catalog),
-        std::move(retained.state));
-    if (composed.identity() != retained.transaction)
+        std::move(retained_universe->request),
+        std::move(retained_universe->catalog),
+        std::move(retained_universe->state));
+    if (composed.identity() != retained_universe->transaction)
       throw std::runtime_error(
           "retained command universe recomposes another transaction");
     return composed;
   }();
 
   const auto& binding = transaction.resolution().installed().target_binding();
-
-  auto interpreter = pkgexec_linux::interpreter_binding::inspect(
-      command.interpreter);
-  auto execution_backend = pkgexec_linux::isolated_backend::make({interpreter});
-  require_native_execution_preflight(
-      transaction.program(), execution_backend.report(),
-      command.build_credentials, command.lifecycle_credentials);
-  const auto execution_capabilities = execution_backend.capabilities();
-  auto application_target = command_application_target(
-      command, transaction, binding, execution_capabilities);
-  auto target_observer =
-      pkgapply::posix::application_target_observer::from_directory_fd(
-          target_root.get());
 
   auto run_store = open_directory(runtime_path(command, "run"));
   auto evidence_store = open_directory(runtime_path(command, "evidence"));
@@ -2297,12 +2549,56 @@ int execute_transaction_run(transaction_run_command command)
   auto rejected_directory = open_directory(runtime_path(command, "rejected"));
   auto completed_directory = open_directory(runtime_path(command, "completed"));
 
+  const auto dispatch_policy = transaction_dispatch_policy::make(1U, 1U);
+  const auto expected_admission = transaction_run_journal_record::admit(
+      transaction_run::begin(
+          transaction_progress::begin(transaction), dispatch_policy),
+      command.nonce);
+  auto admission_store =
+      posix_transaction_run_journal_store::from_directory_fd(run_store.get());
+  const auto existing = admission_store.load_latest(expected_admission.journal());
+  if (command.intent == transaction_run_command_intent::start && existing)
+    throw std::runtime_error(
+        "exact transaction run is already admitted; use --resume");
+  if (command.intent == transaction_run_command_intent::resume && !existing)
+    throw std::runtime_error(
+        "exact transaction run is not admitted; use --start");
+
+  auto interpreter = pkgexec_linux::interpreter_binding::inspect(
+      command.interpreter);
+  auto execution_backend = pkgexec_linux::isolated_backend::make({interpreter});
+  const auto current_execution_profile = execution_backend.capabilities();
+  retained_native_execution_profiles admitted_execution_profiles{
+      current_execution_profile, current_execution_profile,
+      current_execution_profile};
+  if (retained_universe)
+    admitted_execution_profiles = retained_universe->execution_profiles;
+
+  auto effect_inspection_store =
+      posix_effect_journal_store::from_directory_fd(effect_store.get());
+  const auto execution_scopes = command.intent == transaction_run_command_intent::start
+      ? native_execution_scopes(transaction.program())
+      : resume_native_execution_scopes(
+            transaction.program(), *existing, effect_inspection_store);
+  require_native_execution_preflight(
+      execution_scopes, execution_backend.report(), command.build_credentials,
+      command.lifecycle_credentials,
+      command.intent == transaction_run_command_intent::resume
+          ? &admitted_execution_profiles
+          : nullptr);
+
+  auto application_target = command_application_target(
+      command, transaction, binding, admitted_execution_profiles.lifecycle);
+  auto target_observer =
+      pkgapply::posix::application_target_observer::from_directory_fd(
+          target_root.get());
+
   auto application_journals =
       pkgapply::posix::application_journal_store::from_directory_fd(
           application_journal_directory.get());
   private_effect_body_store effect_bodies(
       runtime_path(command, "effect-bodies"), application_journals,
-      execution_capabilities);
+      admitted_execution_profiles.lifecycle);
   auto application_backend =
       pkgapply::posix::application_posix_backend::from_directory_fds(
           application_target, target_root.get(),
@@ -2319,22 +2615,11 @@ int execute_transaction_run(transaction_run_command command)
       transaction, target_observer, archive_backend, application_target,
       runtime_path(command, "effect-bodies"));
 
-  const auto dispatch_policy = transaction_dispatch_policy::make(1U, 1U);
-  const auto expected_admission = transaction_run_journal_record::admit(
-      transaction_run::begin(
-          transaction_progress::begin(transaction), dispatch_policy),
-      command.nonce);
-  auto admission_store =
-      posix_transaction_run_journal_store::from_directory_fd(run_store.get());
-  const auto existing = admission_store.load_latest(expected_admission.journal());
-  if (command.intent == transaction_run_command_intent::start && existing)
-    throw std::runtime_error(
-        "exact transaction run is already admitted; use --resume");
-  if (command.intent == transaction_run_command_intent::resume && !existing)
-    throw std::runtime_error(
-        "exact transaction run is not admitted; use --start");
   if (command.intent == transaction_run_command_intent::start)
-    universes.retain(command.nonce, transaction);
+  {
+    universes.retain(
+        command.nonce, transaction, admitted_execution_profiles);
+  }
 
   auto configuration = native_transaction_run_runtime_configuration::make(
       transaction, command_sessions(command, binding, interpreter),
@@ -2343,7 +2628,9 @@ int execute_transaction_run(transaction_run_command command)
       run_store.get(), evidence_store.get(), effect_store.get(),
       target_locks.get(), std::move(configuration),
       {installed_packages, operation_authority, effect_bodies,
-       &operation_authority, &effect_bodies, &operation_authority},
+       &operation_authority, &effect_bodies, &operation_authority,
+       &admitted_execution_profiles.construction,
+       &admitted_execution_profiles.check},
       {execution_backend, execution_backend, *application_backend,
        execution_backend, state_store, archive_backend});
 

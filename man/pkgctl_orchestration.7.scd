@@ -14,15 +14,19 @@ the resulting control state.
 
 Version 0.35.0 exposes *pkgctl run*, one narrow command over the existing native
 runtime. *--start* composes from the explicit transaction request, then
-immutably retains command-evidence schema v2: the complete start-only
-transaction inputs plus the owner-encoded catalog/state universe, before admitting one caller-issued run
+immutably retains command-evidence schema v3: the complete start-only
+transaction inputs, exact admitted construction/check/lifecycle backend capability
+profiles, plus the owner-encoded catalog/state universe, before admitting one caller-issued run
 nonce. *--resume* requires the retained universe and exact admitted journal and
 recomposes the same transaction identity without a second semantic request.
 Catalog acquisition, target-binding, architecture, goal, resolution-policy, and
 convergence options are start-only. Resume accepts the current canonical-store
 pathname as live physical authority while taking its target binding from retained
 state evidence. It does not reacquire collections or substitute current state for
-the historical epoch, and no v1 evidence compatibility path exists.
+the historical epoch. Recovery validates historical execution evidence against the
+retained backend profiles; live capability and supervisor-credential preflight is
+required only for execution scopes that can still run. Older command-evidence
+schemas have no compatibility path.
 
 The command-private effect-body store is both durable sink and restart source.
 Lifecycle results, application receipts, publication requests, and publication

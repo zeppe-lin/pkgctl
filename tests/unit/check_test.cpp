@@ -1731,7 +1731,7 @@ void check_stored_check_recovery()
   check_execution_authority_source sessions(session);
   unreachable_operation_recovery_context_source operations;
   pkgctl::native_transaction_dispatch_recovery_context_source native_context(
-      sessions, backend, backend, operations);
+      sessions, backend.capabilities(), backend.capabilities(), operations);
   pkgctl::stored_transaction_dispatch_recovery_authority_source native_source(
       evidence_store, native_context);
   auto native_recovery =

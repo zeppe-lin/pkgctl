@@ -159,14 +159,23 @@ missing lock pathname. Delete the live collection before resume to keep the
 retained-command-universe guarantee in the same proof.
 
 A resumed command must not carry a second semantic transaction request merely so
-the CLI can prove equality with itself. Command-evidence schema v2 retains every start-only transaction input together with owner-encoded catalog/state
-snapshots before run admission. Every process-level resume test must therefore
+the CLI can prove equality with itself. Command-evidence schema v3 retains every
+start-only transaction input, the exact admitted construction/check/lifecycle backend
+capability profiles, and owner-encoded catalog/state snapshots before run admission. Every process-level resume test must therefore
 omit catalog acquisition, target-binding identities, architecture, goals,
 resolution preference, and convergence policy; explicit re-declaration is a
 usage error. The canonical-store pathname remains live physical authority on
 resume, but its target binding comes from retained state evidence. Do not add a
-v1 compatibility decoder: the old evidence format is not a public
-state authority and must fail closed.
+v1/v2 compatibility decoder: older command evidence is not a public state authority
+and must fail closed. Historical execution evidence must be decoded against the
+retained profile, never a freshly probed substitute. Treat current capability reports
+and current-supervisor credential equality as execute-now authority: require them only
+for scopes that durable progress/recovery can still invoke. A completed or externally
+blocked run must not be made unrecoverable merely because an unused actuator is no
+longer executable in the current process context. Keep both sides process-qualified:
+remaining check work must reject a changed supervisor, while completed and retained
+outer-lease-loss runs must reopen under that changed supervisor without journal
+advancement.
 
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has

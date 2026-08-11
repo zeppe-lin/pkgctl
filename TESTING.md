@@ -62,13 +62,15 @@ The final command suite must prove:
 - `--start` and `--resume` are mutually exclusive and require one explicit
   lowercase run nonce, existing roots, inspected interpreter, numeric
   credentials, source-date epoch, and positive step bound;
-- start retains command-evidence schema v2 before admission: the complete start-only transaction inputs plus owner-encoded catalog/state
-  snapshots. Resume requires
+- start retains command-evidence schema v3 before admission: the complete
+  start-only transaction inputs, exact admitted backend capability profiles for
+  construction/check/lifecycle, plus owner-encoded catalog/state snapshots.
+  Resume requires
   that retained universe and exact journal, omits all catalog, target-binding,
   architecture, goal, resolution-policy, and convergence options, and reproduces
   the same transaction identity using only the current canonical-store pathname
   as live state-store coordinate; re-declaring start semantics on resume is a
-  usage error and command-evidence v1 is intentionally unsupported;
+  usage error and command-evidence schemas v1/v2 are intentionally unsupported;
 - effect bodies are durably retained through owner codecs before journal records
   name them, interrupted application recovery uses direct active-request lookup
   rather than enumeration, and later application/terminal replay does not feed
@@ -77,6 +79,14 @@ The final command suite must prove:
   build, or target paths; a malformed caller-owned execution root is retained
   as terminal construction evidence and the command surfaces its durable backend
   diagnostic instead of reporting only a generic failed disposition;
+- resume recovery decodes retained construction/check and lifecycle bodies against
+  the backend capability profiles admitted in command evidence rather than the live
+  backend profile. An incomplete run with remaining check work still refuses a changed
+  supervisor/current execution authority before journal advancement; after completion,
+  the same changed supervisor context must reopen with zero durable steps because no
+  execution scope remains. The privileged outer-lease-loss vertical repeats its
+  externally blocked resume under the same changed supervisor context and must
+  preserve the exact run/effect heads without execute-now preflight;
 - native check execution resets the exact call-scoped temporary host resource
   and prepares `/tmp/home` before entering `libpkgcheck-exec`, while the
   caller-owned execution root view remains untouched;

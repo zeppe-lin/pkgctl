@@ -198,6 +198,11 @@ if not get_option('tests').disabled()
     'fixtures/native_target_lock_revoker.cpp',
   )
 
+  native_credential_context_runner = executable(
+    'native-credential-context-runner',
+    'fixtures/native_credential_context_runner.cpp',
+  )
+
   cpp = meson.get_compiler('cpp')
   native_interpreter = custom_target(
     'native-test-interpreter',
@@ -360,6 +365,7 @@ if not get_option('tests').disabled()
       state_fixture,
       state_inspect_fixture,
       native_interpreter,
+      native_credential_context_runner,
       join_paths(
         meson.project_source_root(),
         'tests/fixtures/collections/simple-install',
@@ -369,7 +375,7 @@ if not get_option('tests').disabled()
         'tests/fixtures/native_root_view_fixture.sh',
       ),
     ],
-    depends: native_interpreter,
+    depends: [native_interpreter, native_credential_context_runner],
     suite: 'integration-privileged',
   )
 
@@ -410,6 +416,7 @@ if not get_option('tests').disabled()
       state_inspect_fixture,
       native_lease_loss_interpreter,
       native_target_lock_revoker,
+      native_credential_context_runner,
       join_paths(
         meson.project_source_root(),
         'tests/fixtures/collections/lifecycle-post-install-lease-loss',
@@ -419,7 +426,7 @@ if not get_option('tests').disabled()
         'tests/fixtures/native_root_view_fixture.sh',
       ),
     ],
-    depends: [native_lease_loss_interpreter, native_target_lock_revoker],
+    depends: [native_lease_loss_interpreter, native_target_lock_revoker, native_credential_context_runner],
     suite: 'integration-privileged',
   )
 

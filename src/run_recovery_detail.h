@@ -22,7 +22,7 @@ native_construction_recovery_context(
     const transaction_dispatch& dispatch,
     const construction_dispatch_evidence_record& evidence,
     transaction_dispatch_session_source& sessions,
-    pkgexec::execution_backend& backend);
+    pkgexec::backend_capability_profile backend);
 
 [[nodiscard]] check_dispatch_recovery_context native_check_recovery_context(
     const transaction_run_journal_record& record,
@@ -30,6 +30,6 @@ native_construction_recovery_context(
     const transaction_dispatch& dispatch,
     const check_dispatch_evidence_record& evidence,
     transaction_dispatch_session_source& sessions,
-    pkgexec::execution_backend& backend);
+    pkgexec::backend_capability_profile backend);
 
 } // namespace pkgctl::detail

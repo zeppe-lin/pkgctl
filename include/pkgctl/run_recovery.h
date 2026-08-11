@@ -73,17 +73,18 @@ public:
  * The same deterministic session source used for fresh execution is consulted
  * again under the retained durable record and dispatch.  Construction source
  * material is reacquired through libpkgfetch, execution requests are reproduced
- * through the pure build/check projections, and backend capability profiles are
- * obtained from the already-selected native backends.  Operation recovery is
- * delegated to its effect-journal owner.
+ * through the pure build/check projections, and the exact historical backend
+ * capability profiles are supplied as retained evidence authority.  Recovery
+ * therefore does not require a live execution backend merely to decode old
+ * evidence.  Operation recovery is delegated to its effect-journal owner.
  */
 class native_transaction_dispatch_recovery_context_source final
     : public transaction_dispatch_recovery_context_source {
 public:
   native_transaction_dispatch_recovery_context_source(
       transaction_dispatch_session_source& sessions,
-      pkgexec::execution_backend& construction_backend,
-      pkgexec::execution_backend& check_backend,
+      pkgexec::backend_capability_profile construction_backend,
+      pkgexec::backend_capability_profile check_backend,
       transaction_operation_recovery_authority_source& operations);
 
   [[nodiscard]] construction_dispatch_recovery_context construction(
@@ -105,8 +106,8 @@ public:
 
 private:
   transaction_dispatch_session_source& sessions_;
-  pkgexec::execution_backend& construction_backend_;
-  pkgexec::execution_backend& check_backend_;
+  pkgexec::backend_capability_profile construction_backend_;
+  pkgexec::backend_capability_profile check_backend_;
   transaction_operation_recovery_authority_source& operations_;
 };
 

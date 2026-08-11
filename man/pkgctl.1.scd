@@ -35,8 +35,9 @@ runtime, and performs at most the positive *--max-steps* bound. Before a fresh
 run is retained or admitted, the command proves that the selected native Linux
 backend can establish the execution guarantees implied by the transaction.
 Capability absence is reported as control-plane unavailability rather than a
-package build/check failure. *--start* then retains command-evidence schema v2:
-the complete start-only transaction inputs plus the original owner-encoded catalog
+package build/check failure. *--start* then retains command-evidence schema v3:
+the complete start-only transaction inputs, exact admitted construction/check/
+lifecycle backend capability profiles, plus the original owner-encoded catalog
 and state snapshots. *--resume* requires that retained universe and the exact admitted
 journal; it does not accept a second collection, target-binding, architecture,
 goal, resolution-policy, or convergence request.
@@ -206,7 +207,7 @@ Exactly one of the following is required:
 	architecture, goal, resolution-policy, and convergence options are invalid on
 	resume: their exact admitted values are decoded from command-evidence schema
 	v2. The current *--canonical-store* pathname remains caller authority for the
-	existing physical store. Evidence in the schema v1 format is rejected.
+	existing physical store. Evidence in schema v1 or v2 format is rejected.
 
 The following run authorities are also required:
 

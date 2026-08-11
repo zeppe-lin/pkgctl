@@ -166,7 +166,14 @@ private:
   std::vector<retained_transaction_effect_archive> archives_;
 };
 
-/*! \brief Live semantic owners bound into one native composition root. */
+/*! \brief Live semantic owners bound into one native composition root.
+ *
+ * Optional construction/check recovery profiles are historical evidence
+ * authority.  When absent, the selected live backend profile is used, which is
+ * suitable for a fresh runtime that has not crossed execution contexts.  A
+ * durable command may supply retained profiles so old evidence can be decoded
+ * without pretending the current backend already owns execution authority.
+ */
 struct native_transaction_run_runtime_authorities final {
   retained_installed_package_tree_source& installed_packages;
   transaction_operation_specification_source& operation_specifications;
@@ -174,6 +181,8 @@ struct native_transaction_run_runtime_authorities final {
   transaction_effect_archive_source* archives = nullptr;
   transaction_effect_body_sink* effect_bodies = nullptr;
   transaction_operation_session_sink* operation_sessions = nullptr;
+  const pkgexec::backend_capability_profile* construction_recovery_backend = nullptr;
+  const pkgexec::backend_capability_profile* check_recovery_backend = nullptr;
 };
 
 /*! \brief Explicit selected physical mechanisms for one native runtime. */

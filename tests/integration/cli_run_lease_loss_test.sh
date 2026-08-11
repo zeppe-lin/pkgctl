@@ -8,8 +8,9 @@ state_fixture=$2
 state_inspect_fixture=$3
 interpreter=$4
 revoker=$5
-fixture_collection=$6
-root_view_fixture=$7
+credential_context_runner=$6
+fixture_collection=$7
+root_view_fixture=$8
 case $interpreter in
   /*)
     ;;
@@ -51,6 +52,16 @@ build_uid=$uid
 build_gid=$gid
 build_groups=$groups
 lifecycle_goal='lifecycle:post-install=fixture'
+
+invoke_pkgctl()
+{
+  if [ -n "${supervisor_uid:-}" ]; then
+    "$credential_context_runner" "$supervisor_uid" "$supervisor_gid" \
+      "$pkgctl" "$@"
+  else
+    "$pkgctl" "$@"
+  fi
+}
 
 fail()
 {
@@ -164,9 +175,9 @@ run_command()
   done
   if [ "$intent" = --start ]; then
     # shellcheck disable=SC2086
-    "$pkgctl" "$@" $binding
+    invoke_pkgctl "$@" $binding
   else
-    "$pkgctl" "$@"
+    invoke_pkgctl "$@"
   fi
 }
 
@@ -361,7 +372,16 @@ target_before=$(sha256sum "$target/usr/bin/pkgctl-fixture")
 post_install_before=$(sha256sum "$target/post-install-ran")
 
 rm -rf "$collection"
-capture_run resumed --resume "$run_nonce" 1
+if [ "$uid" -eq 0 ]; then
+  chown -R 65534:65534 "$root"
+  supervisor_uid=65534
+  supervisor_gid=65534
+  capture_run resumed --resume "$run_nonce" 1
+  unset supervisor_uid supervisor_gid
+  chown -R "$uid:$gid" "$root"
+else
+  capture_run resumed --resume "$run_nonce" 1
+fi
 resumed_status=$(cat "$root/resumed.status")
 [ "$resumed_status" -eq 1 ] || {
   dump_file resumed-stdout "$root/resumed.out"

@@ -6,12 +6,13 @@ set -eu
 srcdir=${1:-.}
 test="$srcdir/tests/integration/cli_run_lease_loss_test.sh"
 fixture="$srcdir/tests/fixtures/native_target_lock_revoker.cpp"
+credential_runner="$srcdir/tests/fixtures/native_credential_context_runner.cpp"
 interpreter="$srcdir/tests/fixtures/native_lease_loss_interpreter_x86_64.S"
 recipe="$srcdir/tests/fixtures/collections/lifecycle-post-install-lease-loss/fixture/recipe.yml"
 meson="$srcdir/tests/meson.build"
 direct="$srcdir/tests/run-direct.sh"
 
-for path in "$test" "$fixture" "$interpreter" "$recipe" "$meson" "$direct"; do
+for path in "$test" "$fixture" "$credential_runner" "$interpreter" "$recipe" "$meson" "$direct"; do
   [ -s "$path" ] || {
     echo "missing CLI lease-loss qualification source: $path" >&2
     exit 1
@@ -35,6 +36,8 @@ for required in \
   'packages 0' \
   'post-install-ran' \
   'rm -rf "$collection"' \
+  'supervisor_uid=65534' \
+  'chown -R 65534:65534 "$root"' \
   "'steps 1'" \
   "'durable-steps 0'" \
   'resumed-run-record' \
@@ -111,6 +114,10 @@ grep -F 'native_target_lock_revoker' "$meson" >/dev/null || {
   echo 'Meson omits native target lock-revoker dependency' >&2
   exit 1
 }
+grep -F 'native_credential_context_runner' "$meson" >/dev/null || {
+  echo 'Meson omits native credential-context dependency' >&2
+  exit 1
+}
 grep -F "'cli-lease-loss-contract'" "$meson" >/dev/null || {
   echo 'Meson omits CLI lease-loss contract' >&2
   exit 1
@@ -125,5 +132,9 @@ grep -F 'native_lease_loss_interpreter_x86_64.S' "$direct" >/dev/null || {
 }
 grep -F 'native_target_lock_revoker.cpp' "$direct" >/dev/null || {
   echo 'direct compiler path omits native target lock revoker' >&2
+  exit 1
+}
+grep -F 'native_credential_context_runner.cpp' "$direct" >/dev/null || {
+  echo 'direct compiler path omits native credential-context runner' >&2
   exit 1
 }

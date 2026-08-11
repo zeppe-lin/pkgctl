@@ -43,7 +43,15 @@ for required in \
   '--max-steps N' \
   'class command_universe_store final' \
   'std::optional<transaction_request> transaction' \
-  'PKGCTL-COMMAND-UNIVERSE-2' \
+  'PKGCTL-COMMAND-UNIVERSE-3' \
+  'pkgctl/command-universe/3' \
+  'struct retained_native_execution_profiles final' \
+  'append_backend_profile' \
+  'read_backend_profile' \
+  'resume_native_execution_scopes(' \
+  'admitted_execution_profiles.lifecycle' \
+  '&admitted_execution_profiles.construction' \
+  '&admitted_execution_profiles.check' \
   'append_transaction_request_inputs' \
   'read_transaction_request_inputs' \
   'universes.load(command.nonce, command.canonical_store)' \
@@ -91,7 +99,10 @@ for forbidden in \
   'application_journals_.load(' \
   'latest_' \
   'list_' \
-  'PKGCTL-COMMAND-UNIVERSE-1'; do
+  'PKGCTL-COMMAND-UNIVERSE-1' \
+  'PKGCTL-COMMAND-UNIVERSE-2' \
+  'pkgctl/command-universe/1' \
+  'pkgctl/command-universe/2'; do
   if grep -F -- "$forbidden" "$command" >/dev/null 2>&1; then
     echo "forbidden bounded transaction command policy: $forbidden" >&2
     exit 1
@@ -151,8 +162,8 @@ grep -F "suite: 'integration-privileged'" "$tests_meson" >/dev/null || {
   echo 'native mutating CLI test is not isolated as privileged integration' >&2
   exit 1
 }
-grep -F 'depends: native_interpreter' "$tests_meson" >/dev/null || {
-  echo 'privileged CLI integration does not build its native interpreter fixture' >&2
+grep -F 'depends: [native_interpreter, native_credential_context_runner]' "$tests_meson" >/dev/null || {
+  echo 'privileged CLI integration does not build its native interpreter/context fixtures' >&2
   exit 1
 }
 grep -F 'build_by_default: true' "$tests_meson" >/dev/null || {
@@ -194,9 +205,20 @@ grep -F 'lifecycle credentials must match the native supervisor' \
   echo 'lifecycle supervisor-credential refusal missing' >&2
   exit 1
 }
+for progress_scope_contract in \
+  'resume-requires-current-authority' \
+  'completed-resume-without-execution-authority' \
+  'native_credential_context_runner' \
+  'capture_run_as' \
+  '65534 65534'; do
+  grep -F -- "$progress_scope_contract" "$integration" "$tests_meson" >/dev/null || {
+    echo "missing progress-scoped resume execution qualification: $progress_scope_contract" >&2
+    exit 1
+  }
+done
 preflight_line=$(grep -n -F 'require_native_execution_preflight(' \
-  "$command" | head -n 1 | cut -d: -f1)
-retain_line=$(grep -n -F 'universes.retain(command.nonce, transaction)' \
+  "$command" | tail -n 1 | cut -d: -f1)
+retain_line=$(grep -n -F 'universes.retain(' \
   "$command" | head -n 1 | cut -d: -f1)
 [ -n "$preflight_line" ] && [ -n "$retain_line" ] && \
     [ "$preflight_line" -lt "$retain_line" ] || {
@@ -368,7 +390,7 @@ for documented in \
   'Release 0.35.0 bounded native command qualification' \
   'Version 0.35.0 retains the native catalog' \
   'BOUNDED NATIVE TRANSACTION COMMAND' \
-  'command-evidence schema v2' \
+  'command-evidence schema v3' \
   'retained transaction semantics'; do
   grep -F -- "$documented" "$srcdir/README.md" "$srcdir/DESIGN.md" \
       "$srcdir/TESTING.md" "$srcdir/man/pkgctl.1.scd" \

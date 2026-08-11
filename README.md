@@ -10,7 +10,8 @@ Release 0.35.0 closes the functional package-management chain with one
 bounded native transaction command. Before fresh-run retention or admission,
 `pkgctl run` proves that the selected native Linux backend can establish the
 execution guarantees implied by the transaction. `--start` then retains the
-complete start-only transaction inputs together with the owner-encoded catalog/state universe
+complete start-only transaction inputs, the exact admitted construction/check/
+lifecycle backend capability profiles, and the owner-encoded catalog/state universe
 before admitting one explicit run nonce. `--resume` requires that retained
 command universe and the exact admitted journal; it refuses a second collection,
 target-binding, architecture, goal, resolution-policy, or convergence request.
@@ -24,10 +25,14 @@ controller journal may reference them. Interrupted applications are reopened
 through the direct `libpkgapply-posix` request-to-journal index. Resume never
 reacquires collections, asks the operator to restate transaction semantics,
 substitutes current state for historical state, scans for journals, or silently
-replans. Command-evidence schema v2 is the only admitted format; schema v1
+replans. Command-evidence schema v3 is the only admitted format; older schema
 evidence is intentionally rejected rather than interpreted through a compatibility
-path. Target observations are live only for the
-current operation dispatch.
+path. Resume uses the retained backend profiles to validate historical execution
+evidence. Current backend capability and supervisor-credential preflight is required
+only for construction, check, or lifecycle work that can still execute; a completed
+or already externally blocked run does not reacquire execute-now authority merely to
+explain durable history. Target observations are live only for the current operation
+dispatch.
 
 Construction/check and lifecycle execution keep separate existing root views
 and explicit numeric credential sets. Supplying the same roots or credentials

@@ -19,8 +19,9 @@ case $interpreter in
     )
     ;;
 esac
-fixture_collection=$5
-root_view_fixture=$6
+credential_context_runner=$5
+fixture_collection=$6
+root_view_fixture=$7
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-run.XXXXXX")
 cleanup()
 {
@@ -43,6 +44,16 @@ groups=$(id -G | tr ' ' '\n' | sort -nu)
 build_uid=$uid
 build_gid=$gid
 build_groups=$groups
+
+invoke_pkgctl()
+{
+  if [ -n "${supervisor_uid:-}" ]; then
+    "$credential_context_runner" "$supervisor_uid" "$supervisor_gid" \
+      "$pkgctl" "$@"
+  else
+    "$pkgctl" "$@"
+  fi
+}
 
 run_command()
 {
@@ -87,9 +98,9 @@ run_command()
     # The fixture emits these five option/value pairs as one trusted shell word
     # sequence so the CLI is exercised exactly as an operator would invoke it.
     # shellcheck disable=SC2086
-    "$pkgctl" "$@" $binding
+    invoke_pkgctl "$@" $binding
   else
-    "$pkgctl" "$@"
+    invoke_pkgctl "$@"
   fi
 }
 
@@ -133,6 +144,19 @@ capture_run()
     dump_file "$name stderr" "$stderr_file"
     exit 1
   fi
+}
+
+capture_run_as()
+{
+  name=$1
+  expected_status=$2
+  intent=$3
+  nonce=$4
+  maximum_steps=$5
+  supervisor_uid=$6
+  supervisor_gid=$7
+  capture_run "$name" "$expected_status" "$intent" "$nonce" "$maximum_steps"
+  unset supervisor_uid supervisor_gid
 }
 
 require_contains()
@@ -297,6 +321,21 @@ printf '%s\n' "$inspection" >"$root/inspection.out"
 require_contains run-inspection "$root/inspection.out" "run.journal=$journal"
 require_contains run-inspection "$root/inspection.out" 'run.complete=false'
 
+if [ "$uid" -eq 0 ]; then
+  chown -R 65534:65534 "$root"
+  capture_run_as resume-requires-current-authority 1 --resume "$run_nonce" 1 \
+    65534 65534
+  require_contains resume-requires-current-authority-stderr \
+    "$root/resume-requires-current-authority.err" \
+    'construction/check credentials must match the native supervisor'
+  chown -R "$uid:$gid" "$root"
+  inspection_after_refusal=$(
+    "$pkgctl" inspect-run --run-store "$runtime/run" --journal "$journal"
+  )
+  require_equal resume-current-authority-run-head "$inspection" \
+    "$inspection_after_refusal"
+fi
+
 capture_run second-start 1 --start "$run_nonce" 1
 require_contains second-start-stderr "$root/second-start.err" \
   'exact transaction run is already admitted; use --resume'
@@ -347,3 +386,19 @@ require_equal repeated-resume-target "$target_before" \
   "$(sha256sum "$target/usr/bin/pkgctl-fixture")"
 require_equal repeated-resume-state "$state_before" \
   "$($state_inspect_fixture "$state")"
+
+if [ "$uid" -eq 0 ]; then
+  chown -R 65534:65534 "$root"
+  capture_run_as completed-resume-without-execution-authority 0 \
+    --resume "$run_nonce" 4 65534 65534
+  require_contains completed-resume-without-execution-authority \
+    "$root/completed-resume-without-execution-authority.out" \
+    'disposition completed'
+  require_contains completed-resume-without-execution-authority \
+    "$root/completed-resume-without-execution-authority.out" \
+    'durable-steps 0'
+  require_equal completed-resume-target "$target_before" \
+    "$(sha256sum "$target/usr/bin/pkgctl-fixture")"
+  require_equal completed-resume-state "$state_before" \
+    "$($state_inspect_fixture "$state")"
+fi

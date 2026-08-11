@@ -142,7 +142,7 @@ The final functional closure is one command, not a new semantic subsystem:
              + live native roots and credentials
              + current canonical-store pathname
                          |
-        immutable command-universe-v2 evidence
+        immutable command-universe-v3 evidence
         owner-encoded effect restart bodies
                          |
        native_posix_transaction_run_runtime
@@ -154,15 +154,26 @@ Start acquires and composes exactly once, then proves that the selected native
 Linux backend can establish the guarantees required by the transaction's build,
 check, and lifecycle nodes. Capability absence is a control-plane refusal: no
 initial command universe or run/effect evidence is retained. Only after that
-preflight does start retain command-evidence schema v2: the complete start-only transaction inputs plus the original owner-encoded
-catalog and state snapshots.
+preflight does start retain command-evidence schema v3: the complete start-only
+transaction inputs, exact admitted construction/check/lifecycle backend capability
+profiles, and the original owner-encoded catalog and
+state snapshots.
 Resume supplies no second collection, target-binding, architecture, goal,
 resolution-policy, or convergence request. It reconstructs the retained request from those inputs,
 binds its retained target identity to the caller-supplied current canonical-store
 pathname, and recomposes the same transaction identity without collection
 reacquisition or live-state replanning. Semantic start options on resume are a
-usage error. There is no v1 compatibility decoder. An already admitted run is
-refused by start; a missing run is refused by resume.
+usage error. There is no compatibility decoder for schema v1 or v2. An already
+admitted run is refused by start; a missing run is refused by resume.
+
+Historical execution evidence is decoded against those retained backend profiles,
+not against whatever capability profile the live backend happens to expose during
+resume. The live backend report and supervisor credentials are execute-now authority:
+resume preflights them only for construction/check/lifecycle scopes that can still
+run. Completed, failed/stopped, and already externally blocked durable states therefore
+reopen without proving capabilities for actuators they cannot invoke. Remaining fresh
+work still requires the current profile to equal its admitted profile and the relevant
+explicit credentials to match the current supervisor.
 
 Construction/check execution and lifecycle execution remain separate command
 authority domains. The CLI therefore accepts distinct existing root views and

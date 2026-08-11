@@ -26,8 +26,8 @@ for required in \
   'class transaction_operation_recovery_authority_source' \
   'class native_transaction_dispatch_recovery_context_source final' \
   'transaction_dispatch_session_source& sessions_' \
-  'pkgexec::execution_backend& construction_backend_' \
-  'pkgexec::execution_backend& check_backend_' \
+  'pkgexec::backend_capability_profile construction_backend_' \
+  'pkgexec::backend_capability_profile check_backend_' \
   'transaction_operation_recovery_authority_source& operations_' \
   'class stored_transaction_dispatch_recovery_authority_source final' \
   'transaction_run_evidence_store& evidence_' \
@@ -80,6 +80,9 @@ for required_test in \
 done
 
 for forbidden in \
+  'pkgexec::execution_backend& construction_backend_' \
+  'pkgexec::execution_backend& check_backend_' \
+  'selected_backend.capabilities()' \
   'from_sha256(evidence' \
   'materialization_identity::from_sha256' \
   'build_request_identity::from_sha256' \
