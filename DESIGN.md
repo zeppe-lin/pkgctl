@@ -38,8 +38,11 @@ work becomes blocked. Application/publication interruption is injected only at a
 effect-journal append boundary after the corresponding subordinate owner may have
 already committed its side effect. Reopen then uses the production run/effect
 restart checkpoints and `reconcile_operation_dispatch_durable()`: completed POSIX
-application journals are resumed without a fresh apply, while an already-selected
-canonical publication is observed without publishing the same state again.
+application journals whose exact receipt body is already durable are adopted into
+the controller journal without a fresh apply or application resume; genuinely
+resumable subordinate journals still use `libpkgapply` continuation. An
+already-selected canonical publication is observed without publishing the same
+state again.
 
 ## Release 0.35.0 bounded native command boundary
 

@@ -49,9 +49,13 @@ completion so transaction progression owns which dependent work becomes blocked.
 Application and publication interruption must occur by refusing an exact effect
 journal append after the subordinate side effect has reached the selected durable
 boundary. Restart must reopen retained run/effect/application authority and enter
-the production reconciliation path. Tests must prove that a completed application
-is resumed rather than freshly applied and that already-selected canonical state
-is observed rather than published a second time.
+the production reconciliation path. When the subordinate application journal is
+already terminal and the exact receipt body was durably retained before the lost
+controller append, tests must prove that controller authority adopts that terminal
+receipt without either a fresh application or an application resume. When only a
+resumable subordinate journal exists, the ordinary resume path remains required.
+Already-selected canonical state must be observed rather than published a second
+time.
 
 Qualification may directly compose a downstream library family that `pkgctl`
 does not yet own in production, but that seam must remain test-only until the

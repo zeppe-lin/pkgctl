@@ -41,6 +41,9 @@ for required in \
   'retained.attempt_session()' \
   'record.stage() == effect_attempt_stage::application_intent' \
   'application_journals_.load_active(' \
+  'result.application_journal->receipt()' \
+  'read_optional(' \
+  'result.application = std::move(body)' \
   'pkgstate::posix::canonical_generation_store::open_existing(' \
   'native_posix_transaction_run_runtime::from_directory_fds(' \
   'require_native_execution_preflight(' \

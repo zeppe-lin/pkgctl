@@ -36,6 +36,10 @@ for required in \
   'resume_effectful_operation' \
   'effect_restart_requires_continuation_driver' \
   'effect_restart_requires_publication_driver' \
+  'validate_ahead_application_receipt' \
+  'pkgapply::application_restart_disposition::terminal' \
+  'application && !journal.application()' \
+  'journal.complete_application(*application)' \
   'physical.resume_application' \
   'state.read_state()' \
   'state.publish_state' \

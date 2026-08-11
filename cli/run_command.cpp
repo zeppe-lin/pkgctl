@@ -582,6 +582,28 @@ public:
       if (!result.application_journal)
         throw std::runtime_error(
             "interrupted application intent has no active application journal");
+
+      const auto application_restart = pkgapply::assess_application_restart(
+          *result.application_journal);
+      if (application_restart.disposition() ==
+              pkgapply::application_restart_disposition::terminal &&
+          result.application_journal->receipt())
+      {
+        const auto retained = read_optional(
+            directory_.get(),
+            private_body_name(
+                "application",
+                result.application_journal->receipt()->string()));
+        if (retained)
+        {
+          auto body = decode_application_body(
+              *retained, session.request().application());
+          if (body.identity() != *result.application_journal->receipt())
+            throw std::runtime_error(
+                "retained ahead application body contradicts terminal journal");
+          result.application = std::move(body);
+        }
+      }
     }
 
     return result;

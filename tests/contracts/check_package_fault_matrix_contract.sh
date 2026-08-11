@@ -24,6 +24,9 @@ for evidence in \
   'pkgctl::effect_attempt_stage::publication_terminal' \
   'pkgctl::effect_attempt_stage::application_terminal' \
   'application_resume_calls()' \
+  'upgrade_bodies.application()' \
+  'removal_bodies.application()' \
+  'application_resume_calls() == 0U' \
   'publication_calls() == 0U' \
   'reopen_run_head(' \
   'effect_store = pkgctl::posix_effect_journal_store::open(' \

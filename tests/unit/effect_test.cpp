@@ -1725,6 +1725,37 @@ application_restart_journal(const fixture& value)
       header, pkgapply::application_journal_state::preparing, {}, {});
 }
 
+struct completed_application_restart final {
+  pkgapply::application_journal_record journal;
+  pkgapply::application_receipt receipt;
+};
+
+completed_application_restart
+completed_application_restart_journal(const fixture& value)
+{
+  pkgapply::application_attempt_nonce::byte_array nonce_bytes{};
+  nonce_bytes.back() = 78U;
+  const auto attempt = pkgapply::application_attempt::make(
+      value.application.identity(), value.target.identity(),
+      value.target.mutation_backend(),
+      pkgapply::application_attempt_nonce::from_bytes(nonce_bytes));
+  const auto header = pkgapply::application_journal_header::make(
+      pkgplan::operation_kind::install, value.application.identity(),
+      value.application.plan().identity(), attempt, value.target.identity(),
+      value.application.control().identity(), value.projection.identity(),
+      value.outer_lease.identity(), value.target.mutation_backend());
+  const auto evidence = pkgapply::completed_application_evidence::installation(
+      value.application, attempt.identity(), value.projection.identity(),
+      header.identity(), value.evidence.paths(), value.evidence.durability(),
+      value.evidence.backend_evidence());
+  const auto receipt = pkgapply::application_receipt::completed(
+      evidence, pkgapply::application_recovery_state::unchanged);
+  auto journal = pkgapply::application_journal_record::make(
+      header, pkgapply::application_journal_state::application_completed, {}, {},
+      receipt.identity(), evidence.identity());
+  return {std::move(journal), receipt};
+}
+
 struct upgrade_fixture final {
   test_support::temporary_directory temp;
   pkgstate::posix::canonical_generation_store store;
@@ -2517,6 +2548,43 @@ void check_restart_boundaries()
     CHECK(actuator.resume_calls() == 1U);
     CHECK(actuator.trace() == std::vector<std::string>({
         "pre-install", "apply", "resume-apply", "post-install", "publish"}));
+  }
+  {
+    fixture value;
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    driver actuator(value.projection, value.outer_lease,
+                    value.receipt, value.store, std::nullopt,
+                    lease_release_point::never, publication_mode::native,
+                    crash_point::application);
+    memory_effect_journal_store journal;
+    try
+    {
+      (void)pkgctl::execute_effectful_operation_durable(
+          session, effect_nonce(33), actuator, journal);
+    }
+    catch (const std::runtime_error&)
+    {
+    }
+    const auto admission = pkgctl::effect_attempt_record::admit(
+        session.identity(), session.before().size(), session.after().size(),
+        effect_nonce(33));
+    const auto latest = journal.load_latest(admission.attempt());
+    CHECK(latest && latest->stage() ==
+                        pkgctl::effect_attempt_stage::application_intent);
+    const auto completed = completed_application_restart_journal(value);
+    const auto checkpoint = pkgctl::effect_restart_checkpoint::make(
+        session, *latest, actuator.lifecycle_results(), completed.receipt, {},
+        std::nullopt, std::nullopt, completed.journal);
+    const auto restarted = pkgctl::resume_effectful_operation(
+        checkpoint, &actuator, nullptr, journal);
+    CHECK(!restarted.external_resolution_required());
+    CHECK(restarted.terminal());
+    CHECK(restarted.operation());
+    CHECK(restarted.operation() && restarted.operation()->succeeded());
+    CHECK(actuator.resume_calls() == 0U);
+    CHECK(actuator.trace() == std::vector<std::string>({
+        "pre-install", "apply", "post-install", "publish"}));
   }
   {
     fixture value;

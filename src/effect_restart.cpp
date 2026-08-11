@@ -49,6 +49,35 @@ void validate_application_journal(
         "application journal belongs to another effect authority universe");
 }
 
+void validate_ahead_application_receipt(
+    const effectful_operation_session& session,
+    const pkgapply::application_receipt& receipt,
+    const pkgapply::application_journal_record& journal)
+{
+  validate_application_receipt(session, receipt);
+
+  const auto assessment = pkgapply::assess_application_restart(journal);
+  if (assessment.disposition() !=
+      pkgapply::application_restart_disposition::terminal)
+    invalid_checkpoint(
+        "application receipt is ahead of a nonterminal application journal");
+  if (!journal.receipt() || *journal.receipt() != receipt.identity())
+    invalid_checkpoint(
+        "ahead application receipt differs from terminal application journal");
+  if (!receipt.journal() ||
+      *receipt.journal() != journal.header().identity())
+    invalid_checkpoint(
+        "ahead application receipt names another durable application journal");
+
+  const auto completed = receipt.completed_evidence()
+      ? std::optional<pkgapply::completed_application_evidence_identity>(
+            receipt.completed_evidence()->identity())
+      : std::nullopt;
+  if (completed != journal.completed_evidence())
+    invalid_checkpoint(
+        "ahead application receipt differs from terminal completed evidence");
+}
+
 } // namespace
 
 effect_restart_assessment::effect_restart_assessment(
@@ -210,21 +239,35 @@ effect_restart_checkpoint effect_restart_checkpoint::make(
       invalid_checkpoint("pre-lifecycle checkpoint evidence differs from journal");
   }
 
-  if (application.has_value() != record.application().has_value())
+  const bool ahead_application =
+      application.has_value() && !record.application().has_value() &&
+      record.stage() == effect_attempt_stage::application_intent &&
+      application_journal.has_value();
+  if (application.has_value() != record.application().has_value() &&
+      !ahead_application)
     invalid_checkpoint("application checkpoint presence differs from journal");
   if (application)
   {
-    validate_application_receipt(session, *application);
-    const auto& fact = *record.application();
-    const std::string journal_identity = application->journal()
-        ? application->journal()->string() : std::string();
-    const std::string completed_identity = application->completed_evidence()
-        ? application->completed_evidence()->identity().string() : std::string();
-    if (application->identity().string() != fact.receipt() ||
-        application->outcome() != fact.outcome() ||
-        journal_identity != fact.journal().value_or(std::string()) ||
-        completed_identity != fact.completed_evidence().value_or(std::string()))
-      invalid_checkpoint("application checkpoint evidence differs from journal");
+    if (ahead_application)
+    {
+      validate_application_journal(session, *application_journal);
+      validate_ahead_application_receipt(
+          session, *application, *application_journal);
+    }
+    else
+    {
+      validate_application_receipt(session, *application);
+      const auto& fact = *record.application();
+      const std::string journal_identity = application->journal()
+          ? application->journal()->string() : std::string();
+      const std::string completed_identity = application->completed_evidence()
+          ? application->completed_evidence()->identity().string() : std::string();
+      if (application->identity().string() != fact.receipt() ||
+          application->outcome() != fact.outcome() ||
+          journal_identity != fact.journal().value_or(std::string()) ||
+          completed_identity != fact.completed_evidence().value_or(std::string()))
+        invalid_checkpoint("application checkpoint evidence differs from journal");
+    }
   }
 
   if (after.size() != record.after().size())

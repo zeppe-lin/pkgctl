@@ -1376,7 +1376,8 @@ void check_package_pipeline()
         "pipeline upgrade restart lacks application journal");
 
   auto upgrade_effect_checkpoint = pkgctl::effect_restart_checkpoint::make(
-      upgrade_effect_session, *upgrade_effect_record, {}, std::nullopt, {},
+      upgrade_effect_session, *upgrade_effect_record, {},
+      upgrade_bodies.application(), {},
       std::nullopt, std::nullopt, *upgrade_application_journal);
 
   reacquire_application_lease(application, target);
@@ -1397,7 +1398,7 @@ void check_package_pipeline()
   CHECK(upgrade_recovered.result.has_value());
   CHECK(upgrade_recovered.result && upgrade_recovered.result->succeeded());
   CHECK(resumed_upgrade_driver.application_calls() == 0U);
-  CHECK(resumed_upgrade_driver.application_resume_calls() == 1U);
+  CHECK(resumed_upgrade_driver.application_resume_calls() == 0U);
   CHECK(resumed_upgrade_driver.publication_calls() == 1U);
   CHECK(upgrade_recovered.effect_record.stage() ==
         pkgctl::effect_attempt_stage::terminal);
@@ -1683,7 +1684,8 @@ void check_package_pipeline()
         "pipeline removal restart lacks application journal");
 
   auto removal_effect_checkpoint = pkgctl::effect_restart_checkpoint::make(
-      removal_effect_session, *removal_effect_record, {}, std::nullopt, {},
+      removal_effect_session, *removal_effect_record, {},
+      removal_bodies.application(), {},
       std::nullopt, std::nullopt, *removal_application_journal);
 
   reacquire_application_lease(application, target);
@@ -1704,7 +1706,7 @@ void check_package_pipeline()
   CHECK(removal_recovered.result.has_value());
   CHECK(removal_recovered.result && removal_recovered.result->succeeded());
   CHECK(resumed_removal_driver.application_calls() == 0U);
-  CHECK(resumed_removal_driver.application_resume_calls() == 1U);
+  CHECK(resumed_removal_driver.application_resume_calls() == 0U);
   CHECK(resumed_removal_driver.publication_calls() == 1U);
   CHECK(removal_recovered.effect_record.stage() ==
         pkgctl::effect_attempt_stage::terminal);

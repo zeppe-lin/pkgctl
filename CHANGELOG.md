@@ -70,7 +70,9 @@
 - Adds deterministic durability/failure qualification to the same package
   campaign. Publication interruption after canonical selection must reconcile
   without publishing twice; application interruption after POSIX completion must
-  reopen the exact application journal and resume without a fresh apply. A
+  reopen the exact terminal application journal, adopt its durably retained
+  receipt into the controller journal without either a fresh apply or an
+  application resume, and continue to publication. A
   separate mode proves definitive dependency-build and package-check failures block
   dependent target work and publish no package state.
 

@@ -254,11 +254,13 @@ points. Publication interruption occurs after canonical state has already select
 the requested result but before the effect journal records publication terminal;
 restart must reconcile by observing that state and perform zero additional
 publications. Application interruption occurs after POSIX application has completed
-but before the effect journal records application terminal; restart must load the
-exact active application journal, call the resume path, perform zero fresh
-applications, and publish exactly once. Upgrade and removal both qualify this rule.
-Unjournaled bodies retained by the test sink are not passed to the restart
-checkpoint merely because the process still has them.
+and the exact application receipt body has been retained, but before the effect
+journal records application terminal. Restart must load the terminal subordinate
+application journal, bind its receipt identity to the retained owner-encoded body,
+adopt that already-completed application into the controller journal, perform zero
+fresh applications and zero application resumes, and publish exactly once. Upgrade
+and removal both qualify this rule. A terminal subordinate journal without its
+retained exact receipt body is not enough authority for automatic continuation.
 
 `pkgctl:package-failure-matrix` runs the same harness in failure mode. A definitive
 dependency-build failure must fail that node and block its dependent build, check,
@@ -1018,6 +1020,10 @@ The restart suite must prove:
   resolution;
 - the exact application journal permits `libpkgapply` continuation under the
   newly held lease;
+- when the subordinate application journal is already terminal, automatic
+  continuation additionally requires the exact retained receipt body and adopts
+  that receipt into the missing controller application-terminal fact without
+  invoking `libpkgapply` continuation again;
 - publication interrupted before state mutation retries the retained request
   only after observing the exact expected prior snapshot;
 - publication interrupted after state mutation reconciles the exact resulting

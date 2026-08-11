@@ -1292,6 +1292,25 @@ effect_restart_result resume_effectful_operation(
         effect_restart_disposition::external_resolution_required,
         journal, std::nullopt);
 
+  if (assessment.disposition() ==
+          effect_restart_disposition::resume_application &&
+      checkpoint.application_journal())
+  {
+    const auto subordinate = pkgapply::assess_application_restart(
+        *checkpoint.application_journal());
+    if (subordinate.disposition() ==
+        pkgapply::application_restart_disposition::external_resolution_required)
+      return effect_restart_result(
+          effect_restart_disposition::external_resolution_required,
+          journal, std::nullopt);
+    if (subordinate.disposition() ==
+            pkgapply::application_restart_disposition::terminal &&
+        !checkpoint.application())
+      return effect_restart_result(
+          effect_restart_disposition::external_resolution_required,
+          journal, std::nullopt);
+  }
+
   if (assessment.disposition() == effect_restart_disposition::terminal)
   {
     auto operation = detail::rehydrate_terminal_effectful_operation(
@@ -1416,6 +1435,15 @@ effect_restart_result resume_effectful_operation(
         return finish(
             effectful_operation_outcome::lifecycle_failed_before_application);
     }
+  }
+
+  if (application && !journal.application())
+  {
+    journal = append_record(
+        journal_store, journal.complete_application(*application));
+    if (application->outcome() !=
+        pkgapply::application_attempt_outcome::completed)
+      return finish(effectful_operation_outcome::application_not_completed);
   }
 
   if (!application)
