@@ -39,6 +39,11 @@ for required in \
   'class native_transaction_run_runtime_configuration final' \
   'struct native_transaction_run_runtime_authorities final' \
   'struct native_transaction_run_runtime_backends final' \
+  'pkgexec::execution_backend* construction;' \
+  'pkgexec::execution_backend* check;' \
+  'pkgexec::execution_backend* lifecycle;' \
+  'native_recovery_profile(' \
+  'current execution backend is unavailable for durable recovery' \
   'class native_posix_transaction_run_runtime final' \
   'native_posix_transaction_run_runtime::open(' \
   'native_posix_transaction_run_runtime::from_directory_fds(' \
@@ -85,6 +90,7 @@ for token in \
   'check_recovery_backend_(' \
   'progress_context_(' \
   'progress_(' \
+  'unavailable_execution_backend_()' \
   'engine_('; do
   line=$(printf '%s\n' "$native_body" | awk \
     -v token="$token" -v previous="$previous" \

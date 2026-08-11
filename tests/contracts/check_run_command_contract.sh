@@ -41,11 +41,18 @@ for required in \
   '--start SHA256' \
   '--resume SHA256' \
   '--max-steps N' \
-  'class command_universe_store final' \
+  'class command_evidence_store final' \
   'std::optional<transaction_request> transaction' \
-  'PKGCTL-COMMAND-UNIVERSE-3' \
-  'pkgctl/command-universe/3' \
+  'PKGCTL-COMMAND-EVIDENCE' \
+  'pkgctl/command-evidence' \
+  'return "command-" + nonce.hex() + ".pce";' \
   'struct retained_native_execution_profiles final' \
+  'pkgexec::interpreter_identity interpreter' \
+  'append_text(bytes, interpreter.hex())' \
+  'retained_evidence->interpreter' \
+  'current_execution_backend.get()' \
+  'require_native_execution_credentials(' \
+  'current interpreter differs from admitted run authority' \
   'append_backend_profile' \
   'read_backend_profile' \
   'resume_native_execution_scopes(' \
@@ -54,7 +61,7 @@ for required in \
   '&admitted_execution_profiles.check' \
   'append_transaction_request_inputs' \
   'read_transaction_request_inputs' \
-  'universes.load(command.nonce, command.canonical_store)' \
+  'command_evidence.load(command.nonce, command.canonical_store)' \
   'canonical_generation_store::open_existing(' \
   'command.canonical_store, binding' \
   '--resume uses retained transaction semantics' \
@@ -76,7 +83,7 @@ for required in \
   'runtime_path(command, "effect-bodies")' \
   'exact transaction run is already admitted; use --resume' \
   'exact transaction run is not admitted; use --start' \
-  'retained command universe recomposes another transaction' \
+  'retained command evidence recomposes another transaction' \
   'mutation-authority-unavailable' \
   'transaction_run_drive_disposition::mutation_authority_unavailable'; do
   grep -F -- "$required" "$srcdir/cli/options.h" "$options" "$command" \
@@ -85,6 +92,31 @@ for required in \
     exit 1
   }
 done
+
+for retired_private_format in \
+  'PKGCTL-COMMAND-UNIVERSE-3' \
+  'pkgctl/command-universe/3' \
+  'command-evidence schema v3' \
+  'schema v1 or v2' \
+  'schemas v1/v2'; do
+  if grep -R -F -- "$retired_private_format" "$srcdir/cli" \
+      "$srcdir/README.md" "$srcdir/DESIGN.md" "$srcdir/TESTING.md" \
+      "$srcdir/MAINTAINING.md" "$srcdir/CHANGELOG.md" "$srcdir/man" \
+      >/dev/null 2>&1; then
+    echo "retired private command-evidence history remains: $retired_private_format" >&2
+    exit 1
+  fi
+done
+
+credential_line=$(grep -n -F 'require_native_execution_credentials(' "$command" \
+  | tail -1 | cut -d: -f1)
+interpreter_line=$(grep -n -F 'interpreter_binding::inspect(command.interpreter)' \
+  "$command" | tail -1 | cut -d: -f1)
+[ -n "$credential_line" ] && [ -n "$interpreter_line" ] && \
+  [ "$credential_line" -lt "$interpreter_line" ] || {
+  echo 'current credential authority must be refused before interpreter observation' >&2
+  exit 1
+}
 
 for forbidden in \
   'create_director' \
@@ -251,11 +283,11 @@ done
 
 preflight_line=$(grep -n -F 'require_native_execution_preflight(' \
   "$command" | tail -n 1 | cut -d: -f1)
-retain_line=$(grep -n -F 'universes.retain(' \
+retain_line=$(grep -n -F 'command_evidence.retain(' \
   "$command" | head -n 1 | cut -d: -f1)
 [ -n "$preflight_line" ] && [ -n "$retain_line" ] && \
     [ "$preflight_line" -lt "$retain_line" ] || {
-  echo 'native execution preflight does not precede command-universe retention' >&2
+  echo 'native execution preflight does not precede command-evidence retention' >&2
   exit 1
 }
 for retained_resume_contract in \
@@ -423,12 +455,22 @@ for documented in \
   'Release 0.35.0 bounded native command qualification' \
   'Version 0.35.0 retains the native catalog' \
   'BOUNDED NATIVE TRANSACTION COMMAND' \
-  'command-evidence schema v3' \
+  'current private command-evidence format' \
   'retained transaction semantics'; do
   grep -F -- "$documented" "$srcdir/README.md" "$srcdir/DESIGN.md" \
       "$srcdir/TESTING.md" "$srcdir/man/pkgctl.1.scd" \
       "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null || {
     echo "missing bounded transaction command documentation: $documented" >&2
+    exit 1
+  }
+done
+
+for interpreter_recovery_proof in \
+  'interpreter_override=/bin/false' \
+  'current interpreter differs from admitted run authority' \
+  'resume-interpreter-run-head'; do
+  grep -F -- "$interpreter_recovery_proof" "$integration" >/dev/null || {
+    echo "missing retained-interpreter recovery proof: $interpreter_recovery_proof" >&2
     exit 1
   }
 done

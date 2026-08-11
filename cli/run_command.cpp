@@ -38,6 +38,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -54,10 +55,10 @@ namespace pkgctl::cli {
 namespace {
 
 constexpr std::size_t maximum_private_object_size = 1024U * 1024U * 1024U;
-constexpr std::string_view command_universe_magic =
-    "PKGCTL-COMMAND-UNIVERSE-3";
-constexpr std::string_view command_universe_checksum_domain =
-    "pkgctl/command-universe/3";
+constexpr std::string_view command_evidence_magic =
+    "PKGCTL-COMMAND-EVIDENCE";
+constexpr std::string_view command_evidence_checksum_domain =
+    "pkgctl/command-evidence";
 
 class fd_guard final {
 public:
@@ -723,17 +724,18 @@ struct retained_native_execution_profiles final {
   pkgexec::backend_capability_profile lifecycle;
 };
 
-struct retained_command_universe final {
+struct retained_command_evidence final {
   session_identity transaction;
   transaction_request request;
   pkgcatalog::catalog_snapshot catalog;
   pkgstate::snapshot state;
+  pkgexec::interpreter_identity interpreter;
   retained_native_execution_profiles execution_profiles;
 };
 
-class command_universe_store final {
+class command_evidence_store final {
 public:
-  explicit command_universe_store(const std::filesystem::path& directory)
+  explicit command_evidence_store(const std::filesystem::path& directory)
       : directory_(open_directory(directory))
   {
   }
@@ -741,6 +743,7 @@ public:
   void retain(
       const transaction_run_nonce& nonce,
       const transaction_session& transaction,
+      const pkgexec::interpreter_identity& interpreter,
       const retained_native_execution_profiles& execution_profiles)
   {
     const auto catalog = pkgcatalog::encode_catalog_snapshot(
@@ -748,45 +751,48 @@ public:
     const auto state = pkgstate::encode_generation_snapshot(
         transaction.resolution().installed());
     std::vector<std::uint8_t> bytes;
-    append_text(bytes, command_universe_magic);
+    append_text(bytes, command_evidence_magic);
     std::vector<std::uint8_t> request;
     append_transaction_request_inputs(request, transaction.request());
     append_text(bytes, transaction.identity().hex());
     append_bytes(bytes, catalog);
     append_bytes(bytes, state);
     append_bytes(bytes, request);
+    append_text(bytes, interpreter.hex());
     append_backend_profile(bytes, execution_profiles.construction);
     append_backend_profile(bytes, execution_profiles.check);
     append_backend_profile(bytes, execution_profiles.lifecycle);
-    append_text(bytes, checksum(command_universe_checksum_domain, bytes));
+    append_text(bytes, checksum(command_evidence_checksum_domain, bytes));
     retain_immutable(
-        directory_.get(), name(nonce), bytes, "command-universe");
+        directory_.get(), name(nonce), bytes, "command-evidence");
   }
 
-  [[nodiscard]] retained_command_universe load(
+  [[nodiscard]] retained_command_evidence load(
       const transaction_run_nonce& nonce,
       const std::filesystem::path& canonical_store) const
   {
     const auto bytes = read_all(directory_.get(), name(nonce));
     std::size_t offset = 0U;
-    if (read_text(bytes, offset) != command_universe_magic)
-      throw std::runtime_error("command universe has invalid magic");
+    if (read_text(bytes, offset) != command_evidence_magic)
+      throw std::runtime_error("command evidence has invalid magic");
     const auto transaction = session_identity::from_hex(read_text(bytes, offset));
     const auto catalog_encoding = read_bytes(bytes, offset);
     const auto state_encoding = read_bytes(bytes, offset);
     const auto request_encoding = read_bytes(bytes, offset);
+    auto interpreter = pkgexec::interpreter_identity::from_sha256(
+        read_text(bytes, offset));
     retained_native_execution_profiles execution_profiles{
         read_backend_profile(bytes, offset), read_backend_profile(bytes, offset),
         read_backend_profile(bytes, offset)};
     const auto checksum_offset = offset;
     const auto expected_checksum = read_text(bytes, offset);
     if (offset != bytes.size())
-      throw std::runtime_error("command universe has trailing bytes");
+      throw std::runtime_error("command evidence has trailing bytes");
     std::vector<std::uint8_t> prefix(
         bytes.begin(),
         bytes.begin() + static_cast<std::ptrdiff_t>(checksum_offset));
-    if (expected_checksum != checksum(command_universe_checksum_domain, prefix))
-      throw std::runtime_error("command universe checksum is invalid");
+    if (expected_checksum != checksum(command_evidence_checksum_domain, prefix))
+      throw std::runtime_error("command evidence checksum is invalid");
 
     auto catalog = pkgcatalog::decode_catalog_snapshot(catalog_encoding);
     auto state = pkgstate::decode_generation_snapshot(std::string_view(
@@ -797,15 +803,16 @@ public:
         request_encoding, request_offset, canonical_store,
         state.target_binding());
     if (request_offset != request_encoding.size())
-      throw std::runtime_error("command universe request has trailing bytes");
+      throw std::runtime_error("command evidence request has trailing bytes");
     return {transaction, std::move(request), std::move(catalog),
-            std::move(state), std::move(execution_profiles)};
+            std::move(state), std::move(interpreter),
+            std::move(execution_profiles)};
   }
 
 private:
   [[nodiscard]] static std::string name(const transaction_run_nonce& nonce)
   {
-    return "universe-" + nonce.hex() + ".pcu";
+    return "command-" + nonce.hex() + ".pce";
   }
 
   fd_guard directory_;
@@ -2051,8 +2058,6 @@ native_execution_requirements(const native_execution_scope& scopes)
 void require_native_execution_preflight(
     const native_execution_scope& scopes,
     const pkgexec_linux::capability_report& report,
-    const pkgexec::credential_policy& build_credentials,
-    const pkgexec::credential_policy& lifecycle_credentials,
     const retained_native_execution_profiles* retained_profiles = nullptr)
 {
   const auto required = native_execution_requirements(scopes);
@@ -2068,17 +2073,6 @@ void require_native_execution_preflight(
   }
 
   std::vector<std::string> missing_authorities;
-  if ((scopes.construction || scopes.check) &&
-      !current_credentials(build_credentials))
-  {
-    missing_authorities.push_back(
-        "construction/check credentials must match the native supervisor");
-  }
-  if (scopes.lifecycle && !current_credentials(lifecycle_credentials))
-  {
-    missing_authorities.push_back(
-        "lifecycle credentials must match the native supervisor");
-  }
 
   if (retained_profiles != nullptr)
   {
@@ -2132,6 +2126,31 @@ void require_native_execution_preflight(
   throw std::runtime_error(message);
 }
 
+void require_native_execution_credentials(
+    const native_execution_scope& scopes,
+    const pkgexec::credential_policy& build_credentials,
+    const pkgexec::credential_policy& lifecycle_credentials)
+{
+  std::vector<std::string> missing;
+  if ((scopes.construction || scopes.check) &&
+      !current_credentials(build_credentials))
+  {
+    missing.push_back(
+        "construction/check credentials must match the native supervisor");
+  }
+  if (scopes.lifecycle && !current_credentials(lifecycle_credentials))
+    missing.push_back("lifecycle credentials must match the native supervisor");
+
+  if (missing.empty())
+    return;
+
+  std::string message =
+      "native execution unavailable before transaction execution";
+  for (const auto& authority : missing)
+    message += "\n  " + authority;
+  throw std::runtime_error(message);
+}
+
 template<typename Destination, typename Source>
 [[nodiscard]] Destination translate_identity(const Source& source)
 {
@@ -2152,6 +2171,7 @@ template<typename Destination, typename Source>
     const transaction_run_command& command,
     const transaction_session& transaction,
     const pkgstate::state_target_binding& binding,
+    const pkgexec::interpreter_identity& interpreter,
     const pkgexec::backend_capability_profile& execution_capabilities)
 {
   const std::vector<std::string> common{
@@ -2204,7 +2224,7 @@ template<typename Destination, typename Source>
           fields("application-capabilities")),
       [&]() {
         std::vector<std::string> lifecycle_fields{
-            transaction.identity().hex(), command.interpreter.string(),
+            transaction.identity().hex(), interpreter.hex(),
             std::to_string(command.lifecycle_credentials.user_id()),
             std::to_string(command.lifecycle_credentials.group_id()),
             command.lifecycle_root.string(), command.target_root.string(),
@@ -2219,7 +2239,7 @@ template<typename Destination, typename Source>
 [[nodiscard]] native_transaction_session_configuration command_sessions(
     const transaction_run_command& command,
     const pkgstate::state_target_binding& binding,
-    const pkgexec_linux::interpreter_binding& interpreter)
+    const pkgexec::interpreter_identity& interpreter)
 {
   return native_transaction_session_configuration::make(
       {
@@ -2236,10 +2256,10 @@ template<typename Destination, typename Source>
               pkgbuild::environment_policy::hermetic(
                   1U, 0022, command.source_date_epoch)),
           pkgfetch::acquisition_policy::defaults(),
-          {interpreter.identity(), command.build_credentials.user_id(),
+          {interpreter, command.build_credentials.user_id(),
            command.build_credentials.group_id(),
            command.build_credentials.supplementary_groups()},
-          {interpreter.identity(), command.build_credentials.user_id(),
+          {interpreter, command.build_credentials.user_id(),
            command.build_credentials.group_id(),
            command.build_credentials.supplementary_groups()},
           pkgexec::resource_limits::make(),
@@ -2251,7 +2271,7 @@ template<typename Destination, typename Source>
     const transaction_run_command& command,
     const transaction_session& transaction,
     const pkgstate::state_target_binding& binding,
-    const pkgexec_linux::interpreter_binding& interpreter)
+    const pkgexec::interpreter_identity& interpreter)
 {
   return native_transaction_operation_configuration::make(
       transaction,
@@ -2260,7 +2280,7 @@ template<typename Destination, typename Source>
           command.lifecycle_root,
           command.target_root,
           runtime_path(command, "lifecycle-sessions"),
-          {interpreter.identity(), command.lifecycle_credentials.user_id(),
+          {interpreter, command.lifecycle_credentials.user_id(),
            command.lifecycle_credentials.group_id(),
            command.lifecycle_credentials.supplementary_groups()},
       });
@@ -2508,9 +2528,9 @@ int execute_transaction_run(transaction_run_command command)
   (void)open_directory(command.lifecycle_root);
   auto target_root = open_directory(command.target_root);
 
-  command_universe_store universes(
+  command_evidence_store command_evidence(
       runtime_path(command, "command-evidence"));
-  std::optional<retained_command_universe> retained_universe;
+  std::optional<retained_command_evidence> retained_evidence;
   transaction_session transaction = [&]() {
     if (command.intent == transaction_run_command_intent::start)
     {
@@ -2522,15 +2542,15 @@ int execute_transaction_run(transaction_run_command command)
     if (command.transaction)
       throw std::runtime_error(
           "resumed run carries duplicate transaction authority");
-    retained_universe.emplace(
-        universes.load(command.nonce, command.canonical_store));
+    retained_evidence.emplace(
+        command_evidence.load(command.nonce, command.canonical_store));
     auto composed = recompose_transaction(
-        std::move(retained_universe->request),
-        std::move(retained_universe->catalog),
-        std::move(retained_universe->state));
-    if (composed.identity() != retained_universe->transaction)
+        std::move(retained_evidence->request),
+        std::move(retained_evidence->catalog),
+        std::move(retained_evidence->state));
+    if (composed.identity() != retained_evidence->transaction)
       throw std::runtime_error(
-          "retained command universe recomposes another transaction");
+          "retained command evidence recomposes another transaction");
     return composed;
   }();
 
@@ -2564,31 +2584,57 @@ int execute_transaction_run(transaction_run_command command)
     throw std::runtime_error(
         "exact transaction run is not admitted; use --start");
 
-  auto interpreter = pkgexec_linux::interpreter_binding::inspect(
-      command.interpreter);
-  auto execution_backend = pkgexec_linux::isolated_backend::make({interpreter});
-  const auto current_execution_profile = execution_backend.capabilities();
-  retained_native_execution_profiles admitted_execution_profiles{
-      current_execution_profile, current_execution_profile,
-      current_execution_profile};
-  if (retained_universe)
-    admitted_execution_profiles = retained_universe->execution_profiles;
-
   auto effect_inspection_store =
       posix_effect_journal_store::from_directory_fd(effect_store.get());
   const auto execution_scopes = command.intent == transaction_run_command_intent::start
       ? native_execution_scopes(transaction.program())
       : resume_native_execution_scopes(
             transaction.program(), *existing, effect_inspection_store);
-  require_native_execution_preflight(
-      execution_scopes, execution_backend.report(), command.build_credentials,
-      command.lifecycle_credentials,
-      command.intent == transaction_run_command_intent::resume
-          ? &admitted_execution_profiles
-          : nullptr);
+
+  require_native_execution_credentials(
+      execution_scopes, command.build_credentials,
+      command.lifecycle_credentials);
+
+  std::optional<pkgexec_linux::interpreter_binding> current_interpreter;
+  std::unique_ptr<pkgexec_linux::isolated_backend> current_execution_backend;
+  if (command.intent == transaction_run_command_intent::start ||
+      execution_scopes.any())
+  {
+    current_interpreter.emplace(
+        pkgexec_linux::interpreter_binding::inspect(command.interpreter));
+    current_execution_backend.reset(
+        new pkgexec_linux::isolated_backend(
+            pkgexec_linux::isolated_backend::make({*current_interpreter})));
+  }
+
+  retained_native_execution_profiles admitted_execution_profiles = [&]() {
+    if (retained_evidence)
+      return retained_evidence->execution_profiles;
+    const auto profile = current_execution_backend->capabilities();
+    return retained_native_execution_profiles{profile, profile, profile};
+  }();
+  const auto admitted_interpreter = retained_evidence
+      ? retained_evidence->interpreter
+      : current_interpreter->identity();
+
+  if (current_execution_backend)
+  {
+    if (retained_evidence &&
+        current_interpreter->identity() != admitted_interpreter)
+    {
+      throw std::runtime_error(
+          "current interpreter differs from admitted run authority");
+    }
+    require_native_execution_preflight(
+        execution_scopes, current_execution_backend->report(),
+        command.intent == transaction_run_command_intent::resume
+            ? &admitted_execution_profiles
+            : nullptr);
+  }
 
   auto application_target = command_application_target(
-      command, transaction, binding, admitted_execution_profiles.lifecycle);
+      command, transaction, binding, admitted_interpreter,
+      admitted_execution_profiles.lifecycle);
   auto target_observer =
       pkgapply::posix::application_target_observer::from_directory_fd(
           target_root.get());
@@ -2617,13 +2663,15 @@ int execute_transaction_run(transaction_run_command command)
 
   if (command.intent == transaction_run_command_intent::start)
   {
-    universes.retain(
-        command.nonce, transaction, admitted_execution_profiles);
+    command_evidence.retain(
+        command.nonce, transaction, admitted_interpreter,
+        admitted_execution_profiles);
   }
 
   auto configuration = native_transaction_run_runtime_configuration::make(
-      transaction, command_sessions(command, binding, interpreter),
-      command_operations(command, transaction, binding, interpreter), {});
+      transaction, command_sessions(command, binding, admitted_interpreter),
+      command_operations(command, transaction, binding, admitted_interpreter),
+      {});
   auto runtime = native_posix_transaction_run_runtime::from_directory_fds(
       run_store.get(), evidence_store.get(), effect_store.get(),
       target_locks.get(), std::move(configuration),
@@ -2631,8 +2679,9 @@ int execute_transaction_run(transaction_run_command command)
        &operation_authority, &effect_bodies, &operation_authority,
        &admitted_execution_profiles.construction,
        &admitted_execution_profiles.check},
-      {execution_backend, execution_backend, *application_backend,
-       execution_backend, state_store, archive_backend});
+      {current_execution_backend.get(), current_execution_backend.get(),
+       *application_backend, current_execution_backend.get(), state_store,
+       archive_backend});
 
   const auto drive_policy =
       transaction_run_drive_policy::make(command.maximum_steps);

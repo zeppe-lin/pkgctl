@@ -60,17 +60,27 @@ before adding corresponding frontend behavior.
 The final command suite must prove:
 
 - `--start` and `--resume` are mutually exclusive and require one explicit
-  lowercase run nonce, existing roots, inspected interpreter, numeric
-  credentials, source-date epoch, and positive step bound;
-- start retains command-evidence schema v3 before admission: the complete
-  start-only transaction inputs, exact admitted backend capability profiles for
-  construction/check/lifecycle, plus owner-encoded catalog/state snapshots.
+  lowercase run nonce, existing roots, interpreter coordinate, numeric credentials,
+  source-date epoch, and positive step bound; current interpreter inspection is
+  required only when this invocation can execute new process work;
+- start retains the current private command-evidence format before admission: the
+  complete start-only transaction inputs, exact admitted interpreter identity, exact
+  admitted backend capability profiles for construction/check/lifecycle, plus
+  owner-encoded catalog/state snapshots.
   Resume requires
-  that retained universe and exact journal, omits all catalog, target-binding,
+  that retained command evidence and exact journal, omits all catalog, target-binding,
   architecture, goal, resolution-policy, and convergence options, and reproduces
   the same transaction identity using only the current canonical-store pathname
   as live state-store coordinate; re-declaring start semantics on resume is a
-  usage error and command-evidence schemas v1/v2 are intentionally unsupported;
+  usage error and bytes outside the one current private command-evidence format
+  fail closed without a compatibility decoder;
+- completed/native-runtime reopen is qualified with null construction/check/lifecycle
+  backends plus retained recovery profiles, proving historical evidence is not
+  masqueraded as a current executable mechanism;
+- resume with remaining executable work rejects a current interpreter whose exact
+  inspected identity differs from the one retained at admission and leaves the run head
+  unchanged; completed and externally blocked resumes are separately exercised under a
+  supervisor that cannot traverse the original build-tree interpreter pathname;
 - effect bodies are durably retained through owner codecs before journal records
   name them, interrupted application recovery uses direct active-request lookup
   rather than enumeration, and later application/terminal replay does not feed
@@ -402,7 +412,7 @@ dispatch. Another `--start` with the same nonce must be refused because the run
 is already admitted. The test then removes the collection, releases the holder,
 and issues one bounded `--resume`; that call must complete in one durable step
 using a different operation dispatch, proving explicit retry authority and
-retained command-universe replay. A repeated completed resume must remain a
+retained command-evidence replay. A repeated completed resume must remain a
 zero-step no-op. Capability-unavailable development hosts may skip the vertical
 under the same policy as the other privileged native CLI tests; release
 qualification may not.
@@ -449,7 +459,7 @@ now absent.
 admitted, the command checks that the selected Linux backend can establish the
 exact execution guarantees implied by the transaction's build, check, and
 lifecycle nodes. Capability absence is control-plane unavailability: the command
-refuses before retaining the initial command universe or writing a run/evidence
+refuses before retaining the initial command evidence or writing a run/evidence
 journal. It must not manufacture a package construction/check failure from an
 unavailable actuator. The same test supplies construction/check and lifecycle
 root views separately and proves that non-supervisor construction/check
@@ -1267,7 +1277,7 @@ the transaction boundary: `libpkgtransaction` creates lifecycle nodes only from
 explicit lifecycle-scoped resolution goals and does not infer executable work
 merely because a selected recipe declares a lifecycle program. Start and resume
 therefore carry the same typed lifecycle goal, while resume still recomposes from
-the retained command universe rather than rediscovering live collection bytes.
+the retained command evidence rather than rediscovering live collection bytes.
 
 The pre-install case interrupts immediately after the durable
 `before_lifecycle_intent` effect head is synchronized and before lifecycle

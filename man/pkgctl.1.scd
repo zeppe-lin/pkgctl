@@ -35,11 +35,11 @@ runtime, and performs at most the positive *--max-steps* bound. Before a fresh
 run is retained or admitted, the command proves that the selected native Linux
 backend can establish the execution guarantees implied by the transaction.
 Capability absence is reported as control-plane unavailability rather than a
-package build/check failure. *--start* then retains command-evidence schema v3:
-the complete start-only transaction inputs, exact admitted construction/check/
-lifecycle backend capability profiles, plus the original owner-encoded catalog
-and state snapshots. *--resume* requires that retained universe and the exact admitted
-journal; it does not accept a second collection, target-binding, architecture,
+package build/check failure. *--start* then retains the current private
+command-evidence format: the complete start-only transaction inputs, exact admitted
+interpreter identity, exact admitted construction/check/lifecycle backend capability
+profiles, plus the original owner-encoded catalog and state snapshots. *--resume*
+requires that retained command evidence and the exact admitted journal; it does not accept a second collection, target-binding, architecture,
 goal, resolution-policy, or convergence request.
 
 The command does not initialize or enumerate stores, discover journals, replan
@@ -202,12 +202,13 @@ Exactly one of the following is required:
 	already admitted, the command refuses and requires *--resume*.
 
 *--resume* _identity_
-	Resume the exact retained run nonce. The immutable command universe and
+	Resume the exact retained run nonce. The immutable command evidence and
 	admitted journal must both already exist. Collection, target-binding,
 	architecture, goal, resolution-policy, and convergence options are invalid on
-	resume: their exact admitted values are decoded from command-evidence schema
-	v2. The current *--canonical-store* pathname remains caller authority for the
-	existing physical store. Evidence in schema v1 or v2 format is rejected.
+	resume: their exact admitted values are decoded from the retained current command
+	evidence. The current *--canonical-store* pathname remains caller authority for the
+	existing physical store. Bytes outside the current private command-evidence format
+	are rejected; there is no compatibility decoder or migration path.
 
 The following run authorities are also required:
 
@@ -233,7 +234,8 @@ The following run authorities are also required:
 	Existing managed target root.
 
 *--interpreter* _path_
-	Exact interpreter inspected and admitted by *libpkgexec-linux*.
+	Interpreter coordinate. It is inspected and must match retained admission
+	authority only when the current invocation can execute process work.
 
 *--build-user-id* _number_
 	Explicit numeric construction/check execution user identity.

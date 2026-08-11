@@ -185,12 +185,18 @@ struct native_transaction_run_runtime_authorities final {
   const pkgexec::backend_capability_profile* check_recovery_backend = nullptr;
 };
 
-/*! \brief Explicit selected physical mechanisms for one native runtime. */
+/*! \brief Explicit selected physical mechanisms for one native runtime.
+ *
+ * Process backends are nullable because durable recovery may prove that no
+ * current process execution can occur.  A null process backend is not
+ * historical authority and cannot execute; retained recovery profiles belong
+ * to native_transaction_run_runtime_authorities instead.
+ */
 struct native_transaction_run_runtime_backends final {
-  pkgexec::execution_backend& construction;
-  pkgexec::execution_backend& check;
+  pkgexec::execution_backend* construction;
+  pkgexec::execution_backend* check;
   pkgapply::application_backend& application;
-  pkgexec::execution_backend& lifecycle;
+  pkgexec::execution_backend* lifecycle;
   pkgstate::canonical_store& state;
   pkgimage::archive_backend& archive;
 };

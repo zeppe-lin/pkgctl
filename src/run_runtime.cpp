@@ -563,6 +563,21 @@ transaction_run_drive_result posix_transaction_run_runtime::drive(
   return state_->drive(std::move(journal), std::move(drive_policy));
 }
 
+[[nodiscard]] pkgexec::backend_capability_profile native_recovery_profile(
+    const pkgexec::backend_capability_profile* retained,
+    pkgexec::execution_backend* current,
+    std::string_view role)
+{
+  if (retained != nullptr)
+    return *retained;
+  if (current != nullptr)
+    return current->capabilities();
+  throw native_transaction_run_runtime_error(
+      native_transaction_run_runtime_error_code::invalid_configuration, 0,
+      "native runtime lacks " + std::string(role) +
+          " recovery profile and current execution backend");
+}
+
 class native_posix_transaction_run_runtime::implementation final {
 public:
   implementation(
@@ -593,26 +608,36 @@ public:
         archives_(authorities.archives != nullptr
                 ? authorities.archives
                 : owned_archives_.get()),
-        construction_recovery_backend_(
-            authorities.construction_recovery_backend != nullptr
-                ? *authorities.construction_recovery_backend
-                : backends.construction.capabilities()),
-        check_recovery_backend_(
-            authorities.check_recovery_backend != nullptr
-                ? *authorities.check_recovery_backend
-                : backends.check.capabilities()),
+        construction_recovery_backend_(native_recovery_profile(
+            authorities.construction_recovery_backend,
+            backends.construction, "construction")),
+        check_recovery_backend_(native_recovery_profile(
+            authorities.check_recovery_backend, backends.check, "check")),
         progress_context_(
             sessions_, construction_recovery_backend_, check_recovery_backend_,
             operations_),
         progress_(
             configuration_.transaction(), evidence_, effects_,
             progress_context_),
+        unavailable_execution_backend_(),
         engine_(
             runs_, evidence_, effects_, target_lock_directory_fd, progress_,
             sessions_, operations_, operations_, *archives_,
             construction_recovery_backend_, check_recovery_backend_,
-            {backends.construction, backends.check, backends.application,
-             backends.lifecycle, backends.state},
+            {backends.construction != nullptr
+                    ? *backends.construction
+                    : static_cast<pkgexec::execution_backend&>(
+                          unavailable_execution_backend_),
+             backends.check != nullptr
+                    ? *backends.check
+                    : static_cast<pkgexec::execution_backend&>(
+                          unavailable_execution_backend_),
+             backends.application,
+             backends.lifecycle != nullptr
+                    ? *backends.lifecycle
+                    : static_cast<pkgexec::execution_backend&>(
+                          unavailable_execution_backend_),
+             backends.state},
             authorities.effect_bodies)
   {
   }
@@ -648,6 +673,31 @@ private:
   pkgexec::backend_capability_profile check_recovery_backend_;
   native_transaction_progress_rehydration_context_source progress_context_;
   stored_transaction_progress_rehydration_source progress_;
+  class unavailable_execution_backend final : public pkgexec::execution_backend {
+  public:
+    unavailable_execution_backend()
+        : capabilities_(pkgexec::backend_capability_profile::seal(
+              pkgexec::backend_identity::from_sha256(std::string(64U, '0')),
+              {}))
+    {
+    }
+
+    [[nodiscard]] pkgexec::backend_capability_profile capabilities() const override
+    {
+      return capabilities_;
+    }
+
+    [[nodiscard]] pkgexec::execution_result execute(
+        const pkgexec::execution_request&,
+        const pkgexec::execution_resources&) override
+    {
+      throw std::runtime_error(
+          "current execution backend is unavailable for durable recovery");
+    }
+
+  private:
+    pkgexec::backend_capability_profile capabilities_;
+  } unavailable_execution_backend_;
   transaction_run_runtime_engine engine_;
 };
 

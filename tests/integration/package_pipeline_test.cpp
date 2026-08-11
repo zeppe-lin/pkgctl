@@ -2704,6 +2704,7 @@ void check_native_runtime_package_pipeline()
   recording_effect_body_store effect_bodies;
   refusing_installed_package_source installed_packages;
   pipeline_backend backend;
+  const auto retained_execution_profile = backend.capabilities();
 
   const fs::path authority_root = root / "runtime-authority";
   const auto sessions = configuration(authority_root / "construction");
@@ -2734,7 +2735,7 @@ void check_native_runtime_package_pipeline()
       make_runtime_configuration(),
       {installed_packages, operations, effect_bodies, &operations,
        &effect_bodies, &operations},
-      {backend, backend, *application.backend, backend, store,
+      {&backend, &backend, *application.backend, &backend, store,
        archive_backend});
 
   const auto launched = runtime->launch(
@@ -2792,8 +2793,9 @@ void check_native_runtime_package_pipeline()
        application.lock_root},
       make_runtime_configuration(),
       {installed_packages, operations, effect_bodies, &operations,
-       &effect_bodies, &operations},
-      {backend, backend, *application.backend, backend, store,
+       &effect_bodies, &operations, &retained_execution_profile,
+       &retained_execution_profile},
+      {nullptr, nullptr, *application.backend, nullptr, store,
        archive_backend});
   const auto reopened = runtime->drive(
       journal, pkgctl::transaction_run_drive_policy::make(1U));
@@ -2890,7 +2892,7 @@ void check_native_runtime_pre_operation_failure(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {backend, backend, *application.backend, backend, store,
+        {&backend, &backend, *application.backend, &backend, store,
          archive_backend});
   };
 
@@ -3112,7 +3114,7 @@ void check_native_runtime_operation_failure(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {backend, backend, *application_backend, backend, *state_store,
+        {&backend, &backend, *application_backend, &backend, *state_store,
          archive_backend});
   };
 
@@ -3397,7 +3399,7 @@ void check_native_runtime_fresh_lease_contention(std::uint8_t nonce_marker)
         runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {backend, backend, *application.backend, backend, store,
+        {&backend, &backend, *application.backend, &backend, store,
          archive_backend});
   };
 
@@ -3549,7 +3551,7 @@ void check_native_runtime_recovery_lease_contention(std::uint8_t nonce_marker)
         runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {backend, backend, *application.backend, backend, store,
+        {&backend, &backend, *application.backend, &backend, store,
          archive_backend});
   };
 
@@ -3763,7 +3765,7 @@ void check_native_runtime_outer_lease_loss(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {backend, backend, *application.backend, *lifecycle_driver, state_store,
+        {&backend, &backend, *application.backend, lifecycle_driver, state_store,
          archive_backend});
   };
 
@@ -3996,7 +3998,7 @@ void check_native_runtime_publication_intent_uncertainty(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {backend, backend, *application.backend, backend, state_store,
+        {&backend, &backend, *application.backend, &backend, state_store,
          archive_backend});
   };
 
@@ -4234,7 +4236,7 @@ void check_native_runtime_terminal_indeterminate_publication(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {backend, backend, *application.backend, backend, state_store,
+        {&backend, &backend, *application.backend, &backend, state_store,
          archive_backend});
   };
 
@@ -4426,7 +4428,7 @@ void check_native_runtime_lifecycle_intent_external_resolution(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {backend, backend, *application.backend, backend, store,
+        {&backend, &backend, *application.backend, &backend, store,
          archive_backend});
   };
 

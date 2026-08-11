@@ -2945,8 +2945,8 @@ void check_native_posix_transaction_run_runtime()
     (void)pkgctl::native_posix_transaction_run_runtime::open(
         {run_path, run_path, effect_path, lock_path}, configuration,
         {installed_packages, operation_specifications, effect_restart_bodies},
-        {execution_backend, execution_backend, application_backend,
-         execution_backend, state_store, archive_backend});
+        {&execution_backend, &execution_backend, application_backend,
+         &execution_backend, state_store, archive_backend});
   }
   catch (const pkgctl::native_transaction_run_runtime_error& problem)
   {
@@ -2964,8 +2964,8 @@ void check_native_posix_transaction_run_runtime()
     (void)pkgctl::native_posix_transaction_run_runtime::from_directory_fds(
         run_fd, run_fd, effect_fd, lock_fd, configuration,
         {installed_packages, operation_specifications, effect_restart_bodies},
-        {execution_backend, execution_backend, application_backend,
-         execution_backend, state_store, archive_backend});
+        {&execution_backend, &execution_backend, application_backend,
+         &execution_backend, state_store, archive_backend});
   }
   catch (const pkgctl::native_transaction_run_runtime_error& problem)
   {
@@ -2981,8 +2981,8 @@ void check_native_posix_transaction_run_runtime()
       {run_path, evidence_path, effect_path, lock_path},
       std::move(configuration),
       {installed_packages, operation_specifications, effect_restart_bodies},
-      {execution_backend, execution_backend, application_backend,
-       execution_backend, state_store, archive_backend});
+      {&execution_backend, &execution_backend, application_backend,
+       &execution_backend, state_store, archive_backend});
 
   std::filesystem::rename(run_path, selected_run_path);
   std::filesystem::create_directory(run_path);

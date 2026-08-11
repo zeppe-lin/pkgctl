@@ -13,7 +13,7 @@ execution guarantees implied by the transaction. `--start` then retains the
 complete start-only transaction inputs, the exact admitted construction/check/
 lifecycle backend capability profiles, and the owner-encoded catalog/state universe
 before admitting one explicit run nonce. `--resume` requires that retained
-command universe and the exact admitted journal; it refuses a second collection,
+command evidence and the exact admitted journal; it refuses a second collection,
 target-binding, architecture, goal, resolution-policy, or convergence request.
 The current canonical-store pathname remains live resume authority while its
 target binding comes from retained state evidence. Both enter only through
@@ -25,14 +25,15 @@ controller journal may reference them. Interrupted applications are reopened
 through the direct `libpkgapply-posix` request-to-journal index. Resume never
 reacquires collections, asks the operator to restate transaction semantics,
 substitutes current state for historical state, scans for journals, or silently
-replans. Command-evidence schema v3 is the only admitted format; older schema
-evidence is intentionally rejected rather than interpreted through a compatibility
-path. Resume uses the retained backend profiles to validate historical execution
-evidence. Current backend capability and supervisor-credential preflight is required
-only for construction, check, or lifecycle work that can still execute; a completed
-or already externally blocked run does not reacquire execute-now authority merely to
-explain durable history. Target observations are live only for the current operation
-dispatch.
+replans. Private command evidence has one current admitted format. Bytes that do not
+belong to that format are rejected rather than interpreted through a compatibility
+path. Resume uses the retained interpreter identity and backend profiles to validate
+historical execution evidence. Current interpreter observation, backend capability, and supervisor-credential
+preflight are required only for construction, check, or lifecycle work that can still
+execute; a completed or already externally blocked run does not reacquire execute-now
+authority merely to explain durable history. The retained interpreter identity is
+historical evidence authority, not an observation that the old pathname still exists.
+Target observations are live only for the current operation dispatch.
 
 Construction/check and lifecycle execution keep separate existing root views
 and explicit numeric credential sets. Supplying the same roots or credentials
@@ -42,7 +43,8 @@ The current Linux backend admits only the invoking supervisor's credentials;
 than pretending to provide fakeroot or ownership virtualization.
 
 All authority remains explicit: existing runtime, construction/check, lifecycle,
-and target roots; one inspected interpreter; numeric credentials; source-date
+and target roots; one exact interpreter authority when current execution is possible;
+numeric credentials; source-date
 epoch; retained installed-package trees; canonical state binding; and a caller-issued run
 nonce. The command creates no namespace, starts no daemon, waits on no timer,
 loops beyond the bound, retries implicitly, rolls back, repairs, cleans up, or

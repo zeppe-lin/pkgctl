@@ -62,6 +62,7 @@ run_command()
   nonce=$2
   maximum_steps=$3
   inject_resume_semantics=${4:-no}
+  selected_interpreter=${interpreter_override:-$interpreter}
   set -- run --canonical-store "$state"
   if [ "$intent" = --start ]; then
     set -- "$@" \
@@ -78,7 +79,7 @@ run_command()
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
     --target-root "$target" \
-    --interpreter "$interpreter" \
+    --interpreter "$selected_interpreter" \
     --build-user-id "$build_uid" \
     --build-group-id "$build_gid" \
     --lifecycle-user-id "$uid" \
@@ -321,6 +322,18 @@ inspection=$($pkgctl inspect-run --run-store "$runtime/run" --journal "$journal"
 printf '%s\n' "$inspection" >"$root/inspection.out"
 require_contains run-inspection "$root/inspection.out" "run.journal=$journal"
 require_contains run-inspection "$root/inspection.out" 'run.complete=false'
+
+interpreter_override=/bin/false
+capture_run resume-requires-admitted-interpreter 1 --resume "$run_nonce" 1
+unset interpreter_override
+require_contains resume-requires-admitted-interpreter-stderr \
+  "$root/resume-requires-admitted-interpreter.err" \
+  'current interpreter differs from admitted run authority'
+inspection_after_interpreter_refusal=$(
+  "$pkgctl" inspect-run --run-store "$runtime/run" --journal "$journal"
+)
+require_equal resume-interpreter-run-head "$inspection" \
+  "$inspection_after_interpreter_refusal"
 
 if [ "$uid" -eq 0 ]; then
   chown -R 65534:65534 "$root"

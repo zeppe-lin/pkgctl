@@ -165,6 +165,16 @@ grep -F 'pkgctl::transaction_run_advance_disposition::quiescent' "$test_source" 
   echo 'package-pipeline does not prove completed-journal quiescence after runtime reopen' >&2
   exit 1
 }
+grep -F 'const auto retained_execution_profile = backend.capabilities()' \
+  "$test_source" >/dev/null || {
+  echo 'package-pipeline does not retain historical execution-profile authority for reopen' >&2
+  exit 1
+}
+grep -F '{nullptr, nullptr, *application.backend, nullptr, store,' \
+  "$test_source" >/dev/null || {
+  echo 'package-pipeline completed reopen still supplies unused live process backends' >&2
+  exit 1
+}
 
 if grep -R -F 'libpkgreconcile' "$srcdir/meson.build" "$srcdir/src" >/dev/null 2>&1; then
   echo 'reconciliation qualification leaked into pkgctl production dependencies' >&2

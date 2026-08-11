@@ -7,7 +7,7 @@
   that the selected native Linux backend can establish the execution guarantees
   implied by the transaction; actuator unavailability is refused as control
   state rather than recorded as package failure. `--start` admits one explicit
-  run nonce; `--resume` requires that exact retained universe and exact admitted
+  run nonce; `--resume` requires that exact retained command evidence and exact admitted
   journal while refusing a second semantic transaction request. Both perform at
   most the positive `--max-steps` bound through the reviewed native runtime.
 - Corrects the privileged progress-scoped resume fixture so supervisor credentials
@@ -18,17 +18,19 @@
   launcher itself is using dynamic AddressSanitizer, its already-loaded runtime remains
   first while the credential hook and inherited preload chain are added without displacing
   it. Sanitizer startup therefore remains loader authority rather than the uid/gid test.
-- Upgrades immutable command evidence to schema v3. Before run admission it
-  retains the complete start-only transaction inputs, the exact admitted
+- Uses one current fail-closed private command-evidence proof format. Before run
+  admission it retains the complete start-only
+  transaction inputs, the exact admitted interpreter identity, the exact admitted
   construction/check/lifecycle backend capability profiles, and the original
   owner-encoded catalog and canonical-state snapshots. Resume supplies only the
   current canonical-store pathname plus live runtime/actuator authority; retained
   state supplies target binding and retained transaction semantics recompose the same
   transaction identity. Historical execution evidence is validated against retained
-  profiles, while current backend/credential preflight is required only for scopes
-  that can still execute. Completed or externally blocked runs therefore do not
-  re-prove unused actuator authority. Re-declaring start-only semantics is a usage
-  error, and schemas v1/v2 have no compatibility decoder.
+  profiles, while current interpreter/backend/credential preflight is required only
+  for scopes that can still execute. Completed or externally blocked runs therefore
+  do not re-prove unused actuator authority or re-observe the interpreter pathname.
+  Re-declaring start-only semantics is a usage error. Bytes outside the current
+  private proof format fail closed; there is no decoder or migration path.
 - Retains lifecycle results, application receipts, publication requests, and
   publication receipts in a private immutable command store before an effect
   journal may name them. Bodies use their owning codecs and are validated again

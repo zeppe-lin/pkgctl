@@ -156,21 +156,27 @@ is retained, later `--resume` is external-resolution-only: it may reconstruct
 semantic authority to explain the block, but it must not append a durable run/effect
 successor, reserve replacement work, reacquire a mutation lease, or recreate the
 missing lock pathname. Delete the live collection before resume to keep the
-retained-command-universe guarantee in the same proof.
+retained-command-evidence guarantee in the same proof.
 
 A resumed command must not carry a second semantic transaction request merely so
-the CLI can prove equality with itself. Command-evidence schema v3 retains every
-start-only transaction input, the exact admitted construction/check/lifecycle backend
-capability profiles, and owner-encoded catalog/state snapshots before run admission. Every process-level resume test must therefore
-omit catalog acquisition, target-binding identities, architecture, goals,
-resolution preference, and convergence policy; explicit re-declaration is a
-usage error. The canonical-store pathname remains live physical authority on
-resume, but its target binding comes from retained state evidence. Do not add a
-v1/v2 compatibility decoder: older command evidence is not a public state authority
-and must fail closed. Historical execution evidence must be decoded against the
-retained profile, never a freshly probed substitute. Treat current capability reports
-and current-supervisor credential equality as execute-now authority: require them only
-for scopes that durable progress/recovery can still invoke. A completed or externally
+the CLI can prove equality with itself. The one current private command-evidence
+format retains every start-only transaction input, the exact admitted interpreter
+identity, the exact admitted construction/check/lifecycle backend capability profiles,
+and owner-encoded catalog/state snapshots before run admission. Every process-level
+resume test must therefore omit catalog acquisition, target-binding identities,
+architecture, goals, resolution preference, and convergence policy; explicit
+re-declaration is a usage error. The canonical-store pathname remains live physical
+authority on resume, but its target binding comes from retained state evidence. Do not
+add a compatibility decoder or migration path: bytes outside the current private
+format are not authority and must fail closed. Historical execution evidence must be
+decoded against retained interpreter/profile authority, never a freshly probed
+substitute. Treat current interpreter observation, capability reports, and
+current-supervisor credential equality as execute-now authority: require them only for
+scopes that durable progress/recovery can still invoke. Retained interpreter identity
+is historical evidence authority only; do not use it to claim that a pathname is
+currently resolvable or executable. Do not wrap retained profiles in an execution-
+backend adapter merely to satisfy composition types; absence of current process
+authority is represented by null native process backends. A completed or externally
 blocked run must not be made unrecoverable merely because an unused actuator is no
 longer executable in the current process context. Keep both sides process-qualified:
 remaining check work must reject a changed supervisor, while completed and retained

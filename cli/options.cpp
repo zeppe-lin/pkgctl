@@ -770,7 +770,7 @@ Run authority:
   --build-root PATH               existing construction/check root view
   --lifecycle-root PATH           existing lifecycle execution root view
   --target-root PATH              existing managed target root
-  --interpreter PATH              exact inspected interpreter
+  --interpreter PATH              interpreter coordinate; inspected when executable work remains
   --build-user-id N               construction/check execution user id
   --build-group-id N              construction/check execution group id
   --build-supplementary-group N   repeatable construction/check group id
