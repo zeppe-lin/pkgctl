@@ -50,7 +50,7 @@ for required in \
   'commit_transaction_run_successor' \
   'detail::rehydrate_terminal_effectful_operation' \
   'checkpoint.publication_request()->transaction_evidence()'; do
-  grep -F "$required" "$header" "$source" "$restart_header" \
+  grep -F -- "$required" "$header" "$source" "$restart_header" \
       "$restart_source" "$effect_restart" "$effect" >/dev/null || {
     echo "missing durable restart-reconciliation contract: $required" >&2
     exit 1
@@ -151,7 +151,7 @@ for forbidden in \
   'canonical_generation_store' \
   'posix_effect_journal_store' \
   'posix_transaction_run_journal_store'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden durable restart-reconciliation policy: $forbidden" >&2
     exit 1
   fi

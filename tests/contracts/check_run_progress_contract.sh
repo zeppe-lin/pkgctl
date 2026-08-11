@@ -16,7 +16,7 @@ for text in \
   'check_dispatch_recovery_context check(' \
   'effect_restart_checkpoint operation('
 do
-  grep -F "$text" "$header" >/dev/null || fail "missing contract: $text"
+  grep -F -- "$text" "$header" >/dev/null || fail "missing contract: $text"
 done
 
 for text in \
@@ -31,7 +31,7 @@ for text in \
   'transaction_node_status::ready' \
   'progress.identity() != record.progress()'
 do
-  grep -F "$text" "$source" >/dev/null || fail "missing implementation: $text"
+  grep -F -- "$text" "$source" >/dev/null || fail "missing implementation: $text"
 done
 
 for forbidden in \
@@ -45,7 +45,7 @@ for forbidden in \
   'read_state(' \
   'main('
 do
-  ! grep -F "$forbidden" "$source" >/dev/null || \
+  ! grep -F -- "$forbidden" "$source" >/dev/null || \
     fail "rehydrator owns forbidden behavior: $forbidden"
 done
 

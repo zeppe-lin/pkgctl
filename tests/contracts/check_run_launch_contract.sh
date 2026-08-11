@@ -32,7 +32,7 @@ for required in \
   'drive_transaction_run' \
   'transaction launch crossed durable admission authority' \
   'transaction launch moved behind its starting record'; do
-  grep -F "$required" "$header" "$source" "$internal" "$admit_source" \
+  grep -F -- "$required" "$header" "$source" "$internal" "$admit_source" \
     >/dev/null || {
     echo "missing restart-safe transaction-launch contract: $required" >&2
     exit 1
@@ -69,7 +69,7 @@ for required_test in \
   'dispatch_nonces.calls() == 0U' \
   'run_store.latest().sequence() == 0U' \
   'store_contract_violation'; do
-  grep -F "$required_test" "$test_source" >/dev/null || {
+  grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing restart-safe transaction-launch test: $required_test" >&2
     exit 1
   }
@@ -87,7 +87,7 @@ for forbidden in \
   'canonical_generation_store' \
   'posix_effect_journal_store' \
   'posix_transaction_run_journal_store'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden restart-safe transaction-launch policy: $forbidden" >&2
     exit 1
   fi

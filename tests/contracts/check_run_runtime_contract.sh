@@ -59,7 +59,7 @@ for required in \
   'stored_transaction_progress_rehydration_source progress_' \
   'transaction_progress::begin(configuration_.transaction())' \
   'transaction_run_nonce run_nonce'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing transaction-run runtime contract: $required" >&2
     exit 1
   }
@@ -109,7 +109,7 @@ for required_test in \
   'operation_specifications.calls() == 0U' \
   'effect_restart_bodies.calls() == 0U' \
   'artifacts == 1U'; do
-  grep -F "$required_test" "$test_source" >/dev/null || {
+  grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing transaction-run runtime test: $required_test" >&2
     exit 1
   }
@@ -120,7 +120,7 @@ for required_doc in \
   'NATIVE TARGET AND RUNTIME COMPOSITION' \
   'explicit durable run-intent nonce' \
   'live per-dispatch operation specifications'; do
-  grep -F "$required_doc" "$srcdir/CHANGELOG.md" "$readme" "$design" \
+  grep -F -- "$required_doc" "$srcdir/CHANGELOG.md" "$readme" "$design" \
       "$testing" "$manual" >/dev/null || {
     echo "missing native runtime documentation: $required_doc" >&2
     exit 1
@@ -130,7 +130,7 @@ done
 for forbidden_authority in \
   'transaction_run_nonce_source& run_nonces' \
   'transaction_dispatch_nonce_source& dispatch_nonces'; do
-  if grep -F "$forbidden_authority" "$header" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden_authority" "$header" >/dev/null 2>&1; then
     echo "runtime must not borrow nonce service: $forbidden_authority" >&2
     exit 1
   fi
@@ -155,7 +155,7 @@ for forbidden in \
   'canonical_generation_store::initialize' \
   'list_' \
   'latest_'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden native runtime policy: $forbidden" >&2
     exit 1
   fi

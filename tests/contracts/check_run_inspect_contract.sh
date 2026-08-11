@@ -36,7 +36,7 @@ for required in \
   'session.kind=transaction-run' \
   'run.external-evidence-required=' \
   'prefix << "disposition="'; do
-  grep -F "$required" "$header" "$source" "$restart_header" \
+  grep -F -- "$required" "$header" "$source" "$restart_header" \
     "$restart_source" "$report_header" "$report_source" >/dev/null || {
     echo "missing durable transaction-run inspection contract: $required" >&2
     exit 1
@@ -74,7 +74,7 @@ for required_test in \
   'run.disposition=stopped-after-failure' \
   'store_contract_violation' \
   'append_calls() == 0U'; do
-  grep -F "$required_test" "$test_source" >/dev/null || {
+  grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing durable transaction-run inspection test: $required_test" >&2
     exit 1
   }
@@ -96,7 +96,7 @@ for forbidden in \
   'opendir(' \
   'readdir(' \
   'posix_transaction_run_journal_store'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden durable transaction-run inspection policy: $forbidden" >&2
     exit 1
   fi

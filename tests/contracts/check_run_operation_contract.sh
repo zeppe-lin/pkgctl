@@ -40,7 +40,7 @@ for required in \
   'record.journal().hex()' \
   'dispatch.identity().hex()' \
   'incoming.image().receipt().archive_digest()'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing native operation authority contract: $required" >&2
     exit 1
   }
@@ -64,7 +64,7 @@ for required_test in \
   'check_explicit_transaction_effect_archive_source' \
   'expected_archive_digest' \
   'duplicate_refused'; do
-  grep -F "$required_test" "$test_source" >/dev/null || {
+  grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing native operation authority test: $required_test" >&2
     exit 1
   }
@@ -97,7 +97,7 @@ for forbidden in \
   'opendir(' \
   'readdir(' \
   'glob('; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden native operation authority shortcut: $forbidden" >&2
     exit 1
   fi

@@ -54,6 +54,10 @@
 - Keeps the read-only CLI smoke test synchronized with the split `run --start` /
   `run --resume` usage grammar and makes help-surface mismatches diagnostic rather
   than silent `set -e` exits.
+- Hardens shell qualification against option-like expected text: every variable
+  fixed-string `grep` pattern is separated from grep options, and the test-layout
+  contract rejects unsafe forms. Diagnostics beginning with `--` are therefore
+  tested as data rather than accidentally parsed as grep options.
 - Organizes qualification by semantic role and adds a privileged process-level
   `pkgctl run` start/resume test. Capability-unavailable hosts may skip that
   vertical scenario in ordinary development runs, but release qualification

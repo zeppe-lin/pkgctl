@@ -28,6 +28,15 @@ for suite in unit integration contract header; do
   }
 done
 
+unsafe_fixed_greps=$(
+  grep -R -n -E 'grep[[:space:]]+-F[^[:space:]]*[[:space:]]+"\$' "$srcdir/tests" || :
+)
+[ -z "$unsafe_fixed_greps" ] || {
+  echo 'test shell passes variable fixed-string patterns to grep without an option terminator:' >&2
+  printf '%s\n' "$unsafe_fixed_greps" >&2
+  exit 1
+}
+
 for path in \
   'unit/construction_test.cpp' \
   'fixtures/state_fixture.cpp' \
@@ -61,7 +70,7 @@ for path in \
   'contracts/check_target_observation_contract.sh' \
   'contracts/check_test_layout_contract.sh' \
   'contracts/check_fetch_generation_contract.sh'; do
-  grep -F "$path" "$meson" "$srcdir/tests/run-direct.sh" >/dev/null || {
+  grep -F -- "$path" "$meson" "$srcdir/tests/run-direct.sh" >/dev/null || {
     echo "qualification wiring omits categorized test source: $path" >&2
     exit 1
   }

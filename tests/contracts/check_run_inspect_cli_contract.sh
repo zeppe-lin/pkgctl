@@ -78,7 +78,7 @@ done
 read_lock_body=$(sed -n '/^std::optional<fd_guard> lock_store_read_only(/,/^}/p' \
   "$store_source")
 for required in 'O_RDONLY' 'LOCK_SH' 'errno == ENOENT'; do
-  grep -F "$required" <<EOF_INNER >/dev/null || {
+  grep -F -- "$required" <<EOF_INNER >/dev/null || {
 $read_lock_body
 EOF_INNER
     echo "missing read-only run-store lock contract: $required" >&2
@@ -86,7 +86,7 @@ EOF_INNER
   }
 done
 for forbidden in 'O_CREAT' 'O_RDWR' 'LOCK_EX'; do
-  if grep -F "$forbidden" <<EOF_INNER >/dev/null 2>&1
+  if grep -F -- "$forbidden" <<EOF_INNER >/dev/null 2>&1
 $read_lock_body
 EOF_INNER
   then
@@ -121,7 +121,7 @@ for required_test in \
   'no committed store head' \
   'store-open-failed' \
   'store-corrupt'; do
-  grep -F "$required_test" "$cli_test" >/dev/null || {
+  grep -F -- "$required_test" "$cli_test" >/dev/null || {
     echo "missing exact run-inspection command test: $required_test" >&2
     exit 1
   }
@@ -140,7 +140,7 @@ for forbidden in \
   'std::thread' \
   'std::async'; do
   if printf '%s\n%s\n' "$parse_body" "$execute_body" | \
-      grep -F "$forbidden" >/dev/null 2>&1; then
+      grep -F -- "$forbidden" >/dev/null 2>&1; then
     echo "forbidden exact run-inspection command policy: $forbidden" >&2
     exit 1
   fi

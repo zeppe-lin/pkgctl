@@ -46,7 +46,7 @@ for required in \
   'failure containment forbids starting reserved work' \
   'operation dispatch was reserved against a stale state epoch' \
   'indeterminate operation observation cannot advance state'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing transaction dispatch contract: $required" >&2
     exit 1
   }
@@ -66,7 +66,7 @@ for forbidden in \
   'sleep(' \
   'pkgmk' \
   'pkgman'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden transaction dispatch shortcut: $forbidden" >&2
     exit 1
   fi

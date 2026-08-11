@@ -121,7 +121,7 @@ for evidence in \
   'operations.replay_calls() == replay_calls + 2U' \
   'operations.archive_calls() == archive_calls + 2U' \
   'holder.reset()'; do
-  grep -F "$evidence" "$test_source" >/dev/null || {
+  grep -F -- "$evidence" "$test_source" >/dev/null || {
     echo "package fault/restart matrix lacks evidence: $evidence" >&2
     exit 1
   }
@@ -209,7 +209,7 @@ for forbidden in \
   '::fork(' \
   '::execv(' \
   '::execve('; do
-  if grep -F "$forbidden" "$test_source" >/dev/null; then
+  if grep -F -- "$forbidden" "$test_source" >/dev/null; then
     echo "package fault/restart matrix escaped into command/process orchestration: $forbidden" >&2
     exit 1
   fi

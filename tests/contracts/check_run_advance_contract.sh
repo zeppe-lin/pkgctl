@@ -55,7 +55,7 @@ for required in \
   'mutation-authority block has malformed semantic evidence' \
   'mutation-authority block has malformed dispatch state' \
   'transaction_dispatch_state::released_unstarted'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing one-step transaction-advancement contract: $required" >&2
     exit 1
   }
@@ -148,7 +148,7 @@ for forbidden in \
   'canonical_generation_store' \
   'posix_effect_journal_store' \
   'posix_transaction_run_journal_store'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden one-step transaction-advancement policy: $forbidden" >&2
     exit 1
   fi

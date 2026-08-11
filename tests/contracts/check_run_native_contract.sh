@@ -40,7 +40,7 @@ for required in \
   'operation_reconciliation_requires_continuation_driver' \
   'operation_reconciliation_requires_state_observer' \
   'operation_reconciliation_requires_publication_driver'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing native effect-runtime contract: $required" >&2
     exit 1
   }
@@ -51,7 +51,7 @@ for required in \
   "version: ['>=3.0.0', '<4.0.0']" \
   "'libpkgstate-apply'" \
   "version: ['>=3.1.0', '<4.0.0']"; do
-  grep -F "$required" "$meson" >/dev/null || {
+  grep -F -- "$required" "$meson" >/dev/null || {
     echo "missing native effect-runtime dependency floor: $required" >&2
     exit 1
   }
@@ -116,7 +116,7 @@ for required_test in \
   'terminal.continuation == nullptr' \
   'publication.resulting_state == nullptr' \
   'publication_archives.calls() == 0U'; do
-  grep -F "$required_test" "$test_source" >/dev/null || {
+  grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing native effect-runtime test: $required_test" >&2
     exit 1
   }
@@ -141,7 +141,7 @@ for required_doc in \
   'Caller-configured POSIX per-dispatch effect runtime' \
   'Release 0.24.0 native effect-runtime boundary' \
   'CALLER-CONFIGURED POSIX EFFECT RUNTIME'; do
-  grep -F "$required_doc" "$srcdir/CHANGELOG.md" "$design" "$manual" \
+  grep -F -- "$required_doc" "$srcdir/CHANGELOG.md" "$design" "$manual" \
       >/dev/null || {
     echo "missing native effect-runtime documentation: $required_doc" >&2
     exit 1
@@ -158,7 +158,7 @@ for forbidden in \
   'canonical_generation_store::initialize' \
   'transaction_run_journal_store' \
   'effect_journal_store'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden native effect-runtime shortcut: $forbidden" >&2
     exit 1
   fi

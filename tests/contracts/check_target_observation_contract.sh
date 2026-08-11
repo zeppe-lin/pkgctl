@@ -27,7 +27,7 @@ for required in \
   'dispatch.reserved_from_progress() != progress.identity()' \
   'dispatch.reserved_state() != progress.current_state().identity()' \
   'transaction_dispatch_state::reserved'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "target-observation core omits authority: $required" >&2
     exit 1
   }
@@ -54,7 +54,7 @@ for forbidden in \
   'planner_observation(' \
   'planner_kind(' \
   'pkgctl/native-target-observations/1'; do
-  if grep -F "$forbidden" "$cli" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$cli" >/dev/null 2>&1; then
     echo "CLI still owns target-observation semantics: $forbidden" >&2
     exit 1
   fi

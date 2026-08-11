@@ -92,7 +92,7 @@ for forbidden in \
   'latest_' \
   'list_' \
   'PKGCTL-COMMAND-UNIVERSE-1'; do
-  if grep -F "$forbidden" "$command" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$command" >/dev/null 2>&1; then
     echo "forbidden bounded transaction command policy: $forbidden" >&2
     exit 1
   fi
@@ -240,7 +240,7 @@ for required_test in \
   'disposition completed' \
   'package fixture 1.0-1' \
   'durable-steps 0'; do
-  grep -F "$required_test" "$integration" >/dev/null || {
+  grep -F -- "$required_test" "$integration" >/dev/null || {
     echo "missing process-level run qualification: $required_test" >&2
     exit 1
   }
@@ -302,7 +302,7 @@ for required_publication_terminal_interrupt in \
   '.tmp-effect-head-' \
   '.pjeh' \
   'SIGKILL'; do
-  grep -F "$required_publication_terminal_interrupt" "$publication_terminal_fixture" >/dev/null || {
+  grep -F -- "$required_publication_terminal_interrupt" "$publication_terminal_fixture" >/dev/null || {
     echo "missing external publication-terminal interruption mechanism: $required_publication_terminal_interrupt" >&2
     exit 1
   }
@@ -337,7 +337,7 @@ for required_lifecycle_interrupt in \
   'before-lifecycle-intent' \
   'after-lifecycle-intent' \
   'SIGKILL'; do
-  grep -F "$required_lifecycle_interrupt" "$lifecycle_interrupt_fixture" >/dev/null || {
+  grep -F -- "$required_lifecycle_interrupt" "$lifecycle_interrupt_fixture" >/dev/null || {
     echo "missing external lifecycle-intent interruption mechanism: $required_lifecycle_interrupt" >&2
     exit 1
   }
@@ -349,7 +349,7 @@ for required_interrupt in \
   'SYS_fsync' \
   'active-request-v1-sha256-' \
   'SIGKILL'; do
-  grep -F "$required_interrupt" "$interrupt_fixture" >/dev/null || {
+  grep -F -- "$required_interrupt" "$interrupt_fixture" >/dev/null || {
     echo "missing external application-intent interruption mechanism: $required_interrupt" >&2
     exit 1
   }
@@ -370,7 +370,7 @@ for documented in \
   'BOUNDED NATIVE TRANSACTION COMMAND' \
   'command-evidence schema v2' \
   'retained transaction semantics'; do
-  grep -F "$documented" "$srcdir/README.md" "$srcdir/DESIGN.md" \
+  grep -F -- "$documented" "$srcdir/README.md" "$srcdir/DESIGN.md" \
       "$srcdir/TESTING.md" "$srcdir/man/pkgctl.1.scd" \
       "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null || {
     echo "missing bounded transaction command documentation: $documented" >&2

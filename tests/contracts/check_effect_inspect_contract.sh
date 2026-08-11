@@ -63,7 +63,7 @@ for required in \
   'effect.publication-resulting-snapshot=' \
   'effect.terminal-outcome=' \
   'effect.reconciled-state='; do
-  grep -F "$required" "$header" "$journal_header" "$source" \
+  grep -F -- "$required" "$header" "$journal_header" "$source" \
     "$report_header" "$report_source" >/dev/null || {
     echo "missing durable effect-attempt inspection contract: $required" >&2
     exit 1
@@ -94,13 +94,13 @@ for required in \
   'O_RDONLY | O_CLOEXEC | O_NOFOLLOW' \
   'errno == ENOENT' \
   'LOCK_SH'; do
-  printf '%s\n' "$read_lock" | grep -F "$required" >/dev/null || {
+  printf '%s\n' "$read_lock" | grep -F -- "$required" >/dev/null || {
     echo "missing read-only effect-store lock contract: $required" >&2
     exit 1
   }
 done
 for forbidden in 'O_RDWR' 'O_WRONLY' 'O_CREAT' 'LOCK_EX'; do
-  if printf '%s\n' "$read_lock" | grep -F "$forbidden" >/dev/null 2>&1; then
+  if printf '%s\n' "$read_lock" | grep -F -- "$forbidden" >/dev/null 2>&1; then
     echo "read-only effect-store lock has writer authority: $forbidden" >&2
     exit 1
   fi
@@ -119,7 +119,7 @@ printf '%s\n' "$load_body" | grep -F 'catch (...)' >/dev/null || {
 
 writer_lock=$(sed -n '/^fd_guard lock_store(/,/^}$/p' "$store_source")
 for required in 'O_RDWR | O_CREAT' 'LOCK_EX'; do
-  printf '%s\n' "$writer_lock" | grep -F "$required" >/dev/null || {
+  printf '%s\n' "$writer_lock" | grep -F -- "$required" >/dev/null || {
     echo "missing effect-store writer lock contract: $required" >&2
     exit 1
   }
@@ -138,7 +138,7 @@ for required_test in \
   'append_calls() == 0U' \
   '!std::filesystem::exists(lock_path)' \
   'std::filesystem::exists(lock_path)'; do
-  grep -F "$required_test" "$test_source" "$store_test" >/dev/null || {
+  grep -F -- "$required_test" "$test_source" "$store_test" >/dev/null || {
     echo "missing durable effect-attempt inspection test: $required_test" >&2
     exit 1
   }
@@ -158,7 +158,7 @@ for forbidden in \
   'opendir(' \
   'readdir(' \
   'posix_effect_journal_store'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden durable effect-attempt inspection policy: $forbidden" >&2
     exit 1
   fi

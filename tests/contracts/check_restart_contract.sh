@@ -61,7 +61,7 @@ for required in \
   '::linkat' \
   '::fsync' \
   'O_NOFOLLOW'; do
-  grep -F "$required" "$model" "$model_source" "$codec_header" \
+  grep -F -- "$required" "$model" "$model_source" "$codec_header" \
       "$restart" "$effect" "$store" "$codec" \
       >/dev/null || {
     echo "missing durable effect contract: $required" >&2
@@ -119,7 +119,7 @@ for forbidden in \
   'canonical_generation_store::initialize' \
   '.journal_namespace()' \
   '/var/lib/pkg'; do
-  if grep -F "$forbidden" \
+  if grep -F -- "$forbidden" \
       "$model" "$model_source" "$codec_header" "$restart" \
       "$effect" "$store" "$codec" \
       >/dev/null 2>&1; then

@@ -73,7 +73,7 @@ for required in \
   '::renameat' \
   '::fsync' \
   'O_NOFOLLOW'; do
-  grep -F "$required" \
+  grep -F -- "$required" \
       "$model" "$codec_header" "$store_header" "$commit_header" \
       "$restart_header" "$model_source" "$codec" "$store" "$commit" \
       "$restart" \
@@ -97,7 +97,7 @@ for forbidden in \
   'sleep(' \
   'pkgmk' \
   'pkgman'; do
-  if grep -F "$forbidden" \
+  if grep -F -- "$forbidden" \
       "$model" "$codec_header" "$store_header" "$commit_header" \
       "$restart_header" "$model_source" "$codec" "$store" "$commit" \
       "$restart" \

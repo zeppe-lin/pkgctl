@@ -32,7 +32,7 @@ for required in \
   'effectful_operation_request::make' \
   'planning_refused' \
   'preparation_driver_contract_violation'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing operation preparation contract: $required" >&2
     exit 1
   }
@@ -60,7 +60,7 @@ for forbidden in \
   'libpkgexec-linux' \
   'pkgmk' \
   'pkgman'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden operation preparation shortcut: $forbidden" >&2
     exit 1
   fi
@@ -101,7 +101,7 @@ for obsolete in \
   'reinspect and project incoming artifact through libpkgbuild-plan' \
   'every exact `libpkgbuild` package-input subject and tree identity' \
   'translate observed digests into the complete libpkgbuild source set'; do
-  if grep -F "$obsolete" \
+  if grep -F -- "$obsolete" \
       "$srcdir/README.md" \
       "$srcdir/DESIGN.md" \
       "$srcdir/MAINTAINING.md" \

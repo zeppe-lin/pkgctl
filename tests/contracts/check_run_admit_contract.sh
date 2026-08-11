@@ -30,7 +30,7 @@ for required in \
   'validate_exact_committed_admission' \
   'committed.reopen' \
   'run store returned foreign transaction-run admission authority'; do
-  grep -F "$required" "$header" "$source" "$internal" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" "$internal" >/dev/null || {
     echo "missing durable run-admission contract: $required" >&2
     exit 1
   }
@@ -92,7 +92,7 @@ for required_test in \
   'store_contract_violation' \
   'trace == std::vector<std::string>({"nonce", "append"})' \
   '2U, expected_run.identity()'; do
-  grep -F "$required_test" "$test_source" >/dev/null || {
+  grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing durable run-admission test: $required_test" >&2
     exit 1
   }
@@ -111,7 +111,7 @@ for forbidden in \
   'sleep(' \
   'usleep(' \
   'posix_transaction_run_journal_store'; do
-  if grep -F "$forbidden" "$header" "$source" "$internal" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" "$internal" >/dev/null 2>&1; then
     echo "forbidden durable run-admission policy: $forbidden" >&2
     exit 1
   fi

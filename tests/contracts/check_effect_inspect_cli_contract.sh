@@ -79,13 +79,13 @@ done
 read_lock_body=$(sed -n '/^std::optional<fd_guard> lock_store_read_only(/,/^}/p' \
   "$store_source")
 for required in 'O_RDONLY' 'LOCK_SH' 'errno == ENOENT'; do
-  printf '%s\n' "$read_lock_body" | grep -F "$required" >/dev/null || {
+  printf '%s\n' "$read_lock_body" | grep -F -- "$required" >/dev/null || {
     echo "missing read-only effect-store lock contract: $required" >&2
     exit 1
   }
 done
 for forbidden in 'O_CREAT' 'O_RDWR' 'LOCK_EX'; do
-  if printf '%s\n' "$read_lock_body" | grep -F "$forbidden" >/dev/null 2>&1; then
+  if printf '%s\n' "$read_lock_body" | grep -F -- "$forbidden" >/dev/null 2>&1; then
     echo "read-only effect-store lock acquired mutation authority: $forbidden" >&2
     exit 1
   fi
@@ -115,7 +115,7 @@ for required_test in \
   'has no committed store head' \
   'pkgctl: effect journal: store-open-failed:' \
   'pkgctl: effect journal: store-corrupt:'; do
-  grep -F "$required_test" "$cli_test" >/dev/null || {
+  grep -F -- "$required_test" "$cli_test" >/dev/null || {
     echo "missing exact effect-inspection command test: $required_test" >&2
     exit 1
   }
@@ -134,7 +134,7 @@ for forbidden in \
   'std::thread' \
   'std::async'; do
   if printf '%s\n%s\n' "$parse_body" "$execute_body" | \
-      grep -F "$forbidden" >/dev/null 2>&1; then
+      grep -F -- "$forbidden" >/dev/null 2>&1; then
     echo "forbidden exact effect-inspection command policy: $forbidden" >&2
     exit 1
   fi

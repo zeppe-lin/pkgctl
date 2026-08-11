@@ -46,7 +46,7 @@ for required in \
   'detail::native_construction_recovery_context(' \
   'detail::native_check_recovery_context(' \
   'checkpoint.run().progress()'; do
-  grep -F "$required" "$header" "$source" \
+  grep -F -- "$required" "$header" "$source" \
       "$srcdir/include/pkgctl/run_evidence.h" >/dev/null || {
     echo "missing evidence recovery contract: $required" >&2
     exit 1
@@ -60,7 +60,7 @@ for required_test in \
   'transaction_run_evidence_error_code::evidence_missing' \
   'recovery_context_mismatch' \
   'check_posix_transaction_run_runtime_recovery'; do
-  grep -F "$required_test" "$construction" >/dev/null || {
+  grep -F -- "$required_test" "$construction" >/dev/null || {
     echo "missing construction evidence recovery test: $required_test" >&2
     exit 1
   }
@@ -73,7 +73,7 @@ for required_test in \
   'transaction_run_evidence_error_code::evidence_missing' \
   'recovery_context_mismatch' \
   'native_transaction_dispatch_recovery_context_source'; do
-  grep -F "$required_test" "$check" >/dev/null || {
+  grep -F -- "$required_test" "$check" >/dev/null || {
     echo "missing check evidence recovery test: $required_test" >&2
     exit 1
   }
@@ -90,14 +90,14 @@ for forbidden in \
   case "$forbidden" in
     'construction_result('| 'transaction_check_result(')
       # Private reconstruction is restricted to the reviewed access struct.
-      count=$(grep -F "$forbidden" "$source" | wc -l | tr -d ' ')
+      count=$(grep -F -- "$forbidden" "$source" | wc -l | tr -d ' ')
       [ "$count" -le 1 ] || {
         echo "recovery source duplicates controller result construction: $forbidden" >&2
         exit 1
       }
       ;;
     *)
-      if grep -F "$forbidden" "$source" >/dev/null 2>&1; then
+      if grep -F -- "$forbidden" "$source" >/dev/null 2>&1; then
         echo "recovery source fabricates missing authority: $forbidden" >&2
         exit 1
       fi

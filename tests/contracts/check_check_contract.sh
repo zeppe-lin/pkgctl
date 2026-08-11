@@ -32,7 +32,7 @@ for required in \
   'session.execution_request()' \
   'pkgcheck_exec::admitted_check_session::admit' \
   'pkgcheck_exec::seal_execution_request'; do
-  grep -F "$required" "$header" "$source" "$progression" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" "$progression" >/dev/null || {
     echo "missing transaction check contract: $required" >&2
     exit 1
   }
@@ -56,7 +56,7 @@ for forbidden in \
   'ready_units().front' \
   'pkgmk' \
   'pkgman'; do
-  if grep -F "$forbidden" "$header" "$source" "$progression" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" "$progression" >/dev/null 2>&1; then
     echo "forbidden transaction check shortcut: $forbidden" >&2
     exit 1
   fi

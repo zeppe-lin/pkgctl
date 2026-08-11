@@ -41,7 +41,7 @@ for required in \
   'policy.maximum_steps()' \
   'transaction drive requires a positive step bound' \
   'transaction drive did not advance the durable run head'; do
-  grep -F "$required" "$header" "$source" "$advance_header" \
+  grep -F -- "$required" "$header" "$source" "$advance_header" \
       "$advance_source" >/dev/null || {
     echo "missing bounded transaction-drive contract: $required" >&2
     exit 1
@@ -104,7 +104,7 @@ for required_test in \
   'durable_step_count() == 1U' \
   'external_resolution_required' \
   'mutation_authority_unavailable'; do
-  grep -F "$required_test" "$construction_test" "$effect_test" >/dev/null || {
+  grep -F -- "$required_test" "$construction_test" "$effect_test" >/dev/null || {
     echo "missing bounded transaction-drive test: $required_test" >&2
     exit 1
   }
@@ -120,7 +120,7 @@ for forbidden in \
   'canonical_generation_store' \
   'posix_effect_journal_store' \
   'posix_transaction_run_journal_store'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden bounded transaction-drive policy: $forbidden" >&2
     exit 1
   fi

@@ -17,7 +17,7 @@ for command in \
   'pkgctl run' \
   'pkgctl inspect-run' \
   'pkgctl inspect-effect'; do
-  grep -F "$command" "$readme" >/dev/null || {
+  grep -F -- "$command" "$readme" >/dev/null || {
     echo "README omits current command surface: $command" >&2
     exit 1
   }
@@ -27,7 +27,7 @@ grep -F '`pkgctl run` is the sole effect-implying command in 0.35.0.' \
 for obsolete in \
   'The executable still exposes only:' \
   'There are no effect-implying CLI commands in 0.13.0.'; do
-  if grep -F "$obsolete" "$readme" >/dev/null 2>&1; then
+  if grep -F -- "$obsolete" "$readme" >/dev/null 2>&1; then
     echo "obsolete current command surface in README: $obsolete" >&2
     exit 1
   fi

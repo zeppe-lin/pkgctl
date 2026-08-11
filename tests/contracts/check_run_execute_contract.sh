@@ -43,7 +43,7 @@ for required in \
   'validate_target_mutation_lease_scope' \
   'resulting_state.read_state()' \
   'run store returned foreign committed authority'; do
-  grep -F "$required" "$header" "$source" "$commit_header" "$commit_source" \
+  grep -F -- "$required" "$header" "$source" "$commit_header" "$commit_source" \
     >/dev/null || {
       echo "missing durable dispatch execution contract: $required" >&2
       exit 1
@@ -130,7 +130,7 @@ for forbidden in \
   'canonical_generation_store' \
   'while (' \
   'for ('; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden durable dispatch execution policy: $forbidden" >&2
     exit 1
   fi

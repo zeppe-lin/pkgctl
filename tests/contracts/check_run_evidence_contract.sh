@@ -50,7 +50,7 @@ for required in \
   'unlinkat(' \
   'store_conflict' \
   'store_corrupt'; do
-  grep -F "$required" "$model" "$codec" "$store" "$model_source" \
+  grep -F -- "$required" "$model" "$codec" "$store" "$model_source" \
       "$codec_source" "$store_source" >/dev/null || {
     echo "missing transaction-run evidence contract: $required" >&2
     exit 1
@@ -81,7 +81,7 @@ for forbidden in \
   'opendir(' \
   'readdir(' \
   'glob('; do
-  if grep -F "$forbidden" "$model" "$codec" "$store" "$model_source" \
+  if grep -F -- "$forbidden" "$model" "$codec" "$store" "$model_source" \
       "$codec_source" "$store_source" >/dev/null 2>&1; then
     echo "forbidden transaction-run evidence authority: $forbidden" >&2
     exit 1
@@ -103,7 +103,7 @@ for required_test in \
   'posix_transaction_run_evidence_store::open' \
   'injected construction-evidence failure' \
   'injected check-evidence failure'; do
-  grep -F "$required_test" "$construction_test" "$check_test" \
+  grep -F -- "$required_test" "$construction_test" "$check_test" \
       "$srcdir/tests/support/run_execute_support.h" >/dev/null || {
     echo "missing transaction-run evidence test: $required_test" >&2
     exit 1

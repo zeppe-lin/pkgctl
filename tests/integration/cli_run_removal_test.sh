@@ -67,7 +67,7 @@ require_contains()
   label=$1
   file=$2
   expected=$3
-  if ! grep -F "$expected" "$file" >/dev/null; then
+  if ! grep -F -- "$expected" "$file" >/dev/null; then
     printf '%s\n' \
       "pkgctl:cli-run-removal: $label: missing expected text: $expected" >&2
     dump_file "$label" "$file"

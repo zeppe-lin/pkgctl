@@ -41,7 +41,7 @@ for authority in \
   'pkgreconcile::apply_adapter::project_completed_application' \
   'pkgreconcile::apply_posix::publish_verified_projection' \
   'pkgreconcile::posix::inventory_generation_store::open_existing'; do
-  grep -F "$authority" "$test_source" >/dev/null || {
+  grep -F -- "$authority" "$test_source" >/dev/null || {
     echo "package-pipeline test bypasses production authority: $authority" >&2
     exit 1
   }
@@ -172,7 +172,7 @@ if grep -R -F 'libpkgreconcile' "$srcdir/meson.build" "$srcdir/src" >/dev/null 2
 fi
 
 for forbidden in 'pkgctl_exe' 'std::system(' '::execv(' '::execve('; do
-  if grep -F "$forbidden" "$test_source" >/dev/null; then
+  if grep -F -- "$forbidden" "$test_source" >/dev/null; then
     echo "package-pipeline test escaped into command/process orchestration: $forbidden" >&2
     exit 1
   fi

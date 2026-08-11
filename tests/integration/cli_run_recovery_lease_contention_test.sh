@@ -75,7 +75,7 @@ require_contains()
   label=$1
   file=$2
   expected=$3
-  if ! grep -F "$expected" "$file" >/dev/null; then
+  if ! grep -F -- "$expected" "$file" >/dev/null; then
     printf '%s\n' \
       "pkgctl:cli-run-recovery-lease-contention: $label: missing expected text: $expected" \
       >&2
@@ -89,7 +89,7 @@ require_not_contains()
   label=$1
   file=$2
   unexpected=$3
-  if grep -F "$unexpected" "$file" >/dev/null; then
+  if grep -F -- "$unexpected" "$file" >/dev/null; then
     printf '%s\n' \
       "pkgctl:cli-run-recovery-lease-contention: $label: unexpected text: $unexpected" \
       >&2

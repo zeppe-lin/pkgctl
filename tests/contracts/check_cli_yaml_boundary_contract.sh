@@ -48,9 +48,9 @@ cli_block=$(sed -n '/^  dependencies: \[/,/^  \],/p' "$cli_meson")
 printf '%s\n' "$cli_block" | grep -F 'libpkgsource_yaml_dep' >/dev/null ||
   fail 'CLI does not declare the YAML adapter as a direct dependency'
 for dependency in libpkgcatalog_codec_dep libpkgexec_linux_dep; do
-  printf '%s\n' "$cli_block" | grep -F "$dependency" >/dev/null ||
+  printf '%s\n' "$cli_block" | grep -F -- "$dependency" >/dev/null ||
     fail "CLI does not declare its native run dependency: $dependency"
-  if printf '%s\n' "$core_block" | grep -F "$dependency" >/dev/null; then
+  if printf '%s\n' "$core_block" | grep -F -- "$dependency" >/dev/null; then
     fail "CLI-only native run dependency leaked into controller core: $dependency"
   fi
 done

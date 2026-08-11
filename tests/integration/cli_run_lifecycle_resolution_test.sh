@@ -61,7 +61,7 @@ require_contains()
   contains_label=$1
   contains_path=$2
   contains_expected=$3
-  if ! grep -F "$contains_expected" "$contains_path" >/dev/null; then
+  if ! grep -F -- "$contains_expected" "$contains_path" >/dev/null; then
     printf '%s\n' \
       "pkgctl:cli-run-lifecycle-resolution: $contains_label: missing expected text: $contains_expected" \
       >&2
@@ -75,7 +75,7 @@ require_not_contains()
   not_contains_label=$1
   not_contains_path=$2
   not_contains_unexpected=$3
-  if grep -F "$not_contains_unexpected" "$not_contains_path" >/dev/null; then
+  if grep -F -- "$not_contains_unexpected" "$not_contains_path" >/dev/null; then
     printf '%s\n' \
       "pkgctl:cli-run-lifecycle-resolution: $not_contains_label: unexpected text: $not_contains_unexpected" \
       >&2

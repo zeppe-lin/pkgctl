@@ -50,7 +50,7 @@ for required in \
   'operation recovery authority belongs to another durable attempt' \
   'pkgctl.transaction-dispatch-execution-authority.v1' \
   'pkgctl.transaction-dispatch-recovery-authority.v1'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing exact run-authority contract: $required" >&2
     exit 1
   }
@@ -151,7 +151,7 @@ for forbidden in \
   'std::thread' \
   'std::async' \
   'sleep('; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden exact run-authority policy: $forbidden" >&2
     exit 1
   fi

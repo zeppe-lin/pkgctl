@@ -78,7 +78,7 @@ help=$($pkgctl --help)
 require_help_text()
 {
   expected=$1
-  printf '%s\n' "$help" | grep -F "$expected" >/dev/null || {
+  printf '%s\n' "$help" | grep -F -- "$expected" >/dev/null || {
     echo "pkgctl:cli-readonly: help missing expected text: $expected" >&2
     exit 1
   }
@@ -118,7 +118,7 @@ else
   [ "$?" -eq 1 ]
 fi
 grep -F 'pkgctl: yaml: ' "$root/invalid-yaml.err" >/dev/null
-grep -F "$invalid_collection/broken/recipe.yml:" \
+grep -F -- "$invalid_collection/broken/recipe.yml:" \
   "$root/invalid-yaml.err" >/dev/null
 [ ! -s "$root/invalid-yaml.out" ]
 
@@ -260,7 +260,7 @@ for absent in \
   effect.publication-receipt= \
   effect.terminal-outcome= \
   effect.reconciled-state=; do
-  if printf '%s\n' "$effect_inspection" | grep -F "$absent" >/dev/null; then
+  if printf '%s\n' "$effect_inspection" | grep -F -- "$absent" >/dev/null; then
     echo "absent effect evidence was synthesized: $absent" >&2
     exit 1
   fi

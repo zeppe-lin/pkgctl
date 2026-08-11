@@ -255,6 +255,10 @@ program or shell script as interchangeable:
   authority before exposing another command. Such campaigns must keep the real
   owner adapters/stores and may fake only the explicitly isolated actuator.
   Help-text greps are discoverability checks, not substitutes for runtime tests.
+  Shell assertions that pass variable fixed-string patterns to `grep` must
+  terminate option parsing before the pattern; diagnostics and usage fragments
+  may legitimately begin with `-` or `--`. The test-layout contract rejects
+  unsafe variable-pattern forms.
 - `tests/contracts/` rejects source, dependency, boundary, release, and test-layout
   drift. Contract tests may prove forbidden structure, but do not stand in for
   successful runtime behavior.

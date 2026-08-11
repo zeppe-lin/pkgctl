@@ -27,7 +27,7 @@ for required in \
   'pkgbuild_exec::execute' \
   'construction_driver_contract_violation' \
   'image_authority'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing construction authority contract: $required" >&2
     exit 1
   }
@@ -48,7 +48,7 @@ for forbidden in \
   'pkgapply::apply' \
   'pkgmk' \
   'pkgman'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden construction authority shortcut: $forbidden" >&2
     exit 1
   fi

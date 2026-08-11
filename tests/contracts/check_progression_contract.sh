@@ -33,7 +33,7 @@ for required in \
   'indeterminate effect is not terminal progression evidence' \
   'progression.current_state()' \
   'construction is not retained by transaction progression'; do
-  grep -F "$required" "$header" "$source" "$preparation" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" "$preparation" >/dev/null || {
     echo "missing transaction progression contract: $required" >&2
     exit 1
   }
@@ -51,7 +51,7 @@ for forbidden in \
   'libpkgexec-linux' \
   'pkgmk' \
   'pkgman'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden transaction progression shortcut: $forbidden" >&2
     exit 1
   fi

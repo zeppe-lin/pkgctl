@@ -31,7 +31,7 @@ for required in \
   'driver.publish_state' \
   'pkgctl/transaction-evidence/1' \
   'state_publication_indeterminate'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing effect authority contract: $required" >&2
     exit 1
   }
@@ -48,7 +48,7 @@ for forbidden in \
   'canonical_generation_store::initialize' \
   'pkgmk' \
   'pkgman'; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden effect-layer authority dependency: $forbidden" >&2
     exit 1
   fi

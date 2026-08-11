@@ -29,7 +29,7 @@ for required in \
   'record.identity().hex()' \
   'run.identity().hex()' \
   'transaction_dispatch_nonce::from_hex(identity.hex())'; do
-  grep -F "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing canonical transaction nonce contract: $required" >&2
     exit 1
   }
@@ -42,7 +42,7 @@ for required_test in \
   'canonical_transaction_dispatch_nonce(record, run)' \
   'CHECK(next != first)' \
   'transaction_run_journal_error_code::invalid_transition'; do
-  grep -F "$required_test" "$test_source" >/dev/null || {
+  grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing canonical transaction nonce test: $required_test" >&2
     exit 1
   }
@@ -51,7 +51,7 @@ done
 for required_doc in \
   'Release 0.26.0 explicit run intent and canonical dispatch nonce boundary' \
   'EXPLICIT RUN INTENT AND CANONICAL DISPATCH NONCES'; do
-  grep -F "$required_doc" "$design" "$manual" >/dev/null || {
+  grep -F -- "$required_doc" "$design" "$manual" >/dev/null || {
     echo "missing canonical transaction nonce documentation: $required_doc" >&2
     exit 1
   }
@@ -69,7 +69,7 @@ for forbidden in \
   'effect_journal_store' \
   'std::thread' \
   'sleep('; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden canonical transaction nonce authority: $forbidden" >&2
     exit 1
   fi

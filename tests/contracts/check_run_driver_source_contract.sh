@@ -41,7 +41,7 @@ for required in \
   'operation recovery source returned the wrong continuation authority' \
   'operation recovery source returned the wrong state-observer authority' \
   'operation recovery source returned the wrong publication authority'; do
-  grep -F "$required" "$header" "$source" "$effect_header" \
+  grep -F -- "$required" "$header" "$source" "$effect_header" \
       "$restart_header" "$reconcile_header" >/dev/null || {
     echo "missing split effect-authority contract: $required" >&2
     exit 1
@@ -107,7 +107,7 @@ for required_test in \
   'value.outer_lease.release()' \
   'driver_source.recovery_calls() == 0U' \
   'lifecycle_failed_before_application'; do
-  grep -F "$required_test" "$test_source" >/dev/null || {
+  grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing split effect-authority test: $required_test" >&2
     exit 1
   }
@@ -123,7 +123,7 @@ for forbidden in \
   'std::thread' \
   'std::async' \
   'sleep('; do
-  if grep -F "$forbidden" "$header" "$source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden split effect-authority shortcut: $forbidden" >&2
     exit 1
   fi
