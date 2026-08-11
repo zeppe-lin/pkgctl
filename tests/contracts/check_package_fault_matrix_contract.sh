@@ -90,7 +90,17 @@ for evidence in \
   'unresolved.durable_step_count() == 0U' \
   'check_native_runtime_publication_intent_uncertainty' \
   'check_native_runtime_terminal_indeterminate_publication' \
-  'check_native_runtime_lifecycle_intent_external_resolution'; do
+  'check_native_runtime_lifecycle_intent_external_resolution' \
+  'runtime_outer_lease_loss' \
+  'runtime_outer_lease_loss::after_post_install_lifecycle' \
+  'runtime_outer_lease_loss::during_publication' \
+  'unlink_target_lock' \
+  'lease_losing_lifecycle_backend' \
+  'lease_losing_canonical_store' \
+  'effectful_operation_outcome::outer_lease_lost' \
+  'target_lock_count(application.lock_root) == 0U' \
+  'record->observations().size() == 1U' \
+  'check_native_runtime_outer_lease_loss'; do
   grep -F "$evidence" "$test_source" >/dev/null || {
     echo "package fault/restart matrix lacks evidence: $evidence" >&2
     exit 1
@@ -124,6 +134,15 @@ grep -F "args: ['--operation-uncertainty-matrix']" "$test_meson" >/dev/null || {
   exit 1
 }
 
+grep -F "'package-operation-lease-loss-matrix'" "$test_meson" >/dev/null || {
+  echo 'package operation lease-loss matrix is not registered as an integration test' >&2
+  exit 1
+}
+grep -F "args: ['--operation-lease-loss-matrix']" "$test_meson" >/dev/null || {
+  echo 'package operation lease-loss matrix does not execute the shared vertical harness mode' >&2
+  exit 1
+}
+
 grep -F '"$tmp/package-pipeline-test" --failure-matrix' \
   "$srcdir/tests/run-direct.sh" >/dev/null || {
   echo 'direct compiler harness does not execute the package failure matrix' >&2
@@ -139,6 +158,12 @@ grep -F '"$tmp/package-pipeline-test" --operation-failure-matrix' \
 grep -F '"$tmp/package-pipeline-test" --operation-uncertainty-matrix' \
   "$srcdir/tests/run-direct.sh" >/dev/null || {
   echo 'direct compiler harness does not execute the package operation uncertainty matrix' >&2
+  exit 1
+}
+
+grep -F '"$tmp/package-pipeline-test" --operation-lease-loss-matrix' \
+  "$srcdir/tests/run-direct.sh" >/dev/null || {
+  echo 'direct compiler harness does not execute the package operation lease-loss matrix' >&2
   exit 1
 }
 

@@ -38,6 +38,8 @@ for required in \
   'recovered evidence belongs to another started dispatch session' \
   'effect checkpoint belongs to another durable operation attempt' \
   'effect reconciliation checkpoint is not the latest durable record' \
+  'dispatch_already_observes' \
+  'record->observations()' \
   'assess_effect_restart' \
   'resume_effectful_operation' \
   'effect_restart_disposition::external_resolution_required' \
@@ -103,6 +105,8 @@ ordered_tokens "$operation_body" \
   'assess_effect_restart' \
   'automatically_continuable' \
   'resume_effectful_operation' \
+  'dispatch_already_observes' \
+  'effect_restart_disposition::external_resolution_required' \
   'validate_target_mutation_lease_scope' \
   'observer->read_state()' \
   'submit_operation_dispatch_result' \
@@ -123,6 +127,8 @@ for required_test in \
   'reconcile_operation_dispatch_durable' \
   'external_resolution_required' \
   'identity() == result.identity()' \
+  'effectful_operation_outcome::outer_lease_lost' \
+  'durable_observation' \
   'injected run-store failure'; do
   grep -R -F "$required_test" \
     "$srcdir/tests/unit/construction_test.cpp" \

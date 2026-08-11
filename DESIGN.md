@@ -78,6 +78,15 @@ evidence: if authoritative state still exposes the prior generation, pkgctl must
 not discard that receipt and manufacture an automatic retry; external resolution
 is required. An interrupted lifecycle intent with no terminal process evidence is
 similarly external-resolution-required and commits no further durable transition.
+Outer-lease loss has one additional cross-journal rule. The effect journal may
+seal `outer_lease_lost` as exact controller evidence while the transaction
+dispatch deliberately remains started and retains that result identity as an
+ordered observation. If restart finds the terminal effect before that run
+observation was committed, it commits the observation once. If the started
+dispatch already retains the same result identity, reconciliation must stop at
+external resolution rather than submit a duplicate observation. This remains
+true when publication itself completed before the lease was discovered lost;
+canonical state visibility does not retroactively restore controller ownership.
 This qualifies runtime wiring before another CLI option is allowed to become its
 first consumer.
 

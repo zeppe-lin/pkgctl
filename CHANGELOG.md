@@ -93,6 +93,14 @@
   automatic retry. A lifecycle intent with no terminal process evidence likewise
   remains externally blocked across destroy/reopen, commits zero further durable
   steps, and performs no physical replay or archive reacquisition.
+- Qualifies POSIX outer-lease loss through the native runtime and fixes the
+  run/effect restart join exposed by that test. A terminal `outer_lease_lost`
+  effect is a non-retiring transaction observation: restart commits it once if
+  the run journal missed the observation, but an already-retained identical
+  observation now yields `external-resolution-required` instead of duplicate
+  submission. The matrix revokes the real anchored lock after post-install
+  lifecycle work and during successful publication, proving that target/state
+  truth is preserved without replay or accidental completion.
 - Drives the same package transaction through the production
   `native_posix_transaction_run_runtime` composition root, including real
   application and canonical publication. The integration test then destroys and

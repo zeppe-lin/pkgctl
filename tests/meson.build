@@ -115,6 +115,12 @@ if not get_option('tests').disabled()
     args: ['--operation-uncertainty-matrix'],
     suite: 'integration',
   )
+  test(
+    'package-operation-lease-loss-matrix',
+    package_pipeline_test,
+    args: ['--operation-lease-loss-matrix'],
+    suite: 'integration',
+  )
 
   effect_journal_test = executable(
     'effect-journal-test',

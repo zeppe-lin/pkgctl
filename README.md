@@ -65,9 +65,15 @@ retry the exact retained request while authoritative state still exposes the
 exact prior generation. A terminal indeterminate receipt with that prior state
 remains externally blocked instead of being discarded and retried. An
 interrupted lifecycle intent is likewise externally blocked across reopen with
-zero durable advancement or physical replay. Only the external process
-actuator and the explicitly faulted owner protocol are replaced. This test composition
-does not make reconciliation a production `pkgctl` dependency.
+zero durable advancement or physical replay. A separate outer-lease matrix
+revokes the runtime's real POSIX mutation lease by unlinking its anchored lock
+file after a successful post-install lifecycle action and during a successful
+state publication. Lease loss is retained once as a non-retiring dispatch
+observation; the next drive and every reopen report external resolution instead
+of resubmitting the same observation, reacquiring archive authority, or
+promoting a publication completed after ownership was lost. Only the external
+process actuator and the explicitly faulted owner protocol are replaced. This
+test composition does not make reconciliation a production `pkgctl` dependency.
 
 Release 0.33.0 supplies native fresh-operation and restart authority without
 actuating the target. One replayable per-dispatch specification source supplies

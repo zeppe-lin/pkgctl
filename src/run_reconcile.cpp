@@ -67,6 +67,20 @@ void require_latest_effect_record(
         "effect reconciliation checkpoint is not the latest durable record");
 }
 
+bool dispatch_already_observes(
+    const transaction_run& run,
+    const transaction_dispatch& dispatch,
+    const effectful_operation_result& operation)
+{
+  const auto* record = run.record(dispatch.identity());
+  if (record == nullptr)
+    invalid_reconciliation(
+        "operation reconciliation lost its active dispatch record");
+  return std::find(
+      record->observations().begin(), record->observations().end(),
+      operation.identity()) != record->observations().end();
+}
+
 } // namespace
 
 reserved_dispatch_reconciliation_checkpoint
@@ -216,6 +230,15 @@ reconcile_operation_dispatch_durable(
           "effect continuation returned no operation evidence");
     return operation_dispatch_reconciliation_result{
         checkpoint.run(), checkpoint.record(), effect.disposition(),
+        effect.journal(), std::nullopt, false};
+  }
+
+  if (dispatch_already_observes(
+          checkpoint.run(), dispatch, *effect.operation()))
+  {
+    return operation_dispatch_reconciliation_result{
+        checkpoint.run(), checkpoint.record(),
+        effect_restart_disposition::external_resolution_required,
         effect.journal(), std::nullopt, false};
   }
 

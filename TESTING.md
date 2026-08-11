@@ -328,6 +328,19 @@ its protocol. Reopen must append zero durable run/effect transitions, execute no
 lifecycle/application/publication driver, acquire no archive, and preserve the
 same started dispatch and effect record on repeated resume.
 
+`pkgctl:package-operation-lease-loss-matrix` qualifies real POSIX outer-lease
+revocation through the same composition root. One case unlinks the anchored
+mutation-lock file after a successful post-install lifecycle action, after the
+application has completed but before publication. The other unlinks it from a
+publication transaction after publishing the exact resulting snapshot. In both
+cases the effect journal must retain `outer_lease_lost`, the run dispatch must
+remain started with exactly one uncertainty observation, and the next drive
+must report `external-resolution-required` with no durable successor. Reopen
+must preserve the same run head without another build/check/lifecycle call,
+archive acquisition, publication, or lock-file reacquisition. The first case
+keeps canonical state at the prior generation; the second deliberately leaves
+the resulting generation visible and still forbids automatic completion.
+
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the
 exact execution guarantees implied by the transaction's build, check, and

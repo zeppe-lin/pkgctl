@@ -4603,6 +4603,59 @@ void check_durable_operation_reconciliation()
     CHECK(unresolved.effect_record.identity() == intent.identity());
     CHECK(trace == trace_before);
   }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 85U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    const auto started = pkgctl::commit_operation_dispatch_start(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(85U), effect_store, run_store);
+
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store,
+        std::nullopt, lease_release_point::after_application);
+    const auto result = pkgctl::execute_effectful_operation_durable(
+        session, effect_nonce(85U), actuator, effect_store);
+    CHECK(result.outcome() ==
+          pkgctl::effectful_operation_outcome::outer_lease_lost);
+    const auto terminal = effect_store.latest();
+
+    const auto observed = pkgctl::reconcile_operation_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            started.run.progress(), started.run_record),
+        *reservation.dispatch,
+        restart_checkpoint(session, terminal, result),
+        nullptr, nullptr, nullptr, effect_store, run_store);
+    CHECK(observed.run_advanced);
+    CHECK(observed.result.has_value());
+    CHECK(observed.result && observed.result->identity() == result.identity());
+    CHECK(observed.run.records().size() == 1U);
+    if (observed.run.records().size() == 1U) {
+      CHECK(observed.run.records().front().state() ==
+            pkgctl::transaction_dispatch_state::started);
+      CHECK(observed.run.records().front().observations().size() == 1U);
+    }
+
+    const auto durable_observation = observed.record.identity();
+    const auto blocked = pkgctl::reconcile_operation_dispatch_durable(
+        pkgctl::transaction_run_restart_checkpoint::make(
+            observed.run.progress(), observed.record),
+        *reservation.dispatch,
+        restart_checkpoint(session, terminal, result),
+        nullptr, nullptr, nullptr, effect_store, run_store);
+    CHECK(!blocked.run_advanced);
+    CHECK(blocked.disposition ==
+          pkgctl::effect_restart_disposition::external_resolution_required);
+    CHECK(!blocked.result);
+    CHECK(blocked.record.identity() == durable_observation);
+    CHECK(blocked.effect_record.identity() == terminal.identity());
+    CHECK(run_store.latest().identity() == durable_observation);
+  }
 }
 
 

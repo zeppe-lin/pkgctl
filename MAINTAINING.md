@@ -95,6 +95,16 @@ Reopening either externally blocked state must append no run/effect successor an
 must not acquire archive or physical execution authority. Repeated resume without
 new evidence must remain the same externally blocked record.
 
+Treat outer-lease loss as a cross-journal observation, not a retry signal. The
+effect journal can already be terminal while the transaction dispatch remains
+started because lease loss does not retire package truth. If that exact effect
+identity is not yet retained by the run journal, restart may retain it once. If
+it is already present in the dispatch observation list, return external
+resolution without submitting it again. Test the physical mechanism by
+unlinking the real POSIX lock file; do not add a test-only lease-release method.
+A publication that became visible before lease loss remains visible state, but
+pkgctl still has no authority to call the operation completed automatically.
+
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has
 reached the selected durable boundary. Restart must reopen retained
