@@ -51,6 +51,7 @@ done
   "$srcdir/tests/integration/package_pipeline_test.cpp" \
   $objects $core_libs $pipeline_libs -o "$tmp/package-pipeline-test"
 "$tmp/package-pipeline-test"
+"$tmp/package-pipeline-test" --failure-matrix
 
 for fixture in state_fixture state_inspect_fixture run_store_fixture effect_store_fixture; do
   name=$(printf '%s\n' "${fixture%_fixture}" | tr '_' '-')

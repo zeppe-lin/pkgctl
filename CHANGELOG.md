@@ -67,6 +67,12 @@
   publication/resolution/anti-resurrection checks. The reconciliation libraries
   are test-only qualification dependencies and do not change the production
   dependency contract below.
+- Adds deterministic durability/failure qualification to the same package
+  campaign. Publication interruption after canonical selection must reconcile
+  without publishing twice; application interruption after POSIX completion must
+  reopen the exact application journal and resume without a fresh apply. A
+  separate mode proves definitive dependency-build and package-check failures block
+  dependent target work and publish no package state.
 
 ### Dependency contract
 

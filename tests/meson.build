@@ -97,6 +97,12 @@ if not get_option('tests').disabled()
     dependencies: [pkgctl_core_dep] + package_pipeline_reconcile_deps,
   )
   test('package-pipeline', package_pipeline_test, suite: 'integration')
+  test(
+    'package-failure-matrix',
+    package_pipeline_test,
+    args: ['--failure-matrix'],
+    suite: 'integration',
+  )
 
   effect_journal_test = executable(
     'effect-journal-test',
@@ -504,6 +510,16 @@ if not get_option('tests').disabled()
   test(
     'package-pipeline-contract',
     package_pipeline_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  package_fault_matrix_contract = find_program(
+    'contracts/check_package_fault_matrix_contract.sh',
+  )
+  test(
+    'package-fault-matrix-contract',
+    package_fault_matrix_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

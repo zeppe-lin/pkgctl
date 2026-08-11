@@ -42,8 +42,12 @@ core is qualified in-process against disposable roots. That campaign now drives
 real acquisition, resolution, dependency construction, checking, target
 observation, installation, protected upgrade, rejected-object evidence, state
 publication, exact-convergence removal, and reconciliation-store persistence.
-Only the external process actuator is replaced. This test composition does not
-make reconciliation a production `pkgctl` dependency.
+It also crosses durable application/publication restart boundaries and a separate
+build/check failure matrix: completed POSIX application is resumed rather than
+freshly applied, already-selected canonical state is reconciled without duplicate
+publication, and definitive construction/check failures block dependent work before
+target mutation. Only the external process actuator is replaced. This test
+composition does not make reconciliation a production `pkgctl` dependency.
 
 Release 0.33.0 supplies native fresh-operation and restart authority without
 actuating the target. One replayable per-dispatch specification source supplies

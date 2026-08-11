@@ -231,13 +231,41 @@ program or shell script as interchangeable:
 - `tests/fixtures/` contains deterministic fiction and helper executables used
   only to establish test authority. A fixture is not a production backend and
   must not replace the production path under test.
-- `tests/integration/` invokes the built `pkgctl` executable through its actual
-  command-line boundary and verifies observable durable state, target effects,
-  restart behavior, output, and exit status. Help-text greps are discoverability
-  checks, not substitutes for these tests.
+- `tests/integration/` contains vertical composition tests. Command-boundary tests
+  invoke the built `pkgctl` executable and verify observable durable state, target
+  effects, restart behavior, output, and exit status. Pre-frontend campaigns may
+  instead compose `pkgctl-core` in-process when the purpose is to qualify library
+  authority before exposing another command. Such campaigns must keep the real
+  owner adapters/stores and may fake only the explicitly isolated actuator.
+  Help-text greps are discoverability checks, not substitutes for runtime tests.
 - `tests/contracts/` rejects source, dependency, boundary, release, and test-layout
   drift. Contract tests may prove forbidden structure, but do not stand in for
   successful runtime behavior.
+
+`pkgctl:package-pipeline` is the non-privileged pre-frontend package vertical.
+It uses real acquisition, resolution, transaction progression, fetch/build/package
+authority, check admission, target observation, POSIX application, canonical state
+publication, protected upgrade, rejected-object evidence, exact-convergence
+removal, and test-only reconciliation persistence. Its process backend is the only
+fake actuator and must consume the exact resources admitted by the real adapters.
+
+The same campaign deliberately loses controller durability at two asymmetric
+points. Publication interruption occurs after canonical state has already selected
+the requested result but before the effect journal records publication terminal;
+restart must reconcile by observing that state and perform zero additional
+publications. Application interruption occurs after POSIX application has completed
+but before the effect journal records application terminal; restart must load the
+exact active application journal, call the resume path, perform zero fresh
+applications, and publish exactly once. Upgrade and removal both qualify this rule.
+Unjournaled bodies retained by the test sink are not passed to the restart
+checkpoint merely because the process still has them.
+
+`pkgctl:package-failure-matrix` runs the same harness in failure mode. A definitive
+dependency-build failure must fail that node and block its dependent build, check,
+and target operation without publishing package state. A definitive package-check
+failure must retain successful construction evidence, fail the check, block target
+application, and likewise publish no package state. These are transaction
+progression assertions, not frontend exit-code tests.
 
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the

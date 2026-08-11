@@ -6,15 +6,21 @@
 #include <pkgctl/controller.h>
 #include <pkgctl/dispatch.h>
 #include <pkgctl/effect.h>
+#include <pkgctl/effect_restart.h>
 #include <pkgctl/effect_store.h>
 #include <pkgctl/preparation.h>
 #include <pkgctl/run_journal.h>
 #include <pkgctl/run_locator.h>
 #include <pkgctl/run_native.h>
 #include <pkgctl/run_operation.h>
+#include <pkgctl/run_reconcile.h>
+#include <pkgctl/run_execute.h>
+#include <pkgctl/run_restart.h>
+#include <pkgctl/run_store.h>
 #include <pkgctl/target_observation.h>
 
 #include <libpkgapply-posix/backend.h>
+#include <libpkgapply-posix/journal_store.h>
 #include <libpkgapply-posix/mutation_lease.h>
 #include <libpkgimage/package_path.h>
 #include <libpkgimage/libpkgimage.h>
@@ -32,10 +38,12 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace {
 using namespace construction_fixture;
@@ -329,8 +337,20 @@ pkgctl::native_transaction_session_configuration configuration(
       });
 }
 
+enum class pipeline_execution_fault {
+  none,
+  dependency_build,
+  package_check,
+};
+
 class pipeline_backend final : public pkgexec::execution_backend {
 public:
+  explicit pipeline_backend(
+      pipeline_execution_fault fault = pipeline_execution_fault::none)
+      : fault_(fault)
+  {
+  }
+
   pkgexec::backend_capability_profile capabilities() const override
   {
     return construction_fixture::capabilities();
@@ -371,6 +391,16 @@ public:
       if (read_text(package / "usr/bin/tool") != expected_tool)
         throw std::runtime_error(
             "pipeline check did not receive the constructed package tree");
+      if (fault_ == pipeline_execution_fault::package_check) {
+        return pkgexec::execution_result::failed_after_start(
+            request, capabilities(), request.interpreter(),
+            pkgexec::process_termination::exited(1),
+            pkgexec::stream_capture::retained(""),
+            pkgexec::stream_capture::retained("pipeline check failed\n"),
+            request.required_guarantees(), pkgexec::cleanup_outcome::verified,
+            pkgexec::execution_failure_kind::program_exited_nonzero,
+            "injected pipeline check failure");
+      }
       return pkgexec::execution_result::succeeded(
           request, capabilities(), request.interpreter(),
           pkgexec::stream_capture::retained("pipeline check stdout\n"),
@@ -388,6 +418,12 @@ public:
     if (program == "dep-build\n") {
       if (source != "dependency source\n")
         throw std::runtime_error("dependency source materialization changed");
+      if (fault_ == pipeline_execution_fault::dependency_build) {
+        return pkgexec::execution_result::failed_before_start(
+            request, capabilities(),
+            pkgexec::execution_failure_kind::backend_unsupported, {},
+            "injected pipeline dependency build failure");
+      }
       fs::create_directories(output / "usr/lib");
       test_support::write(output / "usr/lib/dep.marker", "dependency package\n");
     } else if (program == "tool-build\n") {
@@ -421,6 +457,9 @@ public:
         pkgexec::stream_capture::retained("pipeline stderr\n"),
         capabilities().guarantees(), "pipeline build success");
   }
+
+private:
+  pipeline_execution_fault fault_;
 };
 
 pkgctl::construction_result execute_construction_reservation(
@@ -429,7 +468,8 @@ pkgctl::construction_result execute_construction_reservation(
     pkgctl::native_transaction_dispatch_session_source& locator,
     pkgctl::native_construction_driver& driver,
     pkgctl::transaction_dispatch_result reservation,
-    std::string_view expected_package)
+    std::string_view expected_package,
+    bool require_success = true)
 {
   if (!reservation.dispatch)
     throw std::runtime_error("pipeline has no ready construction dispatch");
@@ -458,7 +498,7 @@ pkgctl::construction_result execute_construction_reservation(
       reservation.run, dispatch, session);
   auto started_record = reserved_record.successor(started);
   auto construction = pkgctl::execute_construction(session, driver);
-  if (!construction.succeeded())
+  if (require_success && !construction.succeeded())
     throw std::runtime_error("pipeline construction failed");
   auto completed = pkgctl::complete_construction_dispatch(
       started, dispatch, construction);
@@ -473,11 +513,13 @@ pkgctl::construction_result execute_reserved_construction(
     pkgctl::native_transaction_dispatch_session_source& locator,
     pkgctl::native_construction_driver& driver,
     std::uint8_t nonce,
-    std::string_view expected_package)
+    std::string_view expected_package,
+    bool require_success = true)
 {
   return execute_construction_reservation(
       run, record, locator, driver,
-      pkgctl::reserve_next(run, dispatch_nonce(nonce)), expected_package);
+      pkgctl::reserve_next(run, dispatch_nonce(nonce)), expected_package,
+      require_success);
 }
 
 pkgctl::transaction_check_result execute_reserved_check(
@@ -486,7 +528,8 @@ pkgctl::transaction_check_result execute_reserved_check(
     pkgctl::native_transaction_dispatch_session_source& locator,
     pipeline_backend& backend,
     std::uint8_t nonce,
-    std::string_view expected_package)
+    std::string_view expected_package,
+    bool require_success = true)
 {
   auto reservation = pkgctl::reserve_next(run, dispatch_nonce(nonce));
   if (!reservation.dispatch)
@@ -506,7 +549,7 @@ pkgctl::transaction_check_result execute_reserved_check(
   auto started_record = reserved_record.successor(started);
   pkgctl::native_transaction_check_driver driver(backend);
   auto check = pkgctl::execute_transaction_check(session, driver);
-  if (!check.succeeded())
+  if (require_success && !check.succeeded())
     throw std::runtime_error("pipeline package check failed");
   auto completed = pkgctl::complete_check_dispatch(
       started, dispatch, check);
@@ -517,6 +560,8 @@ pkgctl::transaction_check_result execute_reserved_check(
 
 struct application_environment final {
   fs::path target_root;
+  fs::path application_journal_root;
+  fs::path lock_root;
   fs::path rejected_store_root;
   fs::path effect_journal_root;
   std::unique_ptr<pkgapply::posix::application_posix_backend> backend;
@@ -557,8 +602,262 @@ application_environment prepare_application_environment(
   auto lease = pkgapply::posix::target_mutation_lease::acquire(
       target, lock_fd.get());
   return {
-      target_root, rejected, effect_journal,
+      target_root, journal, locks, rejected, effect_journal,
       std::move(backend), std::move(lease)};
+}
+
+
+void reacquire_application_lease(
+    application_environment& application,
+    const pkgapply::application_target_context& target)
+{
+  application.lease.reset();
+  directory_fd lock_fd(application.lock_root);
+  application.lease = pkgapply::posix::target_mutation_lease::acquire(
+      target, lock_fd.get());
+}
+
+class pipeline_run_store final : public pkgctl::transaction_run_journal_store {
+public:
+  explicit pipeline_run_store(pkgctl::transaction_run_journal_record latest)
+      : latest_(std::move(latest))
+  {
+  }
+
+  std::optional<pkgctl::transaction_run_journal_record> load_latest(
+      const pkgctl::session_identity& journal) const override
+  {
+    if (latest_.journal() != journal)
+      return std::nullopt;
+    return latest_;
+  }
+
+  pkgctl::transaction_run_journal_record append(
+      const pkgctl::transaction_run_journal_record& record) override
+  {
+    if (record.journal() != latest_.journal())
+      throw std::runtime_error("pipeline run store received foreign journal");
+    if (record.identity() == latest_.identity())
+      return latest_;
+    record.validate_successor_of(latest_);
+    latest_ = record;
+    return latest_;
+  }
+
+private:
+  pkgctl::transaction_run_journal_record latest_;
+};
+
+pkgctl::transaction_run_journal_record reopen_run_head(
+    const pipeline_run_store& store,
+    const pkgctl::session_identity& journal)
+{
+  const auto latest = store.load_latest(journal);
+  if (!latest)
+    throw std::runtime_error("pipeline restart lacks durable run head");
+  return *latest;
+}
+
+class interrupting_effect_store final : public pkgctl::effect_journal_store {
+public:
+  interrupting_effect_store(
+      pkgctl::effect_journal_store& delegate,
+      pkgctl::effect_attempt_stage interrupt_stage)
+      : delegate_(delegate), interrupt_stage_(interrupt_stage)
+  {
+  }
+
+  std::optional<pkgctl::effect_attempt_record> load_latest(
+      const pkgctl::session_identity& attempt) const override
+  {
+    return delegate_.load_latest(attempt);
+  }
+
+  pkgctl::effect_attempt_record append(
+      const pkgctl::effect_attempt_record& record) override
+  {
+    if (!interrupted_ && record.stage() == interrupt_stage_) {
+      interrupted_ = true;
+      throw pkgctl::effect_journal_error(
+          pkgctl::effect_journal_error_code::store_write_failed,
+          "injected pipeline effect-journal interruption");
+    }
+    return delegate_.append(record);
+  }
+
+  bool interrupted() const noexcept { return interrupted_; }
+
+private:
+  pkgctl::effect_journal_store& delegate_;
+  pkgctl::effect_attempt_stage interrupt_stage_;
+  bool interrupted_ = false;
+};
+
+class recording_effect_body_sink final
+    : public pkgctl::transaction_effect_body_sink {
+public:
+  void retain_lifecycle(
+      const pkgapply_exec::lifecycle_execution_result&) override
+  {
+    ++lifecycle_count_;
+  }
+
+  void retain_application(
+      const pkgapply::package_application_request&,
+      const pkgapply::application_receipt& receipt) override
+  {
+    application_ = receipt;
+  }
+
+  void retain_publication_request(
+      const pkgstate::state_publication_request& request) override
+  {
+    publication_request_ = request;
+  }
+
+  void retain_publication_receipt(
+      const pkgstate::state_publication_request&,
+      const pkgstate::state_publication_receipt& receipt) override
+  {
+    publication_receipt_ = receipt;
+  }
+
+  std::size_t lifecycle_count() const noexcept { return lifecycle_count_; }
+  const std::optional<pkgapply::application_receipt>& application() const noexcept
+  {
+    return application_;
+  }
+  const std::optional<pkgstate::state_publication_request>&
+  publication_request() const noexcept
+  {
+    return publication_request_;
+  }
+  const std::optional<pkgstate::state_publication_receipt>&
+  publication_receipt() const noexcept
+  {
+    return publication_receipt_;
+  }
+
+private:
+  std::size_t lifecycle_count_ = 0U;
+  std::optional<pkgapply::application_receipt> application_;
+  std::optional<pkgstate::state_publication_request> publication_request_;
+  std::optional<pkgstate::state_publication_receipt> publication_receipt_;
+};
+
+class counting_effect_driver final : public pkgctl::transaction_effect_driver {
+public:
+  explicit counting_effect_driver(pkgctl::transaction_effect_driver& delegate)
+      : delegate_(delegate)
+  {
+  }
+
+  pkgapply::target_mutation_lease& lease() noexcept override
+  {
+    return delegate_.lease();
+  }
+
+  const pkgapply::lease_bound_state_projection&
+  state_projection() const noexcept override
+  {
+    return delegate_.state_projection();
+  }
+
+  pkgapply_exec::lifecycle_execution_result execute_lifecycle(
+      const pkgapply_exec::admitted_lifecycle_session& session) override
+  {
+    ++lifecycle_calls_;
+    return delegate_.execute_lifecycle(session);
+  }
+
+  pkgapply::application_receipt apply_application(
+      const pkgapply::package_application_request& request) override
+  {
+    ++application_calls_;
+    return delegate_.apply_application(request);
+  }
+
+  pkgstate::state_publication_receipt publish_state(
+      const pkgstate::state_publication_request& request) override
+  {
+    ++publication_calls_;
+    return delegate_.publish_state(request);
+  }
+
+  pkgapply::application_receipt resume_application(
+      const pkgapply::package_application_request& request,
+      const pkgapply::application_journal_record& journal) override
+  {
+    ++application_resume_calls_;
+    return delegate_.resume_application(request, journal);
+  }
+
+  std::size_t lifecycle_calls() const noexcept { return lifecycle_calls_; }
+  std::size_t application_calls() const noexcept { return application_calls_; }
+  std::size_t application_resume_calls() const noexcept
+  {
+    return application_resume_calls_;
+  }
+  std::size_t publication_calls() const noexcept { return publication_calls_; }
+
+private:
+  pkgctl::transaction_effect_driver& delegate_;
+  std::size_t lifecycle_calls_ = 0U;
+  std::size_t application_calls_ = 0U;
+  std::size_t application_resume_calls_ = 0U;
+  std::size_t publication_calls_ = 0U;
+};
+
+class counting_publication_driver final
+    : public pkgctl::transaction_effect_publication_driver {
+public:
+  explicit counting_publication_driver(
+      pkgctl::transaction_effect_publication_driver& delegate)
+      : delegate_(delegate)
+  {
+  }
+
+  pkgapply::target_mutation_lease& lease() noexcept override
+  {
+    return delegate_.lease();
+  }
+
+  pkgstate::snapshot read_state() const override
+  {
+    ++read_calls_;
+    return delegate_.read_state();
+  }
+
+  pkgstate::state_publication_receipt publish_state(
+      const pkgstate::state_publication_request& request) override
+  {
+    ++publication_calls_;
+    return delegate_.publish_state(request);
+  }
+
+  std::size_t read_calls() const noexcept { return read_calls_; }
+  std::size_t publication_calls() const noexcept { return publication_calls_; }
+
+private:
+  pkgctl::transaction_effect_publication_driver& delegate_;
+  mutable std::size_t read_calls_ = 0U;
+  std::size_t publication_calls_ = 0U;
+};
+
+const pkgctl::transaction_dispatch_restart_assessment&
+require_single_operation_restart(
+    const pkgctl::transaction_run_restart_checkpoint& checkpoint,
+    const pkgctl::transaction_dispatch& dispatch)
+{
+  if (checkpoint.assessment().active().size() != 1U)
+    throw std::runtime_error("pipeline restart does not have one active dispatch");
+  const auto& assessment = checkpoint.assessment().active().front();
+  if (assessment.dispatch() != dispatch.identity() ||
+      assessment.disposition() !=
+          pkgctl::transaction_dispatch_restart_disposition::inspect_effect_journal ||
+      !assessment.effect_attempt())
+    throw std::runtime_error("pipeline restart authority changed");
+  return assessment;
 }
 
 std::vector<pkgplan::package_path> pipeline_operation_paths()
@@ -741,13 +1040,6 @@ void check_package_pipeline()
 
   auto effect_session = pkgctl::effectful_operation_session::admit(
       *prepared.effect(), {}, {});
-  auto operation_started = pkgctl::start_operation_dispatch(
-      operation_reservation.run, operation_dispatch, effect_session,
-      effect_nonce(4U));
-  CHECK(operation_started.effect_attempt.session() == effect_session.identity());
-  auto operation_started_record =
-      operation_reserved_record.successor(operation_started.run);
-
   auto projected = pkgstate::apply_adapter::read_application_state(
       *prepared.application(), *application.lease, store);
 
@@ -760,25 +1052,94 @@ void check_package_pipeline()
       archives, *prepared.application());
   CHECK(archive != nullptr);
 
-  pkgctl::native_transaction_effect_driver effect_driver(
-      projected.projection(), *application.lease, *application.backend,
-      archive.get(), backend, store);
   auto effect_store = pkgctl::posix_effect_journal_store::open(
       application.effect_journal_root.string());
-  const auto effect = pkgctl::execute_effectful_operation_durable(
-      effect_session, effect_nonce(4U), effect_driver, effect_store);
+  pipeline_run_store install_run_store(operation_reserved_record);
+  recording_effect_body_sink install_bodies;
+  {
+    pkgctl::native_transaction_effect_driver native_effect_driver(
+        projected.projection(), *application.lease, *application.backend,
+        archive.get(), backend, store);
+    counting_effect_driver effect_driver(native_effect_driver);
+    pkgctl::native_transaction_effect_publication_driver state_observer(
+        *application.lease, store);
+    interrupting_effect_store interrupted_effect_store(
+        effect_store, pkgctl::effect_attempt_stage::publication_terminal);
 
-  CHECK(effect.succeeded());
-  CHECK(effect.application().has_value());
-  CHECK(effect.publication_request().has_value());
-  CHECK(effect.publication_receipt().has_value());
-  CHECK(effect.publication_receipt() &&
-        effect.publication_receipt()->outcome() ==
-            pkgstate::state_publication_outcome::published);
-  const auto durable_effect = effect_store.load_latest(
-      operation_started.effect_attempt.attempt());
-  CHECK(durable_effect.has_value());
-  CHECK(durable_effect && durable_effect->stage() ==
+    bool interrupted = false;
+    try
+    {
+      (void)pkgctl::execute_operation_dispatch_durable(
+          operation_reserved_record, operation_reservation.run,
+          operation_dispatch, effect_session, effect_nonce(4U), effect_driver,
+          state_observer, interrupted_effect_store, install_run_store,
+          &install_bodies);
+    }
+    catch (const pkgctl::effect_journal_error& problem)
+    {
+      interrupted = problem.code() ==
+          pkgctl::effect_journal_error_code::store_write_failed;
+    }
+    CHECK(interrupted);
+    CHECK(interrupted_effect_store.interrupted());
+    CHECK(effect_driver.application_calls() == 1U);
+    CHECK(effect_driver.application_resume_calls() == 0U);
+    CHECK(effect_driver.publication_calls() == 1U);
+  }
+
+  const auto installed_before_restart = store.read();
+  const auto* installed_before_restart_tool =
+      installed_before_restart.find_package("tool");
+  CHECK(installed_before_restart_tool != nullptr);
+  CHECK(read_text(application.target_root / "usr/bin/tool") ==
+        "constructed tool v1\n");
+  CHECK(read_text(application.target_root / "etc/tool.conf") ==
+        "default config v1\n");
+
+  effect_store = pkgctl::posix_effect_journal_store::open(
+      application.effect_journal_root.string());
+  auto install_restart = pkgctl::transaction_run_restart_checkpoint::make(
+      operation_reservation.run.progress(), reopen_run_head(
+          install_run_store, operation_reserved_record.journal()));
+  const auto& install_restart_assessment = require_single_operation_restart(
+      install_restart, operation_dispatch);
+  const auto install_effect_record = effect_store.load_latest(
+      *install_restart_assessment.effect_attempt());
+  CHECK(install_effect_record.has_value());
+  if (!install_effect_record)
+    throw std::runtime_error("pipeline install restart lacks effect journal");
+  CHECK(install_effect_record->stage() ==
+        pkgctl::effect_attempt_stage::publication_intent);
+  CHECK(install_bodies.lifecycle_count() == 0U);
+  CHECK(install_bodies.application().has_value());
+  CHECK(install_bodies.publication_request().has_value());
+  CHECK(install_bodies.publication_receipt().has_value());
+  if (!install_bodies.application() || !install_bodies.publication_request())
+    throw std::runtime_error(
+        "pipeline install restart lacks subordinate durable bodies");
+
+  auto install_effect_checkpoint = pkgctl::effect_restart_checkpoint::make(
+      effect_session, *install_effect_record, {}, *install_bodies.application(),
+      {}, *install_bodies.publication_request(), std::nullopt);
+  CHECK(pkgctl::assess_effect_restart(*install_effect_record).disposition() ==
+        pkgctl::effect_restart_disposition::reconcile_publication);
+
+  reacquire_application_lease(application, target);
+  pkgctl::native_transaction_effect_publication_driver native_publication(
+      *application.lease, store);
+  counting_publication_driver publication(native_publication);
+  auto install_recovered = pkgctl::reconcile_operation_dispatch_durable(
+      std::move(install_restart), operation_dispatch,
+      std::move(install_effect_checkpoint), nullptr, nullptr, &publication,
+      effect_store, install_run_store, &install_bodies);
+  CHECK(install_recovered.run_advanced);
+  CHECK(install_recovered.result.has_value());
+  CHECK(install_recovered.result && install_recovered.result->succeeded());
+  CHECK(install_recovered.disposition ==
+        pkgctl::effect_restart_disposition::terminal);
+  CHECK(publication.read_calls() >= 1U);
+  CHECK(publication.publication_calls() == 0U);
+  CHECK(install_recovered.effect_record.stage() ==
         pkgctl::effect_attempt_stage::terminal);
 
   const auto installed = store.read();
@@ -794,10 +1155,8 @@ void check_package_pipeline()
   CHECK(read_text(application.target_root / "etc/tool.conf") ==
         "default config v1\n");
 
-  auto completed_run = pkgctl::submit_operation_dispatch_result(
-      operation_started.run, operation_dispatch, effect, installed);
-  record = operation_started_record.successor(completed_run);
-  run = std::move(completed_run);
+  record = install_recovered.record;
+  run = std::move(install_recovered.run);
   CHECK(run.progress().status(tool_install.identity()) ==
         pkgctl::transaction_node_status::satisfied);
   CHECK(run.progress().complete());
@@ -932,11 +1291,6 @@ void check_package_pipeline()
 
   auto upgrade_effect_session = pkgctl::effectful_operation_session::admit(
       *prepared_upgrade.effect(), {}, {});
-  auto upgrade_started = pkgctl::start_operation_dispatch(
-      upgrade_reservation.run, upgrade_dispatch, upgrade_effect_session,
-      effect_nonce(24U));
-  auto upgrade_started_record = upgrade_reserved_record.successor(
-      upgrade_started.run);
   auto upgrade_projected = pkgstate::apply_adapter::read_application_state(
       *prepared_upgrade.application(), *application.lease, store);
   auto upgrade_archives = pkgctl::explicit_transaction_effect_archive_source::make(
@@ -946,13 +1300,111 @@ void check_package_pipeline()
   auto upgrade_archive = pkgctl::acquire_transaction_effect_archive(
       upgrade_archives, *prepared_upgrade.application());
   CHECK(upgrade_archive != nullptr);
-  pkgctl::native_transaction_effect_driver upgrade_effect_driver(
-      upgrade_projected.projection(), *application.lease,
+
+  pipeline_run_store upgrade_run_store(upgrade_reserved_record);
+  recording_effect_body_sink upgrade_bodies;
+  {
+    pkgctl::native_transaction_effect_driver native_upgrade_driver(
+        upgrade_projected.projection(), *application.lease,
+        *application.backend, upgrade_archive.get(), backend, store);
+    counting_effect_driver upgrade_driver(native_upgrade_driver);
+    pkgctl::native_transaction_effect_publication_driver upgrade_state_observer(
+        *application.lease, store);
+    interrupting_effect_store interrupted_effect_store(
+        effect_store, pkgctl::effect_attempt_stage::application_terminal);
+
+    bool interrupted = false;
+    try
+    {
+      (void)pkgctl::execute_operation_dispatch_durable(
+          upgrade_reserved_record, upgrade_reservation.run, upgrade_dispatch,
+          upgrade_effect_session, effect_nonce(24U), upgrade_driver,
+          upgrade_state_observer, interrupted_effect_store, upgrade_run_store,
+          &upgrade_bodies);
+    }
+    catch (const pkgctl::effect_journal_error& problem)
+    {
+      interrupted = problem.code() ==
+          pkgctl::effect_journal_error_code::store_write_failed;
+    }
+    CHECK(interrupted);
+    CHECK(interrupted_effect_store.interrupted());
+    CHECK(upgrade_driver.application_calls() == 1U);
+    CHECK(upgrade_driver.application_resume_calls() == 0U);
+    CHECK(upgrade_driver.publication_calls() == 0U);
+  }
+
+  CHECK(upgrade_bodies.application().has_value());
+  CHECK(!upgrade_bodies.publication_request().has_value());
+  CHECK(read_text(application.target_root / "usr/bin/tool") ==
+        "constructed tool v2\n");
+  CHECK(read_text(application.target_root / "etc/tool.conf") ==
+        "local config\n");
+  const auto state_before_upgrade_restart = store.read();
+  const auto* state_before_upgrade_restart_tool =
+      state_before_upgrade_restart.find_package("tool");
+  CHECK(state_before_upgrade_restart_tool != nullptr);
+  if (state_before_upgrade_restart_tool != nullptr)
+    CHECK(state_before_upgrade_restart_tool->release().version() == "1.0");
+
+  effect_store = pkgctl::posix_effect_journal_store::open(
+      application.effect_journal_root.string());
+  auto upgrade_restart = pkgctl::transaction_run_restart_checkpoint::make(
+      upgrade_reservation.run.progress(), reopen_run_head(
+          upgrade_run_store, upgrade_reserved_record.journal()));
+  const auto& upgrade_restart_assessment = require_single_operation_restart(
+      upgrade_restart, upgrade_dispatch);
+  const auto upgrade_effect_record = effect_store.load_latest(
+      *upgrade_restart_assessment.effect_attempt());
+  CHECK(upgrade_effect_record.has_value());
+  if (!upgrade_effect_record)
+    throw std::runtime_error("pipeline upgrade restart lacks effect journal");
+  CHECK(upgrade_effect_record->stage() ==
+        pkgctl::effect_attempt_stage::application_intent);
+  CHECK(pkgctl::assess_effect_restart(*upgrade_effect_record).disposition() ==
+        pkgctl::effect_restart_disposition::resume_application);
+
+  auto application_journal_store =
+      pkgapply::posix::application_journal_store::open(
+          application.application_journal_root.string());
+  const auto upgrade_application_journal =
+      application_journal_store.load_active(
+          prepared_upgrade.application()->identity());
+  CHECK(upgrade_application_journal.has_value());
+  if (!upgrade_application_journal)
+    throw std::runtime_error(
+        "pipeline upgrade restart lacks application journal");
+
+  auto upgrade_effect_checkpoint = pkgctl::effect_restart_checkpoint::make(
+      upgrade_effect_session, *upgrade_effect_record, {}, std::nullopt, {},
+      std::nullopt, std::nullopt, *upgrade_application_journal);
+
+  reacquire_application_lease(application, target);
+  auto resumed_upgrade_projection = pkgstate::apply_adapter::read_application_state(
+      *prepared_upgrade.application(), *application.lease, store);
+  pkgctl::native_transaction_effect_driver native_resumed_upgrade_driver(
+      resumed_upgrade_projection.projection(), *application.lease,
       *application.backend, upgrade_archive.get(), backend, store);
-  const auto upgrade_effect = pkgctl::execute_effectful_operation_durable(
-      upgrade_effect_session, effect_nonce(24U), upgrade_effect_driver,
-      effect_store);
-  CHECK(upgrade_effect.succeeded());
+  counting_effect_driver resumed_upgrade_driver(native_resumed_upgrade_driver);
+  pkgctl::native_transaction_effect_publication_driver
+      resumed_upgrade_state_observer(*application.lease, store);
+  auto upgrade_recovered = pkgctl::reconcile_operation_dispatch_durable(
+      std::move(upgrade_restart), upgrade_dispatch,
+      std::move(upgrade_effect_checkpoint), &resumed_upgrade_driver,
+      &resumed_upgrade_state_observer, nullptr, effect_store,
+      upgrade_run_store, &upgrade_bodies);
+  CHECK(upgrade_recovered.run_advanced);
+  CHECK(upgrade_recovered.result.has_value());
+  CHECK(upgrade_recovered.result && upgrade_recovered.result->succeeded());
+  CHECK(resumed_upgrade_driver.application_calls() == 0U);
+  CHECK(resumed_upgrade_driver.application_resume_calls() == 1U);
+  CHECK(resumed_upgrade_driver.publication_calls() == 1U);
+  CHECK(upgrade_recovered.effect_record.stage() ==
+        pkgctl::effect_attempt_stage::terminal);
+
+  if (!upgrade_recovered.result)
+    throw std::runtime_error("pipeline upgrade restart produced no result");
+  const auto& upgrade_effect = *upgrade_recovered.result;
   CHECK(upgrade_effect.application().has_value());
   CHECK(read_text(application.target_root / "usr/bin/tool") ==
         "constructed tool v2\n");
@@ -963,6 +1415,7 @@ void check_package_pipeline()
   const auto* upgraded_installed_tool = upgraded_state.find_package("tool");
   CHECK(upgraded_installed_tool != nullptr);
   if (upgraded_installed_tool != nullptr) {
+    CHECK(upgraded_installed_tool->release().version() == "2.0");
     CHECK(upgraded_installed_tool->find(
               pkgstate::package_path::parse("usr/bin/tool")) != nullptr);
     CHECK(upgraded_installed_tool->find(
@@ -987,10 +1440,8 @@ void check_package_pipeline()
     CHECK(rejected_consequence->rejected_object().has_value());
   }
 
-  auto upgrade_completed_run = pkgctl::submit_operation_dispatch_result(
-      upgrade_started.run, upgrade_dispatch, upgrade_effect, upgraded_state);
-  upgrade_record = upgrade_started_record.successor(upgrade_completed_run);
-  upgrade_run = std::move(upgrade_completed_run);
+  upgrade_record = upgrade_recovered.record;
+  upgrade_run = std::move(upgrade_recovered.run);
   CHECK(upgrade_run.progress().status(tool_upgrade.identity()) ==
         pkgctl::transaction_node_status::satisfied);
   CHECK(upgrade_run.progress().complete());
@@ -1157,20 +1608,106 @@ void check_package_pipeline()
 
   auto removal_effect_session = pkgctl::effectful_operation_session::admit(
       *prepared_removal.effect(), {}, {});
-  auto removal_started = pkgctl::start_operation_dispatch(
-      removal_reservation.run, removal_dispatch, removal_effect_session,
-      effect_nonce(32U));
-  auto removal_started_record = removal_reserved_record.successor(
-      removal_started.run);
   auto removal_projected = pkgstate::apply_adapter::read_application_state(
       *prepared_removal.application(), *application.lease, store);
-  pkgctl::native_transaction_effect_driver removal_effect_driver(
-      removal_projected.projection(), *application.lease,
+  pipeline_run_store removal_run_store(removal_reserved_record);
+  recording_effect_body_sink removal_bodies;
+  {
+    pkgctl::native_transaction_effect_driver native_removal_driver(
+        removal_projected.projection(), *application.lease,
+        *application.backend, nullptr, backend, store);
+    counting_effect_driver removal_driver(native_removal_driver);
+    pkgctl::native_transaction_effect_publication_driver removal_state_observer(
+        *application.lease, store);
+    interrupting_effect_store interrupted_effect_store(
+        effect_store, pkgctl::effect_attempt_stage::application_terminal);
+
+    bool interrupted = false;
+    try
+    {
+      (void)pkgctl::execute_operation_dispatch_durable(
+          removal_reserved_record, removal_reservation.run, removal_dispatch,
+          removal_effect_session, effect_nonce(32U), removal_driver,
+          removal_state_observer, interrupted_effect_store, removal_run_store,
+          &removal_bodies);
+    }
+    catch (const pkgctl::effect_journal_error& problem)
+    {
+      interrupted = problem.code() ==
+          pkgctl::effect_journal_error_code::store_write_failed;
+    }
+    CHECK(interrupted);
+    CHECK(interrupted_effect_store.interrupted());
+    CHECK(removal_driver.application_calls() == 1U);
+    CHECK(removal_driver.application_resume_calls() == 0U);
+    CHECK(removal_driver.publication_calls() == 0U);
+  }
+
+  CHECK(removal_bodies.application().has_value());
+  CHECK(!removal_bodies.publication_request().has_value());
+  CHECK(!fs::exists(application.target_root / "usr/bin/tool"));
+  CHECK(read_text(application.target_root / "etc/tool.conf") ==
+        "local config\n");
+  const auto state_before_removal_restart = store.read();
+  const auto* state_before_removal_restart_tool =
+      state_before_removal_restart.find_package("tool");
+  CHECK(state_before_removal_restart_tool != nullptr);
+  if (state_before_removal_restart_tool != nullptr)
+    CHECK(state_before_removal_restart_tool->release().version() == "2.0");
+
+  effect_store = pkgctl::posix_effect_journal_store::open(
+      application.effect_journal_root.string());
+  application_journal_store = pkgapply::posix::application_journal_store::open(
+      application.application_journal_root.string());
+  auto removal_restart = pkgctl::transaction_run_restart_checkpoint::make(
+      removal_reservation.run.progress(), reopen_run_head(
+          removal_run_store, removal_reserved_record.journal()));
+  const auto& removal_restart_assessment = require_single_operation_restart(
+      removal_restart, removal_dispatch);
+  const auto removal_effect_record = effect_store.load_latest(
+      *removal_restart_assessment.effect_attempt());
+  CHECK(removal_effect_record.has_value());
+  if (!removal_effect_record)
+    throw std::runtime_error("pipeline removal restart lacks effect journal");
+  CHECK(removal_effect_record->stage() ==
+        pkgctl::effect_attempt_stage::application_intent);
+  CHECK(pkgctl::assess_effect_restart(*removal_effect_record).disposition() ==
+        pkgctl::effect_restart_disposition::resume_application);
+
+  const auto removal_application_journal =
+      application_journal_store.load_active(
+          prepared_removal.application()->identity());
+  CHECK(removal_application_journal.has_value());
+  if (!removal_application_journal)
+    throw std::runtime_error(
+        "pipeline removal restart lacks application journal");
+
+  auto removal_effect_checkpoint = pkgctl::effect_restart_checkpoint::make(
+      removal_effect_session, *removal_effect_record, {}, std::nullopt, {},
+      std::nullopt, std::nullopt, *removal_application_journal);
+
+  reacquire_application_lease(application, target);
+  auto resumed_removal_projection = pkgstate::apply_adapter::read_application_state(
+      *prepared_removal.application(), *application.lease, store);
+  pkgctl::native_transaction_effect_driver native_resumed_removal_driver(
+      resumed_removal_projection.projection(), *application.lease,
       *application.backend, nullptr, backend, store);
-  const auto removal_effect = pkgctl::execute_effectful_operation_durable(
-      removal_effect_session, effect_nonce(32U), removal_effect_driver,
-      effect_store);
-  CHECK(removal_effect.succeeded());
+  counting_effect_driver resumed_removal_driver(native_resumed_removal_driver);
+  pkgctl::native_transaction_effect_publication_driver
+      resumed_removal_state_observer(*application.lease, store);
+  auto removal_recovered = pkgctl::reconcile_operation_dispatch_durable(
+      std::move(removal_restart), removal_dispatch,
+      std::move(removal_effect_checkpoint), &resumed_removal_driver,
+      &resumed_removal_state_observer, nullptr, effect_store,
+      removal_run_store, &removal_bodies);
+  CHECK(removal_recovered.run_advanced);
+  CHECK(removal_recovered.result.has_value());
+  CHECK(removal_recovered.result && removal_recovered.result->succeeded());
+  CHECK(resumed_removal_driver.application_calls() == 0U);
+  CHECK(resumed_removal_driver.application_resume_calls() == 1U);
+  CHECK(resumed_removal_driver.publication_calls() == 1U);
+  CHECK(removal_recovered.effect_record.stage() ==
+        pkgctl::effect_attempt_stage::terminal);
 
   const auto removed_state = store.read();
   CHECK(removed_state.find_package("tool") == nullptr);
@@ -1178,10 +1715,8 @@ void check_package_pipeline()
   CHECK(read_text(application.target_root / "etc/tool.conf") ==
         "local config\n");
 
-  auto removal_completed_run = pkgctl::submit_operation_dispatch_result(
-      removal_started.run, removal_dispatch, removal_effect, removed_state);
-  removal_record = removal_started_record.successor(removal_completed_run);
-  removal_run = std::move(removal_completed_run);
+  removal_record = removal_recovered.record;
+  removal_run = std::move(removal_recovered.run);
   CHECK(removal_run.progress().status(tool_remove.identity()) ==
         pkgctl::transaction_node_status::satisfied);
 
@@ -1210,10 +1745,132 @@ void check_package_pipeline()
   }
 }
 
+
+void check_pipeline_build_failure()
+{
+  test_support::temporary_directory temporary;
+  const fs::path root = temporary.path();
+  const fs::path collection = root / "collection";
+  const fs::path state = root / "state";
+  create_pipeline_collection(collection);
+  test_support::initialize_state(state);
+
+  auto resolution_request = pipeline_resolution_request(collection, state);
+  auto transaction = pkgctl::compose_transaction(
+      pkgctl::transaction_request::make(std::move(resolution_request)));
+  const auto& dep_build = node_for(
+      transaction, pkgtransaction::transaction_action_kind::build, "dep");
+  const auto& tool_build = node_for(
+      transaction, pkgtransaction::transaction_action_kind::build, "tool");
+  const auto& tool_check = node_for(
+      transaction, pkgtransaction::transaction_action_kind::check, "tool");
+  const auto& tool_install = node_for(
+      transaction, pkgtransaction::transaction_action_kind::install, "tool");
+
+  auto run = pkgctl::transaction_run::begin(
+      pkgctl::transaction_progress::begin(transaction),
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto record = pkgctl::transaction_run_journal_record::admit(
+      run, journal_nonce(60U));
+  refusing_installed_package_source installed_packages;
+  pkgctl::native_transaction_dispatch_session_source locator(
+      configuration(root / "runtime"), installed_packages);
+  pipeline_backend backend(pipeline_execution_fault::dependency_build);
+  pkgctl::native_construction_driver driver(backend);
+
+  const auto failed = execute_reserved_construction(
+      run, record, locator, driver, 61U, "dep", false);
+  CHECK(!failed.succeeded());
+  CHECK(run.progress().status(dep_build.identity()) ==
+        pkgctl::transaction_node_status::failed);
+  CHECK(run.progress().status(tool_build.identity()) ==
+        pkgctl::transaction_node_status::blocked);
+  CHECK(run.progress().status(tool_check.identity()) ==
+        pkgctl::transaction_node_status::blocked);
+  CHECK(run.progress().status(tool_install.identity()) ==
+        pkgctl::transaction_node_status::blocked);
+  CHECK(run.progress().failed());
+  CHECK(run.progress().ready_units().empty());
+
+  pkgstate::posix::canonical_generation_store store(
+      state, test_support::binding());
+  CHECK(store.read().find_package("tool") == nullptr);
+}
+
+void check_pipeline_check_failure()
+{
+  test_support::temporary_directory temporary;
+  const fs::path root = temporary.path();
+  const fs::path collection = root / "collection";
+  const fs::path state = root / "state";
+  create_pipeline_collection(collection);
+  test_support::initialize_state(state);
+
+  auto resolution_request = pipeline_resolution_request(collection, state);
+  auto transaction = pkgctl::compose_transaction(
+      pkgctl::transaction_request::make(std::move(resolution_request)));
+  const auto& dep_build = node_for(
+      transaction, pkgtransaction::transaction_action_kind::build, "dep");
+  const auto& tool_build = node_for(
+      transaction, pkgtransaction::transaction_action_kind::build, "tool");
+  const auto& tool_check = node_for(
+      transaction, pkgtransaction::transaction_action_kind::check, "tool");
+  const auto& tool_install = node_for(
+      transaction, pkgtransaction::transaction_action_kind::install, "tool");
+
+  auto run = pkgctl::transaction_run::begin(
+      pkgctl::transaction_progress::begin(transaction),
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto record = pkgctl::transaction_run_journal_record::admit(
+      run, journal_nonce(70U));
+  refusing_installed_package_source installed_packages;
+  pkgctl::native_transaction_dispatch_session_source locator(
+      configuration(root / "runtime"), installed_packages);
+  pipeline_backend build_backend;
+  pkgctl::native_construction_driver construction_driver(build_backend);
+
+  const auto dependency = execute_reserved_construction(
+      run, record, locator, construction_driver, 71U, "dep");
+  CHECK(dependency.succeeded());
+  const auto tool = execute_reserved_construction(
+      run, record, locator, construction_driver, 72U, "tool");
+  CHECK(tool.succeeded());
+  CHECK(run.progress().status(tool_check.identity()) ==
+        pkgctl::transaction_node_status::ready);
+
+  pipeline_backend check_backend(pipeline_execution_fault::package_check);
+  const auto failed = execute_reserved_check(
+      run, record, locator, check_backend, 73U, "tool", false);
+  CHECK(!failed.succeeded());
+  CHECK(run.progress().status(dep_build.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  CHECK(run.progress().status(tool_build.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  CHECK(run.progress().status(tool_check.identity()) ==
+        pkgctl::transaction_node_status::failed);
+  CHECK(run.progress().status(tool_install.identity()) ==
+        pkgctl::transaction_node_status::blocked);
+  CHECK(run.progress().failed());
+  CHECK(run.progress().ready_units().empty());
+  CHECK(fs::is_regular_file(tool.session().paths().build.artifact_path));
+
+  pkgstate::posix::canonical_generation_store store(
+      state, test_support::binding());
+  CHECK(store.read().find_package("tool") == nullptr);
+}
+
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
-  check_package_pipeline();
+  if (argc == 2 && std::string_view(argv[1]) == "--failure-matrix") {
+    check_pipeline_build_failure();
+    check_pipeline_check_failure();
+  } else if (argc == 1) {
+    check_package_pipeline();
+  } else {
+    std::cerr << "usage: package-pipeline-test [--failure-matrix]\n";
+    return EXIT_FAILURE;
+  }
   return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

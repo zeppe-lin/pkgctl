@@ -32,8 +32,9 @@ for authority in \
   'pkgctl::acquire_transaction_effect_archive' \
   'pkgctl::native_transaction_effect_driver' \
   'pkgctl::posix_effect_journal_store::open' \
-  'pkgctl::execute_effectful_operation_durable' \
-  'pkgctl::submit_operation_dispatch_result' \
+  'pkgctl::execute_operation_dispatch_durable' \
+  'pkgctl::reconcile_operation_dispatch_durable' \
+  'pkgapply::posix::application_journal_store::open' \
   'pkgctl::observe_native_target_paths' \
   'pkgreconcile::apply_adapter::project_completed_application' \
   'pkgreconcile::apply_posix::publish_verified_projection' \

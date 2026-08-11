@@ -31,6 +31,16 @@ exact completed application evidence is projected and persisted directly by the
 dependency until it owns an actual coordination decision beyond forwarding that
 evidence.
 
+The campaign also qualifies failure and restart as authority composition, not as
+frontend behavior. Build/check failures enter through the execution backend and
+ordinary terminal dispatch completion, so graph progression owns which dependent
+work becomes blocked. Application/publication interruption is injected only at an
+effect-journal append boundary after the corresponding subordinate owner may have
+already committed its side effect. Reopen then uses the production run/effect
+restart checkpoints and `reconcile_operation_dispatch_durable()`: completed POSIX
+application journals are resumed without a fresh apply, while an already-selected
+canonical publication is observed without publishing the same state again.
+
 ## Release 0.35.0 bounded native command boundary
 
 The final functional closure is one command, not a new semantic subsystem:

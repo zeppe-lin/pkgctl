@@ -42,6 +42,17 @@ replay those observations, but it must not own another conversion table. The
 pre-frontend campaign must consume the same core function against its disposable
 target.
 
+Fault qualification must cross durable owner boundaries rather than inject a
+controller shortcut. Definitive build and check failures must be produced by the
+injected execution backend and committed through ordinary construction/check
+completion so transaction progression owns which dependent work becomes blocked.
+Application and publication interruption must occur by refusing an exact effect
+journal append after the subordinate side effect has reached the selected durable
+boundary. Restart must reopen retained run/effect/application authority and enter
+the production reconciliation path. Tests must prove that a completed application
+is resumed rather than freshly applied and that already-selected canonical state
+is observed rather than published a second time.
+
 Qualification may directly compose a downstream library family that `pkgctl`
 does not yet own in production, but that seam must remain test-only until the
 controller has a real orchestration responsibility for it. In particular,
