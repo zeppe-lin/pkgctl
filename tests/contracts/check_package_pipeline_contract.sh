@@ -65,6 +65,23 @@ grep -F 'pkgexec::resource_role::build_input_tree, "checked-package"' \
   exit 1
 }
 
+grep -F 'has_requirement_edge(' "$test_source" >/dev/null || {
+  echo 'package-pipeline test does not prove build-dependency graph edges' >&2
+  exit 1
+}
+grep -F 'pkgtransaction::phase_order_kind::build_before_check' "$test_source" >/dev/null || {
+  echo 'package-pipeline test does not prove build-before-check phase order' >&2
+  exit 1
+}
+grep -F 'pkgtransaction::phase_order_kind::check_before_target' "$test_source" >/dev/null || {
+  echo 'package-pipeline test does not prove check-before-target phase order' >&2
+  exit 1
+}
+grep -F 'pipeline transaction has ambiguous requested node' "$test_source" >/dev/null || {
+  echo 'package-pipeline node lookup does not reject ambiguous graph authority' >&2
+  exit 1
+}
+
 grep -F 'pkgsource::requirement_scope::check()' "$test_source" >/dev/null || {
   echo 'package-pipeline request does not explicitly ask for check authority' >&2
   exit 1
@@ -106,6 +123,16 @@ grep -F 'pkgplan::retained_active_ownership_policy::do_not_claim_operated_packag
   echo 'package-pipeline upgrade does not relinquish protected-path ownership' >&2
   exit 1
 }
+
+grep -F 'removal_progress.status(tool_remove.identity())' "$test_source" >/dev/null || {
+  echo 'package-pipeline removal does not acknowledge independent remove readiness' >&2
+  exit 1
+}
+grep -F 'removal_dispatch_marker' "$test_source" >/dev/null || {
+  echo 'package-pipeline removal still assumes a total order for independent ready units' >&2
+  exit 1
+}
+
 grep -F 'pkgtransaction::convergence_policy::converge_exact()' "$test_source" >/dev/null || {
   echo 'package-pipeline removal does not exercise exact convergence' >&2
   exit 1

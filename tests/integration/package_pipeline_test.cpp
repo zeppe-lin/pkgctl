@@ -171,9 +171,21 @@ const pkgtransaction::transaction_node& node_for(
     pkgtransaction::transaction_action_kind action,
     std::string_view package)
 {
-  for (const auto& node : transaction.program().nodes())
-    if (node.action() == action && node.package().name() == package)
-      return node;
+  const pkgtransaction::transaction_node* found = nullptr;
+  for (const auto& node : transaction.program().nodes()) {
+    if (node.action() != action || node.package().name() != package)
+      continue;
+    if (found != nullptr) {
+      std::string message = "pipeline transaction has ambiguous requested node: ";
+      message += pkgtransaction::to_string(action);
+      message += ":";
+      message += package;
+      throw std::runtime_error(std::move(message));
+    }
+    found = &node;
+  }
+  if (found != nullptr)
+    return *found;
 
   std::string message = "pipeline transaction lacks requested node: ";
   message += pkgtransaction::to_string(action);
@@ -187,6 +199,38 @@ const pkgtransaction::transaction_node& node_for(
     message += node.package().name();
   }
   throw std::runtime_error(std::move(message));
+}
+
+bool has_requirement_edge(
+    const pkgctl::transaction_session& transaction,
+    const pkgtransaction::transaction_node& before,
+    const pkgtransaction::transaction_node& after,
+    pkgsource::requirement_scope_kind scope)
+{
+  return std::any_of(
+      transaction.program().edges().begin(), transaction.program().edges().end(),
+      [&](const auto& edge) {
+        return edge.kind() == pkgtransaction::transaction_edge_kind::requirement &&
+               edge.before() == before.identity() &&
+               edge.after() == after.identity() && edge.scope() &&
+               edge.scope()->kind() == scope;
+      });
+}
+
+bool has_phase_edge(
+    const pkgctl::transaction_session& transaction,
+    const pkgtransaction::transaction_node& before,
+    const pkgtransaction::transaction_node& after,
+    pkgtransaction::phase_order_kind order)
+{
+  return std::any_of(
+      transaction.program().edges().begin(), transaction.program().edges().end(),
+      [&](const auto& edge) {
+        return edge.kind() == pkgtransaction::transaction_edge_kind::phase &&
+               edge.before() == before.identity() &&
+               edge.after() == after.identity() &&
+               edge.phase_order() == order;
+      });
 }
 
 pkgctl::transaction_run_nonce journal_nonce(std::uint8_t marker)
@@ -379,23 +423,33 @@ public:
   }
 };
 
-pkgctl::construction_result execute_reserved_construction(
+pkgctl::construction_result execute_construction_reservation(
     pkgctl::transaction_run& run,
     pkgctl::transaction_run_journal_record& record,
     pkgctl::native_transaction_dispatch_session_source& locator,
     pkgctl::native_construction_driver& driver,
-    std::uint8_t nonce,
+    pkgctl::transaction_dispatch_result reservation,
     std::string_view expected_package)
 {
-  auto reservation = pkgctl::reserve_next(run, dispatch_nonce(nonce));
   if (!reservation.dispatch)
     throw std::runtime_error("pipeline has no ready construction dispatch");
   const auto dispatch = *reservation.dispatch;
   const auto* node = reservation.run.progress().transaction().program().find(
       dispatch.unit().primary_node());
   if (dispatch.unit().kind() != pkgctl::transaction_unit_kind::construction ||
-      node == nullptr || node->package().name() != expected_package)
-    throw std::runtime_error("pipeline dependency order changed");
+      node == nullptr || node->package().name() != expected_package) {
+    std::string message = "pipeline expected construction dispatch for ";
+    message += expected_package;
+    message += ", received ";
+    if (node == nullptr)
+      message += "<missing-node>";
+    else {
+      message += pkgtransaction::to_string(node->action());
+      message += ":";
+      message += node->package().name();
+    }
+    throw std::runtime_error(std::move(message));
+  }
 
   auto reserved_record = record.successor(reservation.run);
   auto session = locator.construction(
@@ -411,6 +465,19 @@ pkgctl::construction_result execute_reserved_construction(
   record = started_record.successor(completed);
   run = std::move(completed);
   return construction;
+}
+
+pkgctl::construction_result execute_reserved_construction(
+    pkgctl::transaction_run& run,
+    pkgctl::transaction_run_journal_record& record,
+    pkgctl::native_transaction_dispatch_session_source& locator,
+    pkgctl::native_construction_driver& driver,
+    std::uint8_t nonce,
+    std::string_view expected_package)
+{
+  return execute_construction_reservation(
+      run, record, locator, driver,
+      pkgctl::reserve_next(run, dispatch_nonce(nonce)), expected_package);
 }
 
 pkgctl::transaction_check_result execute_reserved_check(
@@ -559,6 +626,17 @@ void check_package_pipeline()
       transaction, pkgtransaction::transaction_action_kind::check, "tool");
   const auto& tool_install = node_for(
       transaction, pkgtransaction::transaction_action_kind::install, "tool");
+  CHECK(dep_build.environment() == pkgresolve::resolution_environment::build);
+  CHECK(tool_build.environment() == pkgresolve::resolution_environment::target);
+  CHECK(has_requirement_edge(
+      transaction, dep_build, tool_build,
+      pkgsource::requirement_scope_kind::build));
+  CHECK(has_phase_edge(
+      transaction, tool_build, tool_check,
+      pkgtransaction::phase_order_kind::build_before_check));
+  CHECK(has_phase_edge(
+      transaction, tool_check, tool_install,
+      pkgtransaction::phase_order_kind::check_before_target));
 
   auto progress = pkgctl::transaction_progress::begin(transaction);
   CHECK(progress.status(dep_build.identity()) ==
@@ -744,6 +822,19 @@ void check_package_pipeline()
   const auto& tool_upgrade = node_for(
       upgrade_transaction, pkgtransaction::transaction_action_kind::upgrade,
       "tool");
+  CHECK(upgrade_dep_build.environment() ==
+        pkgresolve::resolution_environment::build);
+  CHECK(upgrade_tool_build.environment() ==
+        pkgresolve::resolution_environment::target);
+  CHECK(has_requirement_edge(
+      upgrade_transaction, upgrade_dep_build, upgrade_tool_build,
+      pkgsource::requirement_scope_kind::build));
+  CHECK(has_phase_edge(
+      upgrade_transaction, upgrade_tool_build, upgrade_tool_check,
+      pkgtransaction::phase_order_kind::build_before_check));
+  CHECK(has_phase_edge(
+      upgrade_transaction, upgrade_tool_check, tool_upgrade,
+      pkgtransaction::phase_order_kind::check_before_target));
 
   auto upgrade_progress = pkgctl::transaction_progress::begin(upgrade_transaction);
   CHECK(upgrade_progress.status(upgrade_dep_build.identity()) ==
@@ -994,6 +1085,8 @@ void check_package_pipeline()
       removal_transaction);
   CHECK(removal_progress.status(removal_dep_build.identity()) ==
         pkgctl::transaction_node_status::ready);
+  CHECK(removal_progress.status(tool_remove.identity()) ==
+        pkgctl::transaction_node_status::ready);
   auto removal_run = pkgctl::transaction_run::begin(
       std::move(removal_progress),
       pkgctl::transaction_dispatch_policy::make(1U, 1U));
@@ -1001,18 +1094,32 @@ void check_package_pipeline()
       removal_run, journal_nonce(30U));
   pkgctl::native_transaction_dispatch_session_source removal_locator(
       configuration(root / "runtime-removal"), installed_packages);
-  auto removal_dependency = execute_reserved_construction(
-      removal_run, removal_record, removal_locator, construction_driver,
-      31U, "dep");
-  CHECK(removal_dependency.succeeded());
-  CHECK(removal_run.progress().status(tool_remove.identity()) ==
-        pkgctl::transaction_node_status::ready);
 
+  std::uint8_t removal_dispatch_marker = 31U;
   auto removal_reservation = pkgctl::reserve_next(
-      removal_run, dispatch_nonce(32U));
-  CHECK(removal_reservation.dispatch.has_value());
+      removal_run, dispatch_nonce(removal_dispatch_marker++));
   if (!removal_reservation.dispatch)
-    return;
+    throw std::runtime_error("pipeline removal has no ready dispatch");
+  const auto* first_removal_node =
+      removal_reservation.run.progress().transaction().program().find(
+          removal_reservation.dispatch->unit().primary_node());
+  if (removal_reservation.dispatch->unit().kind() ==
+      pkgctl::transaction_unit_kind::construction) {
+    if (first_removal_node == nullptr ||
+        first_removal_node->identity() != removal_dep_build.identity())
+      throw std::runtime_error(
+          "pipeline removal selected an unexpected construction unit");
+    const auto removal_dependency = execute_construction_reservation(
+        removal_run, removal_record, removal_locator, construction_driver,
+        std::move(removal_reservation), "dep");
+    CHECK(removal_dependency.succeeded());
+    removal_reservation = pkgctl::reserve_next(
+        removal_run, dispatch_nonce(removal_dispatch_marker++));
+    if (!removal_reservation.dispatch)
+      throw std::runtime_error(
+          "pipeline removal has no operation after construction");
+  }
+
   const auto removal_dispatch = *removal_reservation.dispatch;
   const auto* removal_node =
       removal_reservation.run.progress().transaction().program().find(
@@ -1076,6 +1183,16 @@ void check_package_pipeline()
   removal_record = removal_started_record.successor(removal_completed_run);
   removal_run = std::move(removal_completed_run);
   CHECK(removal_run.progress().status(tool_remove.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+
+  if (removal_run.progress().status(removal_dep_build.identity()) !=
+      pkgctl::transaction_node_status::satisfied) {
+    const auto removal_dependency = execute_reserved_construction(
+        removal_run, removal_record, removal_locator, construction_driver,
+        removal_dispatch_marker++, "dep");
+    CHECK(removal_dependency.succeeded());
+  }
+  CHECK(removal_run.progress().status(removal_dep_build.identity()) ==
         pkgctl::transaction_node_status::satisfied);
   CHECK(removal_run.progress().complete());
   CHECK(removal_record.complete());
