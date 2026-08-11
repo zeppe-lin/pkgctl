@@ -105,7 +105,15 @@ enum class transaction_run_advance_disposition : std::uint8_t {
   executed_operation = 9,
 };
 
-/*! \brief Operation evidence returned by fresh execution or restart repair. */
+/*! \brief Operation evidence returned by fresh execution or restart repair.
+ *
+ * Fresh execution retains the exact effect-attempt admission used by the
+ * write-ahead handoff; the effect journal may already have advanced beyond
+ * that record while the physical operation ran. Reconciliation instead
+ * returns the exact effect record selected or produced by restart. Callers
+ * that need the current durable effect head after fresh execution must load it
+ * from the effect journal by `record.attempt()`.
+ */
 struct transaction_run_operation_advance_evidence final {
   effect_attempt_record record;
   std::optional<effectful_operation_result> result;

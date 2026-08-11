@@ -95,6 +95,11 @@
   coincident step-limit outcome. A lifecycle intent with no terminal process evidence likewise
   remains externally blocked across destroy/reopen, commits zero further durable
   steps, and performs no physical replay or archive reacquisition.
+- Corrects the outer-lease runtime qualification to respect the operation
+  advancement evidence contract: fresh execution returns the exact write-ahead
+  effect admission while the terminal lease-loss record is loaded separately
+  from the effect journal. Fresh driving now expects one specification call and
+  no replay; explicit reopen performs the retained semantic reconstruction.
 - Qualifies POSIX outer-lease loss through the native runtime and fixes the
   run/effect restart join exposed by that test. A terminal `outer_lease_lost`
   effect is a non-retiring transaction observation: restart commits it once if

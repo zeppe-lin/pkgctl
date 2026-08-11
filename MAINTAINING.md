@@ -101,10 +101,17 @@ started because lease loss does not retire package truth. If that exact effect
 identity is not yet retained by the run journal, restart may retain it once; the
 bounded drive must classify that newly durable non-retiring observation as an
 external-resolution stop immediately. If it is already present in the dispatch
-observation list, return external resolution without submitting it again. Test the physical mechanism by
-unlinking the real POSIX lock file; do not add a test-only lease-release method.
-A publication that became visible before lease loss remains visible state, but
-pkgctl still has no authority to call the operation completed automatically.
+observation list, return external resolution without submitting it again.
+Do not confuse the fresh run-advance operation record with the effect-journal
+head: fresh execution returns the exact write-ahead admission record by
+contract. Inspect terminal lease-loss durability by loading the latest effect
+record for that attempt. Likewise, do not require semantic replay during the
+fresh drive once the non-retiring observation itself is the stopping step;
+replay belongs to explicit restart reconstruction. Test the physical mechanism
+by unlinking the real POSIX lock file; do not add a test-only lease-release
+method. A publication that became visible before lease loss remains visible
+state, but pkgctl still has no authority to call the operation completed
+automatically.
 
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has

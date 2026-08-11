@@ -98,6 +98,13 @@ for evidence in \
   'lease_losing_lifecycle_backend' \
   'lease_losing_canonical_store' \
   'effectful_operation_outcome::outer_lease_lost' \
+  'observed->record.stage() == pkgctl::effect_attempt_stage::admitted' \
+  'effect_store.load_latest(observed->record.attempt())' \
+  'latest_effect->stage() == pkgctl::effect_attempt_stage::terminal' \
+  'operations.operation_calls() == 1U' \
+  'operations.replay_calls() == 0U' \
+  'operations.operation_calls() == operation_calls + 1U' \
+  'operations.replay_calls() == replay_calls + 1U' \
   'target_lock_count(application.lock_root) == 0U' \
   'record->observations().size() == 1U' \
   'check_native_runtime_outer_lease_loss'; do

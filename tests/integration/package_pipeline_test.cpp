@@ -3451,10 +3451,19 @@ void check_native_runtime_outer_lease_loss(
       if (observed->result)
         CHECK(observed->result->outcome() ==
               pkgctl::effectful_operation_outcome::outer_lease_lost);
-      CHECK(observed->record.stage() == pkgctl::effect_attempt_stage::terminal);
-      CHECK(observed->record.terminal_outcome() ==
-            std::optional<pkgctl::effectful_operation_outcome>(
-                pkgctl::effectful_operation_outcome::outer_lease_lost));
+      CHECK(observed->record.stage() == pkgctl::effect_attempt_stage::admitted);
+      CHECK(!observed->record.terminal_outcome().has_value());
+      auto effect_store = pkgctl::posix_effect_journal_store::open(
+          application.effect_journal_root.string());
+      const auto latest_effect =
+          effect_store.load_latest(observed->record.attempt());
+      CHECK(latest_effect.has_value());
+      if (latest_effect) {
+        CHECK(latest_effect->stage() == pkgctl::effect_attempt_stage::terminal);
+        CHECK(latest_effect->terminal_outcome() ==
+              std::optional<pkgctl::effectful_operation_outcome>(
+                  pkgctl::effectful_operation_outcome::outer_lease_lost));
+      }
     }
   }
 
@@ -3484,8 +3493,8 @@ void check_native_runtime_outer_lease_loss(
 
   CHECK(backend.build_calls() == 2U);
   CHECK(backend.check_calls() == 1U);
-  CHECK(operations.operation_calls() >= 2U);
-  CHECK(operations.replay_calls() >= 1U);
+  CHECK(operations.operation_calls() == 1U);
+  CHECK(operations.replay_calls() == 0U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == 1U);
   CHECK(fs::is_regular_file(application.target_root / "usr/bin/tool"));
@@ -3528,6 +3537,8 @@ void check_native_runtime_outer_lease_loss(
   const auto build_calls = backend.build_calls();
   const auto check_calls = backend.check_calls();
   const auto lifecycle_calls = backend.lifecycle_calls();
+  const auto operation_calls = operations.operation_calls();
+  const auto replay_calls = operations.replay_calls();
   const auto archive_calls = operations.archive_calls();
   const auto publication_calls = state_store.publication_calls();
 
@@ -3552,6 +3563,8 @@ void check_native_runtime_outer_lease_loss(
   CHECK(backend.build_calls() == build_calls);
   CHECK(backend.check_calls() == check_calls);
   CHECK(backend.lifecycle_calls() == lifecycle_calls);
+  CHECK(operations.operation_calls() == operation_calls + 1U);
+  CHECK(operations.replay_calls() == replay_calls + 1U);
   CHECK(operations.archive_calls() == archive_calls);
   CHECK(state_store.publication_calls() == publication_calls);
   CHECK(target_lock_count(application.lock_root) == 0U);

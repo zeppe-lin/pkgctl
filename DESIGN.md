@@ -1344,6 +1344,13 @@ inferred. If the started run commits but execution has not begun, restart names
 the exact effect-attempt journal and continues conservatively from its admitted
 record.
 
+Fresh `executed_operation` advancement evidence retains that admission record as
+the cross-journal write-ahead coordinate even when execution subsequently seals
+a later effect record. It is not an alias for the current effect-journal head.
+Restart reconciliation, by contrast, returns the effect record selected or
+produced by recovery. Code that needs the terminal head of a freshly executed
+attempt must load it from the effect store by the admission's attempt identity.
+
 No driver may run before the applicable started-run commit. If a run append or
 synchronization fails, execution must not begin. This is the controller
 write-ahead barrier that makes a recorded `reserved` dispatch safe to release

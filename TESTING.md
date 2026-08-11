@@ -336,13 +336,20 @@ mutation-lock file after a successful post-install lifecycle action, after the
 application has completed but before publication. The other unlinks it from a
 publication transaction after publishing the exact resulting snapshot. In both
 cases the effect journal must retain `outer_lease_lost`, the run dispatch must
-remain started with exactly one uncertainty observation. The same bounded drive
-that retains that observation must report `external-resolution-required`; every
-later drive/reopen must report the same block with no durable successor. Reopen
-must preserve the same run head without another build/check/lifecycle call,
-archive acquisition, publication, or lock-file reacquisition. The first case
-keeps canonical state at the prior generation; the second deliberately leaves
-the resulting generation visible and still forbids automatic completion.
+remain started with exactly one uncertainty observation. Fresh
+`executed_operation` evidence deliberately exposes the write-ahead effect
+admission, not the later terminal effect head; the matrix must load that head
+from the POSIX effect store by the admission's attempt identity and prove the
+terminal lease-loss outcome there. The same bounded drive that retains the run
+observation must report `external-resolution-required`; every later drive/reopen
+must report the same block with no durable successor. Before reopen the
+operation specification source has one fresh call and zero replay calls; reopen
+must reconstruct the retained session exactly once without reacquiring archive
+or physical execution authority. It must also preserve the same run head
+without another build/check/lifecycle call, publication, or lock-file
+reacquisition. The first case keeps canonical state at the prior generation;
+the second deliberately leaves the resulting generation visible and still
+forbids automatic completion.
 
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the
