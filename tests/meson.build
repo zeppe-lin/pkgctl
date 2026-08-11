@@ -378,6 +378,36 @@ if not get_option('tests').disabled()
     suite: 'integration-privileged',
   )
 
+  cli_run_recovery_lease_contention_test = find_program(
+    'integration/cli_run_recovery_lease_contention_test.sh',
+  )
+  test(
+    'cli-run-recovery-lease-contention',
+    cli_run_recovery_lease_contention_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_interpreter,
+      application_intent_interrupt_fixture,
+      native_target_lock_holder,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/simple-install',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [
+      native_interpreter,
+      application_intent_interrupt_fixture,
+      native_target_lock_holder,
+    ],
+    suite: 'integration-privileged',
+  )
+
   cli_run_removal_test = find_program('integration/cli_run_removal_test.sh')
   test(
     'cli-run-removal',
@@ -726,6 +756,16 @@ if not get_option('tests').disabled()
   test(
     'cli-lease-contention-contract',
     cli_lease_contention_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_recovery_lease_contention_contract = find_program(
+    'contracts/check_cli_recovery_lease_contention_contract.sh',
+  )
+  test(
+    'cli-recovery-lease-contention-contract',
+    cli_recovery_lease_contention_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

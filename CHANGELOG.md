@@ -118,6 +118,13 @@
   run, removes the live collection, then releases the holder and completes via
   one explicit `--resume` using a new operation dispatch. No new CLI option,
   waiting policy, or implicit retry is introduced.
+- Qualifies the complementary already-started contention window through the
+  privileged frontend. A real application-intent interruption leaves one operation
+  dispatch/effect attempt durable; a competing real POSIX lease then forces
+  `--resume` to return `mutation-authority-unavailable` with zero durable
+  advancement and identical run/effect heads. After holder release, a later explicit
+  `--resume` must complete that same dispatch and effect attempt, not allocate a
+  replacement, even after the live collection is removed.
 - Qualifies POSIX outer-lease loss through the native runtime and fixes the
   run/effect restart join exposed by that test. A terminal `outer_lease_lost`
   effect is a non-retiring transaction observation: restart commits it once if

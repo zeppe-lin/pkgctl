@@ -381,6 +381,20 @@ zero-step no-op. Capability-unavailable development hosts may skip the vertical
 under the same policy as the other privileged native CLI tests; release
 qualification may not.
 
+`pkgctl:cli-run-recovery-lease-contention` qualifies the already-started frontend
+window. The application-intent interruption fixture first leaves one operation
+dispatch started with one durable resumable effect attempt and no target/state
+mutation. The real POSIX holder then acquires that transaction's exact command
+mutation domain before `--resume`. The blocked resume must exit nonzero with
+`mutation-authority-unavailable`, report one non-durable control step and zero durable
+steps, preserve
+the exact run/effect record identities, retain exactly one started operation
+dispatch and one effect object, and leave target/state unchanged. The test deletes
+the live collection before this resume. After explicit holder release, a one-step
+`--resume` must complete the exact same operation-dispatch and effect-attempt
+identities; a replacement operation dispatch is forbidden because effect ownership
+was already durable. A repeated completed resume remains a zero-step no-op.
+
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the
 exact execution guarantees implied by the transaction's build, check, and

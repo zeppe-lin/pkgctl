@@ -86,8 +86,15 @@ domain before `pkgctl run --start`: the admitted run must report
 reservation with no effect attempt, refuse a duplicate `--start`, and complete
 only after an explicit `--resume` once the holder releases. That resume is also
 required to succeed after the live collection is removed, proving the block did
-not create hidden rediscovery authority. Only the external process actuator and
-the explicitly faulted owner protocol are replaced in the in-process campaign.
+not create hidden rediscovery authority. A sibling privileged recovery vertical
+interrupts after durable application intent, then holds that same command-derived
+POSIX exclusion domain across `--resume`. The blocked resume must report
+`mutation-authority-unavailable` with zero durable advancement while preserving
+the exact started operation dispatch and effect head. After explicit holder
+release, a later `--resume` must complete that same dispatch/effect rather than
+reserving a replacement, even after live collection bytes are removed. Only the
+external process actuator and the explicitly faulted owner protocol are replaced
+in the in-process campaign.
 This test composition does not make reconciliation a production `pkgctl`
 dependency.
 

@@ -131,7 +131,13 @@ run with a released-unstarted operation and no effect attempt; duplicate
 `--start` remains an admission error. Release the external holder explicitly and
 resume the same nonce. The replacement operation dispatch must differ from the
 released one, and deleting the collection before resume must not change the
-outcome.
+outcome. The recovery-side CLI vertical must start from a real durable
+application-intent effect, not a synthetic started-dispatch marker. Acquire the same
+real POSIX domain only after that interruption. A contended `--resume` must commit
+zero run/effect successors and preserve the exact started dispatch/effect identities;
+do not release or replace already-started work. Remove the collection before resume
+to prove retained command authority. Once the holder is explicitly released, the
+next `--resume` must complete the same dispatch and effect attempt.
 
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has

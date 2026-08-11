@@ -138,6 +138,13 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
   "$srcdir/tests/fixtures/collections/simple-install" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
+"$srcdir/tests/integration/cli_run_recovery_lease_contention_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-test-interpreter" "$tmp/application-intent-interrupt-fixture" \
+  "$tmp/native-target-lock-holder" \
+  "$srcdir/tests/fixtures/collections/simple-install" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
 "$srcdir/tests/integration/cli_run_removal_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" \

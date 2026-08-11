@@ -110,7 +110,13 @@ dispatch. The frontend must render `mutation-authority-unavailable`, reject anot
 for the same nonce, and perform no same-call retry. After the holder releases,
 one explicit `--resume` owns retry and must reserve a different operation
 dispatch; resume remains based on the retained command universe even if live
-collection bytes have disappeared.
+collection bytes have disappeared. A complementary recovery vertical first leaves
+one operation dispatch started at durable application intent, then holds the same
+mutation domain while `--resume` reconstructs that attempt. Contention there must
+return `mutation-authority-unavailable` with zero run/effect successor and preserve
+the exact dispatch/effect identities. Releasing the holder gives a later explicit
+`--resume` authority to continue that same started dispatch; allocating a
+replacement operation would erase already-owned effect history and is forbidden.
 
 This qualifies runtime and current frontend wiring before another CLI option is
 allowed to become its first consumer.
