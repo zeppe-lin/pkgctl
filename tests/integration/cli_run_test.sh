@@ -20,8 +20,9 @@ case $interpreter in
     ;;
 esac
 credential_context_runner=$5
-fixture_collection=$6
-root_view_fixture=$7
+credential_context_preload=$6
+fixture_collection=$7
+root_view_fixture=$8
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-run.XXXXXX")
 cleanup()
 {
@@ -49,7 +50,7 @@ invoke_pkgctl()
 {
   if [ -n "${supervisor_uid:-}" ]; then
     "$credential_context_runner" "$supervisor_uid" "$supervisor_gid" \
-      "$pkgctl" "$@"
+      "$credential_context_preload" "$pkgctl" "$@"
   else
     "$pkgctl" "$@"
   fi

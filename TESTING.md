@@ -86,7 +86,11 @@ The final command suite must prove:
   the same changed supervisor context must reopen with zero durable steps because no
   execution scope remains. The privileged outer-lease-loss vertical repeats its
   externally blocked resume under the same changed supervisor context and must
-  preserve the exact run/effect heads without execute-now preflight;
+  preserve the exact run/effect heads without execute-now preflight. The privileged
+  credential-context fixture drops uid/gid from a preload constructor after the dynamic
+  loader has already mapped the build-tree CLI closure; loader reachability of the
+  developer build root is therefore not confused with pkgctl execution authority, and
+  the preload control environment is removed before pkgctl can launch subprocesses;
 - native check execution resets the exact call-scoped temporary host resource
   and prepares `/tmp/home` before entering `libpkgcheck-exec`, while the
   caller-owned execution root view remains untouched;

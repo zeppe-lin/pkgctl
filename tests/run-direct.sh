@@ -77,6 +77,10 @@ done
   "$srcdir/tests/fixtures/native_credential_context_runner.cpp" \
   -o "$tmp/native-credential-context-runner"
 
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror -fPIC -shared \
+  "$srcdir/tests/fixtures/native_credential_context_preload.cpp" \
+  -o "$tmp/native-credential-context-preload.so"
+
 "$cxx" -nostdlib -static -Wl,-e,_start \
   "$srcdir/tests/fixtures/native_interpreter_x86_64.S" \
   -o "$tmp/native-test-interpreter"
@@ -141,6 +145,7 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
 "$srcdir/tests/integration/cli_run_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" "$tmp/native-credential-context-runner" \
+  "$tmp/native-credential-context-preload.so" \
   "$srcdir/tests/fixtures/collections/simple-install" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
@@ -154,6 +159,7 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-lease-loss-interpreter" "$tmp/native-target-lock-revoker" \
   "$tmp/native-credential-context-runner" \
+  "$tmp/native-credential-context-preload.so" \
   "$srcdir/tests/fixtures/collections/lifecycle-post-install-lease-loss" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 

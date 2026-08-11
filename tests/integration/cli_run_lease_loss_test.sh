@@ -9,8 +9,9 @@ state_inspect_fixture=$3
 interpreter=$4
 revoker=$5
 credential_context_runner=$6
-fixture_collection=$7
-root_view_fixture=$8
+credential_context_preload=$7
+fixture_collection=$8
+root_view_fixture=$9
 case $interpreter in
   /*)
     ;;
@@ -57,7 +58,7 @@ invoke_pkgctl()
 {
   if [ -n "${supervisor_uid:-}" ]; then
     "$credential_context_runner" "$supervisor_uid" "$supervisor_gid" \
-      "$pkgctl" "$@"
+      "$credential_context_preload" "$pkgctl" "$@"
   else
     "$pkgctl" "$@"
   fi

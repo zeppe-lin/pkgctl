@@ -43,6 +43,7 @@ for path in \
   'fixtures/native_root_view_fixture.sh' \
   'fixtures/native_target_lock_holder.cpp' \
   'fixtures/native_credential_context_runner.cpp' \
+  'fixtures/native_credential_context_preload.cpp' \
   'fixtures/application_intent_interrupt_fixture.cpp' \
   'fixtures/application_intent_interrupt_probe.cpp' \
   'fixtures/publication_intent_interrupt_fixture.cpp' \

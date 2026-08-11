@@ -175,7 +175,10 @@ blocked run must not be made unrecoverable merely because an unused actuator is 
 longer executable in the current process context. Keep both sides process-qualified:
 remaining check work must reject a changed supervisor, while completed and retained
 outer-lease-loss runs must reopen under that changed supervisor without journal
-advancement.
+advancement. The privileged credential-context fixture must perform the uid/gid
+transition only after the dynamic loader has mapped the build-tree CLI dependency
+closure. A pre-exec credential drop accidentally tests pathname accessibility of the
+developer build root and is not valid execution-authority qualification.
 
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has

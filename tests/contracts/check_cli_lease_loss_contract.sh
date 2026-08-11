@@ -7,12 +7,13 @@ srcdir=${1:-.}
 test="$srcdir/tests/integration/cli_run_lease_loss_test.sh"
 fixture="$srcdir/tests/fixtures/native_target_lock_revoker.cpp"
 credential_runner="$srcdir/tests/fixtures/native_credential_context_runner.cpp"
+credential_preload="$srcdir/tests/fixtures/native_credential_context_preload.cpp"
 interpreter="$srcdir/tests/fixtures/native_lease_loss_interpreter_x86_64.S"
 recipe="$srcdir/tests/fixtures/collections/lifecycle-post-install-lease-loss/fixture/recipe.yml"
 meson="$srcdir/tests/meson.build"
 direct="$srcdir/tests/run-direct.sh"
 
-for path in "$test" "$fixture" "$credential_runner" "$interpreter" "$recipe" "$meson" "$direct"; do
+for path in "$test" "$fixture" "$credential_runner" "$credential_preload" "$interpreter" "$recipe" "$meson" "$direct"; do
   [ -s "$path" ] || {
     echo "missing CLI lease-loss qualification source: $path" >&2
     exit 1
@@ -118,6 +119,10 @@ grep -F 'native_credential_context_runner' "$meson" >/dev/null || {
   echo 'Meson omits native credential-context dependency' >&2
   exit 1
 }
+grep -F 'native_credential_context_preload' "$meson" >/dev/null || {
+  echo 'Meson omits post-loader credential-context preload' >&2
+  exit 1
+}
 grep -F "'cli-lease-loss-contract'" "$meson" >/dev/null || {
   echo 'Meson omits CLI lease-loss contract' >&2
   exit 1
@@ -138,3 +143,22 @@ grep -F 'native_credential_context_runner.cpp' "$direct" >/dev/null || {
   echo 'direct compiler path omits native credential-context runner' >&2
   exit 1
 }
+grep -F 'native_credential_context_preload.cpp' "$direct" >/dev/null || {
+  echo 'direct compiler path omits post-loader credential-context preload' >&2
+  exit 1
+}
+
+for required in \
+  'restore_loader_environment' \
+  '::setgroups(0, nullptr)' \
+  '::setgid(gid)' \
+  '::setuid(uid)'; do
+  grep -F -- "$required" "$credential_preload" >/dev/null || {
+    echo "credential-context preload omits post-loader transition: $required" >&2
+    exit 1
+  }
+done
+if grep -F '::setuid(' "$credential_runner" >/dev/null; then
+  echo 'credential-context runner changes credentials before loading pkgctl' >&2
+  exit 1
+fi

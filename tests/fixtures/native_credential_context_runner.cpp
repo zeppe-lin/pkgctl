@@ -4,7 +4,6 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
-#include <grp.h>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -37,9 +36,9 @@ namespace {
 
 int main(int argc, char** argv)
 {
-  if (argc < 4)
+  if (argc < 5)
   {
-    std::cerr << "usage: native-credential-context-runner UID GID PROGRAM [ARG ...]\n";
+    std::cerr << "usage: native-credential-context-runner UID GID PRELOAD PROGRAM [ARG ...]\n";
     return 2;
   }
 
@@ -54,12 +53,28 @@ int main(int argc, char** argv)
     return 2;
   }
 
-  if (::setgroups(0, nullptr) != 0)
-    fail("setgroups");
-  if (::setgid(static_cast<gid_t>(gid_value)) != 0)
-    fail("setgid");
-  if (::setuid(static_cast<uid_t>(uid_value)) != 0)
-    fail("setuid");
-  ::execv(argv[3], &argv[3]);
+  const char* previous_preload = std::getenv("LD_PRELOAD");
+  if (previous_preload != nullptr && *previous_preload != '\0')
+  {
+    if (::setenv("PKGCTL_TEST_PREVIOUS_LD_PRELOAD", previous_preload, 1) != 0)
+      fail("retain LD_PRELOAD");
+  }
+  else if (::unsetenv("PKGCTL_TEST_PREVIOUS_LD_PRELOAD") != 0)
+  {
+    fail("clear retained LD_PRELOAD");
+  }
+
+  std::string preload = argv[3];
+  if (previous_preload != nullptr && *previous_preload != '\0')
+    preload += ":" + std::string(previous_preload);
+
+  if (::setenv("LD_PRELOAD", preload.c_str(), 1) != 0 ||
+      ::setenv("PKGCTL_TEST_SUPERVISOR_UID", argv[1], 1) != 0 ||
+      ::setenv("PKGCTL_TEST_SUPERVISOR_GID", argv[2], 1) != 0)
+    fail("prepare credential-context environment");
+
+  // Exec while the original supervisor still owns loader/path authority. The
+  // preload constructor drops credentials after the loader has mapped pkgctl.
+  ::execv(argv[4], &argv[4]);
   fail("execv");
 }

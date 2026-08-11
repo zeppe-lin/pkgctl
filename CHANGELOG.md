@@ -10,6 +10,10 @@
   run nonce; `--resume` requires that exact retained universe and exact admitted
   journal while refusing a second semantic transaction request. Both perform at
   most the positive `--max-steps` bound through the reviewed native runtime.
+- Corrects the privileged progress-scoped resume fixture so supervisor credentials
+  are dropped after the dynamic loader maps the build-tree CLI closure. Reduced-credential
+  qualification now measures pkgctl execute-now authority rather than access to shared
+  libraries under the developer build root.
 - Upgrades immutable command evidence to schema v3. Before run admission it
   retains the complete start-only transaction inputs, the exact admitted
   construction/check/lifecycle backend capability profiles, and the original

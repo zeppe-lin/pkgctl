@@ -162,7 +162,7 @@ grep -F "suite: 'integration-privileged'" "$tests_meson" >/dev/null || {
   echo 'native mutating CLI test is not isolated as privileged integration' >&2
   exit 1
 }
-grep -F 'depends: [native_interpreter, native_credential_context_runner]' "$tests_meson" >/dev/null || {
+grep -F 'depends: [native_interpreter, native_credential_context_runner, native_credential_context_preload]' "$tests_meson" >/dev/null || {
   echo 'privileged CLI integration does not build its native interpreter/context fixtures' >&2
   exit 1
 }
@@ -209,6 +209,7 @@ for progress_scope_contract in \
   'resume-requires-current-authority' \
   'completed-resume-without-execution-authority' \
   'native_credential_context_runner' \
+  'native_credential_context_preload' \
   'capture_run_as' \
   '65534 65534'; do
   grep -F -- "$progress_scope_contract" "$integration" "$tests_meson" >/dev/null || {
@@ -216,6 +217,26 @@ for progress_scope_contract in \
     exit 1
   }
 done
+
+for credential_fixture_contract in \
+  'PKGCTL_TEST_SUPERVISOR_UID' \
+  'PKGCTL_TEST_SUPERVISOR_GID' \
+  'PKGCTL_TEST_PREVIOUS_LD_PRELOAD' \
+  'native-credential-context-preload' \
+  'native_credential_context_preload.cpp'; do
+  grep -F -- "$credential_fixture_contract" \
+    "$srcdir/tests/fixtures/native_credential_context_runner.cpp" \
+    "$srcdir/tests/fixtures/native_credential_context_preload.cpp" \
+    "$tests_meson" "$integration" >/dev/null || {
+    echo "missing post-loader credential-context qualification: $credential_fixture_contract" >&2
+    exit 1
+  }
+done
+if grep -F '::setuid(' "$srcdir/tests/fixtures/native_credential_context_runner.cpp" >/dev/null; then
+  echo 'credential-context runner drops credentials before the dynamic loader' >&2
+  exit 1
+fi
+
 preflight_line=$(grep -n -F 'require_native_execution_preflight(' \
   "$command" | tail -n 1 | cut -d: -f1)
 retain_line=$(grep -n -F 'universes.retain(' \
