@@ -51,6 +51,9 @@
   explicit credentials are refused before transaction admission rather than
   reclassified as package failure. No fakeroot or ownership virtualization is
   implied.
+- Keeps the read-only CLI smoke test synchronized with the split `run --start` /
+  `run --resume` usage grammar and makes help-surface mismatches diagnostic rather
+  than silent `set -e` exits.
 - Organizes qualification by semantic role and adds a privileged process-level
   `pkgctl run` start/resume test. Capability-unavailable hosts may skip that
   vertical scenario in ordinary development runs, but release qualification

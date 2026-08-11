@@ -74,10 +74,20 @@ expected_version="pkgctl $expected_release"
   echo "unexpected pkgctl version: got '$actual_version', expected '$expected_version'" >&2
   exit 1
 }
-$pkgctl --help | grep -F 'pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] RUN-OPTIONS' >/dev/null
-$pkgctl --help | grep -F 'performs at most --max-steps controller advances' >/dev/null
-$pkgctl --help | grep -F 'pkgctl inspect-run --run-store PATH --journal SHA256' >/dev/null
-$pkgctl --help | grep -F 'pkgctl inspect-effect --effect-store PATH --attempt SHA256' >/dev/null
+help=$($pkgctl --help)
+require_help_text()
+{
+  expected=$1
+  printf '%s\n' "$help" | grep -F "$expected" >/dev/null || {
+    echo "pkgctl:cli-readonly: help missing expected text: $expected" >&2
+    exit 1
+  }
+}
+require_help_text 'pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] --start SHA256 RUN-AUTHORITY'
+require_help_text 'pkgctl run --canonical-store PATH --resume SHA256 RUN-AUTHORITY'
+require_help_text 'performs at most --max-steps controller advances'
+require_help_text 'pkgctl inspect-run --run-store PATH --journal SHA256'
+require_help_text 'pkgctl inspect-effect --effect-store PATH --attempt SHA256'
 
 catalog=$($pkgctl catalog --collection "core=$collection")
 printf '%s\n' "$catalog" | grep -F 'session.kind=catalog' >/dev/null

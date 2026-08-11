@@ -10,6 +10,7 @@ main="$srcdir/cli/main.cpp"
 meson="$srcdir/cli/meson.build"
 tests_meson="$srcdir/tests/meson.build"
 integration="$srcdir/tests/integration/cli_run_test.sh"
+readonly_integration="$srcdir/tests/integration/cli_readonly_test.sh"
 removal_integration="$srcdir/tests/integration/cli_run_removal_test.sh"
 restart_integration="$srcdir/tests/integration/cli_run_application_restart_test.sh"
 publication_restart_integration="$srcdir/tests/integration/cli_run_publication_restart_test.sh"
@@ -23,6 +24,7 @@ lifecycle_interrupt_fixture="$srcdir/tests/fixtures/lifecycle_intent_interrupt_f
 interrupt_fixture="$srcdir/tests/fixtures/application_intent_interrupt_fixture.cpp"
 
 for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration" \
+            "$readonly_integration" \
             "$removal_integration" "$restart_integration" "$publication_restart_integration" \
             "$publication_terminal_integration" "$publication_terminal_fixture" \
             "$lifecycle_resolution_integration" "$lease_contention_integration" \
@@ -114,6 +116,25 @@ grep -F "'cli-run'" "$tests_meson" >/dev/null || {
   echo 'bounded run command has no process-level integration test' >&2
   exit 1
 }
+
+for usage in \
+  'pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] --start SHA256 RUN-AUTHORITY' \
+  'pkgctl run --canonical-store PATH --resume SHA256 RUN-AUTHORITY'; do
+  grep -F -- "$usage" "$options" >/dev/null || {
+    echo "bounded run help omits current usage form: $usage" >&2
+    exit 1
+  }
+  grep -F -- "$usage" "$readonly_integration" >/dev/null || {
+    echo "read-only CLI smoke test omits current usage form: $usage" >&2
+    exit 1
+  }
+done
+
+obsolete_usage='pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] RUN-OPTIONS'
+if grep -F -- "$obsolete_usage" "$readonly_integration" >/dev/null 2>&1; then
+  echo "read-only CLI smoke test retains obsolete run usage: $obsolete_usage" >&2
+  exit 1
+fi
 grep -F "'cli-run-removal'" "$tests_meson" >/dev/null || {
   echo 'bounded run command has no removal process-level integration test' >&2
   exit 1
