@@ -727,6 +727,12 @@ effectful_operation_session::after() const noexcept { return after_; }
 const session_identity& effectful_operation_session::identity() const noexcept
 { return identity_; }
 
+const pkgapply::lease_bound_state_projection&
+transaction_effect_driver::publication_state_projection() const noexcept
+{
+  return state_projection();
+}
+
 pkgapply::application_receipt transaction_effect_driver::resume_application(
     const pkgapply::package_application_request&,
     const pkgapply::application_journal_record&)
@@ -741,10 +747,12 @@ native_transaction_effect_driver::native_transaction_effect_driver(
     pkgapply::application_backend& application_backend,
     const pkgimage::package_archive* incoming_archive,
     pkgexec::execution_backend& lifecycle_backend,
-    pkgstate::canonical_store& state_store)
+    pkgstate::canonical_store& state_store,
+    const pkgapply::lease_bound_state_projection* publication_state)
     : state_(state), lease_(lease), application_backend_(application_backend),
       incoming_archive_(incoming_archive), lifecycle_backend_(lifecycle_backend),
-      state_store_(state_store)
+      state_store_(state_store),
+      publication_state_(publication_state != nullptr ? publication_state : &state)
 {
 }
 
@@ -753,6 +761,9 @@ native_transaction_effect_driver::lease() noexcept { return lease_; }
 const pkgapply::lease_bound_state_projection&
 native_transaction_effect_driver::state_projection() const noexcept
 { return state_; }
+const pkgapply::lease_bound_state_projection&
+native_transaction_effect_driver::publication_state_projection() const noexcept
+{ return *publication_state_; }
 
 pkgapply_exec::lifecycle_execution_result
 native_transaction_effect_driver::execute_lifecycle(
@@ -1439,6 +1450,8 @@ effect_restart_result resume_effectful_operation(
 
   if (application && !journal.application())
   {
+    validate_application_receipt(
+        request, physical.publication_state_projection(), *application);
     journal = append_record(
         journal_store, journal.complete_application(*application));
     if (application->outcome() !=
@@ -1496,7 +1509,7 @@ effect_restart_result resume_effectful_operation(
     const auto transaction = transaction_evidence(
         session, before, completed, after);
     publication_request = project_publication(
-        request, physical.state_projection(), completed, transaction);
+        request, physical.publication_state_projection(), completed, transaction);
     if (bodies != nullptr)
       bodies->retain_publication_request(*publication_request);
     journal = append_record(

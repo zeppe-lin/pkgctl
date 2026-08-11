@@ -86,7 +86,7 @@ for contract in \
   'libpkgstate >= 3.1.0, < 4.0.0' \
   'libpkgstate-posix >= 3.0.0, < 4.0.0' \
   'libpkgstate-plan >= 3.0.0, < 4.0.0' \
-  'libpkgstate-apply >= 3.0.0, < 4.0.0' \
+  'libpkgstate-apply >= 3.1.0, < 4.0.0' \
   'libpkgfetch >= 2.0.0, < 3.0.0' \
   'libpkgbuild >= 3.0.0, < 4.0.0' \
   'libpkgbuild-exec >= 2.2.0, < 3.0.0' \

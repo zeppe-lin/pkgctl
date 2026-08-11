@@ -148,6 +148,10 @@ public:
   [[nodiscard]] virtual const pkgapply::lease_bound_state_projection&
   state_projection() const noexcept = 0;
 
+  /*! \brief Return the projection binding completed evidence to publication. */
+  [[nodiscard]] virtual const pkgapply::lease_bound_state_projection&
+  publication_state_projection() const noexcept;
+
   [[nodiscard]] virtual pkgapply_exec::lifecycle_execution_result
   execute_lifecycle(
       const pkgapply_exec::admitted_lifecycle_session& session) = 0;
@@ -193,11 +197,15 @@ public:
       pkgapply::application_backend& application_backend,
       const pkgimage::package_archive* incoming_archive,
       pkgexec::execution_backend& lifecycle_backend,
-      pkgstate::canonical_store& state_store);
+      pkgstate::canonical_store& state_store,
+      const pkgapply::lease_bound_state_projection* publication_state =
+          nullptr);
 
   [[nodiscard]] pkgapply::target_mutation_lease& lease() noexcept override;
   [[nodiscard]] const pkgapply::lease_bound_state_projection&
   state_projection() const noexcept override;
+  [[nodiscard]] const pkgapply::lease_bound_state_projection&
+  publication_state_projection() const noexcept override;
   [[nodiscard]] pkgapply_exec::lifecycle_execution_result
   execute_lifecycle(
       const pkgapply_exec::admitted_lifecycle_session& session) override;
@@ -218,6 +226,7 @@ private:
   const pkgimage::package_archive* incoming_archive_;
   pkgexec::execution_backend& lifecycle_backend_;
   pkgstate::canonical_store& state_store_;
+  const pkgapply::lease_bound_state_projection* publication_state_;
 };
 
 /*! \brief Native target-scoped canonical-state observation and publication. */

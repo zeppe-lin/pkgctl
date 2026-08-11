@@ -30,6 +30,7 @@ for required in \
   'F_DUPFD_CLOEXEC' \
   'pkgapply::posix::target_mutation_lease::acquire' \
   'pkgstate::apply_adapter::read_application_state' \
+  'pkgstate::apply_adapter::read_historical_application_state' \
   'native_transaction_effect_driver' \
   'native_transaction_effect_publication_driver' \
   'archive_image_mismatch' \
@@ -46,7 +47,8 @@ done
 for required in \
   "'libpkgapply-posix'" \
   "version: ['>=3.0.0', '<4.0.0']" \
-  "'libpkgstate-apply'"; do
+  "'libpkgstate-apply'" \
+  "version: ['>=3.1.0', '<4.0.0']"; do
   grep -F "$required" "$meson" >/dev/null || {
     echo "missing native effect-runtime dependency floor: $required" >&2
     exit 1

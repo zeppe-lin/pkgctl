@@ -152,7 +152,7 @@ libpkgapply_exec_dep = dependency(
 )
 libpkgstate_apply_dep = dependency(
   'libpkgstate-apply',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=3.1.0', '<4.0.0'],
   required: true,
   static: want_static,
 )

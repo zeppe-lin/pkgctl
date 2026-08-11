@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <memory>
+#include <optional>
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -103,11 +104,14 @@ struct continuation_runtime final {
   continuation_runtime(
       std::unique_ptr<pkgapply::posix::target_mutation_lease> lease_value,
       pkgstate::apply_adapter::lease_bound_application_state state_value,
+      std::optional<pkgstate::apply_adapter::lease_bound_application_state>
+          publication_state_value,
       std::unique_ptr<pkgimage::package_archive> archive_value,
       pkgapply::application_backend& application_value,
       pkgexec::execution_backend& lifecycle_value,
       pkgstate::canonical_store& store_value)
       : lease(std::move(lease_value)), state(std::move(state_value)),
+        publication_state(std::move(publication_state_value)),
         archive(std::move(archive_value)), application(application_value),
         lifecycle(lifecycle_value), store(store_value)
   {
@@ -115,6 +119,8 @@ struct continuation_runtime final {
 
   std::unique_ptr<pkgapply::posix::target_mutation_lease> lease;
   pkgstate::apply_adapter::lease_bound_application_state state;
+  std::optional<pkgstate::apply_adapter::lease_bound_application_state>
+      publication_state;
   std::unique_ptr<pkgimage::package_archive> archive;
   pkgapply::application_backend& application;
   pkgexec::execution_backend& lifecycle;
@@ -128,7 +134,9 @@ public:
       : runtime_(std::move(runtime)), driver_(
             runtime_->state.projection(), *runtime_->lease,
             runtime_->application, runtime_->archive.get(),
-            runtime_->lifecycle, runtime_->store)
+            runtime_->lifecycle, runtime_->store,
+            runtime_->publication_state
+                ? &runtime_->publication_state->projection() : nullptr)
   {
   }
 
@@ -141,6 +149,12 @@ public:
   state_projection() const noexcept override
   {
     return driver_.state_projection();
+  }
+
+  const pkgapply::lease_bound_state_projection&
+  publication_state_projection() const noexcept override
+  {
+    return driver_.publication_state_projection();
   }
 
   pkgapply_exec::lifecycle_execution_result execute_lifecycle(
@@ -322,7 +336,8 @@ public:
   }
 
   std::shared_ptr<continuation_runtime> acquire_continuation(
-      const effectful_operation_session& session)
+      const effectful_operation_session& session,
+      const pkgapply::application_journal_header* historical = nullptr)
   {
     const auto& request = session.request().application();
     auto archive = acquire_transaction_effect_archive(archives_, request);
@@ -330,9 +345,18 @@ public:
         request.target(), lock_directory_fd_);
     auto state = pkgstate::apply_adapter::read_application_state(
         request, *lease, state_store_);
+    std::optional<pkgstate::apply_adapter::lease_bound_application_state>
+        publication_state;
+    if (historical != nullptr)
+    {
+      publication_state =
+          pkgstate::apply_adapter::read_historical_application_state(
+              request, *historical, *lease, state_store_);
+    }
     return std::make_shared<continuation_runtime>(
-        std::move(lease), std::move(state), std::move(archive),
-        application_backend_, lifecycle_backend_, state_store_);
+        std::move(lease), std::move(state), std::move(publication_state),
+        std::move(archive), application_backend_, lifecycle_backend_,
+        state_store_);
   }
 
   transaction_effect_body_sink* bodies() const noexcept
@@ -432,7 +456,14 @@ posix_transaction_effect_driver_source::acquire_recovery_drivers(
   transaction_effect_recovery_drivers drivers;
   if (continuation)
   {
-    auto runtime = state_->acquire_continuation(checkpoint->session());
+    const pkgapply::application_journal_header* historical = nullptr;
+    if (checkpoint->application() && !checkpoint->record().application() &&
+        checkpoint->application_journal())
+    {
+      historical = &checkpoint->application_journal()->header();
+    }
+    auto runtime =
+        state_->acquire_continuation(checkpoint->session(), historical);
     drivers.continuation =
         std::make_unique<owned_native_continuation>(runtime);
     drivers.resulting_state =

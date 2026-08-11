@@ -14,6 +14,7 @@ pipeline_modules='libpkgreconcile libpkgreconcile-apply libpkgreconcile-posix li
 pkg-config --exists \
   'libpkgfetch >= 2.0.0' 'libpkgfetch < 3.0.0' \
   'libpkgbuild-exec >= 2.2.0' 'libpkgbuild-exec < 3.0.0' \
+  'libpkgstate-apply >= 3.1.0' 'libpkgstate-apply < 4.0.0' \
   'libpkgexec >= 2.0.0' 'libpkgexec < 3.0.0' \
   'libpkgexec-linux >= 0.6.0' 'libpkgexec-linux < 1.0.0' \
   'libpkgresolve >= 3.0.0' 'libpkgresolve < 4.0.0' \

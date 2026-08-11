@@ -72,7 +72,8 @@
   without publishing twice; application interruption after POSIX completion must
   reopen the exact terminal application journal, adopt its durably retained
   receipt into the controller journal without either a fresh apply or an
-  application resume, and continue to publication. A
+  application resume, reconstruct the journal-bound historical state
+  projection under fresh target exclusion, and continue to publication. A
   separate mode proves definitive dependency-build and package-check failures block
   dependent target work and publish no package state.
 
@@ -89,7 +90,7 @@ Current 0.35.0 source accepts exactly these direct dependency generations:
 - libpkgstate >= 3.1.0, < 4.0.0
 - libpkgstate-posix >= 3.0.0, < 4.0.0
 - libpkgstate-plan >= 3.0.0, < 4.0.0
-- libpkgstate-apply >= 3.0.0, < 4.0.0
+- libpkgstate-apply >= 3.1.0, < 4.0.0
 - libpkgfetch >= 2.0.0, < 3.0.0
 - libpkgbuild >= 3.0.0, < 4.0.0
 - libpkgbuild-exec >= 2.2.0, < 3.0.0

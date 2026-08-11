@@ -257,9 +257,11 @@ publications. Application interruption occurs after POSIX application has comple
 and the exact application receipt body has been retained, but before the effect
 journal records application terminal. Restart must load the terminal subordinate
 application journal, bind its receipt identity to the retained owner-encoded body,
-adopt that already-completed application into the controller journal, perform zero
-fresh applications and zero application resumes, and publish exactly once. Upgrade
-and removal both qualify this rule. A terminal subordinate journal without its
+adopt that already-completed application into the controller journal, reconstruct
+the exact historical lease-bound state projection recorded by that journal under
+a newly held target lease, perform zero fresh applications and zero application
+resumes, and publish exactly once. Upgrade and removal both qualify this rule. A
+terminal subordinate journal without its
 retained exact receipt body is not enough authority for automatic continuation.
 
 `pkgctl:package-failure-matrix` runs the same harness in failure mode. A definitive

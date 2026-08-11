@@ -1383,9 +1383,14 @@ void check_package_pipeline()
   reacquire_application_lease(application, target);
   auto resumed_upgrade_projection = pkgstate::apply_adapter::read_application_state(
       *prepared_upgrade.application(), *application.lease, store);
+  auto historical_upgrade_projection =
+      pkgstate::apply_adapter::read_historical_application_state(
+          *prepared_upgrade.application(), upgrade_application_journal->header(),
+          *application.lease, store);
   pkgctl::native_transaction_effect_driver native_resumed_upgrade_driver(
       resumed_upgrade_projection.projection(), *application.lease,
-      *application.backend, upgrade_archive.get(), backend, store);
+      *application.backend, upgrade_archive.get(), backend, store,
+      &historical_upgrade_projection.projection());
   counting_effect_driver resumed_upgrade_driver(native_resumed_upgrade_driver);
   pkgctl::native_transaction_effect_publication_driver
       resumed_upgrade_state_observer(*application.lease, store);
@@ -1691,9 +1696,14 @@ void check_package_pipeline()
   reacquire_application_lease(application, target);
   auto resumed_removal_projection = pkgstate::apply_adapter::read_application_state(
       *prepared_removal.application(), *application.lease, store);
+  auto historical_removal_projection =
+      pkgstate::apply_adapter::read_historical_application_state(
+          *prepared_removal.application(), removal_application_journal->header(),
+          *application.lease, store);
   pkgctl::native_transaction_effect_driver native_resumed_removal_driver(
       resumed_removal_projection.projection(), *application.lease,
-      *application.backend, nullptr, backend, store);
+      *application.backend, nullptr, backend, store,
+      &historical_removal_projection.projection());
   counting_effect_driver resumed_removal_driver(native_resumed_removal_driver);
   pkgctl::native_transaction_effect_publication_driver
       resumed_removal_state_observer(*application.lease, store);

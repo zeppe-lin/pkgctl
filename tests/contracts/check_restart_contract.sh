@@ -41,6 +41,7 @@ for required in \
   'application && !journal.application()' \
   'journal.complete_application(*application)' \
   'physical.resume_application' \
+  'physical.publication_state_projection()' \
   'state.read_state()' \
   'state.publish_state' \
   'effect_restart_disposition::external_resolution_required' \

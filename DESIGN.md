@@ -39,8 +39,12 @@ effect-journal append boundary after the corresponding subordinate owner may hav
 already committed its side effect. Reopen then uses the production run/effect
 restart checkpoints and `reconcile_operation_dispatch_durable()`: completed POSIX
 application journals whose exact receipt body is already durable are adopted into
-the controller journal without a fresh apply or application resume; genuinely
-resumable subordinate journals still use `libpkgapply` continuation. An
+the controller journal without a fresh apply or application resume. Their
+completed evidence remains bound to the historical lease projection recorded by
+the application journal; `libpkgstate-apply` reconstructs that projection from
+canonical pre-state while a newly held lease guards the restart read. Genuinely
+resumable subordinate journals still use `libpkgapply` continuation and bind new
+terminal evidence to the current projection. An
 already-selected canonical publication is observed without publishing the same
 state again.
 
