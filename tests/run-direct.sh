@@ -69,9 +69,17 @@ done
 "$cxx" $flags "$srcdir/tests/fixtures/native_target_lock_holder.cpp" \
   $objects $core_libs -o "$tmp/native-target-lock-holder"
 
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/native_target_lock_revoker.cpp" \
+  -o "$tmp/native-target-lock-revoker"
+
 "$cxx" -nostdlib -static -Wl,-e,_start \
   "$srcdir/tests/fixtures/native_interpreter_x86_64.S" \
   -o "$tmp/native-test-interpreter"
+
+"$cxx" -nostdlib -static -Wl,-e,_start \
+  "$srcdir/tests/fixtures/native_lease_loss_interpreter_x86_64.S" \
+  -o "$tmp/native-lease-loss-interpreter"
 
 "$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
   "$srcdir/tests/fixtures/application_intent_interrupt_fixture.cpp" \
@@ -136,6 +144,12 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" "$tmp/native-target-lock-holder" \
   "$srcdir/tests/fixtures/collections/simple-install" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
+"$srcdir/tests/integration/cli_run_lease_loss_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-lease-loss-interpreter" "$tmp/native-target-lock-revoker" \
+  "$srcdir/tests/fixtures/collections/lifecycle-post-install-lease-loss" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
 "$srcdir/tests/integration/cli_run_recovery_lease_contention_test.sh" "$tmp/pkgctl" \

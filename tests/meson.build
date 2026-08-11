@@ -193,11 +193,31 @@ if not get_option('tests').disabled()
     dependencies: pkgctl_core_dep,
   )
 
+  native_target_lock_revoker = executable(
+    'native-target-lock-revoker',
+    'fixtures/native_target_lock_revoker.cpp',
+  )
+
   cpp = meson.get_compiler('cpp')
   native_interpreter = custom_target(
     'native-test-interpreter',
     input: 'fixtures/native_interpreter_x86_64.S',
     output: 'native-test-interpreter',
+    build_by_default: true,
+    command: cpp.cmd_array() + [
+      '-nostdlib',
+      '-static',
+      '-Wl,-e,_start',
+      '@INPUT@',
+      '-o',
+      '@OUTPUT@',
+    ],
+  )
+
+  native_lease_loss_interpreter = custom_target(
+    'native-lease-loss-interpreter',
+    input: 'fixtures/native_lease_loss_interpreter_x86_64.S',
+    output: 'native-lease-loss-interpreter',
     build_by_default: true,
     command: cpp.cmd_array() + [
       '-nostdlib',
@@ -375,6 +395,31 @@ if not get_option('tests').disabled()
       ),
     ],
     depends: [native_interpreter, native_target_lock_holder],
+    suite: 'integration-privileged',
+  )
+
+  cli_run_lease_loss_test = find_program(
+    'integration/cli_run_lease_loss_test.sh',
+  )
+  test(
+    'cli-run-lease-loss',
+    cli_run_lease_loss_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_lease_loss_interpreter,
+      native_target_lock_revoker,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/lifecycle-post-install-lease-loss',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [native_lease_loss_interpreter, native_target_lock_revoker],
     suite: 'integration-privileged',
   )
 
@@ -756,6 +801,16 @@ if not get_option('tests').disabled()
   test(
     'cli-lease-contention-contract',
     cli_lease_contention_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_lease_loss_contract = find_program(
+    'contracts/check_cli_lease_loss_contract.sh',
+  )
+  test(
+    'cli-lease-loss-contract',
+    cli_lease_loss_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

@@ -117,6 +117,17 @@ return `mutation-authority-unavailable` with zero run/effect successor and prese
 the exact dispatch/effect identities. Releasing the holder gives a later explicit
 `--resume` authority to continue that same started dispatch; allocating a
 replacement operation would erase already-owned effect history and is forbidden.
+The frontend lease-loss vertical exercises the different already-owned-authority
+failure. A marked post-install lifecycle recipe is enacted by a dedicated static test
+interpreter that blocks on a FIFO handshake while an external revoker unlinks the one real anchored POSIX lock. The lifecycle
+process is not released until that unlink succeeds, so lease loss is guaranteed to
+be observed after application/post-install completion and before publication.
+`--start` must return `external-resolution-required` on the same durable operation
+observation, leave the operation dispatch started with exactly one observation,
+and expose a terminal `outer-lease-lost` effect. Because loss of ownership is not
+contention, later `--resume` calls may not acquire a replacement lease or
+operation dispatch; they preserve the same run/effect heads and append no durable
+successor even after live collection bytes disappear.
 
 This qualifies runtime and current frontend wiring before another CLI option is
 allowed to become its first consumer.

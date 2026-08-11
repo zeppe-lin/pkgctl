@@ -92,9 +92,16 @@ POSIX exclusion domain across `--resume`. The blocked resume must report
 `mutation-authority-unavailable` with zero durable advancement while preserving
 the exact started operation dispatch and effect head. After explicit holder
 release, a later `--resume` must complete that same dispatch/effect rather than
-reserving a replacement, even after live collection bytes are removed. Only the
-external process actuator and the explicitly faulted owner protocol are replaced
-in the in-process campaign.
+reserving a replacement, even after live collection bytes are removed. A third
+privileged vertical revokes the command's real anchored POSIX lease while a
+post-install lifecycle action is still active. The admitted `--start` must retain
+one non-retiring `outer-lease-lost` observation and report
+`external-resolution-required`: application and post-install effects remain on
+the target, canonical state remains at the prior generation, and publication
+never starts. Repeated `--resume` after live collection removal must preserve the
+same run/effect heads, perform zero durable advancement, and must not recreate a
+target-lock file. Only the external process actuator and the explicitly faulted
+owner protocol are replaced in the in-process campaign.
 This test composition does not make reconciliation a production `pkgctl`
 dependency.
 

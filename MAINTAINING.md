@@ -139,6 +139,20 @@ do not release or replace already-started work. Remove the collection before res
 to prove retained command authority. Once the holder is explicitly released, the
 next `--resume` must complete the same dispatch and effect attempt.
 
+For the CLI lease-loss vertical, do not approximate revocation with contention or
+by terminating the controller. Synchronize a real post-install lifecycle process
+with an external revoker: the process must remain blocked until the revoker has
+unlinked the single anchored POSIX lock file, so pkgctl observes loss only after
+that lifecycle result succeeds. Inspect the terminal effect head for
+`outer-lease-lost` and the run dispatch for the one non-retiring observation.
+Application/post-install target effects are expected to remain while canonical
+state remains prior because publication was never entered. Once that observation
+is retained, later `--resume` is external-resolution-only: it may reconstruct
+semantic authority to explain the block, but it must not append a durable run/effect
+successor, reserve replacement work, reacquire a mutation lease, or recreate the
+missing lock pathname. Delete the live collection before resume to keep the
+retained-command-universe guarantee in the same proof.
+
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has
 reached the selected durable boundary. Restart must reopen retained

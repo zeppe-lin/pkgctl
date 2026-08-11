@@ -395,6 +395,25 @@ the live collection before this resume. After explicit holder release, a one-ste
 identities; a replacement operation dispatch is forbidden because effect ownership
 was already durable. A repeated completed resume remains a zero-step no-op.
 
+`pkgctl:cli-run-lease-loss` qualifies the corresponding loss-of-owned-authority
+frontend state. A marked post-install lifecycle recipe is enacted by the dedicated static
+lease-loss interpreter: it writes the ordinary target marker, signals a dedicated
+FIFO, and blocks on an acknowledgement FIFO. The external
+`native-target-lock-revoker` waits on that signal, verifies that the runtime
+`target-locks` directory contains exactly one regular anchored lease, unlinks it,
+and only then releases the lifecycle process. This is a deterministic physical
+lease loss, not `lock_busy`, a lease-provider fake, a signal race, or a controller
+hook. `--start` must exit nonzero with `external-resolution-required`, retain one
+started operation dispatch with one non-retiring observation, and expose a terminal
+`outer-lease-lost` effect whose application and post-install lifecycle work are
+already complete while no publication request exists. Target bytes and the
+post-install marker remain; canonical state stays at the prior empty generation.
+After deleting the live collection, `--resume` must report one non-durable control
+step and zero durable steps, preserve the exact run/effect identities, and leave
+the `target-locks` directory empty. Repeated resume must remain identical: lease
+loss never becomes fresh acquisition authority merely because the lock pathname is
+now absent.
+
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the
 exact execution guarantees implied by the transaction's build, check, and

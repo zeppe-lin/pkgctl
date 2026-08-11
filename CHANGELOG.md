@@ -125,6 +125,15 @@
   advancement and identical run/effect heads. After holder release, a later explicit
   `--resume` must complete that same dispatch and effect attempt, not allocate a
   replacement, even after the live collection is removed.
+- Qualifies real outer-lease loss through the privileged `pkgctl run` frontend.
+  A post-install lifecycle fixture blocks on a FIFO handshake while an external
+  revoker unlinks the command's single anchored POSIX target lock, guaranteeing
+  loss after application/lifecycle completion and before publication. `--start`
+  must report `external-resolution-required` with one started operation and one
+  terminal `outer-lease-lost` effect; target effects remain while canonical state
+  stays prior. Later `--resume` calls, including after live collection removal,
+  preserve the same run/effect heads with zero durable advancement and never
+  recreate the missing target lock.
 - Qualifies POSIX outer-lease loss through the native runtime and fixes the
   run/effect restart join exposed by that test. A terminal `outer_lease_lost`
   effect is a non-retiring transaction observation: restart commits it once if
