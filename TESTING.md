@@ -406,7 +406,12 @@ lease loss, not `lock_busy`, a lease-provider fake, a signal race, or a controll
 hook. `--start` must exit nonzero with `external-resolution-required`, retain one
 started operation dispatch with one non-retiring observation, and expose a terminal
 `outer-lease-lost` effect whose application and post-install lifecycle work are
-already complete while no publication request exists. Target bytes and the
+already complete while no publication request exists. `inspect-effect` must report
+that record as effect-local `terminal`, automatically continuable, and not itself
+external-resolution-required: those predicates describe whether effect restart can
+consume the durable terminal record. The run/effect join then retains the
+non-retiring outcome and `pkgctl run` / `inspect-run` own the distinct
+`external-resolution-required` control state. Target bytes and the
 post-install marker remain; canonical state stays at the prior empty generation.
 After deleting the live collection, `--resume` must report one non-durable control
 step and zero durable steps, preserve the exact run/effect identities, and leave

@@ -26,6 +26,9 @@ for required in \
   'dispatch.$operation_index.observations=1' \
   'run.external-evidence-required=true' \
   'effect.stage=terminal' \
+  'effect.disposition=terminal' \
+  'effect.automatically-continuable=true' \
+  'effect.external-resolution-required=false' \
   'effect.application-outcome=completed' \
   'effect.terminal-outcome=outer-lease-lost' \
   'effect.publication-request=' \
@@ -82,6 +85,9 @@ for required in \
 done
 
 for forbidden in \
+  'effect.disposition=external-resolution-required' \
+  'effect.automatically-continuable=false' \
+  'effect.external-resolution-required=true' \
   'flock ' \
   'target_mutation_lease::acquire' \
   'target_mutation_lease_error' \

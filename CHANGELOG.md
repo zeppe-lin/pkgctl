@@ -130,7 +130,10 @@
   revoker unlinks the command's single anchored POSIX target lock, guaranteeing
   loss after application/lifecycle completion and before publication. `--start`
   must report `external-resolution-required` with one started operation and one
-  terminal `outer-lease-lost` effect; target effects remain while canonical state
+  terminal `outer-lease-lost` effect. Effect inspection keeps its own restart
+  classification (`terminal`, automatically continuable, not externally blocked);
+  the run/effect join owns the non-retiring external-resolution control state.
+  Target effects remain while canonical state
   stays prior. Later `--resume` calls, including after live collection removal,
   preserve the same run/effect heads with zero durable advancement and never
   recreate the missing target lock.

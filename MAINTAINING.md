@@ -145,6 +145,11 @@ with an external revoker: the process must remain blocked until the revoker has
 unlinked the single anchored POSIX lock file, so pkgctl observes loss only after
 that lifecycle result succeeds. Inspect the terminal effect head for
 `outer-lease-lost` and the run dispatch for the one non-retiring observation.
+Do not project the run-level external-resolution classification back into
+`inspect-effect`: a terminal effect head is effect-locally `terminal`,
+automatically continuable, and not external-resolution-required because restart
+can consume that durable terminal evidence. The run/effect join is what converts
+its non-retiring outcome into the controller-level external-resolution stop.
 Application/post-install target effects are expected to remain while canonical
 state remains prior because publication was never entered. Once that observation
 is retained, later `--resume` is external-resolution-only: it may reconstruct

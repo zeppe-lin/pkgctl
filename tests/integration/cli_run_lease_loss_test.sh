@@ -328,12 +328,12 @@ run_record_before=$(sed -n 's/^run.record=//p' "$root/lost-run.out")
   >"$root/lost-effect.out"
 require_contains lost-effect "$root/lost-effect.out" 'effect.stage=terminal'
 require_contains lost-effect "$root/lost-effect.out" \
-  'effect.disposition=external-resolution-required'
+  'effect.disposition=terminal'
 require_contains lost-effect "$root/lost-effect.out" 'effect.terminal=true'
 require_contains lost-effect "$root/lost-effect.out" \
-  'effect.automatically-continuable=false'
+  'effect.automatically-continuable=true'
 require_contains lost-effect "$root/lost-effect.out" \
-  'effect.external-resolution-required=true'
+  'effect.external-resolution-required=false'
 require_contains lost-effect "$root/lost-effect.out" 'effect.after-total=1'
 require_contains lost-effect "$root/lost-effect.out" 'effect.after-completed=1'
 require_contains lost-effect "$root/lost-effect.out" \
