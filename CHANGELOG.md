@@ -57,10 +57,34 @@
 
 ### Dependency contract
 
-- libpkgfetch >= 2.0.0, < 3.0.0
-- libpkgapply-posix >= 3.1.0, < 4.0.0
+Current 0.35.0 source accepts exactly these direct dependency generations:
+
+- libpkgsource >= 3.0.0, < 4.0.0
+- libpkgsource-yaml >= 1.0.0, < 2.0.0 (CLI only)
+- libpkgsource-plan >= 1.0.0, < 2.0.0
+- libpkgcatalog >= 3.0.0, < 4.0.0
 - libpkgcatalog-codec >= 3.0.0, < 4.0.0 (CLI only)
-- libpkgexec-linux >= 0.5.2, < 1.0.0 (CLI only)
+- libpkgcatalog-acquire >= 3.0.0, < 4.0.0
+- libpkgstate >= 3.1.0, < 4.0.0
+- libpkgstate-posix >= 3.0.0, < 4.0.0
+- libpkgstate-plan >= 3.0.0, < 4.0.0
+- libpkgstate-apply >= 3.0.0, < 4.0.0
+- libpkgfetch >= 2.0.0, < 3.0.0
+- libpkgbuild >= 3.0.0, < 4.0.0
+- libpkgbuild-exec >= 2.2.0, < 3.0.0
+- libpkgbuild-image >= 1.0.0, < 2.0.0
+- libpkgbuild-plan >= 1.0.0, < 2.0.0
+- libpkgimage >= 0.4.0, < 1.0.0
+- libpkgplan >= 0.3.0, < 1.0.0
+- libpkgexec >= 2.0.0, < 3.0.0
+- libpkgexec-linux >= 0.6.0, < 1.0.0 (CLI only)
+- libpkgapply >= 3.0.0, < 4.0.0
+- libpkgapply-posix >= 3.1.0, < 4.0.0
+- libpkgapply-exec >= 2.0.0, < 3.0.0
+- libpkgresolve >= 3.0.0, < 4.0.0
+- libpkgtransaction >= 3.0.0, < 4.0.0
+- libpkgcheck >= 0.2.0, < 1.0.0
+- libpkgcheck-exec >= 0.4.0, < 1.0.0
 
 ## 0.34.0 - 2026-08-07
 
@@ -342,8 +366,8 @@
 - libpkgapply >= 3.0.0, < 4.0.0
 - libpkgapply-posix >= 3.0.0, < 4.0.0
 - libpkgapply-exec >= 2.0.0, < 3.0.0
-- libpkgresolve >= 3.0.0, < 4.0.0
-- libpkgtransaction >= 3.0.0, < 4.0.0
+- libpkgresolve >= 2.0.0, < 3.0.0
+- libpkgtransaction >= 2.1.0, < 3.0.0
 - libpkgcheck >= 0.2.0, < 1.0.0
 - libpkgcheck-exec >= 0.3.0, < 1.0.0
 

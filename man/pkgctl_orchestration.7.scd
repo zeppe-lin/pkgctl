@@ -441,7 +441,7 @@ Before construction starts, every package input must match one exact
 *libpkgtransaction* requirement edge and exact selected or retained package
 truth. Build and artifact identities must reproduce successful predecessor
 construction evidence. Retained installed inputs must still be the same package
-in the current canonical state. *libpkgtransaction* Version 2.1.0 or later orders
+in the current canonical state. *libpkgtransaction* Version 3.0.0 or later orders
 both build- and check-scoped package inputs before the construction that seals
 them.
 

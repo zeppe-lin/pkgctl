@@ -576,7 +576,7 @@ operation; lost-lease and indeterminate-publication evidence remains an active
 observation until authoritative resolution arrives.
 
 The ledger binds exact successful predecessor evidence. Check-scoped package
-inputs are ordered before construction by `libpkgtransaction >= 2.1.0`, then
+inputs are ordered before construction by `libpkgtransaction >= 3.0.0`, then
 verified against the retained build result and artifact before a construction
 session starts. Retained installed inputs must still be the same exact package
 in the current state. Failure containment prevents both new reservations and

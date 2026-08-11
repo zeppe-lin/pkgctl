@@ -128,7 +128,7 @@ libpkgexec_dep = dependency(
 )
 libpkgexec_linux_dep = dependency(
   'libpkgexec-linux',
-  version: ['>=0.5.2', '<1.0.0'],
+  version: ['>=0.6.0', '<1.0.0'],
   required: true,
   static: want_static,
 )

@@ -45,10 +45,12 @@ require_dependency_range libpkgfetch '>=2.0.0' '<3.0.0'
 require_dependency_range libpkgbuild-exec '>=2.2.0' '<3.0.0'
 require_dependency_range libpkgcheck-exec '>=0.4.0' '<1.0.0'
 require_dependency_range libpkgresolve '>=3.0.0' '<4.0.0'
+require_dependency_range libpkgtransaction '>=3.0.0' '<4.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
+require_dependency_range libpkgexec '>=2.0.0' '<3.0.0'
 require_dependency_range libpkgapply-posix '>=3.1.0' '<4.0.0'
 require_dependency_range libpkgcatalog-codec '>=3.0.0' '<4.0.0'
-require_dependency_range libpkgexec-linux '>=0.5.2' '<1.0.0'
+require_dependency_range libpkgexec-linux '>=0.6.0' '<1.0.0'
 
 grep -F '## 0.35.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
@@ -60,12 +62,26 @@ grep -F 'immutable command-universe object' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F 'Version 0.35.0 exposes *pkgctl run*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
+temporary=${TMPDIR:-/tmp}/pkgctl-release-contract.$$
+trap 'rm -f "$temporary.current" "$temporary.deps" "$temporary.027"' EXIT HUP INT TERM
+
+awk '
+  /^## 0\.35\.0 / { current = 1; next }
+  /^## / && current { exit }
+  current { print }
+' "$srcdir/CHANGELOG.md" > "$temporary.current"
+awk '
+  /^### Dependency contract$/ { dependencies = 1; next }
+  /^### / && dependencies { exit }
+  dependencies { print }
+' "$temporary.current" > "$temporary.deps"
+
 for contract in \
   'libpkgsource >= 3.0.0, < 4.0.0' \
-  'libpkgsource-yaml >= 1.0.0, < 2.0.0' \
+  'libpkgsource-yaml >= 1.0.0, < 2.0.0 (CLI only)' \
   'libpkgsource-plan >= 1.0.0, < 2.0.0' \
   'libpkgcatalog >= 3.0.0, < 4.0.0' \
-  'libpkgcatalog-codec >= 3.0.0, < 4.0.0' \
+  'libpkgcatalog-codec >= 3.0.0, < 4.0.0 (CLI only)' \
   'libpkgcatalog-acquire >= 3.0.0, < 4.0.0' \
   'libpkgstate >= 3.1.0, < 4.0.0' \
   'libpkgstate-posix >= 3.0.0, < 4.0.0' \
@@ -78,8 +94,8 @@ for contract in \
   'libpkgbuild-plan >= 1.0.0, < 2.0.0' \
   'libpkgimage >= 0.4.0, < 1.0.0' \
   'libpkgplan >= 0.3.0, < 1.0.0' \
-  'libpkgexec >= 1.4.0, < 2.0.0' \
-  'libpkgexec-linux >= 0.5.2, < 1.0.0' \
+  'libpkgexec >= 2.0.0, < 3.0.0' \
+  'libpkgexec-linux >= 0.6.0, < 1.0.0 (CLI only)' \
   'libpkgapply >= 3.0.0, < 4.0.0' \
   'libpkgapply-posix >= 3.1.0, < 4.0.0' \
   'libpkgapply-exec >= 2.0.0, < 3.0.0' \
@@ -87,11 +103,32 @@ for contract in \
   'libpkgtransaction >= 3.0.0, < 4.0.0' \
   'libpkgcheck >= 0.2.0, < 1.0.0' \
   'libpkgcheck-exec >= 0.4.0, < 1.0.0'; do
-  grep -F "$contract" "$srcdir/CHANGELOG.md" >/dev/null || {
-    echo "missing dependency floor in changelog: $contract" >&2
+  count=$(grep -F -x -- "- $contract" "$temporary.deps" | wc -l | tr -d ' ')
+  [ "$count" -eq 1 ] || {
+    echo "current 0.35 dependency ledger contains $count copies of: $contract" >&2
     exit 1
   }
 done
+
+# Historical release facts are immutable. 0.27 predates resolver/transaction 3.
+awk '
+  /^## 0\.27\.0 / { current = 1; next }
+  /^## / && current { exit }
+  current { print }
+' "$srcdir/CHANGELOG.md" > "$temporary.027"
+grep -F -x -- '- libpkgresolve >= 2.0.0, < 3.0.0' "$temporary.027" >/dev/null || {
+  echo '0.27 resolver dependency history was rewritten' >&2
+  exit 1
+}
+grep -F -x -- '- libpkgtransaction >= 2.1.0, < 3.0.0' "$temporary.027" >/dev/null || {
+  echo '0.27 transaction dependency history was rewritten' >&2
+  exit 1
+}
+if grep -F -x -- '- libpkgresolve >= 3.0.0, < 4.0.0' "$temporary.027" >/dev/null || \
+   grep -F -x -- '- libpkgtransaction >= 3.0.0, < 4.0.0' "$temporary.027" >/dev/null; then
+  echo '0.27 dependency history contains a current-generation rewrite' >&2
+  exit 1
+fi
 
 [ "$(sed -n 's/^## \([0-9][0-9.]*\) - .*/\1/p' \
     "$srcdir/CHANGELOG.md" | head -n 1)" = "$version" ]
