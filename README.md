@@ -69,8 +69,9 @@ zero durable advancement or physical replay. A separate outer-lease matrix
 revokes the runtime's real POSIX mutation lease by unlinking its anchored lock
 file after a successful post-install lifecycle action and during a successful
 state publication. Lease loss is retained once as a non-retiring dispatch
-observation; the next drive and every reopen report external resolution instead
-of resubmitting the same observation, reacquiring archive authority, or
+observation. The bounded drive that retains that observation reports external
+resolution immediately, and every later drive/reopen reports the same block
+instead of resubmitting the observation, reacquiring archive authority, or
 promoting a publication completed after ownership was lost. Only the external
 process actuator and the explicitly faulted owner protocol are replaced. This
 test composition does not make reconciliation a production `pkgctl` dependency.

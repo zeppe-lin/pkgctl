@@ -3432,9 +3432,9 @@ void check_native_runtime_outer_lease_loss(
         pkgctl::transaction_run_drive_disposition::external_resolution_required);
   CHECK(!launched.drive().terminal());
   CHECK(launched.drive().external_resolution_required());
-  CHECK(launched.drive().steps().size() == 5U);
+  CHECK(launched.drive().steps().size() == 4U);
   CHECK(launched.drive().durable_step_count() == 4U);
-  if (launched.drive().steps().size() == 5U) {
+  if (launched.drive().steps().size() == 4U) {
     CHECK(launched.drive().steps()[0].disposition() ==
           pkgctl::transaction_run_advance_disposition::executed_construction);
     CHECK(launched.drive().steps()[1].disposition() ==
@@ -3443,9 +3443,6 @@ void check_native_runtime_outer_lease_loss(
           pkgctl::transaction_run_advance_disposition::executed_check);
     CHECK(launched.drive().steps()[3].disposition() ==
           pkgctl::transaction_run_advance_disposition::executed_operation);
-    CHECK(launched.drive().steps()[4].disposition() ==
-          pkgctl::transaction_run_advance_disposition::
-              external_resolution_required);
 
     const auto* observed = launched.drive().steps()[3].operation();
     CHECK(observed != nullptr);
@@ -3458,16 +3455,6 @@ void check_native_runtime_outer_lease_loss(
       CHECK(observed->record.terminal_outcome() ==
             std::optional<pkgctl::effectful_operation_outcome>(
                 pkgctl::effectful_operation_outcome::outer_lease_lost));
-    }
-
-    const auto* blocked = launched.drive().steps()[4].operation();
-    CHECK(blocked != nullptr);
-    if (blocked != nullptr) {
-      CHECK(!blocked->result.has_value());
-      CHECK(blocked->restart_disposition ==
-            std::optional<pkgctl::effect_restart_disposition>(
-                pkgctl::effect_restart_disposition::
-                    external_resolution_required));
     }
   }
 
@@ -3898,9 +3885,10 @@ void check_native_runtime_terminal_indeterminate_publication(
   const auto launched = runtime->launch(
       pkgctl::transaction_dispatch_policy::make(1U, 1U),
       journal_nonce(nonce_marker),
-      pkgctl::transaction_run_drive_policy::make(4U));
+      pkgctl::transaction_run_drive_policy::make(5U));
   CHECK(launched.drive().disposition() ==
-        pkgctl::transaction_run_drive_disposition::step_limit_reached);
+        pkgctl::transaction_run_drive_disposition::external_resolution_required);
+  CHECK(launched.drive().external_resolution_required());
   CHECK(!launched.drive().terminal());
   CHECK(launched.drive().steps().size() == 4U);
   CHECK(launched.drive().durable_step_count() == 4U);

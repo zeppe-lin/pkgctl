@@ -82,9 +82,11 @@ Outer-lease loss has one additional cross-journal rule. The effect journal may
 seal `outer_lease_lost` as exact controller evidence while the transaction
 dispatch deliberately remains started and retains that result identity as an
 ordered observation. If restart finds the terminal effect before that run
-observation was committed, it commits the observation once. If the started
-dispatch already retains the same result identity, reconciliation must stop at
-external resolution rather than submit a duplicate observation. This remains
+observation was committed, it commits the observation once; a bounded drive
+classifies that same durable non-retiring observation as an external-resolution
+stop instead of consuming another iteration. If the started dispatch already
+retains the same result identity, reconciliation must stop at external resolution
+rather than submit a duplicate observation. This remains
 true when publication itself completed before the lease was discovered lost;
 canonical state visibility does not retroactively restore controller ownership.
 This qualifies runtime wiring before another CLI option is allowed to become its

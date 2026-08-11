@@ -29,10 +29,28 @@ namespace {
       message);
 }
 
+bool retained_operation_requires_external_resolution(
+    const transaction_run_advance_result& step)
+{
+  const auto* operation = step.operation();
+  if (operation == nullptr || !operation->result || !step.dispatch())
+    return false;
+
+  const auto* record = step.run().record(step.dispatch()->identity());
+  if (record == nullptr ||
+      record->state() != transaction_dispatch_state::started)
+    return false;
+
+  return std::find(
+      record->observations().begin(), record->observations().end(),
+      operation->result->identity()) != record->observations().end();
+}
+
 transaction_run_drive_disposition classify_stop(
     const transaction_run_advance_result& step)
 {
-  if (step.external_resolution_required())
+  if (step.external_resolution_required() ||
+      retained_operation_requires_external_resolution(step))
     return transaction_run_drive_disposition::external_resolution_required;
   if (step.run().progress().complete())
     return transaction_run_drive_disposition::completed;

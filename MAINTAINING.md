@@ -98,9 +98,10 @@ new evidence must remain the same externally blocked record.
 Treat outer-lease loss as a cross-journal observation, not a retry signal. The
 effect journal can already be terminal while the transaction dispatch remains
 started because lease loss does not retire package truth. If that exact effect
-identity is not yet retained by the run journal, restart may retain it once. If
-it is already present in the dispatch observation list, return external
-resolution without submitting it again. Test the physical mechanism by
+identity is not yet retained by the run journal, restart may retain it once; the
+bounded drive must classify that newly durable non-retiring observation as an
+external-resolution stop immediately. If it is already present in the dispatch
+observation list, return external resolution without submitting it again. Test the physical mechanism by
 unlinking the real POSIX lock file; do not add a test-only lease-release method.
 A publication that became visible before lease loss remains visible state, but
 pkgctl still has no authority to call the operation completed automatically.
@@ -359,8 +360,11 @@ function only under an explicit positive caller bound. It must reload the
 committed head on every iteration, reconcile retained ownership before fresh
 work, and obtain dispatch nonces from a caller-owned replay-safe source keyed to
 the exact storage-derived head. The source must not be called for recovery,
-stopped or quiescent runs, or after any stopping outcome. Continued steps must
-remain in one journal and strictly advance durable head sequence. The layer must
+stopped or quiescent runs, or after any stopping outcome. A durable operation
+step that retains a result while leaving its dispatch started is already an
+external-resolution stopping outcome; stop on that same step rather than taking
+a non-durable rediscovery iteration. Continued steps must remain in one journal
+and strictly advance durable head sequence. The layer must
 not create workers, concurrency, adaptive priority, unbounded execution, retry
 or backoff timing, discovery, process adoption, rollback, cleanup, compaction,
 garbage collection, or a mutating command.

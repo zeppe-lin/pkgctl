@@ -69,8 +69,11 @@ private:
  * advance_transaction_run_once(). Retained ownership is reconciled before new
  * work. The nonce source is consulted only when that committed head can reserve
  * fresh work. The call stops on completion, terminal failure containment,
- * external-resolution authority, incomplete quiescence, or the step bound.
- * It creates no worker, concurrency, adaptive priority, retry timing, sleep,
+ * external-resolution authority, incomplete quiescence, or the step bound. A
+ * durable operation result that remains a started dispatch is itself an
+ * external-resolution stop; the drive does not consume another no-op iteration
+ * merely to rediscover that retained observation. It creates no worker,
+ * concurrency, adaptive priority, retry timing, sleep,
  * discovery, rollback, cleanup, compaction, or command action.
  */
 [[nodiscard]] transaction_run_drive_result drive_transaction_run(

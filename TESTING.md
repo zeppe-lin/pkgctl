@@ -319,8 +319,10 @@ the exact prior generation remains authoritative, reopen may publish the exact
 retained request once and complete. Neither path reacquires the incoming archive
 or reapplies the target. By contrast, once an indeterminate publication receipt
 is terminally retained, an unchanged prior generation does not license automatic
-republication: reopen must report `external-resolution-required` and leave the
-receipt, run head, archive count, and publication-call count unchanged. A durable
+republication: the bounded drive that retains that terminal indeterminate
+observation must report `external-resolution-required` immediately, and reopen
+must leave the receipt, run head, archive count, and publication-call count
+unchanged. A durable
 `before_lifecycle_intent` with no terminal process evidence has the same external
 resolution requirement. Its fixture constructs that exact committed recovery
 state directly rather than making a `libpkgexec` backend throw in violation of
@@ -334,8 +336,9 @@ mutation-lock file after a successful post-install lifecycle action, after the
 application has completed but before publication. The other unlinks it from a
 publication transaction after publishing the exact resulting snapshot. In both
 cases the effect journal must retain `outer_lease_lost`, the run dispatch must
-remain started with exactly one uncertainty observation, and the next drive
-must report `external-resolution-required` with no durable successor. Reopen
+remain started with exactly one uncertainty observation. The same bounded drive
+that retains that observation must report `external-resolution-required`; every
+later drive/reopen must report the same block with no durable successor. Reopen
 must preserve the same run head without another build/check/lifecycle call,
 archive acquisition, publication, or lock-file reacquisition. The first case
 keeps canonical state at the prior generation; the second deliberately leaves

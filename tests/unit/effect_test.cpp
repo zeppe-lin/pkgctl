@@ -4656,6 +4656,91 @@ void check_durable_operation_reconciliation()
     CHECK(blocked.effect_record.identity() == terminal.identity());
     CHECK(run_store.latest().identity() == durable_observation);
   }
+
+  {
+    removal_fixture value;
+    auto [reservation, reserved] = reserve_operation(value, 86U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
+    const auto started = pkgctl::commit_operation_dispatch_start(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(86U), effect_store, run_store);
+
+    driver actuator(
+        value.projection, value.outer_lease, value.receipt, value.store,
+        std::nullopt, lease_release_point::after_application);
+    const auto result = pkgctl::execute_effectful_operation_durable(
+        session, effect_nonce(86U), actuator, effect_store);
+    CHECK(result.outcome() ==
+          pkgctl::effectful_operation_outcome::outer_lease_lost);
+    const auto terminal = effect_store.latest();
+
+    fixed_effect_progress_source progress_source(started.run.progress());
+    operation_execution_authority_source execution_source(
+        session, effect_nonce(87U));
+    operation_recovery_authority_source recovery_source(
+        restart_checkpoint(session, terminal, result));
+    forbidden_dispatch_nonce_source nonces;
+    rejecting_effect_driver_source driver_source(trace);
+
+    const auto driven = pkgctl::drive_transaction_run(
+        started.run_record.journal(),
+        pkgctl::transaction_run_drive_policy::make(3U), nonces,
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, &driver_source},
+        {run_store, evidence_store, &effect_store});
+
+    CHECK(driven.disposition() ==
+          pkgctl::transaction_run_drive_disposition::
+              external_resolution_required);
+    CHECK(driven.external_resolution_required());
+    CHECK(!driven.terminal());
+    CHECK(driven.steps().size() == 1U);
+    CHECK(driven.durable_step_count() == 1U);
+    CHECK(driven.steps().front().disposition() ==
+          pkgctl::transaction_run_advance_disposition::reconciled_operation);
+    const auto* observation = driven.steps().front().operation();
+    CHECK(observation != nullptr);
+    if (observation != nullptr && observation->result)
+      CHECK(observation->result->outcome() ==
+            pkgctl::effectful_operation_outcome::outer_lease_lost);
+    CHECK(driven.record().sequence() == started.run_record.sequence() + 1U);
+    CHECK(driven.run().records().size() == 1U);
+    if (driven.run().records().size() == 1U) {
+      CHECK(driven.run().records().front().state() ==
+            pkgctl::transaction_dispatch_state::started);
+      CHECK(driven.run().records().front().observations().size() == 1U);
+    }
+    CHECK(nonces.calls() == 0U);
+    CHECK(recovery_source.calls() == 1U);
+    CHECK(driver_source.execution_calls() == 0U);
+    CHECK(driver_source.recovery_calls() == 0U);
+
+    const auto durable_observation = driven.record().identity();
+    const auto repeated = pkgctl::drive_transaction_run(
+        started.run_record.journal(),
+        pkgctl::transaction_run_drive_policy::make(3U), nonces,
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, &driver_source},
+        {run_store, evidence_store, &effect_store});
+    CHECK(repeated.disposition() ==
+          pkgctl::transaction_run_drive_disposition::
+              external_resolution_required);
+    CHECK(repeated.steps().size() == 1U);
+    CHECK(repeated.durable_step_count() == 0U);
+    CHECK(repeated.record().identity() == durable_observation);
+    CHECK(repeated.steps().front().disposition() ==
+          pkgctl::transaction_run_advance_disposition::
+              external_resolution_required);
+    CHECK(nonces.calls() == 0U);
+    CHECK(recovery_source.calls() == 2U);
+    CHECK(driver_source.execution_calls() == 0U);
+    CHECK(driver_source.recovery_calls() == 0U);
+  }
 }
 
 

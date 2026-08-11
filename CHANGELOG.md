@@ -90,15 +90,17 @@
   prior generation permits one execution of the retained publication request.
   A terminal indeterminate receipt with that prior state remains
   `external-resolution-required` and is never discarded to manufacture an
-  automatic retry. A lifecycle intent with no terminal process evidence likewise
+  automatic retry. The bounded drive now reports that block on the same durable
+  step that retains the non-retiring observation instead of misreporting a
+  coincident step-limit outcome. A lifecycle intent with no terminal process evidence likewise
   remains externally blocked across destroy/reopen, commits zero further durable
   steps, and performs no physical replay or archive reacquisition.
 - Qualifies POSIX outer-lease loss through the native runtime and fixes the
   run/effect restart join exposed by that test. A terminal `outer_lease_lost`
   effect is a non-retiring transaction observation: restart commits it once if
-  the run journal missed the observation, but an already-retained identical
-  observation now yields `external-resolution-required` instead of duplicate
-  submission. The matrix revokes the real anchored lock after post-install
+  the run journal missed the observation, and the bounded drive stops for
+  `external-resolution-required` on that same durable step. An already-retained
+  identical observation yields the same block instead of duplicate submission. The matrix revokes the real anchored lock after post-install
   lifecycle work and during successful publication, proving that target/state
   truth is preserved without replay or accidental completion.
 - Drives the same package transaction through the production

@@ -31,6 +31,10 @@ for required in \
   'quiescent_incomplete' \
   'step_limit_reached' \
   'transaction_run_drive_result' \
+  'retained_operation_requires_external_resolution' \
+  'transaction_dispatch_state::started' \
+  'operation->result->identity()' \
+  'record->observations()' \
   'drive_transaction_run' \
   'advance_transaction_run_once' \
   'policy.maximum_steps()' \
@@ -95,6 +99,8 @@ for required_test in \
   'std::vector<pkgctl::session_identity>(2U, admitted.identity())' \
   'nonces.calls() == 0U' \
   'forbidden_dispatch_nonce_source' \
+  'effectful_operation_outcome::outer_lease_lost' \
+  'durable_step_count() == 1U' \
   'external_resolution_required'; do
   grep -F "$required_test" "$construction_test" "$effect_test" >/dev/null || {
     echo "missing bounded transaction-drive test: $required_test" >&2
