@@ -69,8 +69,13 @@ state still names the prior generation. Those facts are terminal evidence, not
 implicit rollback instructions. Reopening the failed runtime must reproduce the
 same effect identity and progress from retained subordinate bodies without
 rerunning lifecycle/application work, reacquiring the archive, rolling back the
-target, or publishing state. This qualifies runtime wiring before another CLI
-option is allowed to become its first consumer.
+target, or publishing state. Non-terminal uncertainty crosses the same root but
+never masquerades as terminal failure: indeterminate publication retains the
+started dispatch until authoritative state either proves the requested generation
+already visible or permits retry of the exact retained request while the prior generation remains authoritative, while an interrupted lifecycle
+intent with no terminal process evidence stops as external-resolution-required
+and commits no further durable transition. This qualifies runtime wiring before
+another CLI option is allowed to become its first consumer.
 
 ## Release 0.35.0 bounded native command boundary
 

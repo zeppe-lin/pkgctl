@@ -310,6 +310,21 @@ its private `tmp/home` beneath that parent; no journal/dispatch intermediate
 directory may be required, and reopen must create no additional lifecycle
 scratch.
 
+`pkgctl:package-operation-uncertainty-matrix` qualifies non-terminal operation
+uncertainty through the same composition root. An indeterminate canonical
+publication must first remain a started operation with one retained uncertainty
+observation and no terminal progression. Destroy/reopen then resolves only from
+authoritative canonical state: if the requested resulting generation is already
+visible, reconciliation completes without a second publication; if the exact
+prior generation is still visible, the retained request is published exactly
+once more and then completes. Neither path reacquires the incoming archive or
+reapplies the target. A lifecycle backend interruption after the controller has
+durably committed `before_lifecycle_intent` is different: no process result
+exists to infer. Reopen must report `external-resolution-required`, append zero
+durable run/effect transitions, execute no lifecycle/application/publication
+driver, acquire no archive, and preserve the same started dispatch and effect
+record on repeated resume.
+
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the
 exact execution guarantees implied by the transaction's build, check, and

@@ -70,7 +70,22 @@ for evidence in \
   'application_failure.active_calls() == application_active_calls' \
   'publication_failure.publication_calls() == publication_calls' \
   'operations.archive_calls() == archive_calls' \
-  'check_native_runtime_operation_failure'; do
+  'check_native_runtime_operation_failure' \
+  'runtime_publication_uncertainty' \
+  'runtime_publication_uncertainty::resulting_visible' \
+  'runtime_publication_uncertainty::retry_from_prior' \
+  'indeterminate_canonical_store' \
+  'state_publication_backend_result::indeterminate' \
+  'pkgstate::state_publication_outcome::indeterminate' \
+  'pkgctl::transaction_run_drive_disposition::step_limit_reached' \
+  'pkgctl::transaction_run_advance_disposition::reconciled_operation' \
+  'expected_publication_calls' \
+  'pipeline_execution_fault::interrupt_pre_install_lifecycle' \
+  'pkgctl::effect_attempt_stage::before_lifecycle_intent' \
+  'pkgctl::transaction_run_drive_disposition::external_resolution_required' \
+  'unresolved.durable_step_count() == 0U' \
+  'check_native_runtime_publication_uncertainty' \
+  'check_native_runtime_lifecycle_intent_external_resolution'; do
   grep -F "$evidence" "$test_source" >/dev/null || {
     echo "package fault/restart matrix lacks evidence: $evidence" >&2
     exit 1
@@ -95,6 +110,15 @@ grep -F "args: ['--operation-failure-matrix']" "$test_meson" >/dev/null || {
   exit 1
 }
 
+grep -F "'package-operation-uncertainty-matrix'" "$test_meson" >/dev/null || {
+  echo 'package operation uncertainty matrix is not registered as an integration test' >&2
+  exit 1
+}
+grep -F "args: ['--operation-uncertainty-matrix']" "$test_meson" >/dev/null || {
+  echo 'package operation uncertainty matrix does not execute the shared vertical harness mode' >&2
+  exit 1
+}
+
 grep -F '"$tmp/package-pipeline-test" --failure-matrix' \
   "$srcdir/tests/run-direct.sh" >/dev/null || {
   echo 'direct compiler harness does not execute the package failure matrix' >&2
@@ -104,6 +128,12 @@ grep -F '"$tmp/package-pipeline-test" --failure-matrix' \
 grep -F '"$tmp/package-pipeline-test" --operation-failure-matrix' \
   "$srcdir/tests/run-direct.sh" >/dev/null || {
   echo 'direct compiler harness does not execute the package operation failure matrix' >&2
+  exit 1
+}
+
+grep -F '"$tmp/package-pipeline-test" --operation-uncertainty-matrix' \
+  "$srcdir/tests/run-direct.sh" >/dev/null || {
+  echo 'direct compiler harness does not execute the package operation uncertainty matrix' >&2
   exit 1
 }
 

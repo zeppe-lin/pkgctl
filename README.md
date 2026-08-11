@@ -57,8 +57,12 @@ reopens terminal application, pre/post-lifecycle, and publication failures witho
 retry, rollback, or republication. The latter cases preserve the exact physical
 truth: application/pre-lifecycle failure leaves the target unchanged, while
 post-lifecycle/publication failure may leave the application present with
-canonical state still at its prior generation. Only the external process actuator
-and the explicitly faulted owner protocol are replaced. This test composition
+canonical state still at its prior generation. A separate uncertainty matrix
+keeps indeterminate publication as active observation until authoritative state
+resolves it, qualifying both no-republish reconciliation and one exact retained
+request retry; an interrupted lifecycle intent remains externally blocked across
+reopen with zero durable advancement or physical replay. Only the external process
+actuator and the explicitly faulted owner protocol are replaced. This test composition
 does not make reconciliation a production `pkgctl` dependency.
 
 Release 0.33.0 supplies native fresh-operation and restart authority without

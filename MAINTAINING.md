@@ -79,6 +79,17 @@ caller-provisioned parent, and each admitted lifecycle scratch leaf must be a
 deterministic direct child of it. `libpkgapply-exec` owns creation and protection
 of that single-use leaf.
 
+Keep uncertainty distinct from definitive failure in the same runtime campaign.
+An indeterminate publication is a retained observation on a still-started
+dispatch: authoritative state may reconcile it without republishing when the
+result is already visible, or retry the exact retained request when the
+prior state is still current. The uncertainty matrix exercises one such retry
+that completes definitively. An interrupted lifecycle intent has no terminal
+subordinate evidence and therefore requires external resolution; reopening it
+must append no run/effect successor and must not acquire archive or physical
+execution authority. Repeated resume without new evidence must remain the same
+externally blocked record, not become retry policy.
+
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has
 reached the selected durable boundary. Restart must reopen retained
