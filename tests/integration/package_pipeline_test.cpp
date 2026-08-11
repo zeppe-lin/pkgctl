@@ -763,6 +763,12 @@ public:
     return delegate_.state_projection();
   }
 
+  const pkgapply::lease_bound_state_projection&
+  publication_state_projection() const noexcept override
+  {
+    return delegate_.publication_state_projection();
+  }
+
   pkgapply_exec::lifecycle_execution_result execute_lifecycle(
       const pkgapply_exec::admitted_lifecycle_session& session) override
   {

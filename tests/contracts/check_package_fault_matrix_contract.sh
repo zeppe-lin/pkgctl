@@ -32,6 +32,8 @@ for evidence in \
   'effect_store = pkgctl::posix_effect_journal_store::open(' \
   'reacquire_application_lease(' \
   'read_historical_application_state(' \
+  'publication_state_projection() const noexcept override' \
+  'return delegate_.publication_state_projection();' \
   'check_pipeline_build_failure' \
   'check_pipeline_check_failure' \
   'run.progress().failed()' \
