@@ -89,6 +89,18 @@ retains the same result identity, reconciliation must stop at external resolutio
 rather than submit a duplicate observation. This remains
 true when publication itself completed before the lease was discovered lost;
 canonical state visibility does not retroactively restore controller ownership.
+Target-lock contention is a different control state from lease loss. The POSIX
+provider remains nonblocking and owns the `lock_busy` mechanism fact; the native
+driver source translates only that fact into generic
+`transaction_effect_authority_unavailable`. Fresh contention occurs after the
+operation reservation is durable but before effect admission. The advancement
+releases that unstarted reservation, returns
+`mutation_authority_unavailable`, and records no effect result. Recovery
+contention cannot release a started dispatch: it returns the same disposition
+without a run/effect successor. Bounded driving stops on either form and never
+waits or retries inside the call. Other lease-provider errors remain mechanism
+errors. A later explicit drive is the caller's retry authority.
+
 This qualifies runtime wiring before another CLI option is allowed to become its
 first consumer.
 

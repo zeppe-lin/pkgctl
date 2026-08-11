@@ -48,7 +48,13 @@ for required in \
   'run advancement journal has no committed store head' \
   'run store returned foreign advancement authority' \
   'quiescent advancement carries dispatch or semantic evidence' \
-  'externally blocked advancement has malformed effect evidence'; do
+  'externally blocked advancement has malformed effect evidence' \
+  'transaction_effect_authority_unavailable' \
+  'mutation_authority_unavailable' \
+  'release_unstarted_dispatch' \
+  'mutation-authority block has malformed semantic evidence' \
+  'mutation-authority block has malformed dispatch state' \
+  'transaction_dispatch_state::released_unstarted'; do
   grep -F "$required" "$header" "$source" >/dev/null || {
     echo "missing one-step transaction-advancement contract: $required" >&2
     exit 1
@@ -118,6 +124,8 @@ for required_test in \
   'executed_operation' \
   'reconciled_operation' \
   'external_resolution_required' \
+  'mutation_authority_unavailable' \
+  'injected target mutation contention' \
   'evidence-construction' \
   'evidence-check' \
   'run-1' \

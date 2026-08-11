@@ -72,7 +72,14 @@ state publication. Lease loss is retained once as a non-retiring dispatch
 observation. The bounded drive that retains that observation reports external
 resolution immediately, and every later drive/reopen reports the same block
 instead of resubmitting the observation, reacquiring archive authority, or
-promoting a publication completed after ownership was lost. Only the external
+promoting a publication completed after ownership was lost. A complementary
+lease-contention matrix holds the same real POSIX exclusion domain from another
+controller. `lock_busy` is translated into the stable
+`mutation-authority-unavailable` control disposition rather than package/effect
+failure. Fresh contention releases the unstarted reservation and admits no
+effect attempt; recovery contention preserves the already-started run/effect
+heads with zero durable advancement. Neither call waits or retries. A later
+explicit drive may proceed after the competing holder releases. Only the external
 process actuator and the explicitly faulted owner protocol are replaced. This
 test composition does not make reconciliation a production `pkgctl` dependency.
 

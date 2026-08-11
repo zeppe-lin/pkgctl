@@ -100,6 +100,16 @@
   effect admission while the terminal lease-loss record is loaded separately
   from the effect journal. Fresh driving now expects one specification call and
   no replay; explicit reopen performs the retained semantic reconstruction.
+- Adds a native-runtime target-lease contention boundary. The concrete POSIX
+  source translates only nonblocking `lock_busy` into a generic
+  `mutation-authority-unavailable` controller disposition. Fresh contention
+  releases its unstarted reservation before returning and creates no effect
+  attempt; recovery contention leaves the started run/effect heads unchanged.
+  Bounded driving stops immediately in either case, performs no waiting or
+  implicit retry, and a later explicit drive may continue after the competing
+  holder releases. The package authority fixture now retains target observations
+  per admitted operation session so released reservations and later fresh
+  attempts do not share invented replay authority.
 - Qualifies POSIX outer-lease loss through the native runtime and fixes the
   run/effect restart join exposed by that test. A terminal `outer_lease_lost`
   effect is a non-retiring transaction observation: restart commits it once if

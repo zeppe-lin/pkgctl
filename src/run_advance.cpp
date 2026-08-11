@@ -298,8 +298,19 @@ transaction_run_advance_result reconcile_active(
           operation_reconciliation_requires_state_observer(*recovery) ||
           operation_reconciliation_requires_publication_driver(*recovery))
       {
-        acquired = acquire_recovery_drivers(
-            require_operation_driver_source(drivers), handoff);
+        try
+        {
+          acquired = acquire_recovery_drivers(
+              require_operation_driver_source(drivers), handoff);
+        }
+        catch (const transaction_effect_authority_unavailable&)
+        {
+          return detail_transaction_run_advance_access::make(
+              handoff.checkpoint().run(), handoff.checkpoint().record(),
+              transaction_run_advance_disposition::
+                  mutation_authority_unavailable,
+              handoff.dispatch(), std::monostate{});
+        }
       }
       auto value = reconcile_operation_dispatch_durable(
           handoff.checkpoint(), handoff.dispatch(), *recovery,
@@ -387,6 +398,20 @@ void validate_advance_result(
         invalid_advancement(
             "externally blocked advancement has malformed effect evidence");
       return;
+    case transaction_run_advance_disposition::mutation_authority_unavailable:
+    {
+      if (!dispatch || !empty)
+        invalid_advancement(
+            "mutation-authority block has malformed semantic evidence");
+      const auto* retained = run.record(dispatch->identity());
+      if (retained == nullptr ||
+          (retained->state() != transaction_dispatch_state::started &&
+           retained->state() !=
+               transaction_dispatch_state::released_unstarted))
+        invalid_advancement(
+            "mutation-authority block has malformed dispatch state");
+      return;
+    }
   }
   invalid_advancement("unknown transaction advancement disposition");
 }
@@ -439,8 +464,24 @@ transaction_run_advance_result execute_reserved(
       if (authority == nullptr)
         invalid_advancement(
             "operation execution handoff carries no effect authority");
-      auto acquired = acquire_execution_drivers(
-          require_operation_driver_source(drivers), handoff);
+      transaction_effect_execution_drivers acquired;
+      try
+      {
+        acquired = acquire_execution_drivers(
+            require_operation_driver_source(drivers), handoff);
+      }
+      catch (const transaction_effect_authority_unavailable&)
+      {
+        auto released = release_unstarted_dispatch(
+            handoff.run(), handoff.dispatch());
+        auto committed = commit_transaction_run_successor(
+            handoff.record(), std::move(released), stores.runs);
+        return detail_transaction_run_advance_access::make(
+            std::move(committed.run), std::move(committed.record),
+            transaction_run_advance_disposition::
+                mutation_authority_unavailable,
+            handoff.dispatch(), std::monostate{});
+      }
       auto value = execute_operation_dispatch_durable(
           handoff.record(), handoff.run(), handoff.dispatch(),
           authority->session, authority->nonce, *acquired.continuation,
@@ -581,6 +622,15 @@ transaction_run_advance_result::operation() const noexcept
 bool transaction_run_advance_result::durable_transition_committed()
     const noexcept
 {
+  if (disposition_ ==
+      transaction_run_advance_disposition::mutation_authority_unavailable)
+  {
+    if (!dispatch_)
+      return false;
+    const auto* retained = run_.record(dispatch_->identity());
+    return retained != nullptr &&
+        retained->state() == transaction_dispatch_state::released_unstarted;
+  }
   return disposition_ != transaction_run_advance_disposition::quiescent &&
       disposition_ !=
           transaction_run_advance_disposition::external_resolution_required;
@@ -591,6 +641,13 @@ bool transaction_run_advance_result::external_resolution_required()
 {
   return disposition_ ==
       transaction_run_advance_disposition::external_resolution_required;
+}
+
+bool transaction_run_advance_result::mutation_authority_unavailable()
+    const noexcept
+{
+  return disposition_ ==
+      transaction_run_advance_disposition::mutation_authority_unavailable;
 }
 
 transaction_run_advance_result advance_transaction_run_once(

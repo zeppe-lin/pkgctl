@@ -29,6 +29,8 @@ for required in \
   'acquire_recovery_drivers(' \
   'F_DUPFD_CLOEXEC' \
   'pkgapply::posix::target_mutation_lease::acquire' \
+  'transaction_effect_authority_unavailable' \
+  'target_mutation_lease_error_code::lock_busy' \
   'pkgstate::apply_adapter::read_application_state' \
   'pkgstate::apply_adapter::read_historical_application_state' \
   'native_transaction_effect_driver' \
@@ -75,9 +77,16 @@ continuation=$(sed -n \
   '/acquire_continuation(/,/^  }/p' "$source")
 ordered_tokens "$continuation" \
   'acquire_transaction_effect_archive' \
-  'target_mutation_lease::acquire' \
+  'acquire_target_lease' \
   'read_application_state' \
   'make_shared<continuation_runtime>'
+
+lease=$(sed -n \
+  '/^acquire_target_lease(/,/^}/p' "$source")
+ordered_tokens "$lease" \
+  'target_mutation_lease::acquire' \
+  'target_mutation_lease_error_code::lock_busy' \
+  'transaction_effect_authority_unavailable'
 
 execution=$(sed -n \
   '/acquire_execution_drivers(/,/^}/p' "$source")

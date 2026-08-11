@@ -25,6 +25,9 @@ for required in \
   'struct transaction_effect_execution_drivers final' \
   'struct transaction_effect_recovery_drivers final' \
   'class transaction_effect_driver_source' \
+  'class transaction_effect_authority_unavailable final' \
+  'Expected transient refusal to grant target mutation authority' \
+  'presently owned elsewhere' \
   'acquire_execution_drivers(' \
   'acquire_recovery_drivers(' \
   'transaction_effect_driver_source* operation;' \

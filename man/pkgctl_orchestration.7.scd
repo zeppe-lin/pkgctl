@@ -228,7 +228,12 @@ continuation driver and resulting-state observer retain one shared lease
 acquisition. Recovery receives the exact classifier-selected shape: the shared
 pair for continuation, a target-scoped observer for terminal success, a
 publication driver for publication reconciliation, or no authority for terminal
-failure and external resolution.
+failure and external resolution. Nonblocking lock contention is not an effect
+outcome. The POSIX source translates only *lock_busy* into the controller's
+*mutation-authority-unavailable* disposition. Fresh contention releases the
+unstarted reservation without admitting an effect attempt; recovery contention
+leaves existing run/effect ownership unchanged. No waiting or retry occurs inside
+the bounded drive.
 
 The source performs no path discovery, state-store initialization, backend or
 credential construction, archive enumeration, waiting, retry, scheduling,

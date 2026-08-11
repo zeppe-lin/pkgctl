@@ -3107,6 +3107,8 @@ public:
     return *latest_;
   }
 
+  std::size_t append_count() const noexcept { return append_count_; }
+
 private:
   std::vector<std::string>& trace_;
   std::size_t fail_on_append_;
@@ -3342,6 +3344,35 @@ public:
 
 private:
   std::vector<std::string>& trace_;
+  std::size_t execution_calls_ = 0U;
+  std::size_t recovery_calls_ = 0U;
+};
+
+class unavailable_effect_driver_source final
+    : public pkgctl::transaction_effect_driver_source {
+public:
+  pkgctl::transaction_effect_execution_drivers
+  acquire_execution_drivers(
+      const pkgctl::transaction_dispatch_execution_handoff&) override
+  {
+    ++execution_calls_;
+    throw pkgctl::transaction_effect_authority_unavailable(
+        "injected target mutation contention");
+  }
+
+  pkgctl::transaction_effect_recovery_drivers
+  acquire_recovery_drivers(
+      const pkgctl::transaction_dispatch_recovery_handoff&) override
+  {
+    ++recovery_calls_;
+    throw pkgctl::transaction_effect_authority_unavailable(
+        "injected target mutation contention");
+  }
+
+  std::size_t execution_calls() const noexcept { return execution_calls_; }
+  std::size_t recovery_calls() const noexcept { return recovery_calls_; }
+
+private:
   std::size_t execution_calls_ = 0U;
   std::size_t recovery_calls_ = 0U;
 };
@@ -5119,6 +5150,121 @@ void check_single_step_operation_advancement()
     CHECK(driver_source.recovery_calls() == 0U);
     CHECK(trace == trace_before);
     CHECK(actuator.trace().empty());
+  }
+  {
+    removal_fixture value;
+    auto [run, admitted] = make_admitted(value, 110U);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    fixed_effect_progress_source progress_source(run.progress());
+    operation_execution_authority_source execution_source(
+        session, effect_nonce(110U));
+    unreachable_effect_recovery_source recovery_source;
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(admitted, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
+    unavailable_effect_driver_source driver_source;
+
+    const auto unavailable = pkgctl::advance_transaction_run_once(
+        admitted.journal(), dispatch_nonce(110U),
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, &driver_source},
+        {run_store, evidence_store, &effect_store});
+
+    CHECK(unavailable.disposition() ==
+          pkgctl::transaction_run_advance_disposition::
+              mutation_authority_unavailable);
+    CHECK(unavailable.mutation_authority_unavailable());
+    CHECK(unavailable.durable_transition_committed());
+    CHECK(!unavailable.external_resolution_required());
+    CHECK(unavailable.dispatch().has_value());
+    CHECK(unavailable.operation() == nullptr);
+    CHECK(unavailable.record().sequence() == admitted.sequence() + 2U);
+    CHECK(unavailable.record().identity() == run_store.latest().identity());
+    CHECK(unavailable.run().active_count(
+              pkgctl::transaction_unit_kind::operation) == 0U);
+    if (unavailable.dispatch()) {
+      const auto* retained = unavailable.run().record(
+          unavailable.dispatch()->identity());
+      CHECK(retained != nullptr);
+      if (retained != nullptr)
+        CHECK(retained->state() ==
+              pkgctl::transaction_dispatch_state::released_unstarted);
+    }
+    CHECK(effect_store.append_count() == 0U);
+    CHECK(execution_source.calls() == 1U);
+    CHECK(driver_source.execution_calls() == 1U);
+    CHECK(driver_source.recovery_calls() == 0U);
+  }
+
+  {
+    removal_fixture value;
+    auto [run, admitted] = make_admitted(value, 111U);
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(111U));
+    CHECK(reservation.dispatch.has_value());
+    if (!reservation.dispatch)
+      throw std::runtime_error("operation contention fixture did not reserve");
+    auto reserved = admitted.successor(reservation.run);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    std::vector<std::string> trace;
+    sequenced_effect_store effect_store(trace);
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
+    const auto started = pkgctl::commit_operation_dispatch_start(
+        reserved, reservation.run, *reservation.dispatch, session,
+        effect_nonce(111U), effect_store, run_store);
+    const auto effect_head = effect_store.latest();
+
+    fixed_effect_progress_source progress_source(started.run.progress());
+    operation_execution_authority_source execution_source(
+        session, effect_nonce(112U));
+    operation_recovery_authority_source recovery_source(
+        pkgctl::effect_restart_checkpoint::make(
+            session, effect_head, {}, std::nullopt, {},
+            std::nullopt, std::nullopt));
+    unavailable_effect_driver_source driver_source;
+
+    const auto unavailable = pkgctl::advance_transaction_run_once(
+        started.run_record.journal(), dispatch_nonce(112U),
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, &driver_source},
+        {run_store, evidence_store, &effect_store});
+
+    CHECK(unavailable.disposition() ==
+          pkgctl::transaction_run_advance_disposition::
+              mutation_authority_unavailable);
+    CHECK(unavailable.mutation_authority_unavailable());
+    CHECK(!unavailable.durable_transition_committed());
+    CHECK(!unavailable.external_resolution_required());
+    CHECK(unavailable.record().identity() == started.run_record.identity());
+    CHECK(unavailable.operation() == nullptr);
+    CHECK(effect_store.latest().identity() == effect_head.identity());
+    CHECK(execution_source.calls() == 0U);
+    CHECK(recovery_source.calls() == 1U);
+    CHECK(driver_source.execution_calls() == 0U);
+    CHECK(driver_source.recovery_calls() == 1U);
+
+    forbidden_dispatch_nonce_source nonces;
+    const auto driven = pkgctl::drive_transaction_run(
+        started.run_record.journal(),
+        pkgctl::transaction_run_drive_policy::make(3U), nonces,
+        {progress_source, execution_source, recovery_source},
+        {nullptr, nullptr, &driver_source},
+        {run_store, evidence_store, &effect_store});
+    CHECK(driven.disposition() ==
+          pkgctl::transaction_run_drive_disposition::
+              mutation_authority_unavailable);
+    CHECK(driven.mutation_authority_unavailable());
+    CHECK(!driven.external_resolution_required());
+    CHECK(!driven.terminal());
+    CHECK(driven.steps().size() == 1U);
+    CHECK(driven.durable_step_count() == 0U);
+    CHECK(driven.record().identity() == started.run_record.identity());
+    CHECK(nonces.calls() == 0U);
+    CHECK(recovery_source.calls() == 2U);
+    CHECK(driver_source.recovery_calls() == 2U);
   }
 }
 

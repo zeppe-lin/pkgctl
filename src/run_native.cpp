@@ -88,6 +88,25 @@ int duplicate_lock_directory(int directory_fd)
   return duplicate;
 }
 
+std::unique_ptr<pkgapply::posix::target_mutation_lease>
+acquire_target_lease(
+    const pkgapply::application_target_context& target,
+    int lock_directory_fd)
+{
+  try
+  {
+    return pkgapply::posix::target_mutation_lease::acquire(
+        target, lock_directory_fd);
+  }
+  catch (const pkgapply::posix::target_mutation_lease_error& problem)
+  {
+    if (problem.code() ==
+        pkgapply::posix::target_mutation_lease_error_code::lock_busy)
+      throw transaction_effect_authority_unavailable(problem.what());
+    throw;
+  }
+}
+
 struct observation_runtime final {
   observation_runtime(
       std::unique_ptr<pkgapply::posix::target_mutation_lease> value,
@@ -341,8 +360,7 @@ public:
   {
     const auto& request = session.request().application();
     auto archive = acquire_transaction_effect_archive(archives_, request);
-    auto lease = pkgapply::posix::target_mutation_lease::acquire(
-        request.target(), lock_directory_fd_);
+    auto lease = acquire_target_lease(request.target(), lock_directory_fd_);
     auto state = pkgstate::apply_adapter::read_application_state(
         request, *lease, state_store_);
     std::optional<pkgstate::apply_adapter::lease_bound_application_state>
@@ -367,7 +385,7 @@ public:
   std::shared_ptr<observation_runtime> acquire_observation(
       const effectful_operation_session& session)
   {
-    auto lease = pkgapply::posix::target_mutation_lease::acquire(
+    auto lease = acquire_target_lease(
         session.request().application().target(), lock_directory_fd_);
     return std::make_shared<observation_runtime>(
         std::move(lease), state_store_);

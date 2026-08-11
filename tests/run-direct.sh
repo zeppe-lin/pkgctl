@@ -56,6 +56,7 @@ done
 "$tmp/package-pipeline-test" --operation-failure-matrix
 "$tmp/package-pipeline-test" --operation-uncertainty-matrix
 "$tmp/package-pipeline-test" --operation-lease-loss-matrix
+"$tmp/package-pipeline-test" --operation-lease-contention-matrix
 
 for fixture in state_fixture state_inspect_fixture run_store_fixture effect_store_fixture; do
   name=$(printf '%s\n' "${fixture%_fixture}" | tr '_' '-')

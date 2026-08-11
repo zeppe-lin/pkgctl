@@ -1694,6 +1694,8 @@ template<typename Destination, typename Source>
       return "quiescent-incomplete";
     case transaction_run_drive_disposition::step_limit_reached:
       return "step-limit-reached";
+    case transaction_run_drive_disposition::mutation_authority_unavailable:
+      return "mutation-authority-unavailable";
   }
   return "unknown";
 }
@@ -1905,6 +1907,7 @@ void render_run_result(
     case transaction_run_drive_disposition::stopped_after_failure:
     case transaction_run_drive_disposition::external_resolution_required:
     case transaction_run_drive_disposition::quiescent_incomplete:
+    case transaction_run_drive_disposition::mutation_authority_unavailable:
       return EXIT_FAILURE;
   }
   return EXIT_FAILURE;

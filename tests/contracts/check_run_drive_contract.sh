@@ -30,6 +30,7 @@ for required in \
   'external_resolution_required' \
   'quiescent_incomplete' \
   'step_limit_reached' \
+  'mutation_authority_unavailable' \
   'transaction_run_drive_result' \
   'retained_operation_requires_external_resolution' \
   'transaction_dispatch_state::started' \
@@ -101,7 +102,8 @@ for required_test in \
   'forbidden_dispatch_nonce_source' \
   'effectful_operation_outcome::outer_lease_lost' \
   'durable_step_count() == 1U' \
-  'external_resolution_required'; do
+  'external_resolution_required' \
+  'mutation_authority_unavailable'; do
   grep -F "$required_test" "$construction_test" "$effect_test" >/dev/null || {
     echo "missing bounded transaction-drive test: $required_test" >&2
     exit 1

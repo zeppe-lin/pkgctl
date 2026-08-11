@@ -35,6 +35,7 @@ enum class transaction_run_drive_disposition : std::uint8_t {
   external_resolution_required = 3,
   quiescent_incomplete = 4,
   step_limit_reached = 5,
+  mutation_authority_unavailable = 6,
 };
 
 /*! \brief Exact ordered outcomes observed by one bounded drive call. */
@@ -49,6 +50,7 @@ public:
   [[nodiscard]] std::size_t durable_step_count() const noexcept;
   [[nodiscard]] bool terminal() const noexcept;
   [[nodiscard]] bool external_resolution_required() const noexcept;
+  [[nodiscard]] bool mutation_authority_unavailable() const noexcept;
 
 private:
   friend struct detail_transaction_run_drive_access;
@@ -69,7 +71,8 @@ private:
  * advance_transaction_run_once(). Retained ownership is reconciled before new
  * work. The nonce source is consulted only when that committed head can reserve
  * fresh work. The call stops on completion, terminal failure containment,
- * external-resolution authority, incomplete quiescence, or the step bound. A
+ * external-resolution authority, transient target-mutation contention,
+ * incomplete quiescence, or the step bound. A
  * durable operation result that remains a started dispatch is itself an
  * external-resolution stop; the drive does not consume another no-op iteration
  * merely to rediscover that retained observation. It creates no worker,

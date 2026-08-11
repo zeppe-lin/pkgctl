@@ -351,6 +351,19 @@ reacquisition. The first case keeps canonical state at the prior generation;
 the second deliberately leaves the resulting generation visible and still
 forbids automatic completion.
 
+`pkgctl:package-operation-lease-contention-matrix` qualifies the complementary
+nonblocking control-plane case with the real POSIX lock mechanism. One case holds
+the exclusion domain before fresh physical mutation authority can be acquired. The
+bounded drive must return `mutation-authority-unavailable`, release the
+unstarted reservation, retain no effect attempt, leave target/canonical state
+unchanged, and perform no waiting or same-call retry. The second case first
+commits an admitted effect attempt, then acquires the competing lease before
+reopen. Recovery must return the same disposition with zero durable run/effect
+advancement and the identical effect head. Releasing the competing holder and
+issuing a later explicit drive must complete the operation normally. The matrix
+also proves only POSIX `lock_busy` is classified this way; the lower native-source
+unit contract keeps other lease-mechanism failures exceptional.
+
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the
 exact execution guarantees implied by the transaction's build, check, and

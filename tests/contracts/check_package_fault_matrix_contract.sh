@@ -107,7 +107,20 @@ for evidence in \
   'operations.replay_calls() == replay_calls + 1U' \
   'target_lock_count(application.lock_root) == 0U' \
   'record->observations().size() == 1U' \
-  'check_native_runtime_outer_lease_loss'; do
+  'check_native_runtime_outer_lease_loss' \
+  'check_native_runtime_fresh_lease_contention' \
+  'check_native_runtime_recovery_lease_contention' \
+  'pkgctl::transaction_run_drive_disposition::' \
+  'mutation_authority_unavailable' \
+  'pkgctl::transaction_dispatch_state::released_unstarted' \
+  'pkgapply::posix::target_mutation_lease::acquire' \
+  'fs::is_empty(application.effect_journal_root)' \
+  'blocked.drive().durable_step_count() == 4U' \
+  'blocked.durable_step_count() == 0U' \
+  'operations.retain_calls() == 2U' \
+  'operations.replay_calls() == replay_calls + 2U' \
+  'operations.archive_calls() == archive_calls + 2U' \
+  'holder.reset()'; do
   grep -F "$evidence" "$test_source" >/dev/null || {
     echo "package fault/restart matrix lacks evidence: $evidence" >&2
     exit 1
@@ -150,6 +163,15 @@ grep -F "args: ['--operation-lease-loss-matrix']" "$test_meson" >/dev/null || {
   exit 1
 }
 
+grep -F "'package-operation-lease-contention-matrix'" "$test_meson" >/dev/null || {
+  echo 'package operation lease-contention matrix is not registered as an integration test' >&2
+  exit 1
+}
+grep -F "args: ['--operation-lease-contention-matrix']" "$test_meson" >/dev/null || {
+  echo 'package operation lease-contention matrix does not execute the shared vertical harness mode' >&2
+  exit 1
+}
+
 grep -F '"$tmp/package-pipeline-test" --failure-matrix' \
   "$srcdir/tests/run-direct.sh" >/dev/null || {
   echo 'direct compiler harness does not execute the package failure matrix' >&2
@@ -171,6 +193,12 @@ grep -F '"$tmp/package-pipeline-test" --operation-uncertainty-matrix' \
 grep -F '"$tmp/package-pipeline-test" --operation-lease-loss-matrix' \
   "$srcdir/tests/run-direct.sh" >/dev/null || {
   echo 'direct compiler harness does not execute the package operation lease-loss matrix' >&2
+  exit 1
+}
+
+grep -F '"$tmp/package-pipeline-test" --operation-lease-contention-matrix' \
+  "$srcdir/tests/run-direct.sh" >/dev/null || {
+  echo 'direct compiler harness does not execute the package operation lease-contention matrix' >&2
   exit 1
 }
 

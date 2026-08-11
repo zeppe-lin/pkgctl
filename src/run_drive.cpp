@@ -49,6 +49,8 @@ bool retained_operation_requires_external_resolution(
 transaction_run_drive_disposition classify_stop(
     const transaction_run_advance_result& step)
 {
+  if (step.mutation_authority_unavailable())
+    return transaction_run_drive_disposition::mutation_authority_unavailable;
   if (step.external_resolution_required() ||
       retained_operation_requires_external_resolution(step))
     return transaction_run_drive_disposition::external_resolution_required;
@@ -180,6 +182,13 @@ bool transaction_run_drive_result::external_resolution_required()
 {
   return disposition_ ==
       transaction_run_drive_disposition::external_resolution_required;
+}
+
+bool transaction_run_drive_result::mutation_authority_unavailable()
+    const noexcept
+{
+  return disposition_ ==
+      transaction_run_drive_disposition::mutation_authority_unavailable;
 }
 
 transaction_run_drive_result drive_transaction_run(

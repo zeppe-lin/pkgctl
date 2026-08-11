@@ -113,6 +113,16 @@ method. A publication that became visible before lease loss remains visible
 state, but pkgctl still has no authority to call the operation completed
 automatically.
 
+Treat target-lock contention separately from both outer-lease loss and external
+resolution. `libpkgapply-posix` owns the nonblocking `lock_busy` fact; only the
+native physical source may translate that expected mechanism result into
+`transaction_effect_authority_unavailable`. Fresh contention must release the
+unstarted reservation before returning `mutation_authority_unavailable` and
+must not fabricate an effect attempt. Recovery contention must preserve the
+started dispatch and exact effect head and commit no successor. Do not catch
+other lease errors as contention, and do not add sleep, waiting, backoff, or an
+implicit retry loop. Retry authority belongs to a later explicit drive call.
+
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has
 reached the selected durable boundary. Restart must reopen retained

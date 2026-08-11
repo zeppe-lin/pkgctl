@@ -52,7 +52,9 @@ for required in \
   'runtime_path(command, "effect-bodies")' \
   'exact transaction run is already admitted; use --resume' \
   'exact transaction run is not admitted; use --start' \
-  'retained command universe recomposes another transaction'; do
+  'retained command universe recomposes another transaction' \
+  'mutation-authority-unavailable' \
+  'transaction_run_drive_disposition::mutation_authority_unavailable'; do
   grep -F -- "$required" "$srcdir/cli/options.h" "$options" "$command" \
       >/dev/null || {
     echo "missing bounded transaction command contract: $required" >&2

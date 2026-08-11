@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <variant>
 
 #include <pkgctl/run_authority.h>
@@ -56,6 +57,18 @@ struct transaction_effect_recovery_drivers final {
   transaction_effect_body_sink* bodies = nullptr;
 };
 
+/*! \brief Expected transient refusal to grant target mutation authority.
+ *
+ * Driver sources use this control signal only when the exact requested
+ * physical authority is presently owned elsewhere. It is not package failure,
+ * effect evidence, or permission to wait or retry inside the controller.
+ */
+class transaction_effect_authority_unavailable final
+    : public std::runtime_error {
+public:
+  using std::runtime_error::runtime_error;
+};
+
 /*! \brief Caller-owned source of exact per-dispatch physical authority.
  *
  * A transaction may contain several operation dispatches. Each dispatch can
@@ -69,10 +82,22 @@ class transaction_effect_driver_source {
 public:
   virtual ~transaction_effect_driver_source() = default;
 
+  /*! \brief Acquire exact physical authority for fresh execution.
+   *
+   * Implementations may throw `transaction_effect_authority_unavailable`
+   * when the requested target-mutation authority is presently owned
+   * elsewhere. The caller treats that as transient control-plane blocking,
+   * not effect evidence or package failure.
+   */
   [[nodiscard]] virtual transaction_effect_execution_drivers
   acquire_execution_drivers(
       const transaction_dispatch_execution_handoff& handoff) = 0;
 
+  /*! \brief Acquire exact physical authority for retained-effect recovery.
+   *
+   * Implementations may throw `transaction_effect_authority_unavailable`
+   * under the same narrow contention condition as fresh acquisition.
+   */
   [[nodiscard]] virtual transaction_effect_recovery_drivers
   acquire_recovery_drivers(
       const transaction_dispatch_recovery_handoff& handoff) = 0;
@@ -103,6 +128,7 @@ enum class transaction_run_advance_disposition : std::uint8_t {
   executed_construction = 7,
   executed_check = 8,
   executed_operation = 9,
+  mutation_authority_unavailable = 10,
 };
 
 /*! \brief Operation evidence returned by fresh execution or restart repair.
@@ -142,6 +168,7 @@ public:
   operation() const noexcept;
   [[nodiscard]] bool durable_transition_committed() const noexcept;
   [[nodiscard]] bool external_resolution_required() const noexcept;
+  [[nodiscard]] bool mutation_authority_unavailable() const noexcept;
 
 private:
   friend struct detail_transaction_run_advance_access;
