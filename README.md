@@ -68,9 +68,13 @@ the current operation, while fixed transaction/lifecycle configuration supplies
 coordinates and credentials. The existing effect boundary validates the order
 against the exact lifecycle-node set attached by transaction phase edges; graph
 storage order is not treated as execution precedence. The native source prepares
-through the existing owner boundaries, admits deterministic lifecycle sessions
-beneath stable journal and dispatch coordinates, and issues a mechanical attempt
-nonce for one exact reserved head.
+through the existing owner boundaries and admits each deterministic lifecycle
+scratch session as a direct child of the caller-provisioned session root. The
+child identity is keyed by the stable journal, dispatch, lifecycle phase, and
+phase index, so the operation-authority boundary performs no filesystem
+materialization while `libpkgapply-exec` still receives the pre-existing parent
+it requires. The source then issues a mechanical attempt nonce for one exact
+reserved head.
 
 Restart reconstructs the same session, selects the exact run-retained latest
 effect record, and asks a caller-owned body source for semantic values the

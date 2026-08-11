@@ -96,9 +96,13 @@ Fresh authority consumes the exact current progress and predecessor
 construction and uses the existing preparation boundary. The effect boundary
 validates that the supplied lifecycle order contains exactly the nodes attached
 to the action by transaction phase edges; deterministic graph storage does not
-become execution precedence. The source then admits deterministic lifecycle
-sessions beneath the stable run-journal and dispatch identities. It issues one domain-separated mechanical effect-attempt
-nonce for the exact durable head. Restart reconstructs the same session, loads
+become execution precedence. The source then admits each deterministic lifecycle
+scratch session as one direct child of the caller-provisioned session root. The
+child identity is domain-separated by stable run journal, dispatch, lifecycle
+phase, and phase index; the source creates no directories, while
+*libpkgapply-exec* creates and protects the single-use leaf. It issues one
+domain-separated mechanical effect-attempt nonce for the exact durable head.
+Restart reconstructs the same session, loads
 the exact active effect record, obtains subordinate semantic bodies from their
 owner, and invokes the canonical effect checkpoint validator.
 

@@ -29,6 +29,9 @@ for required in \
   'specifications_.operation' \
   'specification.lifecycle()' \
   'if (order.empty())' \
+  'pkgctl/native-lifecycle-session-root/1' \
+  'record.journal().hex()' \
+  'dispatch.identity().hex()' \
   'native_operation_preparation_driver' \
   'effect_restart_checkpoint::make' \
   'effects_.load_latest' \
@@ -53,6 +56,8 @@ for required_test in \
   'fresh.session.identity() == repeated.session.identity()' \
   'recording_operation_session_sink' \
   'sessions.calls() == 2U' \
+  'lifecycle_session_parent' \
+  'admitted_lifecycle.paths().session_root.parent_path()' \
   '!std::filesystem::exists(authority_root)' \
   'effect_attempt_missing' \
   'planning_refused' \

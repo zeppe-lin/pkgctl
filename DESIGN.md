@@ -215,8 +215,11 @@ is not execution precedence. Executable lifecycle nodes come only from
 `libpkgapply-exec`. When both exact lifecycle phase sets are empty, operation
 authority derives no lifecycle nodes and requires no lifecycle-executor binding
 from the application target. A non-empty phase set enters `libpkgapply-exec` and
-therefore retains its strict target-selected executor binding. Paths are
-deterministic children of the stable run journal and dispatch identities, so
+therefore retains its strict target-selected executor binding. Each lifecycle
+scratch path is one deterministic direct child of the caller-provisioned session
+root. Its child identity is domain-separated by stable run journal, dispatch,
+phase, and phase index. This preserves the no-I/O operation-authority boundary
+and satisfies `libpkgapply-exec`'s contract that the leaf parent already exists;
 fresh and restarted acquisition reproduce one session without touching the
 filesystem.
 

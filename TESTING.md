@@ -303,7 +303,12 @@ mutated while canonical state remains at the prior generation. Each case destroy
 and reconstructs the native runtime over the same journals; reopen must reproduce
 the same stopped progress and terminal effect, load retained subordinate bodies,
 and perform no additional construction, check, lifecycle actuation, application,
-archive acquisition, rollback, or state publication.
+archive acquisition, rollback, or state publication. The fixture provisions the
+configured lifecycle-session parent exactly as the CLI runtime layout does. Every
+executed lifecycle session must then appear as one single-use direct child with
+its private `tmp/home` beneath that parent; no journal/dispatch intermediate
+directory may be required, and reopen must create no additional lifecycle
+scratch.
 
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the

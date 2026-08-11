@@ -2769,6 +2769,20 @@ void check_native_runtime_operation_failure(
     state_store = &publication_failure;
 
   const fs::path authority_root = root / "runtime-authority";
+  const fs::path lifecycle_sessions = authority_root / "lifecycle-sessions";
+  if (with_lifecycle)
+    fs::create_directories(lifecycle_sessions);
+  const auto lifecycle_session_count = [&]() {
+    std::size_t count = 0U;
+    if (!fs::exists(lifecycle_sessions))
+      return count;
+    for (const auto& entry : fs::directory_iterator(lifecycle_sessions)) {
+      ++count;
+      CHECK(fs::is_directory(entry.path()));
+      CHECK(fs::is_directory(entry.path() / "tmp/home"));
+    }
+    return count;
+  };
   const auto sessions = configuration(authority_root / "construction");
   const auto lifecycle_identity = pkgapply_exec::lifecycle_execution_identity{
       pkgexec::interpreter_identity::from_sha256(std::string(64U, 'e')),
@@ -2780,8 +2794,7 @@ void check_native_runtime_operation_failure(
         pkgctl::native_transaction_operation_configuration::make(
             transaction,
             {sessions.roots().root_view, sessions.roots().root_view_path,
-             application.target_root, authority_root / "lifecycle-sessions",
-             lifecycle_identity});
+             application.target_root, lifecycle_sessions, lifecycle_identity});
     return pkgctl::native_transaction_run_runtime_configuration::make(
         transaction, sessions, std::move(operation_configuration), {});
   };
@@ -2946,6 +2959,13 @@ void check_native_runtime_operation_failure(
     CHECK(publication_failure.publication_calls() == 1U);
   }
 
+  std::size_t expected_lifecycle_sessions = 0U;
+  if (failure == runtime_operation_failure::pre_install_lifecycle)
+    expected_lifecycle_sessions = 1U;
+  else if (failure == runtime_operation_failure::post_install_lifecycle)
+    expected_lifecycle_sessions = 2U;
+  CHECK(lifecycle_session_count() == expected_lifecycle_sessions);
+
   const auto journal = launched.record().journal();
   const auto failed_record = launched.record().identity();
   const auto failed_progress = launched.run().progress().identity();
@@ -2993,6 +3013,7 @@ void check_native_runtime_operation_failure(
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == archive_calls);
   CHECK(effect_bodies.load_count() >= 1U);
+  CHECK(lifecycle_session_count() == expected_lifecycle_sessions);
   CHECK(state_store->read().identity() == initial_state.identity());
   CHECK(store.read().identity() == initial_state.identity());
   CHECK(fs::is_regular_file(application.target_root / "usr/bin/tool") ==

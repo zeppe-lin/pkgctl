@@ -5342,6 +5342,16 @@ void check_native_operation_authority_source()
   CHECK(fresh.session.request().identity() == effect_request(value).identity());
   CHECK(fresh.session.before().size() == value.before.size());
   CHECK(fresh.session.after().size() == value.after.size());
+  const auto lifecycle_session_parent = authority_root / "sessions";
+  for (const auto& admitted_lifecycle : fresh.session.before())
+    CHECK(admitted_lifecycle.paths().session_root.parent_path() ==
+          lifecycle_session_parent);
+  for (const auto& admitted_lifecycle : fresh.session.after())
+    CHECK(admitted_lifecycle.paths().session_root.parent_path() ==
+          lifecycle_session_parent);
+  if (!fresh.session.before().empty() && !fresh.session.after().empty())
+    CHECK(fresh.session.before().front().paths().session_root !=
+          fresh.session.after().front().paths().session_root);
   CHECK(!std::filesystem::exists(authority_root));
 
   const auto started = pkgctl::start_operation_dispatch(

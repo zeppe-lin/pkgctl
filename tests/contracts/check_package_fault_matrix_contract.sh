@@ -64,6 +64,9 @@ for evidence in \
   'state_publication_not_completed' \
   'effect_bodies.lifecycle_count() == 1U' \
   'effect_bodies.lifecycle_count() == 2U' \
+  'fs::create_directories(lifecycle_sessions)' \
+  'fs::is_directory(entry.path() / "tmp/home")' \
+  'lifecycle_session_count() == expected_lifecycle_sessions' \
   'application_failure.active_calls() == application_active_calls' \
   'publication_failure.publication_calls() == publication_calls' \
   'operations.archive_calls() == archive_calls' \

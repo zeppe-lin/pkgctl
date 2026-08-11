@@ -73,7 +73,11 @@ unchanged, whereas post-lifecycle or publication failure may leave a completed
 application on the target while canonical state remains at its previous
 generation. The same terminal effect identity and retained subordinate bodies
 must rehydrate without another actuator, archive acquisition, application, or
-publication call.
+publication call. Lifecycle session coordinates are not an excuse to move POSIX
+preparation into operation authority: the configured session root is the
+caller-provisioned parent, and each admitted lifecycle scratch leaf must be a
+deterministic direct child of it. `libpkgapply-exec` owns creation and protection
+of that single-use leaf.
 
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has

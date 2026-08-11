@@ -95,6 +95,11 @@
   operations. Native operation admission does not invoke `libpkgapply-exec` when
   the transaction's exact before/after lifecycle order is empty; non-empty
   lifecycle orders retain the existing target-bound executor validation.
+- Binds every executable lifecycle scratch session as one deterministic direct
+  child of the caller-provisioned lifecycle-session root. The child identity is
+  domain-separated by run journal, dispatch, phase, and index, so
+  `libpkgapply-exec` can materialize its single-use leaf without requiring
+  unowned intermediate directories or filesystem mutation in operation authority.
 
 ### Dependency contract
 
