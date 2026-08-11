@@ -287,6 +287,21 @@ authority, effect bodies, target mutation, or canonical publication. These are
 transaction progression and durable runtime assertions, not frontend exit-code
 tests.
 
+`pkgctl:package-operation-failure-matrix` carries definitive operation failures
+through that same native composition root. Faults are injected only at the
+subordinate owner protocol that can produce them: a failed `libpkgapply` backend
+operation, failed pre-install or post-install `libpkgexec` lifecycle actuation,
+or a `libpkgstate` publication transaction that fails before publication. The
+controller must retain the exact terminal effect outcome and block later work
+without manufacturing rollback authority. Application and pre-install lifecycle
+failure leave the target unchanged. Post-install lifecycle and publication
+failure retain completed application evidence and may therefore leave the target
+mutated while canonical state remains at the prior generation. Each case destroys
+and reconstructs the native runtime over the same journals; reopen must reproduce
+the same stopped progress and terminal effect, load retained subordinate bodies,
+and perform no additional construction, check, lifecycle actuation, application,
+archive acquisition, rollback, or state publication.
+
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the
 exact execution guarantees implied by the transaction's build, check, and

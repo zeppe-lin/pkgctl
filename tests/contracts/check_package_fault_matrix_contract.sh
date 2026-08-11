@@ -46,7 +46,26 @@ for evidence in \
   'reopened.record().identity() == failed_record' \
   'pkgctl::transaction_run_advance_disposition::quiescent' \
   'run.progress().failed()' \
-  'transaction_node_status::blocked'; do
+  'transaction_node_status::blocked' \
+  'runtime_operation_failure' \
+  'runtime_operation_failure::application' \
+  'runtime_operation_failure::pre_install_lifecycle' \
+  'runtime_operation_failure::post_install_lifecycle' \
+  'runtime_operation_failure::publication' \
+  'faulting_application_backend' \
+  'pkgapply::backend_operation_outcome::failed' \
+  'failing_canonical_store' \
+  'failed_before_publication()' \
+  'pkgctl::effectful_operation_outcome::application_not_completed' \
+  'lifecycle_failed_before_application' \
+  'lifecycle_failed_after_application' \
+  'state_publication_not_completed' \
+  'effect_bodies.lifecycle_count() == 1U' \
+  'effect_bodies.lifecycle_count() == 2U' \
+  'application_failure.active_calls() == application_active_calls' \
+  'publication_failure.publication_calls() == publication_calls' \
+  'operations.archive_calls() == archive_calls' \
+  'check_native_runtime_operation_failure'; do
   grep -F "$evidence" "$test_source" >/dev/null || {
     echo "package fault/restart matrix lacks evidence: $evidence" >&2
     exit 1
@@ -62,9 +81,24 @@ grep -F "args: ['--failure-matrix']" "$test_meson" >/dev/null || {
   exit 1
 }
 
+grep -F "'package-operation-failure-matrix'" "$test_meson" >/dev/null || {
+  echo 'package operation failure matrix is not registered as an integration test' >&2
+  exit 1
+}
+grep -F "args: ['--operation-failure-matrix']" "$test_meson" >/dev/null || {
+  echo 'package operation failure matrix does not execute the shared vertical harness mode' >&2
+  exit 1
+}
+
 grep -F '"$tmp/package-pipeline-test" --failure-matrix' \
   "$srcdir/tests/run-direct.sh" >/dev/null || {
   echo 'direct compiler harness does not execute the package failure matrix' >&2
+  exit 1
+}
+
+grep -F '"$tmp/package-pipeline-test" --operation-failure-matrix' \
+  "$srcdir/tests/run-direct.sh" >/dev/null || {
+  echo 'direct compiler harness does not execute the package operation failure matrix' >&2
   exit 1
 }
 

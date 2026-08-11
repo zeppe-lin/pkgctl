@@ -42,19 +42,24 @@ core is qualified in-process against disposable roots. That campaign now drives
 real acquisition, resolution, dependency construction, checking, target
 observation, installation, protected upgrade, rejected-object evidence, state
 publication, exact-convergence removal, and reconciliation-store persistence.
-It also crosses durable application/publication restart boundaries and a separate
-build/check failure matrix: a completed POSIX application whose exact receipt body
-was durably retained is adopted into the controller journal rather than applied or
-resumed again, already-selected canonical state is reconciled without duplicate
-publication, and definitive construction/check failures block dependent work
-before target mutation. The campaign also launches successful and failed sealed
-transactions through `native_posix_transaction_run_runtime`. It destroys and
-reopens the successful runtime to prove completed operation observations and
-effect bodies replay without a second archive acquisition or mutation, and
-reopens failed build/check journals to prove stop-after-failure rehydration
-without rerunning the actuator or acquiring operation/archive authority. Only the
-external process actuator is replaced. This test composition does not make
-reconciliation a production `pkgctl` dependency.
+It also crosses durable application/publication restart boundaries and separate
+pre-operation and operation failure matrices: a completed POSIX application whose
+exact receipt body was durably retained is adopted into the controller journal
+rather than applied or resumed again, already-selected canonical state is
+reconciled without duplicate publication, and definitive construction/check
+failures block dependent work before target mutation. The campaign also launches
+successful and failed sealed transactions through
+`native_posix_transaction_run_runtime`. It destroys and reopens the successful
+runtime to prove completed operation observations and effect bodies replay without
+a second archive acquisition or mutation; reopens failed build/check journals
+without rerunning the actuator or acquiring operation/archive authority; and
+reopens terminal application, pre/post-lifecycle, and publication failures without
+retry, rollback, or republication. The latter cases preserve the exact physical
+truth: application/pre-lifecycle failure leaves the target unchanged, while
+post-lifecycle/publication failure may leave the application present with
+canonical state still at its prior generation. Only the external process actuator
+and the explicitly faulted owner protocol are replaced. This test composition
+does not make reconciliation a production `pkgctl` dependency.
 
 Release 0.33.0 supplies native fresh-operation and restart authority without
 actuating the target. One replayable per-dispatch specification source supplies

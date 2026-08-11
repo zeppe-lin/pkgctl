@@ -103,6 +103,12 @@ if not get_option('tests').disabled()
     args: ['--failure-matrix'],
     suite: 'integration',
   )
+  test(
+    'package-operation-failure-matrix',
+    package_pipeline_test,
+    args: ['--operation-failure-matrix'],
+    suite: 'integration',
+  )
 
   effect_journal_test = executable(
     'effect-journal-test',

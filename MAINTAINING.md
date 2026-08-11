@@ -61,7 +61,19 @@ The same failures must cross the stable native runtime composition root: reopen 
 failed journal through a newly constructed runtime, prove the stopped result is
 rehydrated from durable evidence, and prove no failed actuator is rerun and no
 operation specification, archive, effect-body, target, or state-publication
-authority is consulted. Application and publication interruption must occur by
+authority is consulted. Definitive operation failures must likewise enter through
+the owning subordinate protocol rather than a controller shortcut: physical
+application failure through `libpkgapply`, lifecycle failure through `libpkgexec`,
+and canonical publication failure through `libpkgstate`. Reopening those terminal
+failures must neither retry them nor roll them back. Preserve the physical/canonical
+asymmetry instead: application or pre-lifecycle failure leaves the target
+unchanged, whereas post-lifecycle or publication failure may leave a completed
+application on the target while canonical state remains at its previous
+generation. The same terminal effect identity and retained subordinate bodies
+must rehydrate without another actuator, archive acquisition, application, or
+publication call.
+
+Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has
 reached the selected durable boundary. Restart must reopen retained
 run/effect/application authority and enter the production reconciliation path.

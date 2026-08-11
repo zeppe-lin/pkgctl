@@ -60,8 +60,17 @@ second time. The same composition root also owns the build/check failure
 containment campaign: a definitive failure commits ordinary subordinate evidence,
 stops dependent progression, and a newly constructed runtime rehydrates that
 stopped journal without rerunning construction/check or crossing into operation,
-archive, effect-body, target, or publication authority. This qualifies runtime
-wiring before another CLI option is allowed to become its first consumer.
+archive, effect-body, target, or publication authority. Definitive operation
+failures cross the same root through their owning protocols. A failed physical
+application or pre-install lifecycle action stops before target mutation; a
+failed post-install lifecycle action or failed canonical publication can stop
+after application, so the target may contain the selected files while canonical
+state still names the prior generation. Those facts are terminal evidence, not
+implicit rollback instructions. Reopening the failed runtime must reproduce the
+same effect identity and progress from retained subordinate bodies without
+rerunning lifecycle/application work, reacquiring the archive, rolling back the
+target, or publishing state. This qualifies runtime wiring before another CLI
+option is allowed to become its first consumer.
 
 ## Release 0.35.0 bounded native command boundary
 

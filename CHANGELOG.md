@@ -78,6 +78,12 @@
   dependent target work and publish no package state; those same failures cross
   the native runtime, survive destroy/reopen from durable evidence, and neither
   rerun the failed execution actuator nor acquire operation/archive authority.
+  A second runtime matrix carries definitive application, pre/post-lifecycle,
+  and canonical-publication failures through their owning subordinate protocols.
+  Destroy/reopen must retain the exact terminal effect without retry or rollback:
+  application/pre-lifecycle failure leaves the target unchanged, while
+  post-lifecycle/publication failure may leave completed application files on the
+  target with canonical state still at the previous generation.
 - Drives the same package transaction through the production
   `native_posix_transaction_run_runtime` composition root, including real
   application and canonical publication. The integration test then destroys and
