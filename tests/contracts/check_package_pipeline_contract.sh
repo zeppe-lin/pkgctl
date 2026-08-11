@@ -21,7 +21,19 @@ for authority in \
   'pkgctl::native_construction_driver' \
   'pkgctl::execute_construction' \
   'pkgctl::complete_construction_dispatch' \
-  'pkgctl::prepare_operation'; do
+  'pkgctl::native_transaction_check_driver' \
+  'pkgctl::execute_transaction_check' \
+  'pkgctl::complete_check_dispatch' \
+  'pkgctl::prepare_operation' \
+  'pkgapply::posix::application_posix_backend::from_directory_fds' \
+  'pkgapply::posix::target_mutation_lease::acquire' \
+  'pkgstate::apply_adapter::read_application_state' \
+  'pkgctl::explicit_transaction_effect_archive_source::make' \
+  'pkgctl::acquire_transaction_effect_archive' \
+  'pkgctl::native_transaction_effect_driver' \
+  'pkgctl::posix_effect_journal_store::open' \
+  'pkgctl::execute_effectful_operation_durable' \
+  'pkgctl::submit_operation_dispatch_result'; do
   grep -F "$authority" "$test_source" >/dev/null || {
     echo "package-pipeline test bypasses production authority: $authority" >&2
     exit 1
@@ -40,6 +52,30 @@ grep -F 'dependency.session().paths().build.package_output_root' \
 grep -F 'pkgexec::resource_role::build_input_tree, "dep"' \
   "$test_source" >/dev/null || {
   echo 'package-pipeline backend does not consume the dependency input slot' >&2
+  exit 1
+}
+
+grep -F 'pkgexec::resource_role::build_input_tree, "checked-package"' \
+  "$test_source" >/dev/null || {
+  echo 'package-pipeline backend does not consume the constructed package during check' >&2
+  exit 1
+}
+grep -F 'tool.session().paths().build.artifact_path' \
+  "$test_source" >/dev/null || {
+  echo 'package-pipeline application does not reopen the exact constructed artifact' >&2
+  exit 1
+}
+grep -F 'installed.find_package("tool")' "$test_source" >/dev/null || {
+  echo 'package-pipeline test does not verify canonical installed package state' >&2
+  exit 1
+}
+grep -F 'application.target_root / "usr/bin/tool"' \
+  "$test_source" >/dev/null || {
+  echo 'package-pipeline test does not verify disposable target bytes' >&2
+  exit 1
+}
+grep -F 'run.progress().complete()' "$test_source" >/dev/null || {
+  echo 'package-pipeline test does not prove terminal transaction progression' >&2
   exit 1
 }
 

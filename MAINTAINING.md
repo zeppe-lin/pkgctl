@@ -15,17 +15,24 @@ publish state are prohibited.
 A new effect-implying frontend must not be the first integration test of an
 already-library-owned package lifecycle. Before extending the command surface,
 compose the existing controller core in-process against disposable collection,
-state, content, build, package-output, and artifact roots. Keep acquisition,
-resolution, transaction ordering, fetching, build admission, package/image
-sealing, progression, and operation preparation real. Replace only the external
-process actuator when determinism or privilege requires it, and make that fake
-consume the exact resources prepared by the real adapters.
+state, content, build, package-output, artifact, application-store, lock, and
+target roots. Keep acquisition, resolution, transaction ordering, fetching,
+build admission, package/image sealing, check admission, progression, operation
+preparation, POSIX application, effect journaling, and canonical publication
+real. Replace only the external process actuator when determinism or privilege
+requires it, and make that fake consume the exact resources prepared by the real
+construction/check adapters.
 
 When a dependent build is under test, obtain its concrete package-input resource
 through the native session locator from successful predecessor construction
 evidence. Do not manufacture a semantically equivalent directory or bypass the
 transaction graph in the fixture. A green CLI is evidence about the frontend; it
 must not be used as the primary proof that lower package authority composes.
+The same rule applies after construction: reopen the exact retained artifact,
+hold the real target mutation lease, publish the exact completed application
+through the canonical store, and retire the operation against the published
+snapshot. Do not replace application or state publication with semantically
+equivalent controller fixtures merely to keep the campaign cheap.
 
 ## Documentation authority
 

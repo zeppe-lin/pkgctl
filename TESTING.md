@@ -5,20 +5,27 @@ suite must compose the production controller core through a disposable package
 campaign. The campaign must acquire real YAML collection authority, resolve and
 compose the dependency graph, prove that a predecessor build becomes ready before
 its dependent build, materialize declared local sources through `libpkgfetch`,
-and execute both constructions through `libpkgbuild-exec`. Only process execution
-may be replaced by a deterministic test backend; that backend must consume the
-real staged source tree and the dependent build must consume the exact predecessor
-package-output resource selected by the native session locator.
+and execute both constructions through `libpkgbuild-exec`. The selected package
+also carries a real check program; `libpkgcheck` / `libpkgcheck-exec` must admit
+that check only after construction and the deterministic process backend must
+consume the exact staged source and constructed package trees selected by the
+native session locator. Only process execution may be replaced by that fake.
 
 Successful construction must produce a real package archive plus retained
 `libpkgbuild-image` authority. The same transaction progression must then become
 planner-ready and pass through `libpkgbuild-plan`, `libpkgstate-plan`,
-`libpkgplan`, and `libpkgapply` request sealing. This campaign is deliberately
-non-CLI and non-privileged: command parsing and namespace capability are not
-allowed to be the first place where library composition defects are discovered.
-Future package/rootfs work should extend this campaign through disposable target
-application, canonical state publication, and package verification before adding
-the corresponding frontend behavior.
+`libpkgplan`, and `libpkgapply` request sealing. That exact request is then
+realized by `libpkgapply-posix` under a real POSIX mutation lease against a
+disposable target root. The campaign reopens the exact constructed archive,
+projects canonical state through `libpkgstate-apply`, durably journals the
+controller effect, publishes the new canonical generation, retires the operation
+with that resulting snapshot, and verifies both target bytes and installed-state
+ownership before requiring terminal transaction progress.
+
+This campaign is deliberately non-CLI and non-privileged: command parsing and
+Linux namespace capability are not allowed to be the first place where library
+composition defects are discovered. Future package/rootfs work should extend
+this in-process campaign before adding corresponding frontend behavior.
 
 ## Release 0.35.0 bounded native command qualification
 
