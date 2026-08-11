@@ -58,10 +58,14 @@ retry, rollback, or republication. The latter cases preserve the exact physical
 truth: application/pre-lifecycle failure leaves the target unchanged, while
 post-lifecycle/publication failure may leave the application present with
 canonical state still at its prior generation. A separate uncertainty matrix
-keeps indeterminate publication as active observation until authoritative state
-resolves it, qualifying both no-republish reconciliation and one exact retained
-request retry; an interrupted lifecycle intent remains externally blocked across
-reopen with zero durable advancement or physical replay. Only the external process
+distinguishes durable publication intent from a terminal indeterminate publication
+receipt. Publication intent reconciles without
+republishing when authoritative state already exposes the exact result, and may
+retry the exact retained request while authoritative state still exposes the
+exact prior generation. A terminal indeterminate receipt with that prior state
+remains externally blocked instead of being discarded and retried. An
+interrupted lifecycle intent is likewise externally blocked across reopen with
+zero durable advancement or physical replay. Only the external process
 actuator and the explicitly faulted owner protocol are replaced. This test composition
 does not make reconciliation a production `pkgctl` dependency.
 

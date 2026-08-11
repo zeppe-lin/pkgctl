@@ -70,12 +70,16 @@ implicit rollback instructions. Reopening the failed runtime must reproduce the
 same effect identity and progress from retained subordinate bodies without
 rerunning lifecycle/application work, reacquiring the archive, rolling back the
 target, or publishing state. Non-terminal uncertainty crosses the same root but
-never masquerades as terminal failure: indeterminate publication retains the
-started dispatch until authoritative state either proves the requested generation
-already visible or permits retry of the exact retained request while the prior generation remains authoritative, while an interrupted lifecycle
-intent with no terminal process evidence stops as external-resolution-required
-and commits no further durable transition. This qualifies runtime wiring before
-another CLI option is allowed to become its first consumer.
+never masquerades as terminal failure. A durable publication intent may reconcile
+without republication when authoritative state already proves the exact requested
+generation, or retry the exact retained request while the exact prior generation
+remains authoritative. A terminal indeterminate publication receipt is stronger
+evidence: if authoritative state still exposes the prior generation, pkgctl must
+not discard that receipt and manufacture an automatic retry; external resolution
+is required. An interrupted lifecycle intent with no terminal process evidence is
+similarly external-resolution-required and commits no further durable transition.
+This qualifies runtime wiring before another CLI option is allowed to become its
+first consumer.
 
 ## Release 0.35.0 bounded native command boundary
 

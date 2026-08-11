@@ -84,13 +84,15 @@
   application/pre-lifecycle failure leaves the target unchanged, while
   post-lifecycle/publication failure may leave completed application files on the
   target with canonical state still at the previous generation.
-- Adds a native-runtime uncertainty matrix. Indeterminate publication remains a
-  started operation until authoritative canonical state resolves it: an already
-  visible requested generation completes without republication, while an unchanged
-  prior generation permits one exact retained-request retry. A lifecycle process
-  interruption after durable intent remains `external-resolution-required` across
-  destroy/reopen, commits zero further durable steps, and performs no physical
-  replay or archive reacquisition.
+- Adds a native-runtime uncertainty matrix that distinguishes durable publication
+  intent from terminal indeterminate publication evidence. Intent plus an already
+  visible exact result reconciles without republication; intent plus the exact
+  prior generation permits one execution of the retained publication request.
+  A terminal indeterminate receipt with that prior state remains
+  `external-resolution-required` and is never discarded to manufacture an
+  automatic retry. A lifecycle intent with no terminal process evidence likewise
+  remains externally blocked across destroy/reopen, commits zero further durable
+  steps, and performs no physical replay or archive reacquisition.
 - Drives the same package transaction through the production
   `native_posix_transaction_run_runtime` composition root, including real
   application and canonical publication. The integration test then destroys and

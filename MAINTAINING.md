@@ -80,15 +80,20 @@ deterministic direct child of it. `libpkgapply-exec` owns creation and protectio
 of that single-use leaf.
 
 Keep uncertainty distinct from definitive failure in the same runtime campaign.
-An indeterminate publication is a retained observation on a still-started
-dispatch: authoritative state may reconcile it without republishing when the
-result is already visible, or retry the exact retained request when the
-prior state is still current. The uncertainty matrix exercises one such retry
-that completes definitively. An interrupted lifecycle intent has no terminal
-subordinate evidence and therefore requires external resolution; reopening it
-must append no run/effect successor and must not acquire archive or physical
-execution authority. Repeated resume without new evidence must remain the same
-externally blocked record, not become retry policy.
+A durable publication intent has not yet retained terminal publication evidence:
+authoritative state may reconcile it without republishing when the exact result
+is already visible, or retry the exact retained request when the exact prior
+state is still current. A terminal indeterminate publication receipt is not the
+same state. If authoritative state still exposes the prior generation, preserve
+the receipt and require external resolution; do not discard terminal uncertainty
+and turn it into automatic retry policy. The uncertainty matrix must exercise all
+three publication states. A lifecycle intent with no terminal subordinate
+evidence also requires external resolution. Construct that crash point at the
+durable controller/effect boundary; do not make a `libpkgexec` execution backend
+throw, because a throwing backend is itself a backend-contract violation.
+Reopening either externally blocked state must append no run/effect successor and
+must not acquire archive or physical execution authority. Repeated resume without
+new evidence must remain the same externally blocked record.
 
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has

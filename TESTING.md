@@ -311,19 +311,22 @@ directory may be required, and reopen must create no additional lifecycle
 scratch.
 
 `pkgctl:package-operation-uncertainty-matrix` qualifies non-terminal operation
-uncertainty through the same composition root. An indeterminate canonical
-publication must first remain a started operation with one retained uncertainty
-observation and no terminal progression. Destroy/reopen then resolves only from
-authoritative canonical state: if the requested resulting generation is already
-visible, reconciliation completes without a second publication; if the exact
-prior generation is still visible, the retained request is published exactly
-once more and then completes. Neither path reacquires the incoming archive or
-reapplies the target. A lifecycle backend interruption after the controller has
-durably committed `before_lifecycle_intent` is different: no process result
-exists to infer. Reopen must report `external-resolution-required`, append zero
-durable run/effect transitions, execute no lifecycle/application/publication
-driver, acquire no archive, and preserve the same started dispatch and effect
-record on repeated resume.
+uncertainty through the same composition root. It separates a crash at durable
+`publication_intent` from a retained terminal indeterminate publication receipt.
+If intent is durable and authoritative state already exposes the exact requested
+result, reopen reconciles without another publication. If intent is durable and
+the exact prior generation remains authoritative, reopen may publish the exact
+retained request once and complete. Neither path reacquires the incoming archive
+or reapplies the target. By contrast, once an indeterminate publication receipt
+is terminally retained, an unchanged prior generation does not license automatic
+republication: reopen must report `external-resolution-required` and leave the
+receipt, run head, archive count, and publication-call count unchanged. A durable
+`before_lifecycle_intent` with no terminal process evidence has the same external
+resolution requirement. Its fixture constructs that exact committed recovery
+state directly rather than making a `libpkgexec` backend throw in violation of
+its protocol. Reopen must append zero durable run/effect transitions, execute no
+lifecycle/application/publication driver, acquire no archive, and preserve the
+same started dispatch and effect record on repeated resume.
 
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the

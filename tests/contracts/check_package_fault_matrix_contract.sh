@@ -71,20 +71,25 @@ for evidence in \
   'publication_failure.publication_calls() == publication_calls' \
   'operations.archive_calls() == archive_calls' \
   'check_native_runtime_operation_failure' \
-  'runtime_publication_uncertainty' \
-  'runtime_publication_uncertainty::resulting_visible' \
-  'runtime_publication_uncertainty::retry_from_prior' \
-  'indeterminate_canonical_store' \
+  'runtime_publication_intent_resolution' \
+  'runtime_publication_intent_resolution::resulting_visible' \
+  'runtime_publication_intent_resolution::retry_from_prior' \
+  'published_canonical_store' \
+  'indeterminate_prior_canonical_store' \
+  'publication_intent_interrupting_effect_driver' \
+  'pkgctl::commit_transaction_run_successor' \
+  'pkgctl::commit_operation_dispatch_start' \
   'state_publication_backend_result::indeterminate' \
   'pkgstate::state_publication_outcome::indeterminate' \
   'pkgctl::transaction_run_drive_disposition::step_limit_reached' \
   'pkgctl::transaction_run_advance_disposition::reconciled_operation' \
-  'expected_publication_calls' \
-  'pipeline_execution_fault::interrupt_pre_install_lifecycle' \
+  'state_store.publication_calls() == 1U' \
+  'effect_store.append(' \
   'pkgctl::effect_attempt_stage::before_lifecycle_intent' \
   'pkgctl::transaction_run_drive_disposition::external_resolution_required' \
   'unresolved.durable_step_count() == 0U' \
-  'check_native_runtime_publication_uncertainty' \
+  'check_native_runtime_publication_intent_uncertainty' \
+  'check_native_runtime_terminal_indeterminate_publication' \
   'check_native_runtime_lifecycle_intent_external_resolution'; do
   grep -F "$evidence" "$test_source" >/dev/null || {
     echo "package fault/restart matrix lacks evidence: $evidence" >&2
