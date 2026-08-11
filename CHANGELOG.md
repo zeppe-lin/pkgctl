@@ -110,6 +110,14 @@
   holder releases. The package authority fixture now retains target observations
   per admitted operation session so released reservations and later fresh
   attempts do not share invented replay authority.
+- Qualifies fresh target-lock contention through the privileged `pkgctl run`
+  frontend with the real POSIX lease provider. The test derives and holds the
+  exact command mutation domain before `--start`, requires
+  `mutation-authority-unavailable` with a released-unstarted operation and no
+  effect attempt, proves duplicate `--start` still refuses the already-admitted
+  run, removes the live collection, then releases the holder and completes via
+  one explicit `--resume` using a new operation dispatch. No new CLI option,
+  waiting policy, or implicit retry is introduced.
 - Qualifies POSIX outer-lease loss through the native runtime and fixes the
   run/effect restart join exposed by that test. A terminal `outer_lease_lost`
   effect is a non-retiring transaction observation: restart commits it once if

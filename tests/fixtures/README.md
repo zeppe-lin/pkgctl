@@ -24,6 +24,13 @@ root.
 The C++ fixture executables create or inspect owner-defined durable formats;
 they do not duplicate those formats in shell.
 
+`native_target_lock_holder.cpp` is the one control-plane contention fixture.
+It derives the exact native-command mutation-exclusion domain from the
+read-only resolution target-binding and transaction identities plus the
+selected command roots, then acquires the real `libpkgapply-posix` nonblocking
+mutation lease. It does not emulate `flock(2)`, inject errno, or call the controller.
+The held lease is released only when the test explicitly terminates the fixture.
+
 `native_root_view_fixture.sh` creates only the stable logical mount
 destinations required by the native build, check, and lifecycle adapters. The
 root view itself remains caller-owned fiction: the production Linux backend is

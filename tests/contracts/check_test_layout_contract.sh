@@ -32,6 +32,7 @@ for path in \
   'unit/construction_test.cpp' \
   'fixtures/state_fixture.cpp' \
   'fixtures/native_root_view_fixture.sh' \
+  'fixtures/native_target_lock_holder.cpp' \
   'fixtures/application_intent_interrupt_fixture.cpp' \
   'fixtures/application_intent_interrupt_probe.cpp' \
   'fixtures/publication_intent_interrupt_fixture.cpp' \
@@ -48,6 +49,7 @@ for path in \
   'integration/lifecycle_intent_interrupt_fixture_test.sh' \
   'integration/package_pipeline_test.cpp' \
   'integration/cli_readonly_test.sh' \
+  'integration/cli_run_lease_contention_test.sh' \
   'integration/cli_run_removal_test.sh' \
   'integration/cli_run_application_restart_test.sh' \
   'integration/cli_run_publication_restart_test.sh' \
@@ -55,6 +57,7 @@ for path in \
   'integration/cli_run_lifecycle_resolution_test.sh' \
   'contracts/check_package_pipeline_contract.sh' \
   'contracts/check_package_fault_matrix_contract.sh' \
+  'contracts/check_cli_lease_contention_contract.sh' \
   'contracts/check_target_observation_contract.sh' \
   'contracts/check_test_layout_contract.sh' \
   'contracts/check_fetch_generation_contract.sh'; do

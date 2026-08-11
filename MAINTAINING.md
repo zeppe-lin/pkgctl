@@ -122,6 +122,16 @@ must not fabricate an effect attempt. Recovery contention must preserve the
 started dispatch and exact effect head and commit no successor. Do not catch
 other lease errors as contention, and do not add sleep, waiting, backoff, or an
 implicit retry loop. Retry authority belongs to a later explicit drive call.
+The privileged CLI contention vertical must use the real POSIX provider, not
+`flock(1)`, an errno shim, or a controller test hook. Derive the exact command
+mutation domain from the same transaction identity, target-binding identity,
+target root, runtime root, provider-version field, and target-lock root used by
+`command_application_target()`. A blocked fresh `--start` must leave an admitted
+run with a released-unstarted operation and no effect attempt; duplicate
+`--start` remains an admission error. Release the external holder explicitly and
+resume the same nonce. The replacement operation dispatch must differ from the
+released one, and deleting the collection before resume must not change the
+outcome.
 
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has

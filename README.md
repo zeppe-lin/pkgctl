@@ -79,9 +79,17 @@ controller. `lock_busy` is translated into the stable
 failure. Fresh contention releases the unstarted reservation and admits no
 effect attempt; recovery contention preserves the already-started run/effect
 heads with zero durable advancement. Neither call waits or retries. A later
-explicit drive may proceed after the competing holder releases. Only the external
-process actuator and the explicitly faulted owner protocol are replaced. This
-test composition does not make reconciliation a production `pkgctl` dependency.
+explicit drive may proceed after the competing holder releases. The privileged
+CLI vertical independently holds the exact command-derived POSIX exclusion
+domain before `pkgctl run --start`: the admitted run must report
+`mutation-authority-unavailable`, retain one released-unstarted operation
+reservation with no effect attempt, refuse a duplicate `--start`, and complete
+only after an explicit `--resume` once the holder releases. That resume is also
+required to succeed after the live collection is removed, proving the block did
+not create hidden rediscovery authority. Only the external process actuator and
+the explicitly faulted owner protocol are replaced in the in-process campaign.
+This test composition does not make reconciliation a production `pkgctl`
+dependency.
 
 Release 0.33.0 supplies native fresh-operation and restart authority without
 actuating the target. One replayable per-dispatch specification source supplies

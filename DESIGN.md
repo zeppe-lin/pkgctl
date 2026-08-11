@@ -101,8 +101,19 @@ without a run/effect successor. Bounded driving stops on either form and never
 waits or retries inside the call. Other lease-provider errors remain mechanism
 errors. A later explicit drive is the caller's retry authority.
 
-This qualifies runtime wiring before another CLI option is allowed to become its
-first consumer.
+The existing `pkgctl run` frontend consumes the same control state without
+adding policy. A privileged vertical derives the exact command mutation domain
+from the read-only resolution target-binding and transaction identity, holds
+that domain through `libpkgapply-posix`, and requires fresh `--start`
+contention to preserve the admitted run while releasing only the unstarted operation
+dispatch. The frontend must render `mutation-authority-unavailable`, reject another `--start`
+for the same nonce, and perform no same-call retry. After the holder releases,
+one explicit `--resume` owns retry and must reserve a different operation
+dispatch; resume remains based on the retained command universe even if live
+collection bytes have disappeared.
+
+This qualifies runtime and current frontend wiring before another CLI option is
+allowed to become its first consumer.
 
 ## Release 0.35.0 bounded native command boundary
 

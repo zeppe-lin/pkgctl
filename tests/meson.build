@@ -187,6 +187,12 @@ if not get_option('tests').disabled()
     dependencies: pkgctl_core_dep,
   )
 
+  native_target_lock_holder = executable(
+    'native-target-lock-holder',
+    'fixtures/native_target_lock_holder.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+
   cpp = meson.get_compiler('cpp')
   native_interpreter = custom_target(
     'native-test-interpreter',
@@ -344,6 +350,31 @@ if not get_option('tests').disabled()
       ),
     ],
     depends: native_interpreter,
+    suite: 'integration-privileged',
+  )
+
+  cli_run_lease_contention_test = find_program(
+    'integration/cli_run_lease_contention_test.sh',
+  )
+  test(
+    'cli-run-lease-contention',
+    cli_run_lease_contention_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_interpreter,
+      native_target_lock_holder,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/simple-install',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [native_interpreter, native_target_lock_holder],
     suite: 'integration-privileged',
   )
 
@@ -685,6 +716,16 @@ if not get_option('tests').disabled()
   test(
     'effect-inspect-cli-contract',
     effect_inspect_cli_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_lease_contention_contract = find_program(
+    'contracts/check_cli_lease_contention_contract.sh',
+  )
+  test(
+    'cli-lease-contention-contract',
+    cli_lease_contention_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

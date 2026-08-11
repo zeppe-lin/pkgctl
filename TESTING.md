@@ -364,6 +364,23 @@ issuing a later explicit drive must complete the operation normally. The matrix
 also proves only POSIX `lock_busy` is classified this way; the lower native-source
 unit contract keeps other lease-mechanism failures exceptional.
 
+`pkgctl:cli-run-lease-contention` carries that same fresh-contention state
+through the real frontend. It first uses the read-only `resolve` and
+`transaction` commands to obtain the exact target-binding and transaction
+identities, then a fixture derives the command's mutation-exclusion domain and
+holds it with the actual `libpkgapply-posix` mutation lease. The `pkgctl run --start`
+call must exit nonzero with `mutation-authority-unavailable`, the exact
+completed pre-operation steps plus its durable released reservation, unchanged
+target/state, no effect-store object, and a released-unstarted operation
+dispatch. Another `--start` with the same nonce must be refused because the run
+is already admitted. The test then removes the collection, releases the holder,
+and issues one bounded `--resume`; that call must complete in one durable step
+using a different operation dispatch, proving explicit retry authority and
+retained command-universe replay. A repeated completed resume must remain a
+zero-step no-op. Capability-unavailable development hosts may skip the vertical
+under the same policy as the other privileged native CLI tests; release
+qualification may not.
+
 `pkgctl:cli-run` is the privileged native vertical test. Before a fresh run is
 admitted, the command checks that the selected Linux backend can establish the
 exact execution guarantees implied by the transaction's build, check, and

@@ -65,6 +65,10 @@ for fixture in state_fixture state_inspect_fixture run_store_fixture effect_stor
     -o "$tmp/$name-fixture"
 done
 
+# shellcheck disable=SC2086
+"$cxx" $flags "$srcdir/tests/fixtures/native_target_lock_holder.cpp" \
+  $objects $core_libs -o "$tmp/native-target-lock-holder"
+
 "$cxx" -nostdlib -static -Wl,-e,_start \
   "$srcdir/tests/fixtures/native_interpreter_x86_64.S" \
   -o "$tmp/native-test-interpreter"
@@ -125,6 +129,12 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
 "$srcdir/tests/integration/cli_run_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" \
+  "$srcdir/tests/fixtures/collections/simple-install" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
+"$srcdir/tests/integration/cli_run_lease_contention_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-test-interpreter" "$tmp/native-target-lock-holder" \
   "$srcdir/tests/fixtures/collections/simple-install" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
