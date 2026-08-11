@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <dlfcn.h>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -11,6 +12,33 @@
 #include <unistd.h>
 
 namespace {
+
+extern "C" void __asan_init() __attribute__((weak));
+
+void append_preload(std::string& chain, const char* entry)
+{
+  if (entry == nullptr || *entry == '\0')
+    return;
+  if (!chain.empty())
+    chain += ':';
+  chain += entry;
+}
+
+[[nodiscard]] const char* dynamic_asan_runtime()
+{
+  if (__asan_init == nullptr)
+    return nullptr;
+
+  Dl_info info{};
+  if (::dladdr(reinterpret_cast<const void*>(__asan_init), &info) == 0 ||
+      info.dli_fname == nullptr)
+    return nullptr;
+
+  // GCC normally supplies ASan as a DSO and requires it to precede every
+  // explicit preload. Clang commonly links ASan into the executable instead;
+  // such a path is not itself preloadable and needs no ordering repair.
+  return std::strstr(info.dli_fname, ".so") != nullptr ? info.dli_fname : nullptr;
+}
 
 [[nodiscard]] unsigned long long parse_id(const char* text, const char* name)
 {
@@ -64,9 +92,10 @@ int main(int argc, char** argv)
     fail("clear retained LD_PRELOAD");
   }
 
-  std::string preload = argv[3];
-  if (previous_preload != nullptr && *previous_preload != '\0')
-    preload += ":" + std::string(previous_preload);
+  std::string preload;
+  append_preload(preload, dynamic_asan_runtime());
+  append_preload(preload, argv[3]);
+  append_preload(preload, previous_preload);
 
   if (::setenv("LD_PRELOAD", preload.c_str(), 1) != 0 ||
       ::setenv("PKGCTL_TEST_SUPERVISOR_UID", argv[1], 1) != 0 ||

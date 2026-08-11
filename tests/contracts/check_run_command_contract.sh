@@ -237,6 +237,18 @@ if grep -F '::setuid(' "$srcdir/tests/fixtures/native_credential_context_runner.
   exit 1
 fi
 
+for sanitizer_order_contract in \
+  '__asan_init' \
+  'dynamic_asan_runtime' \
+  'append_preload(preload, dynamic_asan_runtime())' \
+  'append_preload(preload, argv[3])' \
+  'append_preload(preload, previous_preload)'; do
+  grep -F -- "$sanitizer_order_contract" "$srcdir/tests/fixtures/native_credential_context_runner.cpp" >/dev/null || {
+    echo "credential-context runner omits sanitizer-safe preload ordering: $sanitizer_order_contract" >&2
+    exit 1
+  }
+done
+
 preflight_line=$(grep -n -F 'require_native_execution_preflight(' \
   "$command" | tail -n 1 | cut -d: -f1)
 retain_line=$(grep -n -F 'universes.retain(' \

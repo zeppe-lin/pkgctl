@@ -14,6 +14,10 @@
   are dropped after the dynamic loader maps the build-tree CLI closure. Reduced-credential
   qualification now measures pkgctl execute-now authority rather than access to shared
   libraries under the developer build root.
+- Preserves sanitizer loader ordering in that credential-context fixture: when the
+  launcher itself is using dynamic AddressSanitizer, its already-loaded runtime remains
+  first while the credential hook and inherited preload chain are added without displacing
+  it. Sanitizer startup therefore remains loader authority rather than the uid/gid test.
 - Upgrades immutable command evidence to schema v3. Before run admission it
   retains the complete start-only transaction inputs, the exact admitted
   construction/check/lifecycle backend capability profiles, and the original

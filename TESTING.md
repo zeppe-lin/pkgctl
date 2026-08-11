@@ -89,8 +89,10 @@ The final command suite must prove:
   preserve the exact run/effect heads without execute-now preflight. The privileged
   credential-context fixture drops uid/gid from a preload constructor after the dynamic
   loader has already mapped the build-tree CLI closure; loader reachability of the
-  developer build root is therefore not confused with pkgctl execution authority, and
-  the preload control environment is removed before pkgctl can launch subprocesses;
+  developer build root is therefore not confused with pkgctl execution authority. When
+  dynamic AddressSanitizer is active, the launcher keeps that runtime first in the preload
+  order while preserving the inherited preload chain around the credential hook. The hook
+  removes its control environment before pkgctl can launch subprocesses;
 - native check execution resets the exact call-scoped temporary host resource
   and prepares `/tmp/home` before entering `libpkgcheck-exec`, while the
   caller-owned execution root view remains untouched;

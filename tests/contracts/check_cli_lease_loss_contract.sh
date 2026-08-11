@@ -162,3 +162,15 @@ if grep -F '::setuid(' "$credential_runner" >/dev/null; then
   echo 'credential-context runner changes credentials before loading pkgctl' >&2
   exit 1
 fi
+
+for sanitizer_order_contract in \
+  '__asan_init' \
+  'dynamic_asan_runtime' \
+  'append_preload(preload, dynamic_asan_runtime())' \
+  'append_preload(preload, argv[3])' \
+  'append_preload(preload, previous_preload)'; do
+  grep -F -- "$sanitizer_order_contract" "$credential_runner" >/dev/null || {
+    echo "credential-context runner omits sanitizer-safe preload ordering: $sanitizer_order_contract" >&2
+    exit 1
+  }
+done

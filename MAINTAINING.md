@@ -178,7 +178,10 @@ outer-lease-loss runs must reopen under that changed supervisor without journal
 advancement. The privileged credential-context fixture must perform the uid/gid
 transition only after the dynamic loader has mapped the build-tree CLI dependency
 closure. A pre-exec credential drop accidentally tests pathname accessibility of the
-developer build root and is not valid execution-authority qualification.
+developer build root and is not valid execution-authority qualification. Do not break
+sanitizer startup to reach that boundary: if dynamic AddressSanitizer is active, its
+already-loaded runtime must remain first, and the credential hook must not discard or
+precede that sanitizer runtime when composing the temporary preload chain.
 
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has
