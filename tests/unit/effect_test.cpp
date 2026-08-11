@@ -607,6 +607,27 @@ pkgapply::application_target_context application_target(
       apply_identity<pkgapply::lifecycle_executor_identity>(19));
 }
 
+pkgapply::application_target_context
+application_target_without_lifecycle_executor(
+    const pkgstate::state_target_binding& state_target,
+    const pkgplan::target_system_context_identity& target)
+{
+  return pkgapply::application_target_context::make(
+      target,
+      translate_identity<pkgapply::managed_target_identity>(
+          state_target.managed_target()),
+      translate_identity<pkgapply::root_view_identity>(
+          state_target.root_view()),
+      apply_identity<pkgapply::observation_backend_identity>(11),
+      apply_identity<pkgapply::mutation_backend_identity>(12),
+      apply_identity<pkgapply::mutation_exclusion_domain_identity>(13),
+      apply_identity<pkgapply::active_object_namespace_identity>(14),
+      apply_identity<pkgapply::rejected_object_store_identity>(15),
+      apply_identity<pkgapply::staging_namespace_identity>(16),
+      apply_identity<pkgapply::journal_namespace_identity>(17),
+      apply_identity<pkgapply::execution_capability_profile_identity>(18));
+}
+
 pkgapply::application_execution_control execution_control()
 {
   return pkgapply::application_execution_control::make(
@@ -5506,11 +5527,13 @@ void check_native_incoming_operation_authority_source()
   const auto target_system =
       construction_fixture::plan_identity<
           pkgplan::target_system_context_identity>(52U);
+  auto no_lifecycle_target = application_target_without_lifecycle_executor(
+      store.read().target_binding(), target_system);
+  CHECK(!no_lifecycle_target.lifecycle_executor());
   fixed_operation_specification_source specifications(
       pkgctl::native_transaction_operation_specification::install(
           construction_fixture::install_node(transaction).identity(),
-          application_target(
-              store.read().target_binding(), target_system),
+          std::move(no_lifecycle_target),
           construction_fixture::execution_control(),
           construction_fixture::empty_target_observations(target_system),
           construction_fixture::plan_identity<

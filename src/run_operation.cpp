@@ -163,6 +163,9 @@ admit_lifecycle_sessions(
     const native_transaction_lifecycle_configuration& configuration,
     const std::filesystem::path& root)
 {
+  if (order.empty())
+    return {};
+
   const auto nodes = pkgapply_exec::derive(application);
   const auto* action = transaction.program().find(action_identity);
   if (action == nullptr || !operation_kind(action->action()))

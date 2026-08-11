@@ -199,9 +199,13 @@ specification also supplies explicit lifecycle execution order. The existing
 effect boundary validates that this order contains exactly the lifecycle nodes
 attached to the action by transaction phase edges; deterministic graph storage
 is not execution precedence. Executable lifecycle nodes come only from
-`libpkgapply-exec`. Paths are deterministic children of the stable run journal
-and dispatch identities, so fresh and restarted acquisition reproduce one
-session without touching the filesystem.
+`libpkgapply-exec`. When both exact lifecycle phase sets are empty, operation
+authority derives no lifecycle nodes and requires no lifecycle-executor binding
+from the application target. A non-empty phase set enters `libpkgapply-exec` and
+therefore retains its strict target-selected executor binding. Paths are
+deterministic children of the stable run journal and dispatch identities, so
+fresh and restarted acquisition reproduce one session without touching the
+filesystem.
 
 Restart authority loads only the exact effect attempt retained by the run. The
 effect journal remains control memory: lifecycle results, application receipts,

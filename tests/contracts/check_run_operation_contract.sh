@@ -28,6 +28,7 @@ for required in \
   'const transaction_progress& progress' \
   'specifications_.operation' \
   'specification.lifecycle()' \
+  'if (order.empty())' \
   'native_operation_preparation_driver' \
   'effect_restart_checkpoint::make' \
   'effects_.load_latest' \
@@ -45,6 +46,8 @@ done
 for required_test in \
   'check_native_operation_authority_source' \
   'check_native_incoming_operation_authority_source' \
+  'application_target_without_lifecycle_executor' \
+  '!no_lifecycle_target.lifecycle_executor()' \
   'explicit_lifecycle_order' \
   'incomplete_lifecycle_specifications' \
   'fresh.session.identity() == repeated.session.identity()' \
@@ -95,7 +98,8 @@ for forbidden in \
   fi
 done
 
-# Runtime composition is closed here, but no mutating command exists yet.
+# Frontend code must not bypass the reviewed runtime by directly wiring this
+# operation authority or ad-hoc effect-implying commands into cli/main.cpp.
 ! grep -R -q 'run_operation' "$root/cli"
 ! grep -E -q '(^|[[:space:]])(run|apply|install|upgrade|remove)([[:space:]]|$)' \
   "$root/cli/main.cpp"

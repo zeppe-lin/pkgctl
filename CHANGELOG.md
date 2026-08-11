@@ -83,6 +83,10 @@
   rehydration to use caller-retained target observations and subordinate effect
   bodies, remain quiescent, and perform no second archive acquisition or target
   mutation.
+- Keeps lifecycle-executor authority genuinely optional for lifecycle-free
+  operations. Native operation admission does not invoke `libpkgapply-exec` when
+  the transaction's exact before/after lifecycle order is empty; non-empty
+  lifecycle orders retain the existing target-bound executor validation.
 
 ### Dependency contract
 

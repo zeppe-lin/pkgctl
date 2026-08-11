@@ -143,6 +143,9 @@ The native operation suite must prove:
   incompatible, incomplete, or duplicate lifecycle authority is rejected;
 - fresh removal preparation reproduces the canonical effect request through the
   existing preparation path;
+- lifecycle-free operation authority accepts an application target with no
+  optional lifecycle-executor binding and does not enter `libpkgapply-exec`; a
+  non-empty exact lifecycle order still requires the bound executor;
 - equivalent durable record, run, and dispatch inputs reproduce the same
   admitted lifecycle session and mechanical effect-attempt nonce;
 - locating operation authority creates, removes, scans, stats, opens, executes,
