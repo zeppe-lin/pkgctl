@@ -288,8 +288,11 @@ transaction progression and durable runtime assertions, not frontend exit-code
 tests.
 
 `pkgctl:package-operation-failure-matrix` carries definitive operation failures
-through that same native composition root. Faults are injected only at the
-subordinate owner protocol that can produce them: a failed `libpkgapply` backend
+through that same native composition root. Lifecycle cases add explicit
+pre-install and post-install lifecycle-scoped resolution goals before transaction
+composition; recipe program presence alone is not execution authority. Faults are
+injected only at the subordinate owner protocol that can produce them: a failed
+`libpkgapply` backend
 operation, failed pre-install or post-install `libpkgexec` lifecycle actuation,
 or a `libpkgstate` publication transaction that fails before publication. The
 controller must retain the exact terminal effect outcome and block later work

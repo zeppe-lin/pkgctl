@@ -179,6 +179,24 @@ pkgctl::resolution_request pipeline_resolution_request(
       base.policy());
 }
 
+pkgctl::resolution_request pipeline_lifecycle_resolution_request(
+    const fs::path& collection,
+    const fs::path& state)
+{
+  const auto base = pipeline_resolution_request(collection, state);
+  auto goals = base.goals();
+  for (const auto action : {pkgsource::lifecycle_action::pre_install,
+                            pkgsource::lifecycle_action::post_install}) {
+    goals.emplace_back(
+        pkgsource::requirement_scope::lifecycle(action),
+        pkgsource::requirement_subject(pkgsource::package_reference("tool")),
+        "<pipeline-lifecycle>");
+  }
+  return pkgctl::resolution_request::make(
+      base.catalog(), base.state(), base.architectures(), std::move(goals),
+      base.policy());
+}
+
 pkgctl::resolution_request pipeline_removal_resolution_request(
     const fs::path& collection,
     const fs::path& state)
@@ -2684,7 +2702,9 @@ void check_native_runtime_operation_failure(
       collection, "1.0", "tool source v1\n", with_lifecycle);
   test_support::initialize_state(state);
 
-  auto resolution_request = pipeline_resolution_request(collection, state);
+  auto resolution_request = with_lifecycle
+      ? pipeline_lifecycle_resolution_request(collection, state)
+      : pipeline_resolution_request(collection, state);
   auto transaction = pkgctl::compose_transaction(
       pkgctl::transaction_request::make(std::move(resolution_request)));
   const auto& dep_build = node_for(

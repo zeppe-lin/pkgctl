@@ -64,9 +64,11 @@ operation specification, archive, effect-body, target, or state-publication
 authority is consulted. Definitive operation failures must likewise enter through
 the owning subordinate protocol rather than a controller shortcut: physical
 application failure through `libpkgapply`, lifecycle failure through `libpkgexec`,
-and canonical publication failure through `libpkgstate`. Reopening those terminal
-failures must neither retry them nor roll them back. Preserve the physical/canonical
-asymmetry instead: application or pre-lifecycle failure leaves the target
+and canonical publication failure through `libpkgstate`. Lifecycle fault cases
+must obtain their phase nodes from explicit lifecycle-scoped resolution goals; a
+recipe lifecycle program is not implicit transaction authority. Reopening those
+terminal failures must neither retry them nor roll them back. Preserve the
+physical/canonical asymmetry instead: application or pre-lifecycle failure leaves the target
 unchanged, whereas post-lifecycle or publication failure may leave a completed
 application on the target while canonical state remains at its previous
 generation. The same terminal effect identity and retained subordinate bodies

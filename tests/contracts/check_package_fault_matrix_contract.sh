@@ -52,6 +52,8 @@ for evidence in \
   'runtime_operation_failure::pre_install_lifecycle' \
   'runtime_operation_failure::post_install_lifecycle' \
   'runtime_operation_failure::publication' \
+  'pipeline_lifecycle_resolution_request' \
+  'pkgsource::requirement_scope::lifecycle(action)' \
   'faulting_application_backend' \
   'pkgapply::backend_operation_outcome::failed' \
   'failing_canonical_store' \
