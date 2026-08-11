@@ -65,10 +65,36 @@ if not get_option('tests').disabled()
   )
   test('session', session_test, suite: 'unit')
 
+  package_pipeline_reconcile_deps = [
+    dependency(
+      'libpkgreconcile',
+      version: ['>=0.3.0', '<1.0.0'],
+      required: true,
+      static: want_static,
+    ),
+    dependency(
+      'libpkgreconcile-apply',
+      version: ['>=0.1.0', '<1.0.0'],
+      required: true,
+      static: want_static,
+    ),
+    dependency(
+      'libpkgreconcile-posix',
+      version: ['>=0.1.0', '<1.0.0'],
+      required: true,
+      static: want_static,
+    ),
+    dependency(
+      'libpkgreconcile-apply-posix',
+      version: ['>=0.1.0', '<1.0.0'],
+      required: true,
+      static: want_static,
+    ),
+  ]
   package_pipeline_test = executable(
     'package-pipeline-test',
     'integration/package_pipeline_test.cpp',
-    dependencies: pkgctl_core_dep,
+    dependencies: [pkgctl_core_dep] + package_pipeline_reconcile_deps,
   )
   test('package-pipeline', package_pipeline_test, suite: 'integration')
 

@@ -22,6 +22,26 @@ controller effect, publishes the new canonical generation, retires the operation
 with that resulting snapshot, and verifies both target bytes and installed-state
 ownership before requiring terminal transaction progress.
 
+The campaign must also cover mutation over existing state. After a real v1
+installation it edits one protected target path locally, reacquires a v2 catalog,
+forces catalog preference, and requires a real upgrade. Fresh target facts must
+come through `pkgctl::observe_native_target_paths()` from the same
+`libpkgapply-posix` observer used by the native frontend; integration tests must
+not duplicate application-to-planner fact conversion. The upgrade must retain
+local protected bytes, stage the incoming object as rejected evidence, publish
+v2 state without claiming the protected path, and retain the exact completed
+application evidence.
+
+The same completed evidence is then a qualification seam for the reconciliation
+libraries. They are test-only dependencies here, not `pkgctl` production
+authority: the campaign projects pending reconciliation, verifies the exact
+POSIX rejected-object record, proves duplicate publication is idempotent,
+reopens the inventory, resolves the tuple, reopens it again, and proves the
+resolved tombstone suppresses resurrection. Finally an exact-convergence
+transaction removes the installed package through the normal planner/apply/state
+path while the unowned local configuration survives and the resolved
+reconciliation record remains durable.
+
 This campaign is deliberately non-CLI and non-privileged: command parsing and
 Linux namespace capability are not allowed to be the first place where library
 composition defects are discovered. Future package/rootfs work should extend

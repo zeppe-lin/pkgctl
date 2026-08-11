@@ -37,6 +37,14 @@ loops beyond the bound, retries implicitly, rolls back, repairs, cleans up, or
 collects history. Package management is now functionally closed; remaining work
 is one coordinated whole-zoo qualification and publication pass.
 
+Before new package-construction frontend surface is added, the same controller
+core is qualified in-process against disposable roots. That campaign now drives
+real acquisition, resolution, dependency construction, checking, target
+observation, installation, protected upgrade, rejected-object evidence, state
+publication, exact-convergence removal, and reconciliation-store persistence.
+Only the external process actuator is replaced. This test composition does not
+make reconciliation a production `pkgctl` dependency.
+
 Release 0.33.0 supplies native fresh-operation and restart authority without
 actuating the target. One replayable per-dispatch specification source supplies
 exact target and planning authority plus explicit lifecycle execution order for

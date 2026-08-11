@@ -9,7 +9,9 @@ source=$srcdir/src/target_observation.cpp
 cli=$srcdir/cli/run_command.cpp
 meson=$srcdir/src/meson.build
 tests_meson=$srcdir/tests/meson.build
-for file in "$header" "$source" "$cli" "$meson" "$tests_meson"; do
+pipeline=$srcdir/tests/integration/package_pipeline_test.cpp
+
+for file in "$header" "$source" "$cli" "$meson" "$tests_meson" "$pipeline"; do
   [ -s "$file" ] || {
     echo "missing target-observation authority source: $file" >&2
     exit 1
@@ -43,6 +45,11 @@ grep -F 'observe_native_target_paths(' "$cli" >/dev/null || {
   echo 'CLI does not consume pkgctl-core target-observation authority' >&2
   exit 1
 }
+grep -F 'pkgctl::observe_native_target_paths(' "$pipeline" >/dev/null || {
+  echo 'package pipeline bypasses pkgctl-core target-observation authority' >&2
+  exit 1
+}
+
 for forbidden in \
   'planner_observation(' \
   'planner_kind(' \

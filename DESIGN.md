@@ -13,6 +13,24 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Pre-frontend live-target qualification boundary
+
+The in-process package campaign shares live target-observation semantics with the
+native runtime. `pkgctl-core` owns one translation from descriptor-anchored
+`libpkgapply-posix` observations into complete `libpkgplan` target facts and
+seals them in `pkgctl/native-target-observations/1`. The CLI retains and replays
+those values, but no longer owns the object-kind, metadata, content, or device
+conversion table.
+
+This lets package qualification exercise install, protected upgrade, rejected
+object publication, canonical state replacement, exact-convergence removal, and
+restart-safe reconciliation persistence without first adding another frontend
+command. Reconciliation remains an adjacent library seam in this campaign: the
+exact completed application evidence is projected and persisted directly by the
+`libpkgreconcile*` owners. `pkgctl` does not acquire a production reconciliation
+dependency until it owns an actual coordination decision beyond forwarding that
+evidence.
+
 ## Release 0.35.0 bounded native command boundary
 
 The final functional closure is one command, not a new semantic subsystem:

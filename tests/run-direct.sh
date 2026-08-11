@@ -10,6 +10,7 @@ trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
 core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
 cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
+pipeline_modules='libpkgreconcile libpkgreconcile-apply libpkgreconcile-posix libpkgreconcile-apply-posix'
 pkg-config --exists \
   'libpkgfetch >= 2.0.0' 'libpkgfetch < 3.0.0' \
   'libpkgbuild-exec >= 2.2.0' 'libpkgbuild-exec < 3.0.0' \
@@ -17,11 +18,17 @@ pkg-config --exists \
   'libpkgexec-linux >= 0.6.0' 'libpkgexec-linux < 1.0.0' \
   'libpkgresolve >= 3.0.0' 'libpkgresolve < 4.0.0' \
   'libpkgtransaction >= 3.0.0' 'libpkgtransaction < 4.0.0' \
-  'libpkgcheck-exec >= 0.4.0' 'libpkgcheck-exec < 1.0.0'
+  'libpkgcheck-exec >= 0.4.0' 'libpkgcheck-exec < 1.0.0' \
+  'libpkgreconcile >= 0.3.0' 'libpkgreconcile < 1.0.0' \
+  'libpkgreconcile-apply >= 0.1.0' 'libpkgreconcile-apply < 1.0.0' \
+  'libpkgreconcile-posix >= 0.1.0' 'libpkgreconcile-posix < 1.0.0' \
+  'libpkgreconcile-apply-posix >= 0.1.0' 'libpkgreconcile-apply-posix < 1.0.0'
 core_cflags=$(pkg-config --cflags $core_modules)
 core_libs=$(pkg-config --libs $core_modules)
 cli_cflags=$(pkg-config --cflags $cli_modules)
 cli_libs=$(pkg-config --libs $cli_modules)
+pipeline_cflags=$(pkg-config --cflags $pipeline_modules)
+pipeline_libs=$(pkg-config --libs $pipeline_modules)
 flags="-std=c++17 -Wall -Wextra -Wpedantic -Werror -I$srcdir/include -I$srcdir/tests $core_cflags"
 objects=
 for source in "$srcdir"/src/*.cpp; do
@@ -40,8 +47,9 @@ done
 
 # The non-CLI vertical campaign must also survive the direct compiler path.
 # shellcheck disable=SC2086
-"$cxx" $flags "$srcdir/tests/integration/package_pipeline_test.cpp" \
-  $objects $core_libs -o "$tmp/package-pipeline-test"
+"$cxx" $flags $pipeline_cflags \
+  "$srcdir/tests/integration/package_pipeline_test.cpp" \
+  $objects $core_libs $pipeline_libs -o "$tmp/package-pipeline-test"
 "$tmp/package-pipeline-test"
 
 for fixture in state_fixture state_inspect_fixture run_store_fixture effect_store_fixture; do

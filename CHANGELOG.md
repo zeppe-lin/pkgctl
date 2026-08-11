@@ -55,6 +55,19 @@
   test build graph and remains an explicit test dependency, so clean or
   no-rebuild qualification cannot accidentally rely on a stale fixture.
 
+### Pre-frontend package campaign qualification
+
+- Moves live application-to-planner target observation conversion out of the CLI
+  and into `pkgctl-core`, preserving the existing
+  `pkgctl/native-target-observations/1` identity domain while leaving retention
+  and replay policy with the runtime/frontend.
+- Extends the non-CLI package campaign through a locally modified protected-path
+  upgrade, real rejected-object publication, v2 canonical-state replacement,
+  exact-convergence package removal, and durable reconciliation
+  publication/resolution/anti-resurrection checks. The reconciliation libraries
+  are test-only qualification dependencies and do not change the production
+  dependency contract below.
+
 ### Dependency contract
 
 Current 0.35.0 source accepts exactly these direct dependency generations:

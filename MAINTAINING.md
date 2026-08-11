@@ -34,6 +34,22 @@ through the canonical store, and retire the operation against the published
 snapshot. Do not replace application or state publication with semantically
 equivalent controller fixtures merely to keep the campaign cheap.
 
+Fresh target observation used by operation planning is controller-core authority,
+not frontend policy. `pkgctl-core` owns conversion of complete
+`libpkgapply` path facts into `libpkgplan` observations and the stable
+`pkgctl/native-target-observations/1` identity domain. A frontend may retain or
+replay those observations, but it must not own another conversion table. The
+pre-frontend campaign must consume the same core function against its disposable
+target.
+
+Qualification may directly compose a downstream library family that `pkgctl`
+does not yet own in production, but that seam must remain test-only until the
+controller has a real orchestration responsibility for it. In particular,
+reconciliation projection and POSIX inventory persistence may qualify completed
+application evidence without adding `libpkgreconcile*` to production dependency
+closure. Do not create a pass-through controller wrapper merely to make the test
+look more integrated.
+
 ## Documentation authority
 
 Current-facing documentation is normative for the current controller boundary:

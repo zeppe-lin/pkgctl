@@ -33,7 +33,11 @@ for authority in \
   'pkgctl::native_transaction_effect_driver' \
   'pkgctl::posix_effect_journal_store::open' \
   'pkgctl::execute_effectful_operation_durable' \
-  'pkgctl::submit_operation_dispatch_result'; do
+  'pkgctl::submit_operation_dispatch_result' \
+  'pkgctl::observe_native_target_paths' \
+  'pkgreconcile::apply_adapter::project_completed_application' \
+  'pkgreconcile::apply_posix::publish_verified_projection' \
+  'pkgreconcile::posix::inventory_generation_store::open_existing'; do
   grep -F "$authority" "$test_source" >/dev/null || {
     echo "package-pipeline test bypasses production authority: $authority" >&2
     exit 1
@@ -88,6 +92,37 @@ grep -F 'run.progress().complete()' "$test_source" >/dev/null || {
   echo 'package-pipeline test does not prove terminal transaction progression' >&2
   exit 1
 }
+
+grep -F 'pkgresolve::installed_preference::prefer_catalog' "$test_source" >/dev/null || {
+  echo 'package-pipeline test does not force a catalog upgrade over installed state' >&2
+  exit 1
+}
+grep -F 'pkgplan::rejected_object_policy::stage' "$test_source" >/dev/null || {
+  echo 'package-pipeline upgrade does not stage protected incoming evidence' >&2
+  exit 1
+}
+grep -F 'pkgplan::retained_active_ownership_policy::do_not_claim_operated_package' \
+  "$test_source" >/dev/null || {
+  echo 'package-pipeline upgrade does not relinquish protected-path ownership' >&2
+  exit 1
+}
+grep -F 'pkgtransaction::convergence_policy::converge_exact()' "$test_source" >/dev/null || {
+  echo 'package-pipeline removal does not exercise exact convergence' >&2
+  exit 1
+}
+grep -F 'suppressed_resolved() == 1U' "$test_source" >/dev/null || {
+  echo 'package-pipeline reconciliation does not prove anti-resurrection' >&2
+  exit 1
+}
+grep -F 'application.target_root / "etc/tool.conf"' "$test_source" >/dev/null || {
+  echo 'package-pipeline does not verify protected local target bytes' >&2
+  exit 1
+}
+
+if grep -R -F 'libpkgreconcile' "$srcdir/meson.build" "$srcdir/src" >/dev/null 2>&1; then
+  echo 'reconciliation qualification leaked into pkgctl production dependencies' >&2
+  exit 1
+fi
 
 for forbidden in 'pkgctl_exe' 'std::system(' '::execv(' '::execve('; do
   if grep -F "$forbidden" "$test_source" >/dev/null; then
