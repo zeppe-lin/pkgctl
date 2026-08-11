@@ -12,15 +12,21 @@ tests_meson="$srcdir/tests/meson.build"
 integration="$srcdir/tests/integration/cli_run_test.sh"
 removal_integration="$srcdir/tests/integration/cli_run_removal_test.sh"
 restart_integration="$srcdir/tests/integration/cli_run_application_restart_test.sh"
+publication_restart_integration="$srcdir/tests/integration/cli_run_publication_restart_test.sh"
 publication_terminal_integration="$srcdir/tests/integration/cli_run_publication_terminal_restart_test.sh"
 publication_terminal_fixture="$srcdir/tests/fixtures/publication_terminal_interrupt_fixture.cpp"
 lifecycle_resolution_integration="$srcdir/tests/integration/cli_run_lifecycle_resolution_test.sh"
+lease_contention_integration="$srcdir/tests/integration/cli_run_lease_contention_test.sh"
+recovery_lease_contention_integration="$srcdir/tests/integration/cli_run_recovery_lease_contention_test.sh"
+lease_loss_integration="$srcdir/tests/integration/cli_run_lease_loss_test.sh"
 lifecycle_interrupt_fixture="$srcdir/tests/fixtures/lifecycle_intent_interrupt_fixture.cpp"
 interrupt_fixture="$srcdir/tests/fixtures/application_intent_interrupt_fixture.cpp"
 
 for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration" \
-            "$removal_integration" "$restart_integration" "$publication_terminal_integration" \
-            "$publication_terminal_fixture" "$lifecycle_resolution_integration" \
+            "$removal_integration" "$restart_integration" "$publication_restart_integration" \
+            "$publication_terminal_integration" "$publication_terminal_fixture" \
+            "$lifecycle_resolution_integration" "$lease_contention_integration" \
+            "$recovery_lease_contention_integration" "$lease_loss_integration" \
             "$lifecycle_interrupt_fixture" "$interrupt_fixture"; do
   [ -s "$file" ] || {
     echo "missing bounded transaction command source: $file" >&2
@@ -34,6 +40,14 @@ for required in \
   '--resume SHA256' \
   '--max-steps N' \
   'class command_universe_store final' \
+  'std::optional<transaction_request> transaction' \
+  'PKGCTL-COMMAND-UNIVERSE-2' \
+  'append_transaction_request_inputs' \
+  'read_transaction_request_inputs' \
+  'universes.load(command.nonce, command.canonical_store)' \
+  'canonical_generation_store::open_existing(' \
+  'command.canonical_store, binding' \
+  '--resume uses retained transaction semantics' \
   'class private_effect_body_store final' \
   'class live_operation_authority final' \
   'public transaction_operation_session_sink' \
@@ -74,7 +88,8 @@ for forbidden in \
   'getenv(' \
   'application_journals_.load(' \
   'latest_' \
-  'list_'; do
+  'list_' \
+  'PKGCTL-COMMAND-UNIVERSE-1'; do
   if grep -F "$forbidden" "$command" >/dev/null 2>&1; then
     echo "forbidden bounded transaction command policy: $forbidden" >&2
     exit 1
@@ -167,6 +182,32 @@ retain_line=$(grep -n -F 'universes.retain(command.nonce, transaction)' \
   echo 'native execution preflight does not precede command-universe retention' >&2
   exit 1
 }
+for retained_resume_contract in \
+  'inject_resume_semantics' \
+  '--resume uses retained transaction semantics' \
+  'rm -rf "$collection"'; do
+  grep -F -- "$retained_resume_contract" "$integration" >/dev/null || {
+    echo "missing retained resume-semantics qualification: $retained_resume_contract" >&2
+    exit 1
+  }
+done
+
+for resume_script in \
+  "$integration" \
+  "$removal_integration" \
+  "$restart_integration" \
+  "$publication_restart_integration" \
+  "$publication_terminal_integration" \
+  "$lifecycle_resolution_integration" \
+  "$lease_contention_integration" \
+  "$recovery_lease_contention_integration" \
+  "$lease_loss_integration"; do
+  grep -F 'if [ "$intent" = --start ]; then' "$resume_script" >/dev/null || {
+    echo "resume-capable integration does not isolate start semantics: $resume_script" >&2
+    exit 1
+  }
+done
+
 for required_test in \
   'disposition step-limit-reached' \
   'durable-steps 1' \
@@ -305,7 +346,9 @@ for documented in \
   'Release 0.35.0 bounded native command boundary' \
   'Release 0.35.0 bounded native command qualification' \
   'Version 0.35.0 retains the native catalog' \
-  'BOUNDED NATIVE TRANSACTION COMMAND'; do
+  'BOUNDED NATIVE TRANSACTION COMMAND' \
+  'command-evidence schema v2' \
+  'retained transaction semantics'; do
   grep -F "$documented" "$srcdir/README.md" "$srcdir/DESIGN.md" \
       "$srcdir/TESTING.md" "$srcdir/man/pkgctl.1.scd" \
       "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null || {

@@ -8,12 +8,16 @@
   implied by the transaction; actuator unavailability is refused as control
   state rather than recorded as package failure. `--start` admits one explicit
   run nonce; `--resume` requires that exact retained universe and exact admitted
-  journal. Both perform at most the positive `--max-steps` bound through the
-  reviewed native runtime.
-- Retains the original catalog snapshot and canonical state snapshot as one
-  immutable command-universe object before run admission. Resume decodes those
-  owner formats and recomposes the same transaction identity; it never
-  reacquires collections or replans against a newer live state epoch.
+  journal while refusing a second semantic transaction request. Both perform at
+  most the positive `--max-steps` bound through the reviewed native runtime.
+- Upgrades immutable command evidence to schema v2. Before run admission it
+  retains the complete start-only transaction inputs together with the original
+  owner-encoded catalog and canonical-state snapshots. Resume supplies only the
+  current canonical-store pathname plus live runtime/actuator authority; the
+  retained state snapshot supplies target binding, and retained collection,
+  architecture, goal, resolution-policy, and convergence semantics recompose the
+  same transaction identity. Re-declaring those start-only semantics on resume is
+  a usage error. The schema v1 evidence format has no compatibility decoder.
 - Retains lifecycle results, application receipts, publication requests, and
   publication receipts in a private immutable command store before an effect
   journal may name them. Bodies use their owning codecs and are validated again

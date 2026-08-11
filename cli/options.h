@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -40,7 +41,8 @@ struct installed_tree_option final {
 };
 
 struct transaction_run_command final {
-  transaction_request transaction;
+  std::optional<transaction_request> transaction;
+  std::filesystem::path canonical_store;
   transaction_run_command_intent intent;
   transaction_run_nonce nonce;
   std::filesystem::path runtime_root;

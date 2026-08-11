@@ -52,6 +52,10 @@ namespace pkgctl::cli {
 namespace {
 
 constexpr std::size_t maximum_private_object_size = 1024U * 1024U * 1024U;
+constexpr std::string_view command_universe_magic =
+    "PKGCTL-COMMAND-UNIVERSE-2";
+constexpr std::string_view command_universe_checksum_domain =
+    "pkgctl/command-universe/2";
 
 class fd_guard final {
 public:
@@ -310,8 +314,316 @@ void append_bytes(
   return make_session_identity(std::string(domain), {body}).hex();
 }
 
+
+void append_command_optional_text(
+    std::vector<std::uint8_t>& output,
+    const std::optional<std::string>& value)
+{
+  append_u64(output, value ? 1U : 0U);
+  if (value)
+    append_text(output, *value);
+}
+
+[[nodiscard]] std::optional<std::string> read_command_optional_text(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset)
+{
+  const auto present = read_u64(bytes, offset);
+  if (present > 1U)
+    throw std::runtime_error("private run optional-text tag is invalid");
+  if (present == 0U)
+    return std::nullopt;
+  return read_text(bytes, offset);
+}
+
+[[nodiscard]] std::size_t read_count(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset,
+    std::string_view description)
+{
+  const auto value = read_u64(bytes, offset);
+  if (value > static_cast<std::uint64_t>(
+                  std::numeric_limits<std::size_t>::max()) ||
+      value > static_cast<std::uint64_t>(bytes.size() - offset))
+  {
+    throw std::runtime_error(
+        "private run " + std::string(description) + " count is invalid");
+  }
+  return static_cast<std::size_t>(value);
+}
+
+[[nodiscard]] std::uint32_t read_u32_value(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset,
+    std::string_view description)
+{
+  const auto value = read_u64(bytes, offset);
+  if (value > std::numeric_limits<std::uint32_t>::max())
+    throw std::runtime_error(
+        "private run " + std::string(description) + " is too large");
+  return static_cast<std::uint32_t>(value);
+}
+
+void append_scope(
+    std::vector<std::uint8_t>& output,
+    const pkgsource::requirement_scope& scope)
+{
+  switch (scope.kind())
+  {
+    case pkgsource::requirement_scope_kind::build:
+      append_u64(output, 1U);
+      return;
+    case pkgsource::requirement_scope_kind::run:
+      append_u64(output, 2U);
+      return;
+    case pkgsource::requirement_scope_kind::check:
+      append_u64(output, 3U);
+      return;
+    case pkgsource::requirement_scope_kind::lifecycle:
+      append_u64(output, 4U);
+      break;
+  }
+
+  if (!scope.action())
+    throw std::runtime_error("retained lifecycle goal lacks an action");
+  switch (*scope.action())
+  {
+    case pkgsource::lifecycle_action::pre_install:
+      append_u64(output, 1U);
+      return;
+    case pkgsource::lifecycle_action::post_install:
+      append_u64(output, 2U);
+      return;
+    case pkgsource::lifecycle_action::pre_remove:
+      append_u64(output, 3U);
+      return;
+    case pkgsource::lifecycle_action::post_remove:
+      append_u64(output, 4U);
+      return;
+  }
+  throw std::runtime_error("retained lifecycle goal has an unknown action");
+}
+
+[[nodiscard]] pkgsource::requirement_scope read_scope(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset)
+{
+  switch (read_u64(bytes, offset))
+  {
+    case 1U: return pkgsource::requirement_scope::build();
+    case 2U: return pkgsource::requirement_scope::run();
+    case 3U: return pkgsource::requirement_scope::check();
+    case 4U:
+      break;
+    default:
+      throw std::runtime_error("private run goal scope tag is invalid");
+  }
+
+  switch (read_u64(bytes, offset))
+  {
+    case 1U:
+      return pkgsource::requirement_scope::lifecycle(
+          pkgsource::lifecycle_action::pre_install);
+    case 2U:
+      return pkgsource::requirement_scope::lifecycle(
+          pkgsource::lifecycle_action::post_install);
+    case 3U:
+      return pkgsource::requirement_scope::lifecycle(
+          pkgsource::lifecycle_action::pre_remove);
+    case 4U:
+      return pkgsource::requirement_scope::lifecycle(
+          pkgsource::lifecycle_action::post_remove);
+    default:
+      throw std::runtime_error("private run lifecycle-action tag is invalid");
+  }
+}
+
+void append_subject(
+    std::vector<std::uint8_t>& output,
+    const pkgsource::requirement_subject& subject)
+{
+  switch (subject.kind())
+  {
+    case pkgsource::requirement_subject_kind::package:
+      append_u64(output, 1U);
+      append_text(output, subject.package().name());
+      return;
+    case pkgsource::requirement_subject_kind::profile:
+      append_u64(output, 2U);
+      append_text(output, subject.profile().name());
+      return;
+  }
+  throw std::runtime_error("retained goal has an unknown subject kind");
+}
+
+[[nodiscard]] pkgsource::requirement_subject read_subject(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset)
+{
+  const auto kind = read_u64(bytes, offset);
+  auto text = read_text(bytes, offset);
+  if (kind == 1U)
+    return pkgsource::requirement_subject(
+        pkgsource::package_reference(std::move(text)));
+  if (kind == 2U)
+    return pkgsource::requirement_subject(
+        pkgsource::profile_reference(std::move(text)));
+  throw std::runtime_error("private run goal subject tag is invalid");
+}
+
+void append_transaction_request_inputs(
+    std::vector<std::uint8_t>& output,
+    const transaction_request& request)
+{
+  const auto& resolution = request.resolution();
+  const auto& catalog = resolution.catalog();
+  append_u64(output, catalog.collections().size());
+  for (const auto& collection : catalog.collections())
+  {
+    append_u64(output, collection.precedence());
+    append_text(output, collection.name().name());
+    append_text(output, collection.root().string());
+    append_command_optional_text(output, collection.external_revision());
+    const auto& declaration = collection.declaration();
+    append_text(output, declaration.document());
+    append_text(output, declaration.path());
+    append_u64(output, declaration.line());
+    append_u64(output, declaration.column());
+  }
+  append_u64(output, catalog.limits().max_document_bytes());
+
+  append_text(output, resolution.architectures().build().name());
+  append_text(output, resolution.architectures().target().name());
+  append_u64(output, resolution.goals().size());
+  for (const auto& goal : resolution.goals())
+  {
+    append_scope(output, goal.scope());
+    append_subject(output, goal.subject());
+    append_text(output, goal.origin());
+  }
+
+  switch (resolution.policy().preference())
+  {
+    case pkgresolve::installed_preference::retain_compatible:
+      append_u64(output, 1U);
+      break;
+    case pkgresolve::installed_preference::prefer_catalog:
+      append_u64(output, 2U);
+      break;
+  }
+
+  switch (request.convergence().mode())
+  {
+    case pkgtransaction::convergence_mode::preserve_unselected:
+      append_u64(output, 1U);
+      break;
+    case pkgtransaction::convergence_mode::remove_explicit:
+      append_u64(output, 2U);
+      break;
+    case pkgtransaction::convergence_mode::converge_exact:
+      append_u64(output, 3U);
+      break;
+  }
+  append_u64(output, request.convergence().removals().size());
+  for (const auto& package : request.convergence().removals())
+    append_text(output, package.name());
+}
+
+[[nodiscard]] transaction_request read_transaction_request_inputs(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset,
+    const std::filesystem::path& canonical_store,
+    const pkgstate::state_target_binding& binding)
+{
+  const auto collection_count = read_count(bytes, offset, "collection");
+  std::vector<pkgcatalog::acquire::collection_specification> collections;
+  collections.reserve(collection_count);
+  for (std::size_t index = 0U; index < collection_count; ++index)
+  {
+    const auto precedence = read_u32_value(bytes, offset, "precedence");
+    auto name = read_text(bytes, offset);
+    auto root = read_text(bytes, offset);
+    auto revision = read_command_optional_text(bytes, offset);
+    auto document = read_text(bytes, offset);
+    auto path = read_text(bytes, offset);
+    const auto line = read_u32_value(bytes, offset, "declaration line");
+    const auto column = read_u32_value(bytes, offset, "declaration column");
+    collections.emplace_back(
+        precedence, pkgcatalog::collection_reference(std::move(name)),
+        std::filesystem::path(std::move(root)), std::move(revision),
+        pkgsource::declaration_provenance(
+            std::move(document), std::move(path), line, column));
+  }
+  const auto maximum_document_bytes = read_u64(bytes, offset);
+  auto catalog = catalog_request::make(
+      std::move(collections),
+      pkgcatalog::acquire::limits(maximum_document_bytes));
+
+  pkgresolve::architecture_context architectures(
+      pkgsource::architecture_reference(read_text(bytes, offset)),
+      pkgsource::architecture_reference(read_text(bytes, offset)));
+  const auto goal_count = read_count(bytes, offset, "goal");
+  std::vector<pkgresolve::resolution_goal> goals;
+  goals.reserve(goal_count);
+  for (std::size_t index = 0U; index < goal_count; ++index)
+  {
+    auto scope = read_scope(bytes, offset);
+    auto subject = read_subject(bytes, offset);
+    auto origin = read_text(bytes, offset);
+    goals.emplace_back(
+        std::move(scope), std::move(subject), std::move(origin));
+  }
+
+  pkgresolve::resolution_policy policy([&]() {
+    switch (read_u64(bytes, offset))
+    {
+      case 1U: return pkgresolve::installed_preference::retain_compatible;
+      case 2U: return pkgresolve::installed_preference::prefer_catalog;
+      default:
+        throw std::runtime_error(
+            "private run resolution-policy tag is invalid");
+    }
+  }());
+
+  const auto convergence_tag = read_u64(bytes, offset);
+  const auto removal_count = read_count(bytes, offset, "explicit removal");
+  std::vector<pkgsource::package_reference> removals;
+  removals.reserve(removal_count);
+  for (std::size_t index = 0U; index < removal_count; ++index)
+    removals.emplace_back(read_text(bytes, offset));
+
+  pkgtransaction::convergence_policy convergence = [&]() {
+    switch (convergence_tag)
+    {
+      case 1U:
+        if (!removals.empty())
+          throw std::runtime_error(
+              "private run preserve convergence carries removals");
+        return pkgtransaction::convergence_policy::preserve_unselected();
+      case 2U:
+        return pkgtransaction::convergence_policy::remove_explicit(
+            std::move(removals));
+      case 3U:
+        if (!removals.empty())
+          throw std::runtime_error(
+              "private run exact convergence carries removals");
+        return pkgtransaction::convergence_policy::converge_exact();
+      default:
+        throw std::runtime_error(
+            "private run convergence-policy tag is invalid");
+    }
+  }();
+
+  auto resolution = resolution_request::make(
+      std::move(catalog), state_location::make(canonical_store, binding),
+      std::move(architectures), std::move(goals), std::move(policy));
+  return transaction_request::make(
+      std::move(resolution), std::move(convergence));
+}
+
 struct retained_command_universe final {
   session_identity transaction;
+  transaction_request request;
   pkgcatalog::catalog_snapshot catalog;
   pkgstate::snapshot state;
 };
@@ -332,26 +644,30 @@ public:
     const auto state = pkgstate::encode_generation_snapshot(
         transaction.resolution().installed());
     std::vector<std::uint8_t> bytes;
-    static constexpr std::string_view magic = "PKGCTL-COMMAND-UNIVERSE-1";
-    append_text(bytes, magic);
+    append_text(bytes, command_universe_magic);
+    std::vector<std::uint8_t> request;
+    append_transaction_request_inputs(request, transaction.request());
     append_text(bytes, transaction.identity().hex());
     append_bytes(bytes, catalog);
     append_bytes(bytes, state);
-    append_text(bytes, checksum("pkgctl/command-universe/1", bytes));
+    append_bytes(bytes, request);
+    append_text(bytes, checksum(command_universe_checksum_domain, bytes));
     retain_immutable(
         directory_.get(), name(nonce), bytes, "command-universe");
   }
 
   [[nodiscard]] retained_command_universe load(
-      const transaction_run_nonce& nonce) const
+      const transaction_run_nonce& nonce,
+      const std::filesystem::path& canonical_store) const
   {
     const auto bytes = read_all(directory_.get(), name(nonce));
     std::size_t offset = 0U;
-    if (read_text(bytes, offset) != "PKGCTL-COMMAND-UNIVERSE-1")
+    if (read_text(bytes, offset) != command_universe_magic)
       throw std::runtime_error("command universe has invalid magic");
     const auto transaction = session_identity::from_hex(read_text(bytes, offset));
-    const auto catalog = read_bytes(bytes, offset);
-    const auto state = read_bytes(bytes, offset);
+    const auto catalog_encoding = read_bytes(bytes, offset);
+    const auto state_encoding = read_bytes(bytes, offset);
+    const auto request_encoding = read_bytes(bytes, offset);
     const auto checksum_offset = offset;
     const auto expected_checksum = read_text(bytes, offset);
     if (offset != bytes.size())
@@ -359,13 +675,21 @@ public:
     std::vector<std::uint8_t> prefix(
         bytes.begin(),
         bytes.begin() + static_cast<std::ptrdiff_t>(checksum_offset));
-    if (expected_checksum != checksum("pkgctl/command-universe/1", prefix))
+    if (expected_checksum != checksum(command_universe_checksum_domain, prefix))
       throw std::runtime_error("command universe checksum is invalid");
+
+    auto catalog = pkgcatalog::decode_catalog_snapshot(catalog_encoding);
+    auto state = pkgstate::decode_generation_snapshot(std::string_view(
+        reinterpret_cast<const char*>(state_encoding.data()),
+        state_encoding.size()));
+    std::size_t request_offset = 0U;
+    auto request = read_transaction_request_inputs(
+        request_encoding, request_offset, canonical_store,
+        state.target_binding());
+    if (request_offset != request_encoding.size())
+      throw std::runtime_error("command universe request has trailing bytes");
     return {
-        transaction,
-        pkgcatalog::decode_catalog_snapshot(catalog),
-        pkgstate::decode_generation_snapshot(std::string_view(
-            reinterpret_cast<const char*>(state.data()), state.size()))};
+        transaction, std::move(request), std::move(catalog), std::move(state)};
   }
 
 private:
@@ -1926,10 +2250,18 @@ int execute_transaction_run(transaction_run_command command)
       runtime_path(command, "command-evidence"));
   transaction_session transaction = [&]() {
     if (command.intent == transaction_run_command_intent::start)
-      return compose_transaction(command.transaction);
-    auto retained = universes.load(command.nonce);
+    {
+      if (!command.transaction)
+        throw std::runtime_error(
+            "fresh run lacks explicit transaction authority");
+      return compose_transaction(std::move(*command.transaction));
+    }
+    if (command.transaction)
+      throw std::runtime_error(
+          "resumed run carries duplicate transaction authority");
+    auto retained = universes.load(command.nonce, command.canonical_store);
     auto composed = recompose_transaction(
-        command.transaction, std::move(retained.catalog),
+        std::move(retained.request), std::move(retained.catalog),
         std::move(retained.state));
     if (composed.identity() != retained.transaction)
       throw std::runtime_error(
@@ -1938,9 +2270,6 @@ int execute_transaction_run(transaction_run_command command)
   }();
 
   const auto& binding = transaction.resolution().installed().target_binding();
-  if (binding != command.transaction.resolution().state().target_binding())
-    throw std::runtime_error(
-        "transaction state binding differs from configured canonical store");
 
   auto interpreter = pkgexec_linux::interpreter_binding::inspect(
       command.interpreter);
@@ -1982,7 +2311,7 @@ int execute_transaction_run(transaction_run_command command)
           capture_directory.get(), rejected_directory.get(),
           completed_directory.get());
   auto state_store = pkgstate::posix::canonical_generation_store::open_existing(
-      command.transaction.resolution().state().canonical_store(), binding);
+      command.canonical_store, binding);
   pkgimage::libarchive_backend archive_backend;
   explicit_installed_package_source installed_packages(
       std::move(command.installed_trees));

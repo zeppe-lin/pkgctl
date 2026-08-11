@@ -49,12 +49,18 @@ run_command()
   intent=$1
   nonce=$2
   maximum_steps=$3
-  set -- run \
-    --collection "core=$collection" \
-    --canonical-store "$state" \
-    --build-architecture x86_64 \
-    --target-architecture x86_64 \
-    --goal 'run=@base' \
+  inject_resume_semantics=${4:-no}
+  set -- run --canonical-store "$state"
+  if [ "$intent" = --start ]; then
+    set -- "$@" \
+      --collection "core=$collection" \
+      --build-architecture x86_64 \
+      --target-architecture x86_64 \
+      --goal 'run=@base'
+  elif [ "$inject_resume_semantics" = yes ]; then
+    set -- "$@" --goal 'run=@base'
+  fi
+  set -- "$@" \
     "$intent" "$nonce" \
     --runtime-root "$runtime" \
     --build-root "$build" \
@@ -77,10 +83,14 @@ run_command()
       set -- "$@" --lifecycle-supplementary-group "$group"
     fi
   done
-  # The fixture emits these five option/value pairs as one trusted shell word
-  # sequence so the CLI is exercised exactly as an operator would invoke it.
-  # shellcheck disable=SC2086
-  "$pkgctl" "$@" $binding
+  if [ "$intent" = --start ]; then
+    # The fixture emits these five option/value pairs as one trusted shell word
+    # sequence so the CLI is exercised exactly as an operator would invoke it.
+    # shellcheck disable=SC2086
+    "$pkgctl" "$@" $binding
+  else
+    "$pkgctl" "$@"
+  fi
 }
 
 fail()
@@ -290,6 +300,19 @@ require_contains run-inspection "$root/inspection.out" 'run.complete=false'
 capture_run second-start 1 --start "$run_nonce" 1
 require_contains second-start-stderr "$root/second-start.err" \
   'exact transaction run is already admitted; use --resume'
+
+set +e
+run_command --resume "$run_nonce" 1 yes \
+  >"$root/resume-semantic.out" 2>"$root/resume-semantic.err"
+resume_semantic_status=$?
+set -e
+[ "$resume_semantic_status" -eq 2 ] || {
+  dump_file resume-semantic-stdout "$root/resume-semantic.out"
+  dump_file resume-semantic-stderr "$root/resume-semantic.err"
+  fail "resume semantic redeclaration: expected status 2, got $resume_semantic_status"
+}
+require_contains resume-semantic-stderr "$root/resume-semantic.err" \
+  '--resume uses retained transaction semantics'
 
 rm -rf "$collection"
 capture_run resume 0 --resume "$run_nonce" 8

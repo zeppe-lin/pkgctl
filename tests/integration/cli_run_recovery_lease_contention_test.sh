@@ -142,12 +142,15 @@ run_command()
   intent=$1
   nonce=$2
   maximum_steps=$3
-  set -- run \
-    --collection "core=$collection" \
-    --canonical-store "$state" \
-    --build-architecture x86_64 \
-    --target-architecture x86_64 \
-    --goal 'run=@base' \
+  set -- run --canonical-store "$state"
+  if [ "$intent" = --start ]; then
+    set -- "$@" \
+      --collection "core=$collection" \
+      --build-architecture x86_64 \
+      --target-architecture x86_64 \
+      --goal 'run=@base'
+  fi
+  set -- "$@" \
     "$intent" "$nonce" \
     --runtime-root "$runtime" \
     --build-root "$build" \
@@ -170,8 +173,14 @@ run_command()
       set -- "$@" --lifecycle-supplementary-group "$group"
     fi
   done
-  # shellcheck disable=SC2086
-  "$pkgctl" "$@" $binding
+  if [ "$intent" = --start ]; then
+    # The fixture emits these five option/value pairs as one trusted shell word
+    # sequence so the CLI is exercised exactly as an operator would invoke it.
+    # shellcheck disable=SC2086
+    "$pkgctl" "$@" $binding
+  else
+    "$pkgctl" "$@"
+  fi
 }
 
 run_interrupted_command()

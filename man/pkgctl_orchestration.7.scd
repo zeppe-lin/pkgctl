@@ -13,12 +13,16 @@ the resulting control state.
 # BOUNDED NATIVE TRANSACTION COMMAND
 
 Version 0.35.0 exposes *pkgctl run*, one narrow command over the existing native
-runtime. *--start* composes from the explicit collection and canonical-state
-request, immutably retains that catalog/state universe, and then admits one
-caller-issued run nonce. *--resume* requires the retained universe and exact
-admitted journal, decodes the owner formats, and recomposes the same transaction
-identity. It does not reacquire collections or substitute current state for the
-historical epoch.
+runtime. *--start* composes from the explicit transaction request, then
+immutably retains command-evidence schema v2: the complete start-only
+transaction inputs plus the owner-encoded catalog/state universe, before admitting one caller-issued run
+nonce. *--resume* requires the retained universe and exact admitted journal and
+recomposes the same transaction identity without a second semantic request.
+Catalog acquisition, target-binding, architecture, goal, resolution-policy, and
+convergence options are start-only. Resume accepts the current canonical-store
+pathname as live physical authority while taking its target binding from retained
+state evidence. It does not reacquire collections or substitute current state for
+the historical epoch, and no v1 evidence compatibility path exists.
 
 The command-private effect-body store is both durable sink and restart source.
 Lifecycle results, application receipts, publication requests, and publication

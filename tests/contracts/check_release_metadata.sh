@@ -58,7 +58,7 @@ grep -F 'Version 0.35.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 
 grep -F 'Bounded native transaction command' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F '`pkgctl run`' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'immutable command-universe object' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Upgrades immutable command evidence to schema v2.' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F 'Version 0.35.0 exposes *pkgctl run*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 

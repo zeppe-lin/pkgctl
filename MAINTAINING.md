@@ -158,6 +158,16 @@ successor, reserve replacement work, reacquire a mutation lease, or recreate the
 missing lock pathname. Delete the live collection before resume to keep the
 retained-command-universe guarantee in the same proof.
 
+A resumed command must not carry a second semantic transaction request merely so
+the CLI can prove equality with itself. Command-evidence schema v2 retains every start-only transaction input together with owner-encoded catalog/state
+snapshots before run admission. Every process-level resume test must therefore
+omit catalog acquisition, target-binding identities, architecture, goals,
+resolution preference, and convergence policy; explicit re-declaration is a
+usage error. The canonical-store pathname remains live physical authority on
+resume, but its target binding comes from retained state evidence. Do not add a
+v1 compatibility decoder: the old evidence format is not a public
+state authority and must fail closed.
+
 Application and publication interruption must occur by
 refusing an exact effect journal append after the subordinate side effect has
 reached the selected durable boundary. Restart must reopen retained

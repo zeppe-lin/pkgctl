@@ -62,9 +62,13 @@ The final command suite must prove:
 - `--start` and `--resume` are mutually exclusive and require one explicit
   lowercase run nonce, existing roots, inspected interpreter, numeric
   credentials, source-date epoch, and positive step bound;
-- start retains the original catalog/state universe before admission and refuses
-  an existing journal, while resume requires both the retained universe and
-  that exact journal and reproduces the same transaction identity;
+- start retains command-evidence schema v2 before admission: the complete start-only transaction inputs plus owner-encoded catalog/state
+  snapshots. Resume requires
+  that retained universe and exact journal, omits all catalog, target-binding,
+  architecture, goal, resolution-policy, and convergence options, and reproduces
+  the same transaction identity using only the current canonical-store pathname
+  as live state-store coordinate; re-declaring start semantics on resume is a
+  usage error and command-evidence v1 is intentionally unsupported;
 - effect bodies are durably retained through owner codecs before journal records
   name them, interrupted application recovery uses direct active-request lookup
   rather than enumeration, and later application/terminal replay does not feed
@@ -92,8 +96,10 @@ The final command suite must prove:
 - the existing read-only commands remain byte-stable sensors;
 - the actual built `pkgctl` executable can start one synthetic installation,
   stop after one durable construction step, lose access to the live collection,
-  resume the exact retained transaction to target/state completion, and report
-  the same transaction and journal identities across both processes;
+  resume the exact retained transaction to target/state completion without
+  re-declaring its collection, binding, architecture, goals, resolver policy, or
+  convergence policy, and report the same transaction and journal identities
+  across both processes;
 - a second start of the admitted nonce is refused, while a second resume of the
   completed run reports zero durable work and leaves target bytes and canonical
   state unchanged;

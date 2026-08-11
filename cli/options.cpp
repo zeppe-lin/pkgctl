@@ -38,6 +38,7 @@ struct raw_options final {
   std::vector<raw_collection> collections;
   std::map<std::string, std::string> external_revisions;
   std::uint64_t max_document_bytes = 1024U * 1024U;
+  bool max_document_bytes_explicit = false;
   std::optional<std::string> canonical_store;
   std::optional<std::string> managed_target;
   std::optional<std::string> state_store;
@@ -308,8 +309,11 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
     }
     if (argument == "--max-document-bytes")
     {
+      if (parsed.max_document_bytes_explicit)
+        fail("--max-document-bytes specified more than once");
       parsed.max_document_bytes = decimal(
           require_value(argc, argv, index, argument), "document byte limit");
+      parsed.max_document_bytes_explicit = true;
       continue;
     }
     if (argument == "--canonical-store")
@@ -492,65 +496,93 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
     fail("unknown option: " + argument);
   }
 
-  if (parsed.collections.empty())
-    fail("at least one --collection is required");
+  if (kind == command_kind::run && (!parsed.run_intent || !parsed.run_nonce))
+    fail("run requires exactly one --start or --resume nonce");
 
-  for (raw_collection& collection : parsed.collections)
-  {
-    const auto revision = parsed.external_revisions.find(collection.name);
-    if (revision != parsed.external_revisions.end())
-    {
-      collection.external_revision = revision->second;
-      parsed.external_revisions.erase(revision);
-    }
-  }
-  if (!parsed.external_revisions.empty())
-    fail("external revision names an unknown collection: " +
-         parsed.external_revisions.begin()->first);
+  const bool resume = kind == command_kind::run &&
+      *parsed.run_intent == transaction_run_command_intent::resume;
+  const bool has_start_semantics = !parsed.collections.empty() ||
+      !parsed.external_revisions.empty() || parsed.max_document_bytes_explicit ||
+      parsed.managed_target || parsed.state_store || parsed.root_view ||
+      parsed.state_backend || parsed.publication_domain ||
+      parsed.build_architecture || parsed.target_architecture ||
+      !parsed.goals.empty() || parsed.prefer_catalog || parsed.converge_exact;
 
-  if (kind == command_kind::catalog)
+  if (resume)
   {
-    if (parsed.canonical_store || parsed.managed_target || parsed.state_store ||
-        parsed.root_view || parsed.state_backend || parsed.publication_domain ||
-        parsed.build_architecture || parsed.target_architecture ||
-        !parsed.goals.empty() || parsed.prefer_catalog || parsed.converge_exact)
+    if (!parsed.canonical_store)
+      fail("--resume requires --canonical-store");
+    if (has_start_semantics)
     {
-      fail("catalog command received resolution or transaction options");
+      fail("--resume uses retained transaction semantics; catalog, "
+           "target-binding, architecture, goal, resolution-policy, and "
+           "convergence options are valid only with --start");
     }
   }
   else
   {
-    if (!parsed.canonical_store || !parsed.managed_target ||
-        !parsed.state_store || !parsed.root_view || !parsed.state_backend ||
-        !parsed.publication_domain)
-      fail("all canonical state options are required");
-    if (!parsed.build_architecture || !parsed.target_architecture)
-      fail("both architecture options are required");
-    if (parsed.goals.empty())
-      fail("at least one --goal is required");
-    if (kind != command_kind::transaction && kind != command_kind::run &&
-        parsed.converge_exact)
-      fail("--converge-exact is valid only for transaction or run");
+    if (parsed.collections.empty())
+      fail("at least one --collection is required");
+
+    for (raw_collection& collection : parsed.collections)
+    {
+      const auto revision = parsed.external_revisions.find(collection.name);
+      if (revision != parsed.external_revisions.end())
+      {
+        collection.external_revision = revision->second;
+        parsed.external_revisions.erase(revision);
+      }
+    }
+    if (!parsed.external_revisions.empty())
+      fail("external revision names an unknown collection: " +
+           parsed.external_revisions.begin()->first);
+
+    if (kind == command_kind::catalog)
+    {
+      if (parsed.canonical_store || parsed.managed_target || parsed.state_store ||
+          parsed.root_view || parsed.state_backend ||
+          parsed.publication_domain || parsed.build_architecture ||
+          parsed.target_architecture || !parsed.goals.empty() ||
+          parsed.prefer_catalog || parsed.converge_exact)
+      {
+        fail("catalog command received resolution or transaction options");
+      }
+    }
+    else
+    {
+      if (!parsed.canonical_store || !parsed.managed_target ||
+          !parsed.state_store || !parsed.root_view || !parsed.state_backend ||
+          !parsed.publication_domain)
+        fail("all canonical state options are required");
+      if (!parsed.build_architecture || !parsed.target_architecture)
+        fail("both architecture options are required");
+      if (parsed.goals.empty())
+        fail("at least one --goal is required");
+      if (kind != command_kind::transaction && kind != command_kind::run &&
+          parsed.converge_exact)
+        fail("--converge-exact is valid only for transaction or run");
+    }
   }
 
   const bool has_run_options = parsed.run_intent || parsed.run_nonce ||
       parsed.runtime_root || parsed.build_root_path ||
-      parsed.lifecycle_root_path || parsed.target_root_path || parsed.interpreter || parsed.build_user_id || parsed.build_group_id ||
-      !parsed.build_supplementary_groups.empty() ||
-      parsed.lifecycle_user_id || parsed.lifecycle_group_id ||
+      parsed.lifecycle_root_path || parsed.target_root_path ||
+      parsed.interpreter || parsed.build_user_id || parsed.build_group_id ||
+      !parsed.build_supplementary_groups.empty() || parsed.lifecycle_user_id ||
+      parsed.lifecycle_group_id ||
       !parsed.lifecycle_supplementary_groups.empty() ||
-      parsed.source_date_epoch ||
-      parsed.maximum_steps || !parsed.installed_trees.empty();
+      parsed.source_date_epoch || parsed.maximum_steps ||
+      !parsed.installed_trees.empty();
   if (kind == command_kind::run)
   {
-    if (!parsed.run_intent || !parsed.run_nonce || !parsed.runtime_root ||
-        !parsed.build_root_path || !parsed.lifecycle_root_path ||
-        !parsed.target_root_path || !parsed.interpreter ||
-        !parsed.build_user_id.has_value() || !parsed.build_group_id.has_value() ||
+    if (!parsed.runtime_root || !parsed.build_root_path ||
+        !parsed.lifecycle_root_path || !parsed.target_root_path ||
+        !parsed.interpreter || !parsed.build_user_id.has_value() ||
+        !parsed.build_group_id.has_value() ||
         !parsed.lifecycle_user_id.has_value() ||
         !parsed.lifecycle_group_id.has_value() ||
         !parsed.source_date_epoch.has_value() || !parsed.maximum_steps)
-      fail("run requires intent, roots, interpreter, build/lifecycle credentials, epoch, and bound");
+      fail("run requires roots, interpreter, build/lifecycle credentials, epoch, and bound");
     if (*parsed.maximum_steps >
         static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
       fail("maximum step count is too large for this platform");
@@ -606,6 +638,28 @@ resolution_request resolution_from(raw_options& parsed)
       std::move(parsed.goals), std::move(policy));
 }
 
+transaction_run_command run_from(
+    raw_options& parsed,
+    std::optional<transaction_request> transaction,
+    std::filesystem::path canonical_store)
+{
+  return transaction_run_command{
+      std::move(transaction), std::move(canonical_store), *parsed.run_intent,
+      transaction_run_nonce::from_hex(std::move(*parsed.run_nonce)),
+      std::move(*parsed.runtime_root), std::move(*parsed.build_root_path),
+      std::move(*parsed.lifecycle_root_path),
+      std::move(*parsed.target_root_path), std::move(*parsed.interpreter),
+      pkgexec::credential_policy::fixed(
+          *parsed.build_user_id, *parsed.build_group_id,
+          std::move(parsed.build_supplementary_groups), true),
+      pkgexec::credential_policy::fixed(
+          *parsed.lifecycle_user_id, *parsed.lifecycle_group_id,
+          std::move(parsed.lifecycle_supplementary_groups), true),
+      *parsed.source_date_epoch,
+      static_cast<std::size_t>(*parsed.maximum_steps),
+      std::move(parsed.installed_trees)};
+}
+
 } // namespace
 
 usage_error::usage_error(std::string message)
@@ -625,6 +679,22 @@ command parse_command(int argc, char** argv)
   raw_options parsed = parse_raw(kind, argc, argv);
   if (kind == command_kind::catalog)
     return catalog_from(parsed);
+
+  if (kind == command_kind::run &&
+      *parsed.run_intent == transaction_run_command_intent::resume)
+  {
+    try
+    {
+      return run_from(
+          parsed, std::nullopt, std::filesystem::path(*parsed.canonical_store));
+    }
+    catch (const std::exception& problem)
+    {
+      fail(std::string("invalid run authority: ") + problem.what());
+    }
+  }
+
+  const std::filesystem::path canonical_store = *parsed.canonical_store;
   resolution_request resolution = resolution_from(parsed);
   if (kind == command_kind::resolve)
     return resolution;
@@ -637,21 +707,8 @@ command parse_command(int argc, char** argv)
     return transaction;
   try
   {
-    return transaction_run_command{
-        std::move(transaction), *parsed.run_intent,
-        transaction_run_nonce::from_hex(std::move(*parsed.run_nonce)),
-        std::move(*parsed.runtime_root), std::move(*parsed.build_root_path),
-        std::move(*parsed.lifecycle_root_path),
-        std::move(*parsed.target_root_path), std::move(*parsed.interpreter),
-        pkgexec::credential_policy::fixed(
-            *parsed.build_user_id, *parsed.build_group_id,
-            std::move(parsed.build_supplementary_groups), true),
-        pkgexec::credential_policy::fixed(
-            *parsed.lifecycle_user_id, *parsed.lifecycle_group_id,
-            std::move(parsed.lifecycle_supplementary_groups), true),
-        *parsed.source_date_epoch,
-        static_cast<std::size_t>(*parsed.maximum_steps),
-        std::move(parsed.installed_trees)};
+    return run_from(
+        parsed, std::move(transaction), std::move(canonical_store));
   }
   catch (const std::exception& problem)
   {
@@ -665,7 +722,8 @@ std::string help_text()
   pkgctl catalog OPTIONS
   pkgctl resolve OPTIONS --goal SCOPE=SUBJECT [--goal ...]
   pkgctl transaction OPTIONS --goal SCOPE=SUBJECT [--goal ...]
-  pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] RUN-OPTIONS
+  pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] --start SHA256 RUN-AUTHORITY
+  pkgctl run --canonical-store PATH --resume SHA256 RUN-AUTHORITY
   pkgctl inspect-run --run-store PATH --journal SHA256
   pkgctl inspect-effect --effect-store PATH --attempt SHA256
 
@@ -676,8 +734,8 @@ Catalog options:
   --external-revision NAME=VALUE  diagnostic revision provenance
   --max-document-bytes N          per-document acquisition limit
 
-State options required by resolve and transaction:
-  --canonical-store PATH
+State options required by resolve, transaction, and run --start:
+  --canonical-store PATH           existing store path; also required by --resume
   --managed-target ID
   --state-store ID
   --root-view ID
@@ -698,9 +756,16 @@ Transaction options:
   --converge-exact                remove installed packages outside the exact
                                   selected target closure; never the default
 
-Run options:
-  --start SHA256                  admit a new explicit run intent
-  --resume SHA256                 resume exactly that retained run intent
+Run intent:
+  --start SHA256                  admit a new explicit semantic run request
+  --resume SHA256                 resume retained semantic request and run intent
+
+Catalog acquisition, target-binding, architecture, goal, resolution-policy,
+and convergence options are start-only. Resume refuses their re-declaration and
+uses command-evidence retained at admission. --canonical-store remains live
+resume authority naming the existing physical canonical state store.
+
+Run authority:
   --runtime-root PATH             existing private runtime hierarchy
   --build-root PATH               existing construction/check root view
   --lifecycle-root PATH           existing lifecycle execution root view

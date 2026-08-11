@@ -10,16 +10,23 @@ Release 0.35.0 closes the functional package-management chain with one
 bounded native transaction command. Before fresh-run retention or admission,
 `pkgctl run` proves that the selected native Linux backend can establish the
 execution guarantees implied by the transaction. `--start` then retains the
-exact catalog/state universe before admitting one explicit run nonce; `--resume`
-requires that retained universe and the exact admitted journal. Both enter only
-through `native_posix_transaction_run_runtime` and perform at most the explicit
+complete start-only transaction inputs together with the owner-encoded catalog/state universe
+before admitting one explicit run nonce. `--resume` requires that retained
+command universe and the exact admitted journal; it refuses a second collection,
+target-binding, architecture, goal, resolution-policy, or convergence request.
+The current canonical-store pathname remains live resume authority while its
+target binding comes from retained state evidence. Both enter only through
+`native_posix_transaction_run_runtime` and perform at most the explicit
 `--max-steps` bound.
 
 The command retains subordinate effect bodies in owner encodings before the
 controller journal may reference them. Interrupted applications are reopened
 through the direct `libpkgapply-posix` request-to-journal index. Resume never
-reacquires collections, substitutes current state for historical state, scans
-for journals, or silently replans. Target observations are live only for the
+reacquires collections, asks the operator to restate transaction semantics,
+substitutes current state for historical state, scans for journals, or silently
+replans. Command-evidence schema v2 is the only admitted format; schema v1
+evidence is intentionally rejected rather than interpreted through a compatibility
+path. Target observations are live only for the
 current operation dispatch.
 
 Construction/check and lifecycle execution keep separate existing root views

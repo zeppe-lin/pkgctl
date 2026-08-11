@@ -173,13 +173,16 @@ run_command()
   intent=$1
   nonce=$2
   maximum_steps=$3
-  set -- run \
-    --collection "core=$collection" \
-    --canonical-store "$state" \
-    --build-architecture x86_64 \
-    --target-architecture x86_64 \
-    --goal 'run=@base' \
-    --goal "$lifecycle_goal" \
+  set -- run --canonical-store "$state"
+  if [ "$intent" = --start ]; then
+    set -- "$@" \
+      --collection "core=$collection" \
+      --build-architecture x86_64 \
+      --target-architecture x86_64 \
+      --goal 'run=@base' \
+      --goal "$lifecycle_goal"
+  fi
+  set -- "$@" \
     "$intent" "$nonce" \
     --runtime-root "$runtime" \
     --build-root "$build" \
@@ -202,8 +205,12 @@ run_command()
       set -- "$@" --lifecycle-supplementary-group "$group"
     fi
   done
-  # shellcheck disable=SC2086
-  "$pkgctl" "$@" $binding
+  if [ "$intent" = --start ]; then
+    # shellcheck disable=SC2086
+    "$pkgctl" "$@" $binding
+  else
+    "$pkgctl" "$@"
+  fi
 }
 
 run_interrupted_command()

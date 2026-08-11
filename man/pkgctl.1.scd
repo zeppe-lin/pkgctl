@@ -14,7 +14,9 @@ pkgctl - inspect or boundedly execute native package authority
 _resolution-options_ [*--converge-exact*]
 
 *pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_ \
-[*--converge-exact*] _run-options_
+[*--converge-exact*] *--start* _identity_ _run-authority_
+
+*pkgctl* *run* *--canonical-store* _path_ *--resume* _identity_ _run-authority_
 
 *pkgctl* *inspect-run* *--run-store* _path_ *--journal* _identity_
 
@@ -33,9 +35,11 @@ runtime, and performs at most the positive *--max-steps* bound. Before a fresh
 run is retained or admitted, the command proves that the selected native Linux
 backend can establish the execution guarantees implied by the transaction.
 Capability absence is reported as control-plane unavailability rather than a
-package build/check failure. *--start* then retains the original catalog and
-state universe before admission; *--resume* requires that retained universe and
-the exact admitted journal.
+package build/check failure. *--start* then retains command-evidence schema v2:
+the complete start-only transaction inputs plus the original owner-encoded catalog
+and state snapshots. *--resume* requires that retained universe and the exact admitted
+journal; it does not accept a second collection, target-binding, architecture,
+goal, resolution-policy, or convergence request.
 
 The command does not initialize or enumerate stores, discover journals, replan
 a resumed transaction from live catalog/state, loop without a bound, sleep,
@@ -141,7 +145,9 @@ and the read-only command surface is unchanged.
 
 # STATE OPTIONS
 
-The following options are all required by *resolve*, *transaction*, and *run*:
+The following options are all required by *resolve*, *transaction*, and
+*run --start*. Only *--canonical-store* remains a live state option for
+*run --resume*; the target binding is recovered from retained command evidence.
 
 *--canonical-store* _path_
 	Open the existing canonical generation store at the absolute _path_. Missing
@@ -196,9 +202,13 @@ Exactly one of the following is required:
 
 *--resume* _identity_
 	Resume the exact retained run nonce. The immutable command universe and
-	admitted journal must both already exist.
+	admitted journal must both already exist. Collection, target-binding,
+	architecture, goal, resolution-policy, and convergence options are invalid on
+	resume: their exact admitted values are decoded from command-evidence schema
+	v2. The current *--canonical-store* pathname remains caller authority for the
+	existing physical store. Evidence in the schema v1 format is rejected.
 
-The following are also required:
+The following run authorities are also required:
 
 *--runtime-root* _path_
 	Existing absolute private runtime hierarchy. The command requires these
