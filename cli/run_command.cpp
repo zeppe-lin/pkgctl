@@ -7,6 +7,7 @@
 #include <pkgctl/preparation.h>
 #include <pkgctl/run_runtime.h>
 #include <pkgctl/run_store.h>
+#include <pkgctl/target_observation.h>
 
 #include <libpkgapply/application_receipt_codec.h>
 #include <libpkgapply/request.h>
@@ -602,42 +603,6 @@ template<typename Identity>
       "v1:sha256:" + make_session_identity(std::string(domain), fields).hex());
 }
 
-[[nodiscard]] pkgplan::filesystem_object_kind planner_kind(
-    pkgapply::completed_object_kind kind)
-{
-  switch (kind)
-  {
-    case pkgapply::completed_object_kind::regular:
-      return pkgplan::filesystem_object_kind::regular;
-    case pkgapply::completed_object_kind::directory:
-      return pkgplan::filesystem_object_kind::directory;
-    case pkgapply::completed_object_kind::symlink:
-      return pkgplan::filesystem_object_kind::symlink;
-    case pkgapply::completed_object_kind::fifo:
-      return pkgplan::filesystem_object_kind::fifo;
-    case pkgapply::completed_object_kind::character_device:
-      return pkgplan::filesystem_object_kind::character_device;
-    case pkgapply::completed_object_kind::block_device:
-      return pkgplan::filesystem_object_kind::block_device;
-    case pkgapply::completed_object_kind::socket:
-      return pkgplan::filesystem_object_kind::socket;
-    case pkgapply::completed_object_kind::other:
-      return pkgplan::filesystem_object_kind::other;
-  }
-  throw std::runtime_error("target observer returned an invalid object kind");
-}
-
-template<typename Value>
-[[nodiscard]] const Value& required_fact(
-    const pkgapply::qualified_fact<Value>& fact,
-    std::string_view name)
-{
-  if (fact.state() != pkgapply::fact_state::known || !fact.value())
-    throw std::runtime_error(
-        "target observation lacks required " + std::string(name));
-  return *fact.value();
-}
-
 [[nodiscard]] std::int64_t read_i64_text(
     const std::vector<std::uint8_t>& bytes,
     std::size_t& offset,
@@ -899,57 +864,6 @@ void append_operation_observation(
       complete != 0U ? pkgplan::fact_set_completeness::complete
                      : pkgplan::fact_set_completeness::partial,
       std::move(observations));
-}
-
-[[nodiscard]] pkgplan::target_path_observation planner_observation(
-    const pkgapply::application_path_observation& observation)
-{
-  if (observation.state() == pkgapply::fact_state::not_applicable)
-    return pkgplan::target_path_observation::absent(observation.path());
-  if (observation.state() != pkgapply::fact_state::known ||
-      !observation.object())
-    throw std::runtime_error(
-        "native operation requires complete target observation");
-  const auto& object = *observation.object();
-  if (object.completeness() != pkgapply::object_fact_completeness::complete)
-    throw std::runtime_error(
-        "native operation refuses partial target object facts");
-
-  std::optional<std::uint64_t> size;
-  if (object.size().state() == pkgapply::fact_state::known)
-    size = required_fact(object.size(), "object size");
-  std::optional<pkgplan::object_timestamp> mtime;
-  if (object.mtime().state() == pkgapply::fact_state::known)
-  {
-    const auto& value = required_fact(object.mtime(), "object timestamp");
-    mtime.emplace(value.seconds, value.nanoseconds);
-  }
-  std::optional<pkgplan::filesystem_regular_content_identity> content;
-  if (object.regular_content().state() == pkgapply::fact_state::known)
-  {
-    content = pkgplan::filesystem_regular_content_identity::parse(
-        required_fact(object.regular_content(), "regular content").string());
-  }
-  std::optional<std::string> symlink;
-  if (object.symlink_target().state() == pkgapply::fact_state::known)
-    symlink = required_fact(object.symlink_target(), "symlink target");
-  std::optional<pkgplan::device_number> device;
-  if (object.device().state() == pkgapply::fact_state::known)
-  {
-    const auto& value = required_fact(object.device(), "device number");
-    device.emplace(value.major, value.minor);
-  }
-
-  return pkgplan::target_path_observation::present(
-      pkgplan::filesystem_object_fact(
-          object.path(),
-          pkgplan::filesystem_object_metadata(
-              planner_kind(object.kind()),
-              required_fact(object.mode(), "object mode"),
-              required_fact(object.uid(), "object uid"),
-              required_fact(object.gid(), "object gid"),
-              std::move(size), std::move(mtime), std::move(content),
-              std::move(symlink), std::move(device))));
 }
 
 void add_path_closure(
@@ -1340,55 +1254,9 @@ private:
       throw std::runtime_error(
           "operation authority cannot replay a released dispatch");
 
-    auto batch = observer_.observe(requested, std::move(hardlinks));
-    std::vector<pkgplan::target_path_observation> observations;
-    observations.reserve(batch.observations().size());
-    std::vector<std::string> observation_fields{
-        record.identity().hex(), progress.identity().hex(),
-        dispatch.identity().hex(), target_.target().string()};
-    for (const auto& value : batch.observations())
-    {
-      auto planned = planner_observation(value);
-      observation_fields.push_back(planned.path().string());
-      observation_fields.push_back(planned.is_present() ? "present" : "absent");
-      if (const auto* object = planned.object())
-      {
-        observation_fields.push_back(
-            std::to_string(static_cast<unsigned int>(object->kind())));
-        observation_fields.push_back(std::to_string(object->mode()));
-        observation_fields.push_back(std::to_string(object->uid()));
-        observation_fields.push_back(std::to_string(object->gid()));
-        observation_fields.push_back(
-            object->size() ? "size:" + std::to_string(*object->size())
-                           : "size:-");
-        observation_fields.push_back(
-            object->mtime()
-                ? "mtime:" + std::to_string(object->mtime()->seconds()) + ":" +
-                    std::to_string(object->mtime()->nanoseconds())
-                : "mtime:-");
-        observation_fields.push_back(
-            object->regular_content()
-                ? "content:" + object->regular_content()->string()
-                : "content:-");
-        observation_fields.push_back(
-            object->symlink_target()
-                ? "symlink:" + *object->symlink_target()
-                : "symlink:-");
-        observation_fields.push_back(
-            object->device()
-                ? "device:" + std::to_string(object->device()->major()) + ":" +
-                    std::to_string(object->device()->minor())
-                : "device:-");
-      }
-      observations.push_back(std::move(planned));
-    }
-    for (const auto& evidence : batch.evidence())
-      observation_fields.push_back(evidence.string());
-    return pkgplan::target_observation_set(
-        derived_digest_identity<pkgplan::observation_set_identity>(
-            "pkgctl/native-target-observations/1", observation_fields),
-        target_.target(), pkgplan::fact_set_completeness::complete,
-        std::move(observations));
+    return observe_native_target_paths(
+        record, progress, dispatch, target_.target(), observer_,
+        requested, std::move(hardlinks));
   }
 
   transaction_session transaction_;

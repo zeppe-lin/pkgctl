@@ -459,6 +459,7 @@ if not get_option('tests').disabled()
     'run_runtime.h',
     'run_store.h',
     'session.h',
+    'target_observation.h',
     'version.h',
   ]
   foreach header : pkgctl_headers
@@ -477,6 +478,16 @@ if not get_option('tests').disabled()
   test(
     'package-pipeline-contract',
     package_pipeline_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  target_observation_contract = find_program(
+    'contracts/check_target_observation_contract.sh',
+  )
+  test(
+    'target-observation-contract',
+    target_observation_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

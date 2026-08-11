@@ -46,4 +46,5 @@
 #include <pkgctl/run_runtime.h>
 #include <pkgctl/run_store.h>
 #include <pkgctl/session.h>
+#include <pkgctl/target_observation.h>
 #include <pkgctl/version.h>

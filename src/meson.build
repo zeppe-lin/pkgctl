@@ -45,6 +45,7 @@ pkgctl_core = static_library(
     'run_store.cpp',
     'request.cpp',
     'session.cpp',
+    'target_observation.cpp',
   ],
   include_directories: pkgctl_inc,
   dependencies: pkgctl_core_authority_deps,
