@@ -18,6 +18,8 @@ for authority in \
   'pkgctl::transaction_run::begin' \
   'pkgctl::reserve_next' \
   'pkgctl::native_transaction_dispatch_session_source' \
+  'pkgctl::native_transaction_run_runtime_configuration::make' \
+  'pkgctl::native_posix_transaction_run_runtime::open' \
   'pkgctl::native_construction_driver' \
   'pkgctl::execute_construction' \
   'pkgctl::complete_construction_dispatch' \
@@ -144,6 +146,23 @@ grep -F 'suppressed_resolved() == 1U' "$test_source" >/dev/null || {
 }
 grep -F 'application.target_root / "etc/tool.conf"' "$test_source" >/dev/null || {
   echo 'package-pipeline does not verify protected local target bytes' >&2
+  exit 1
+}
+
+grep -F 'runtime_pipeline_operation_authority' "$test_source" >/dev/null || {
+  echo 'package-pipeline does not qualify caller-owned runtime operation authority' >&2
+  exit 1
+}
+grep -F 'operations.replay_calls() >= 1U' "$test_source" >/dev/null || {
+  echo 'package-pipeline does not prove retained operation replay after target mutation' >&2
+  exit 1
+}
+grep -F 'effect_bodies.load_count() >= 1U' "$test_source" >/dev/null || {
+  echo 'package-pipeline does not prove terminal effect-body rehydration through the runtime' >&2
+  exit 1
+}
+grep -F 'pkgctl::transaction_run_advance_disposition::quiescent' "$test_source" >/dev/null || {
+  echo 'package-pipeline does not prove completed-journal quiescence after runtime reopen' >&2
   exit 1
 }
 

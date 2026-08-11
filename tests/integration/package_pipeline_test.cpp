@@ -15,6 +15,7 @@
 #include <pkgctl/run_operation.h>
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_execute.h>
+#include <pkgctl/run_runtime.h>
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_store.h>
 #include <pkgctl/target_observation.h>
@@ -33,6 +34,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -295,9 +297,15 @@ public:
   pkgctl::retained_installed_package_tree locate(
       const pkgstate::installed_package&) override
   {
+    ++locate_calls_;
     throw std::runtime_error(
         "pipeline unexpectedly requested an installed package tree");
   }
+
+  std::size_t locate_calls() const noexcept { return locate_calls_; }
+
+private:
+  std::size_t locate_calls_ = 0U;
 };
 
 pkgctl::native_transaction_session_configuration configuration(
@@ -693,8 +701,9 @@ private:
   bool interrupted_ = false;
 };
 
-class recording_effect_body_sink final
-    : public pkgctl::transaction_effect_body_sink {
+class recording_effect_body_store final
+    : public pkgctl::transaction_effect_body_sink,
+      public pkgctl::transaction_effect_restart_body_source {
 public:
   void retain_lifecycle(
       const pkgapply_exec::lifecycle_execution_result&) override
@@ -722,7 +731,51 @@ public:
     publication_receipt_ = receipt;
   }
 
+  pkgctl::transaction_effect_restart_bodies load(
+      const pkgctl::effectful_operation_session& session,
+      const pkgctl::effect_attempt_record& record) override
+  {
+    ++load_count_;
+    if (!record.before().empty() || !record.after().empty())
+      throw std::runtime_error(
+          "pipeline body store cannot replay lifecycle bodies");
+
+    pkgctl::transaction_effect_restart_bodies result;
+    if (record.application()) {
+      if (!application_ ||
+          application_->identity().string() != record.application()->receipt())
+        throw std::runtime_error(
+            "pipeline body store lacks exact application body");
+      result.application = application_;
+    }
+    if (record.publication_request()) {
+      if (!publication_request_ ||
+          publication_request_->identity().string() !=
+              *record.publication_request())
+        throw std::runtime_error(
+            "pipeline body store lacks exact publication request");
+      result.publication_request = publication_request_;
+    }
+    if (record.publication()) {
+      if (!publication_receipt_ || !result.publication_request ||
+          publication_receipt_->identity().string() !=
+              record.publication()->receipt())
+        throw std::runtime_error(
+            "pipeline body store lacks exact publication receipt");
+      result.publication_receipt = publication_receipt_;
+    }
+    if (record.stage() == pkgctl::effect_attempt_stage::application_intent)
+      throw std::runtime_error(
+          "pipeline body store cannot reconstruct an application journal");
+    if (application_ &&
+        session.request().application().identity() != application_->request())
+      throw std::runtime_error(
+          "pipeline body store application belongs to another session");
+    return result;
+  }
+
   std::size_t lifecycle_count() const noexcept { return lifecycle_count_; }
+  std::size_t load_count() const noexcept { return load_count_; }
   const std::optional<pkgapply::application_receipt>& application() const noexcept
   {
     return application_;
@@ -740,6 +793,7 @@ public:
 
 private:
   std::size_t lifecycle_count_ = 0U;
+  std::size_t load_count_ = 0U;
   std::optional<pkgapply::application_receipt> application_;
   std::optional<pkgstate::state_publication_request> publication_request_;
   std::optional<pkgstate::state_publication_receipt> publication_receipt_;
@@ -904,6 +958,145 @@ const pkgplan::upgrade_path_decision& upgrade_decision(
   throw std::runtime_error("pipeline upgrade lacks expected path decision");
 }
 
+class runtime_pipeline_operation_authority final
+    : public pkgctl::transaction_operation_specification_source,
+      public pkgctl::transaction_effect_archive_source,
+      public pkgctl::transaction_operation_session_sink {
+public:
+  runtime_pipeline_operation_authority(
+      pkgctl::transaction_session transaction,
+      pkgtransaction::transaction_node_identity construction_node,
+      pkgtransaction::transaction_node_identity action_node,
+      pkgapply::posix::application_target_observer& observer,
+      pkgimage::archive_backend& archive_backend,
+      pkgapply::application_target_context target,
+      pkgplan::target_system_context_identity target_system)
+      : transaction_(std::move(transaction)),
+        construction_node_(std::move(construction_node)),
+        action_node_(std::move(action_node)), observer_(observer),
+        archive_backend_(archive_backend), target_(std::move(target)),
+        target_system_(std::move(target_system))
+  {
+  }
+
+  pkgctl::native_transaction_operation_specification operation(
+      const pkgctl::transaction_run_journal_record& record,
+      const pkgctl::transaction_progress& progress,
+      const pkgctl::transaction_dispatch& dispatch) override
+  {
+    ++operation_calls_;
+    if (progress.transaction().identity() != transaction_.identity() ||
+        dispatch.unit().kind() != pkgctl::transaction_unit_kind::operation ||
+        dispatch.unit().primary_node() != action_node_)
+      throw std::runtime_error(
+          "runtime pipeline operation authority received another dispatch");
+
+    const auto* construction = progress.construction(construction_node_);
+    if (construction == nullptr || !construction->succeeded())
+      throw std::runtime_error(
+          "runtime pipeline operation lacks predecessor construction");
+    pkgctl::native_operation_preparation_driver projector;
+    const auto artifact = projector.project_artifact(*construction);
+    archive_path_ = construction->session().paths().build.artifact_path;
+    archive_image_ = artifact.authority().image().image().identity().string();
+
+    const auto& retained = retained_dispatch(record, dispatch);
+    if (retained.state() == pkgctl::transaction_dispatch_state::reserved) {
+      observations_ = pkgctl::observe_native_target_paths(
+          record, progress, dispatch, target_system_, observer_,
+          pipeline_operation_paths());
+    } else if (retained.state() == pkgctl::transaction_dispatch_state::started ||
+               retained.state() == pkgctl::transaction_dispatch_state::completed) {
+      ++replay_calls_;
+      if (!observations_ || !retained.attempt_session() ||
+          !retained_session_ ||
+          *retained.attempt_session() != *retained_session_)
+        throw std::runtime_error(
+            "runtime pipeline operation lacks retained replay authority");
+    } else {
+      throw std::runtime_error(
+          "runtime pipeline operation cannot replay a released dispatch");
+    }
+
+    if (!observations_)
+      throw std::runtime_error(
+          "runtime pipeline operation lacks target observations");
+    return pkgctl::native_transaction_operation_specification::install(
+        action_node_, target_, execution_control(), *observations_,
+        plan_identity<pkgplan::runtime_dependency_closure_identity>(81),
+        package_policy(), pkgctl::lifecycle_order::make({}, {}),
+        pkgstate::installation_reason::explicit_request());
+  }
+
+  void retain(
+      const pkgctl::transaction_run_journal_record&,
+      const pkgctl::transaction_progress&,
+      const pkgctl::transaction_dispatch& dispatch,
+      const pkgctl::native_transaction_operation_specification& specification,
+      const pkgctl::effectful_operation_session& session) override
+  {
+    ++retain_calls_;
+    if (dispatch.unit().primary_node() != action_node_ ||
+        specification.action_node() != action_node_ || !observations_ ||
+        specification.observations().identity() != observations_->identity())
+      throw std::runtime_error(
+          "runtime pipeline retained another operation specification");
+    if (retained_session_ && *retained_session_ != session.identity())
+      throw std::runtime_error(
+          "runtime pipeline operation session changed across retention");
+    retained_session_ = session.identity();
+  }
+
+  std::unique_ptr<pkgimage::package_archive> open_archive(
+      const pkgapply::incoming_package_authority& incoming) override
+  {
+    ++archive_calls_;
+    if (!archive_path_ || !archive_image_ ||
+        *archive_image_ != incoming.image().image().identity().string())
+      throw std::runtime_error(
+          "runtime pipeline lacks exact retained incoming archive");
+    return archive_backend_.open(
+        {*archive_path_, incoming.image().receipt().archive_digest()});
+  }
+
+  std::size_t operation_calls() const noexcept { return operation_calls_; }
+  std::size_t replay_calls() const noexcept { return replay_calls_; }
+  std::size_t retain_calls() const noexcept { return retain_calls_; }
+  std::size_t archive_calls() const noexcept { return archive_calls_; }
+
+private:
+  static const pkgctl::transaction_dispatch_record& retained_dispatch(
+      const pkgctl::transaction_run_journal_record& record,
+      const pkgctl::transaction_dispatch& dispatch)
+  {
+    const auto found = std::find_if(
+        record.dispatches().begin(), record.dispatches().end(),
+        [&](const auto& candidate) {
+          return candidate.dispatch().identity() == dispatch.identity();
+        });
+    if (found == record.dispatches().end())
+      throw std::runtime_error(
+          "runtime pipeline operation lacks durable dispatch authority");
+    return *found;
+  }
+
+  pkgctl::transaction_session transaction_;
+  pkgtransaction::transaction_node_identity construction_node_;
+  pkgtransaction::transaction_node_identity action_node_;
+  pkgapply::posix::application_target_observer& observer_;
+  pkgimage::archive_backend& archive_backend_;
+  pkgapply::application_target_context target_;
+  pkgplan::target_system_context_identity target_system_;
+  std::optional<pkgplan::target_observation_set> observations_;
+  std::optional<pkgctl::session_identity> retained_session_;
+  std::optional<fs::path> archive_path_;
+  std::optional<std::string> archive_image_;
+  std::size_t operation_calls_ = 0U;
+  std::size_t replay_calls_ = 0U;
+  std::size_t retain_calls_ = 0U;
+  std::size_t archive_calls_ = 0U;
+};
+
 void check_package_pipeline()
 {
   test_support::temporary_directory temporary;
@@ -1061,7 +1254,7 @@ void check_package_pipeline()
   auto effect_store = pkgctl::posix_effect_journal_store::open(
       application.effect_journal_root.string());
   pipeline_run_store install_run_store(operation_reserved_record);
-  recording_effect_body_sink install_bodies;
+  recording_effect_body_store install_bodies;
   {
     pkgctl::native_transaction_effect_driver native_effect_driver(
         projected.projection(), *application.lease, *application.backend,
@@ -1308,7 +1501,7 @@ void check_package_pipeline()
   CHECK(upgrade_archive != nullptr);
 
   pipeline_run_store upgrade_run_store(upgrade_reserved_record);
-  recording_effect_body_sink upgrade_bodies;
+  recording_effect_body_store upgrade_bodies;
   {
     pkgctl::native_transaction_effect_driver native_upgrade_driver(
         upgrade_projected.projection(), *application.lease,
@@ -1623,7 +1816,7 @@ void check_package_pipeline()
   auto removal_projected = pkgstate::apply_adapter::read_application_state(
       *prepared_removal.application(), *application.lease, store);
   pipeline_run_store removal_run_store(removal_reserved_record);
-  recording_effect_body_sink removal_bodies;
+  recording_effect_body_store removal_bodies;
   {
     pkgctl::native_transaction_effect_driver native_removal_driver(
         removal_projected.projection(), *application.lease,
@@ -1764,6 +1957,155 @@ void check_package_pipeline()
 }
 
 
+void check_native_runtime_package_pipeline()
+{
+  test_support::temporary_directory temporary;
+  const fs::path root = temporary.path();
+  const fs::path collection = root / "collection";
+  const fs::path state = root / "state";
+  create_pipeline_collection(collection);
+  test_support::initialize_state(state);
+
+  auto resolution_request = pipeline_resolution_request(collection, state);
+  auto transaction = pkgctl::compose_transaction(
+      pkgctl::transaction_request::make(std::move(resolution_request)));
+  const auto& dep_build = node_for(
+      transaction, pkgtransaction::transaction_action_kind::build, "dep");
+  const auto& tool_build = node_for(
+      transaction, pkgtransaction::transaction_action_kind::build, "tool");
+  const auto& tool_check = node_for(
+      transaction, pkgtransaction::transaction_action_kind::check, "tool");
+  const auto& tool_install = node_for(
+      transaction, pkgtransaction::transaction_action_kind::install, "tool");
+
+  pkgstate::posix::canonical_generation_store store(
+      state, test_support::binding());
+  const auto target_system =
+      plan_identity<pkgplan::target_system_context_identity>(82);
+  const auto target =
+      application_target(store.read().target_binding(), target_system);
+  auto application = prepare_application_environment(
+      root / "application", target);
+  application.lease.reset();
+
+  auto observer = pkgapply::posix::application_target_observer::open(
+      application.target_root.string());
+  pkgimage::libarchive_backend archive_backend;
+  runtime_pipeline_operation_authority operations(
+      transaction, tool_build.identity(), tool_install.identity(), observer,
+      archive_backend, target, target_system);
+  recording_effect_body_store effect_bodies;
+  refusing_installed_package_source installed_packages;
+  pipeline_backend backend;
+
+  const fs::path authority_root = root / "runtime-authority";
+  const auto sessions = configuration(authority_root / "construction");
+  const auto lifecycle_identity = pkgapply_exec::lifecycle_execution_identity{
+      pkgexec::interpreter_identity::from_sha256(std::string(64U, 'c')),
+      static_cast<std::uint64_t>(::geteuid()),
+      static_cast<std::uint64_t>(::getegid()),
+      {}};
+  const auto make_runtime_configuration = [&]() {
+    auto operation_configuration =
+        pkgctl::native_transaction_operation_configuration::make(
+            transaction,
+            {sessions.roots().root_view, sessions.roots().root_view_path,
+             application.target_root, authority_root / "lifecycle-sessions",
+             lifecycle_identity});
+    return pkgctl::native_transaction_run_runtime_configuration::make(
+        transaction, sessions, std::move(operation_configuration), {});
+  };
+
+  const fs::path run_store = root / "run-store";
+  const fs::path evidence_store = root / "evidence-store";
+  for (const auto& path : {run_store, evidence_store})
+    fs::create_directories(path);
+
+  auto runtime = pkgctl::native_posix_transaction_run_runtime::open(
+      {run_store, evidence_store, application.effect_journal_root,
+       application.lock_root},
+      make_runtime_configuration(),
+      {installed_packages, operations, effect_bodies, &operations,
+       &effect_bodies, &operations},
+      {backend, backend, *application.backend, backend, store,
+       archive_backend});
+
+  const auto launched = runtime->launch(
+      pkgctl::transaction_dispatch_policy::make(1U, 1U), journal_nonce(80U),
+      pkgctl::transaction_run_drive_policy::make(4U));
+  CHECK(launched.origin() == pkgctl::transaction_run_launch_origin::admitted);
+  CHECK(launched.admission_committed());
+  CHECK(launched.drive().disposition() ==
+        pkgctl::transaction_run_drive_disposition::completed);
+  CHECK(launched.run().progress().complete());
+  CHECK(launched.drive().steps().size() == 4U);
+  if (launched.drive().steps().size() == 4U) {
+    CHECK(launched.drive().steps()[0].disposition() ==
+          pkgctl::transaction_run_advance_disposition::executed_construction);
+    CHECK(launched.drive().steps()[1].disposition() ==
+          pkgctl::transaction_run_advance_disposition::executed_construction);
+    CHECK(launched.drive().steps()[2].disposition() ==
+          pkgctl::transaction_run_advance_disposition::executed_check);
+    CHECK(launched.drive().steps()[3].disposition() ==
+          pkgctl::transaction_run_advance_disposition::executed_operation);
+  }
+  CHECK(launched.run().progress().status(dep_build.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  CHECK(launched.run().progress().status(tool_build.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  CHECK(launched.run().progress().status(tool_check.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  CHECK(launched.run().progress().status(tool_install.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  CHECK(operations.operation_calls() == 1U);
+  CHECK(operations.replay_calls() == 0U);
+  CHECK(operations.retain_calls() == 1U);
+  CHECK(operations.archive_calls() == 1U);
+  CHECK(effect_bodies.application().has_value());
+  CHECK(effect_bodies.publication_request().has_value());
+  CHECK(effect_bodies.publication_receipt().has_value());
+  CHECK(effect_bodies.load_count() == 0U);
+  CHECK(installed_packages.locate_calls() == 0U);
+
+  const auto installed = store.read();
+  const auto* installed_tool = installed.find_package("tool");
+  CHECK(installed_tool != nullptr);
+  if (installed_tool != nullptr)
+    CHECK(installed_tool->release().version() == "1.0");
+  CHECK(read_text(application.target_root / "usr/bin/tool") ==
+        "constructed tool v1\n");
+  CHECK(read_text(application.target_root / "etc/tool.conf") ==
+        "default config v1\n");
+
+  const auto journal = launched.record().journal();
+  const auto completed_record = launched.record().identity();
+  runtime.reset();
+  runtime = pkgctl::native_posix_transaction_run_runtime::open(
+      {run_store, evidence_store, application.effect_journal_root,
+       application.lock_root},
+      make_runtime_configuration(),
+      {installed_packages, operations, effect_bodies, &operations,
+       &effect_bodies, &operations},
+      {backend, backend, *application.backend, backend, store,
+       archive_backend});
+  const auto reopened = runtime->drive(
+      journal, pkgctl::transaction_run_drive_policy::make(1U));
+  CHECK(reopened.disposition() ==
+        pkgctl::transaction_run_drive_disposition::completed);
+  CHECK(reopened.steps().size() == 1U);
+  CHECK(reopened.steps().front().disposition() ==
+        pkgctl::transaction_run_advance_disposition::quiescent);
+  CHECK(reopened.record().identity() == completed_record);
+  CHECK(reopened.run().progress().complete());
+  CHECK(operations.operation_calls() >= 2U);
+  CHECK(operations.replay_calls() >= 1U);
+  CHECK(operations.retain_calls() == 1U);
+  CHECK(operations.archive_calls() == 1U);
+  CHECK(effect_bodies.load_count() >= 1U);
+  CHECK(store.read().identity() == installed.identity());
+}
+
+
 void check_pipeline_build_failure()
 {
   test_support::temporary_directory temporary;
@@ -1886,6 +2228,7 @@ int main(int argc, char** argv)
     check_pipeline_check_failure();
   } else if (argc == 1) {
     check_package_pipeline();
+    check_native_runtime_package_pipeline();
   } else {
     std::cerr << "usage: package-pipeline-test [--failure-matrix]\n";
     return EXIT_FAILURE;

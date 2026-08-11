@@ -76,6 +76,13 @@
   projection under fresh target exclusion, and continue to publication. A
   separate mode proves definitive dependency-build and package-check failures block
   dependent target work and publish no package state.
+- Drives the same package transaction through the production
+  `native_posix_transaction_run_runtime` composition root, including real
+  application and canonical publication. The integration test then destroys and
+  reopens the runtime over the same journals and requires completed-operation
+  rehydration to use caller-retained target observations and subordinate effect
+  bodies, remain quiescent, and perform no second archive acquisition or target
+  mutation.
 
 ### Dependency contract
 

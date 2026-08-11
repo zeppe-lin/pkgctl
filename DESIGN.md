@@ -48,6 +48,17 @@ terminal evidence to the current projection. An
 already-selected canonical publication is observed without publishing the same
 state again.
 
+The package campaign also crosses the production native composition root itself.
+A bounded `native_posix_transaction_run_runtime` launch executes the real package
+transaction through construction, check, application, and publication. The
+caller retains the exact operation observation set before target mutation and
+serves it again when a newly constructed runtime rehydrates the completed
+journal; subordinate terminal bodies are likewise supplied by the caller-owned
+restart-body source. Reopening therefore reproduces completed progress and stops
+quiescent without acquiring the incoming archive or mutating target/state a
+second time. This qualifies runtime wiring before another CLI option is allowed
+to become its first consumer.
+
 ## Release 0.35.0 bounded native command boundary
 
 The final functional closure is one command, not a new semantic subsystem:

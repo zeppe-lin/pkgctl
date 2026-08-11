@@ -44,8 +44,16 @@ reconciliation record remains durable.
 
 This campaign is deliberately non-CLI and non-privileged: command parsing and
 Linux namespace capability are not allowed to be the first place where library
-composition defects are discovered. Future package/rootfs work should extend
-this in-process campaign before adding corresponding frontend behavior.
+composition defects are discovered. The same transaction must also cross
+`native_posix_transaction_run_runtime`, not stop at manually assembled controller
+functions. One bounded launch must execute dependency construction, package
+construction, check, application, and publication through that composition root.
+After the runtime object is destroyed and reopened over the same durable stores,
+driving the completed journal must rehydrate the exact retained per-dispatch
+operation observations and subordinate effect bodies, return quiescent, preserve
+the terminal record, and perform no second archive acquisition or target/state
+mutation. Future package/rootfs work should extend this in-process campaign
+before adding corresponding frontend behavior.
 
 ## Release 0.35.0 bounded native command qualification
 

@@ -42,6 +42,17 @@ replay those observations, but it must not own another conversion table. The
 pre-frontend campaign must consume the same core function against its disposable
 target.
 
+The pre-frontend campaign must also cross the stable native runtime composition
+root. Do not qualify package effects only by manually wiring the lower dispatch
+and effect functions and then assume the frontend runtime is equivalent. A
+bounded native runtime launch must reach a real operation, retain its exact
+per-dispatch specification before mutation, and complete through canonical state
+publication. Reopening that completed journal must obtain the retained operation
+observations rather than re-observe the already-mutated target, load the exact
+subordinate terminal bodies through the caller-owned restart source, and remain
+quiescent without new effect authority. The runtime owns wiring and mechanical
+lifetime; retention/replay remains caller authority.
+
 Fault qualification must cross durable owner boundaries rather than inject a
 controller shortcut. Definitive build and check failures must be produced by the
 injected execution backend and committed through ordinary construction/check
