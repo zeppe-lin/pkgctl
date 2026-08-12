@@ -162,6 +162,11 @@ private:
   operation_session_encoding output_;
 };
 
+/*
+ * This reader owns a mutable cursor.  Under C++17, function arguments are not
+ * evaluated left-to-right, so callers must sequence distinct field reads in
+ * separate statements before passing the resulting values onward.
+ */
 class reader final {
 public:
   reader(const operation_session_encoding& input, std::size_t limit)
@@ -374,7 +379,12 @@ pkgplan::target_path_observation decode_observation(reader& input)
   if (has_mtime > 1U)
     corrupt("filesystem timestamp presence is not canonical");
   if (has_mtime != 0U)
-    mtime.emplace(decode_i64(input.text(), "filesystem timestamp"), input.u32());
+  {
+    const auto seconds =
+        decode_i64(input.text(), "filesystem timestamp");
+    const auto nanoseconds = input.u32();
+    mtime.emplace(seconds, nanoseconds);
+  }
 
   std::optional<pkgplan::filesystem_regular_content_identity> content;
   const auto has_content = input.byte();
@@ -395,7 +405,11 @@ pkgplan::target_path_observation decode_observation(reader& input)
   if (has_device > 1U)
     corrupt("device-number presence is not canonical");
   if (has_device != 0U)
-    device.emplace(input.u64(), input.u64());
+  {
+    const auto major = input.u64();
+    const auto minor = input.u64();
+    device.emplace(major, minor);
+  }
 
   return pkgplan::target_path_observation::present(
       pkgplan::filesystem_object_fact(
@@ -545,9 +559,9 @@ pkgplan::package_policy_snapshot decode_policy(reader& input)
   overrides.reserve(count);
   for (std::uint32_t index = 0U; index < count; ++index)
   {
-    overrides.emplace_back(
-        pkgplan::package_path::parse(input.text()),
-        decode_normalized_policy(input));
+    auto path = pkgplan::package_path::parse(input.text());
+    auto policy = decode_normalized_policy(input);
+    overrides.emplace_back(std::move(path), std::move(policy));
   }
   return pkgplan::package_policy_snapshot(
       std::move(identity), std::move(defaults), std::move(overrides));
@@ -577,26 +591,42 @@ pkgapply::application_target_context decode_target(reader& input)
 {
   const auto retained = pkgapply::application_target_context_identity::parse(
       input.text());
+  auto target_system =
+      pkgplan::target_system_context_identity::parse(input.text());
+  auto managed_target = pkgapply::managed_target_identity::parse(input.text());
+  auto root_view = pkgapply::root_view_identity::parse(input.text());
+  auto observation_backend =
+      pkgapply::observation_backend_identity::parse(input.text());
+  auto mutation_backend =
+      pkgapply::mutation_backend_identity::parse(input.text());
+  auto mutation_exclusion_domain =
+      pkgapply::mutation_exclusion_domain_identity::parse(input.text());
+  auto active_namespace =
+      pkgapply::active_object_namespace_identity::parse(input.text());
+  auto rejected_store =
+      pkgapply::rejected_object_store_identity::parse(input.text());
+  auto staging_namespace =
+      pkgapply::staging_namespace_identity::parse(input.text());
+  auto journal_namespace =
+      pkgapply::journal_namespace_identity::parse(input.text());
+  auto capabilities =
+      pkgapply::execution_capability_profile_identity::parse(input.text());
+
+  std::optional<pkgapply::lifecycle_executor_identity> lifecycle_executor;
+  const auto has_lifecycle_executor = input.byte();
+  if (has_lifecycle_executor > 1U)
+    corrupt("lifecycle-executor presence is not canonical");
+  if (has_lifecycle_executor != 0U)
+    lifecycle_executor =
+        pkgapply::lifecycle_executor_identity::parse(input.text());
+
   auto target = pkgapply::application_target_context::make(
-      pkgplan::target_system_context_identity::parse(input.text()),
-      pkgapply::managed_target_identity::parse(input.text()),
-      pkgapply::root_view_identity::parse(input.text()),
-      pkgapply::observation_backend_identity::parse(input.text()),
-      pkgapply::mutation_backend_identity::parse(input.text()),
-      pkgapply::mutation_exclusion_domain_identity::parse(input.text()),
-      pkgapply::active_object_namespace_identity::parse(input.text()),
-      pkgapply::rejected_object_store_identity::parse(input.text()),
-      pkgapply::staging_namespace_identity::parse(input.text()),
-      pkgapply::journal_namespace_identity::parse(input.text()),
-      pkgapply::execution_capability_profile_identity::parse(input.text()),
-      [&]() -> std::optional<pkgapply::lifecycle_executor_identity> {
-        const auto present = input.byte();
-        if (present > 1U)
-          corrupt("lifecycle-executor presence is not canonical");
-        if (present == 0U)
-          return std::nullopt;
-        return pkgapply::lifecycle_executor_identity::parse(input.text());
-      }());
+      std::move(target_system), std::move(managed_target),
+      std::move(root_view), std::move(observation_backend),
+      std::move(mutation_backend), std::move(mutation_exclusion_domain),
+      std::move(active_namespace), std::move(rejected_store),
+      std::move(staging_namespace), std::move(journal_namespace),
+      std::move(capabilities), std::move(lifecycle_executor));
   if (target.identity() != retained)
     corrupt("application-target identity mismatch");
   return target;
@@ -629,10 +659,13 @@ pkgapply::application_execution_control decode_control(reader& input)
       input.byte(),
       static_cast<std::uint8_t>(pkgapply::application_cancellation_policy::recover_after_target_mutation),
       "application cancellation policy");
+  auto maximum_staging_bytes =
+      input.optional_u64("maximum staging bytes");
+  auto maximum_recovery_bytes =
+      input.optional_u64("maximum recovery bytes");
   auto control = pkgapply::application_execution_control::make(
-      recovery, durability, cancellation,
-      input.optional_u64("maximum staging bytes"),
-      input.optional_u64("maximum recovery bytes"));
+      recovery, durability, cancellation, maximum_staging_bytes,
+      maximum_recovery_bytes);
   if (control.identity() != retained)
     corrupt("application-control identity mismatch");
   return control;
@@ -719,9 +752,13 @@ std::optional<pkgstate::installation_reason> decode_installation_reason(
       return pkgstate::installation_reason::runtime_dependency(
           pkgstate::package_reference(input.text()));
     case pkgstate::installation_reason_kind::profile_membership:
+    {
+      auto profile = pkgstate::profile_reference(input.text());
+      auto profile_identity = pkgstate::source_profile_identity::parse(
+          input.text());
       return pkgstate::installation_reason::profile_membership(
-          pkgstate::profile_reference(input.text()),
-          pkgstate::source_profile_identity::parse(input.text()));
+          std::move(profile), std::move(profile_identity));
+    }
     case pkgstate::installation_reason_kind::system_policy:
       return pkgstate::installation_reason::system_policy(input.text());
   }
@@ -814,13 +851,22 @@ void encode_lifecycle_configuration(
 native_transaction_lifecycle_configuration decode_lifecycle_configuration(
     reader& input)
 {
+  auto execution_root =
+      pkgexec::root_view_identity::from_sha256(input.identity());
+  auto execution_root_path =
+      decode_path(input.text(), "lifecycle execution root");
+  auto target_root_path =
+      decode_path(input.text(), "lifecycle target root");
+  auto session_root = decode_path(input.text(), "lifecycle session root");
+  auto interpreter = pkgexec::interpreter_identity::from_sha256(
+      input.identity());
+  const auto user_id = input.u64();
+  const auto group_id = input.u64();
+
   native_transaction_lifecycle_configuration lifecycle{
-      pkgexec::root_view_identity::from_sha256(input.identity()),
-      decode_path(input.text(), "lifecycle execution root"),
-      decode_path(input.text(), "lifecycle target root"),
-      decode_path(input.text(), "lifecycle session root"),
-      {pkgexec::interpreter_identity::from_sha256(input.identity()),
-       input.u64(), input.u64(), {}}};
+      std::move(execution_root), std::move(execution_root_path),
+      std::move(target_root_path), std::move(session_root),
+      {std::move(interpreter), user_id, group_id, {}}};
   const auto count = input.u32();
   if (count > maximum_supplementary_group_count)
     corrupt("supplementary-group cardinality exceeds maximum size");
