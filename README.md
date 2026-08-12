@@ -27,7 +27,12 @@ fetch/build evidence before terminal retirement, and a started check retains its
 exact admitted controller session beside owner-encoded check evidence.
 Construction/check restart decodes those retained sessions under the exact
 retained transaction/progress/node authority; it does not reconsult current
-construction/check configuration, the fresh session locator, or retained-installed-package lookup. Interrupted applications are reopened through the direct
+construction/check configuration, the fresh session locator, or retained-installed-package lookup. A started operation likewise retains the complete admitted
+operation session before an effect journal may name it, together with the exact
+incoming-authority-to-artifact-path binding needed by application restart. Operation
+restart decodes that historical session and archive binding without replaying live
+operation specification, target observation, predecessor construction, or collection
+authority. Interrupted applications are reopened through the direct
 `libpkgapply-posix` request-to-journal index. Resume never reacquires
 collections, asks the operator to restate transaction semantics, substitutes
 current state for historical state, scans for journals, or silently replans. Private command evidence has one current admitted format. Bytes that do not
@@ -69,8 +74,8 @@ reconciled without duplicate publication, and definitive construction/check
 failures block dependent work before target mutation. The campaign also launches
 successful and failed sealed transactions through
 `native_posix_transaction_run_runtime`. It destroys and reopens the successful
-runtime to prove completed operation observations and effect bodies replay without
-a second archive acquisition or mutation; reopens failed build/check journals
+runtime to prove completed retained operation sessions and effect bodies replay without
+a second live operation specification, target observation, archive-path discovery, or mutation; reopens failed build/check journals
 without rerunning the actuator or acquiring operation/archive authority; and
 reopens terminal application, pre/post-lifecycle, and publication failures without
 retry, rollback, or republication. The latter cases preserve the exact physical

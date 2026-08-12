@@ -8,8 +8,10 @@ header=$root/include/pkgctl/run_operation.h
 source=$root/src/run_operation.cpp
 test_source=$root/tests/unit/effect_test.cpp
 manual=$root/man/pkgctl_orchestration.7.scd
+codec_header=$root/include/pkgctl/operation_codec.h
+codec_source=$root/src/operation_session_codec.cpp
 
-for file in "$header" "$source" "$test_source" "$manual"; do
+for file in "$header" "$source" "$codec_header" "$codec_source" "$test_source" "$manual"; do
   [ -s "$file" ] || {
     echo "missing native operation authority file: $file" >&2
     exit 1
@@ -19,7 +21,7 @@ done
 for required in \
   'class native_transaction_operation_configuration final' \
   'class transaction_operation_specification_source' \
-  'class transaction_operation_session_sink' \
+  'class transaction_operation_session_store' \
   'class transaction_effect_restart_body_source' \
   'class native_transaction_operation_authority_source final' \
   'public transaction_operation_execution_authority_source' \
@@ -27,6 +29,9 @@ for required in \
   'class explicit_transaction_effect_archive_source final' \
   'const transaction_progress& progress' \
   'specifications_.operation' \
+  'encode_operation_session' \
+  'decode_operation_session' \
+  'sessions_->load' \
   'specification.lifecycle()' \
   'if (order.empty())' \
   'pkgctl/native-lifecycle-session-root/1' \
@@ -54,8 +59,12 @@ for required_test in \
   'explicit_lifecycle_order' \
   'incomplete_lifecycle_specifications' \
   'fresh.session.identity() == repeated.session.identity()' \
-  'recording_operation_session_sink' \
-  'sessions.calls() == 2U' \
+  'recording_operation_session_store' \
+  'sessions.retain_calls() == 2U' \
+  'sessions.load_calls() == 1U' \
+  'drift_specifications.calls() == 0U' \
+  'corrupt_sessions.corrupt' \
+  'corrupt_specifications.calls() == 0U' \
   'lifecycle_session_parent' \
   'admitted_lifecycle.paths().session_root.parent_path()' \
   '!std::filesystem::exists(authority_root)' \
@@ -99,6 +108,25 @@ for forbidden in \
   'glob('; do
   if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden native operation authority shortcut: $forbidden" >&2
+    exit 1
+  fi
+done
+
+# Retained operation-session decoding is pure historical evidence recovery.
+for forbidden in \
+  'std::filesystem::exists' \
+  'directory_iterator' \
+  'canonical(' \
+  'weakly_canonical(' \
+  'open(' \
+  'openat(' \
+  'stat(' \
+  'lstat(' \
+  'readlink(' \
+  'pkgfetch::' \
+  'canonical_store'; do
+  if grep -F -- "$forbidden" "$codec_source" >/dev/null 2>&1; then
+    echo "forbidden operation-session codec observation: $forbidden" >&2
     exit 1
   fi
 done

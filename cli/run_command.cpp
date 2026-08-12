@@ -1066,267 +1066,52 @@ template<typename Identity>
       "v1:sha256:" + make_session_identity(std::string(domain), fields).hex());
 }
 
-[[nodiscard]] std::int64_t read_i64_text(
-    const std::vector<std::uint8_t>& bytes,
-    std::size_t& offset,
-    std::string_view field)
+[[nodiscard]] std::vector<std::uint8_t> encode_operation_archive(
+    const retained_transaction_effect_archive& archive)
 {
-  const auto text = read_text(bytes, offset);
-  std::size_t consumed = 0U;
-  long long value = 0;
-  try
-  {
-    value = std::stoll(text, &consumed, 10);
-  }
-  catch (const std::exception&)
-  {
+  if (!archive.path.is_absolute() || archive.path.empty() ||
+      archive.path != archive.path.lexically_normal())
     throw std::runtime_error(
-        "retained operation observation has invalid " + std::string(field));
-  }
-  if (consumed != text.size() || std::to_string(value) != text)
-    throw std::runtime_error(
-        "retained operation observation has noncanonical " +
-        std::string(field));
-  return static_cast<std::int64_t>(value);
-}
+        "retained operation archive path is not absolute and normalized");
 
-void append_optional_u64(
-    std::vector<std::uint8_t>& output,
-    const std::optional<std::uint64_t>& value)
-{
-  append_u64(output, value ? 1U : 0U);
-  if (value)
-    append_u64(output, *value);
-}
-
-[[nodiscard]] std::optional<std::uint64_t> read_optional_u64(
-    const std::vector<std::uint8_t>& bytes,
-    std::size_t& offset,
-    std::string_view field)
-{
-  const auto present = read_u64(bytes, offset);
-  if (present > 1U)
-    throw std::runtime_error(
-        "retained operation observation has invalid " + std::string(field) +
-        " presence tag");
-  if (present == 0U)
-    return std::nullopt;
-  return read_u64(bytes, offset);
-}
-
-void append_optional_text(
-    std::vector<std::uint8_t>& output,
-    const std::optional<std::string>& value)
-{
-  append_u64(output, value ? 1U : 0U);
-  if (value)
-    append_text(output, *value);
-}
-
-[[nodiscard]] std::optional<std::string> read_optional_text(
-    const std::vector<std::uint8_t>& bytes,
-    std::size_t& offset,
-    std::string_view field)
-{
-  const auto present = read_u64(bytes, offset);
-  if (present > 1U)
-    throw std::runtime_error(
-        "retained operation observation has invalid " + std::string(field) +
-        " presence tag");
-  if (present == 0U)
-    return std::nullopt;
-  return read_text(bytes, offset);
-}
-
-void append_operation_observation(
-    std::vector<std::uint8_t>& output,
-    const pkgplan::target_path_observation& observation)
-{
-  append_text(output, observation.path().string());
-  append_u64(output, observation.is_present() ? 1U : 0U);
-  if (!observation.is_present())
-    return;
-
-  const auto* object = observation.object();
-  if (object == nullptr)
-    throw std::runtime_error(
-        "present operation observation lacks object metadata");
-  append_u64(output, static_cast<std::uint64_t>(object->kind()));
-  append_u64(output, object->mode());
-  append_u64(output, object->uid());
-  append_u64(output, object->gid());
-  append_optional_u64(output, object->size());
-
-  append_u64(output, object->mtime() ? 1U : 0U);
-  if (object->mtime())
-  {
-    append_text(output, std::to_string(object->mtime()->seconds()));
-    append_u64(output, object->mtime()->nanoseconds());
-  }
-
-  append_u64(output, object->regular_content() ? 1U : 0U);
-  if (object->regular_content())
-    append_text(output, object->regular_content()->string());
-  append_optional_text(output, object->symlink_target());
-
-  append_u64(output, object->device() ? 1U : 0U);
-  if (object->device())
-  {
-    append_u64(output, object->device()->major());
-    append_u64(output, object->device()->minor());
-  }
-}
-
-[[nodiscard]] pkgplan::target_path_observation read_operation_observation(
-    const std::vector<std::uint8_t>& bytes,
-    std::size_t& offset)
-{
-  auto path = pkgplan::package_path::parse(read_text(bytes, offset));
-  const auto present = read_u64(bytes, offset);
-  if (present > 1U)
-    throw std::runtime_error(
-        "retained operation observation has invalid presence tag");
-  if (present == 0U)
-    return pkgplan::target_path_observation::absent(std::move(path));
-
-  const auto kind_value = read_u64(bytes, offset);
-  if (kind_value >
-      static_cast<std::uint64_t>(pkgplan::filesystem_object_kind::other))
-  {
-    throw std::runtime_error(
-        "retained operation observation has invalid object kind");
-  }
-  const auto mode = read_u64(bytes, offset);
-  if (mode > std::numeric_limits<std::uint32_t>::max())
-    throw std::runtime_error(
-        "retained operation observation has invalid object mode");
-  const auto uid = read_u64(bytes, offset);
-  const auto gid = read_u64(bytes, offset);
-  auto size = read_optional_u64(bytes, offset, "object size");
-
-  std::optional<pkgplan::object_timestamp> mtime;
-  const auto has_mtime = read_u64(bytes, offset);
-  if (has_mtime > 1U)
-    throw std::runtime_error(
-        "retained operation observation has invalid timestamp presence tag");
-  if (has_mtime != 0U)
-  {
-    const auto seconds = read_i64_text(bytes, offset, "timestamp seconds");
-    const auto nanoseconds = read_u64(bytes, offset);
-    if (nanoseconds > std::numeric_limits<std::uint32_t>::max())
-      throw std::runtime_error(
-          "retained operation observation has invalid timestamp nanoseconds");
-    mtime.emplace(seconds, static_cast<std::uint32_t>(nanoseconds));
-  }
-
-  std::optional<pkgplan::filesystem_regular_content_identity> content;
-  const auto has_content = read_u64(bytes, offset);
-  if (has_content > 1U)
-    throw std::runtime_error(
-        "retained operation observation has invalid content presence tag");
-  if (has_content != 0U)
-  {
-    content = pkgplan::filesystem_regular_content_identity::parse(
-        read_text(bytes, offset));
-  }
-  auto symlink = read_optional_text(bytes, offset, "symlink target");
-
-  std::optional<pkgplan::device_number> device;
-  const auto has_device = read_u64(bytes, offset);
-  if (has_device > 1U)
-    throw std::runtime_error(
-        "retained operation observation has invalid device presence tag");
-  if (has_device != 0U)
-    device.emplace(read_u64(bytes, offset), read_u64(bytes, offset));
-
-  return pkgplan::target_path_observation::present(
-      pkgplan::filesystem_object_fact(
-          std::move(path),
-          pkgplan::filesystem_object_metadata(
-              static_cast<pkgplan::filesystem_object_kind>(kind_value),
-              static_cast<std::uint32_t>(mode), uid, gid, std::move(size),
-              std::move(mtime), std::move(content), std::move(symlink),
-              std::move(device))));
-}
-
-[[nodiscard]] std::vector<std::uint8_t> encode_operation_observations(
-    const session_identity& session,
-    const transaction_dispatch& dispatch,
-    const pkgplan::target_observation_set& observations)
-{
   std::vector<std::uint8_t> bytes;
-  append_text(bytes, "PKGCTL-OPERATION-OBSERVATIONS-1");
-  append_text(bytes, session.hex());
-  append_text(bytes, dispatch.identity().hex());
-  append_text(bytes, observations.identity().string());
-  append_text(bytes, observations.target().string());
-  append_u64(
-      bytes, observations.completeness() == pkgplan::fact_set_completeness::complete
-          ? 1U
-          : 0U);
-  append_u64(bytes, observations.observations().size());
-  for (const auto& observation : observations.observations())
-    append_operation_observation(bytes, observation);
-  append_text(bytes, checksum("pkgctl/operation-observations/1", bytes));
+  append_text(bytes, "PKGCTL-OPERATION-ARCHIVE-1");
+  append_text(bytes, archive.incoming.string());
+  append_text(bytes, archive.path.string());
+  append_text(bytes, checksum("pkgctl/operation-archive/1", bytes));
   return bytes;
 }
 
-[[nodiscard]] pkgplan::target_observation_set decode_operation_observations(
+[[nodiscard]] retained_transaction_effect_archive decode_operation_archive(
     const std::vector<std::uint8_t>& bytes,
-    const session_identity& expected_session,
-    const transaction_dispatch& expected_dispatch,
-    const pkgplan::target_system_context_identity& expected_target)
+    const pkgapply::incoming_package_authority_identity& expected)
 {
   std::size_t offset = 0U;
-  if (read_text(bytes, offset) != "PKGCTL-OPERATION-OBSERVATIONS-1")
-    throw std::runtime_error(
-        "retained operation observations have invalid magic");
-  if (read_text(bytes, offset) != expected_session.hex())
-    throw std::runtime_error(
-        "retained operation observations belong to another session");
-  if (read_text(bytes, offset) != expected_dispatch.identity().hex())
-    throw std::runtime_error(
-        "retained operation observations belong to another dispatch");
-  auto identity = pkgplan::observation_set_identity::parse(
+  if (read_text(bytes, offset) != "PKGCTL-OPERATION-ARCHIVE-1")
+    throw std::runtime_error("retained operation archive has invalid magic");
+  auto incoming = pkgapply::incoming_package_authority_identity::parse(
       read_text(bytes, offset));
-  auto target = pkgplan::target_system_context_identity::parse(
-      read_text(bytes, offset));
-  if (target != expected_target)
+  if (incoming != expected)
     throw std::runtime_error(
-        "retained operation observations belong to another target");
-  const auto complete = read_u64(bytes, offset);
-  if (complete > 1U)
+        "retained operation archive belongs to another incoming authority");
+  std::filesystem::path path(read_text(bytes, offset));
+  if (!path.is_absolute() || path.empty() ||
+      path != path.lexically_normal())
     throw std::runtime_error(
-        "retained operation observations have invalid completeness tag");
-  const auto count = read_u64(bytes, offset);
-  if (count > bytes.size())
-    throw std::runtime_error(
-        "retained operation observation count exceeds body size");
-  std::vector<pkgplan::target_path_observation> observations;
-  observations.reserve(static_cast<std::size_t>(count));
-  for (std::uint64_t index = 0U; index < count; ++index)
-    observations.push_back(read_operation_observation(bytes, offset));
+        "retained operation archive path is not absolute and normalized");
 
   const auto checksum_offset = offset;
-  const auto expected_checksum = read_text(bytes, offset);
+  const auto retained_checksum = read_text(bytes, offset);
   if (offset != bytes.size())
     throw std::runtime_error(
-        "retained operation observations have trailing bytes");
+        "retained operation archive has trailing bytes");
   std::vector<std::uint8_t> prefix(
       bytes.begin(),
       bytes.begin() + static_cast<std::ptrdiff_t>(checksum_offset));
-  if (expected_checksum !=
-      checksum("pkgctl/operation-observations/1", prefix))
-  {
+  if (retained_checksum != checksum("pkgctl/operation-archive/1", prefix))
     throw std::runtime_error(
-        "retained operation observations checksum is invalid");
-  }
-
-  return pkgplan::target_observation_set(
-      std::move(identity), std::move(target),
-      complete != 0U ? pkgplan::fact_set_completeness::complete
-                     : pkgplan::fact_set_completeness::partial,
-      std::move(observations));
+        "retained operation archive checksum is invalid");
+  return {std::move(incoming), std::move(path)};
 }
 
 void add_path_closure(
@@ -1494,17 +1279,17 @@ lifecycle_side(
 class live_operation_authority final
     : public transaction_operation_specification_source,
       public transaction_effect_archive_source,
-      public transaction_operation_session_sink {
+      public transaction_operation_session_store {
 public:
   live_operation_authority(
       transaction_session transaction,
       pkgapply::posix::application_target_observer& observer,
       pkgimage::archive_backend& archives,
       pkgapply::application_target_context target,
-      const std::filesystem::path& observation_directory)
+      const std::filesystem::path& body_directory)
       : transaction_(std::move(transaction)), observer_(observer),
         archives_(archives), target_(std::move(target)),
-        observation_directory_(open_directory(observation_directory)),
+        body_directory_(open_directory(body_directory)),
         control_(pkgapply::application_execution_control::make(
             pkgapply::application_recovery_requirement::exact_prior_state,
             pkgapply::application_durability_requirement::all_application_domains,
@@ -1531,6 +1316,7 @@ public:
         dispatch.unit().kind() != transaction_unit_kind::operation)
       throw std::runtime_error(
           "live operation authority received another transaction or unit kind");
+    pending_archive_.reset();
     const auto* action = transaction_.program().find(
         dispatch.unit().primary_node());
     if (action == nullptr)
@@ -1565,8 +1351,7 @@ public:
       construction = *found;
       native_operation_preparation_driver projector;
       artifact = projector.project_artifact(*construction);
-      archive_paths_[artifact->authority().image().image().identity().string()] =
-          construction->session().paths().build.artifact_path;
+      pending_archive_ = construction->session().paths().build.artifact_path;
     }
 
     std::set<std::string> paths;
@@ -1638,37 +1423,47 @@ public:
   }
 
   void retain(
-      const transaction_run_journal_record& record,
-      const transaction_progress& progress,
-      const transaction_dispatch& dispatch,
-      const native_transaction_operation_specification& specification,
-      const effectful_operation_session& session) override
+      const effectful_operation_session& session,
+      operation_session_encoding encoding) override
   {
-    const auto& retained = retained_dispatch(record, dispatch);
-    if (retained.state() != transaction_dispatch_state::reserved ||
-        progress.transaction().identity() != transaction_.identity() ||
-        specification.action_node() != dispatch.unit().primary_node() ||
-        specification.observations().target() != target_.target())
-    {
+    const auto* incoming = session.request().application().incoming();
+    if ((incoming != nullptr) != pending_archive_.has_value())
       throw std::runtime_error(
-          "operation observation retention has invalid fresh authority");
+          "fresh operation session and retained archive path disagree");
+
+    if (incoming != nullptr)
+    {
+      const retained_transaction_effect_archive archive{
+          incoming->identity(), *pending_archive_};
+      retain_immutable(
+          body_directory_.get(),
+          operation_archive_name(archive.incoming),
+          encode_operation_archive(archive),
+          "operation-archive");
     }
     retain_immutable(
-        observation_directory_.get(), observation_name(session.identity()),
-        encode_operation_observations(
-            session.identity(), dispatch, specification.observations()),
-        "operation-observations");
+        body_directory_.get(), operation_session_name(session.identity()),
+        encoding, "operation-session");
+    pending_archive_.reset();
+  }
+
+  std::optional<operation_session_encoding> load(
+      const session_identity& session) override
+  {
+    return read_optional(
+        body_directory_.get(), operation_session_name(session));
   }
 
   std::unique_ptr<pkgimage::package_archive> open_archive(
       const pkgapply::incoming_package_authority& incoming) override
   {
-    const auto found = archive_paths_.find(incoming.image().image().identity().string());
-    if (found == archive_paths_.end())
-      throw std::runtime_error(
-          "incoming authority has no retained construction artifact path");
+    const auto retained = decode_operation_archive(
+        read_all(
+            body_directory_.get(),
+            operation_archive_name(incoming.identity())),
+        incoming.identity());
     return archives_.open(pkgimage::archive_inspection_request{
-        found->second, incoming.image().receipt().archive_digest()});
+        retained.path, incoming.image().receipt().archive_digest()});
   }
 
 private:
@@ -1687,10 +1482,16 @@ private:
     return *found;
   }
 
-  [[nodiscard]] static std::string observation_name(
+  [[nodiscard]] static std::string operation_session_name(
       const session_identity& session)
   {
-    return private_body_name("operation-observations", session.hex());
+    return private_body_name("operation-session", session.hex());
+  }
+
+  [[nodiscard]] static std::string operation_archive_name(
+      const pkgapply::incoming_package_authority_identity& incoming)
+  {
+    return private_body_name("operation-archive", incoming.string());
   }
 
   [[nodiscard]] pkgplan::target_observation_set operation_observations(
@@ -1701,21 +1502,9 @@ private:
       std::vector<pkgapply::posix::target_hardlink_expectation> hardlinks)
   {
     const auto& retained = retained_dispatch(record, dispatch);
-    if (retained.state() == transaction_dispatch_state::started ||
-        retained.state() == transaction_dispatch_state::completed)
-    {
-      if (!retained.attempt_session())
-        throw std::runtime_error(
-            "retained operation dispatch lacks attempt-session authority");
-      return decode_operation_observations(
-          read_all(
-              observation_directory_.get(),
-              observation_name(*retained.attempt_session())),
-          *retained.attempt_session(), dispatch, target_.target());
-    }
     if (retained.state() != transaction_dispatch_state::reserved)
       throw std::runtime_error(
-          "operation authority cannot replay a released dispatch");
+          "live operation authority is fresh-dispatch authority only");
 
     return observe_native_target_paths(
         record, progress, dispatch, target_.target(), observer_,
@@ -1726,10 +1515,10 @@ private:
   pkgapply::posix::application_target_observer& observer_;
   pkgimage::archive_backend& archives_;
   pkgapply::application_target_context target_;
-  fd_guard observation_directory_;
+  fd_guard body_directory_;
   pkgapply::application_execution_control control_;
   pkgplan::package_policy_snapshot policy_;
-  std::map<std::string, std::filesystem::path> archive_paths_;
+  std::optional<std::filesystem::path> pending_archive_;
 };
 
 class explicit_installed_package_source final

@@ -618,6 +618,7 @@ if not get_option('tests').disabled()
     'effect_store.h',
     'error.h',
     'identity.h',
+    'operation_codec.h',
     'pkgctl.h',
     'preparation.h',
     'progression.h',

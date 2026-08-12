@@ -371,36 +371,65 @@ application_snapshot=$runtime/application-journals/journal-v1-sha256-$applicatio
 [ -s "$application_snapshot" ] || \
   fail 'active application-request index names no durable journal snapshot'
 
-observation_body=$(single_file retained-operation-observations \
-  "$runtime/effect-bodies" 'operation-observations-*.bin')
-observation_name=$(basename "$observation_body")
-observation_digest=$(sha256sum "$observation_body")
+session_body=$(single_file retained-operation-session \
+  "$runtime/effect-bodies" 'operation-session-*.bin')
+session_name=$(basename "$session_body")
+session_digest=$(sha256sum "$session_body")
+archive_body=$(single_file retained-operation-archive \
+  "$runtime/effect-bodies" 'operation-archive-*.bin')
+archive_name=$(basename "$archive_body")
+archive_digest=$(sha256sum "$archive_body")
 run_record_before=$(sed -n 's/^run.record=//p' "$root/interrupted-run.out")
 effect_record_before=$(sed -n 's/^effect.record=//p' "$root/interrupted-effect.out")
 
-# Resume must consume the retained started-dispatch observations. Removing that
-# exact body may not cause the controller to fall back to a fresh target read.
-mv "$observation_body" "$root/$observation_name"
+# Resume must consume the exact retained admitted operation session. Removing
+# that body may not cause the controller to re-run live operation planning or
+# target observation, even after the source collection has disappeared.
+mv "$session_body" "$root/$session_name"
 rm -rf "$collection"
-capture_run missing-observation-resume 1 --resume "$run_nonce" 1
-require_contains missing-observation-resume-stderr \
-  "$root/missing-observation-resume.err" \
-  "private run object is absent: $observation_name"
+capture_run missing-session-resume 1 --resume "$run_nonce" 1
+require_contains missing-session-resume-stderr \
+  "$root/missing-session-resume.err" \
+  'started operation lacks retained session authority'
 "$pkgctl" inspect-run --run-store "$runtime/run" --journal "$journal" \
-  >"$root/after-missing-observation-run.out"
+  >"$root/after-missing-session-run.out"
 "$pkgctl" inspect-effect --effect-store "$runtime/effects" --attempt "$effect" \
-  >"$root/after-missing-observation-effect.out"
-require_equal missing-observation-run-record "$run_record_before" \
-  "$(sed -n 's/^run.record=//p' "$root/after-missing-observation-run.out")"
-require_equal missing-observation-effect-record "$effect_record_before" \
-  "$(sed -n 's/^effect.record=//p' "$root/after-missing-observation-effect.out")"
-require_absent missing-observation-target "$target/usr/bin/pkgctl-fixture"
-require_equal missing-observation-state "$initial_state" \
+  >"$root/after-missing-session-effect.out"
+require_equal missing-session-run-record "$run_record_before" \
+  "$(sed -n 's/^run.record=//p' "$root/after-missing-session-run.out")"
+require_equal missing-session-effect-record "$effect_record_before" \
+  "$(sed -n 's/^effect.record=//p' "$root/after-missing-session-effect.out")"
+require_absent missing-session-target "$target/usr/bin/pkgctl-fixture"
+require_equal missing-session-state "$initial_state" \
   "$($state_inspect_fixture "$state")"
 
-mv "$root/$observation_name" "$observation_body"
-require_equal restored-observation "$observation_digest" \
-  "$(sha256sum "$observation_body")"
+mv "$root/$session_name" "$session_body"
+require_equal restored-session "$session_digest" \
+  "$(sha256sum "$session_body")"
+
+# The admitted incoming authority also needs its exact retained artifact path.
+# Absence of that binding must fail closed rather than asking the deleted
+# construction/source universe to rediscover where the archive used to live.
+mv "$archive_body" "$root/$archive_name"
+capture_run missing-archive-resume 1 --resume "$run_nonce" 1
+require_contains missing-archive-resume-stderr \
+  "$root/missing-archive-resume.err" \
+  "private run object is absent: $archive_name"
+"$pkgctl" inspect-run --run-store "$runtime/run" --journal "$journal" \
+  >"$root/after-missing-archive-run.out"
+"$pkgctl" inspect-effect --effect-store "$runtime/effects" --attempt "$effect" \
+  >"$root/after-missing-archive-effect.out"
+require_equal missing-archive-run-record "$run_record_before" \
+  "$(sed -n 's/^run.record=//p' "$root/after-missing-archive-run.out")"
+require_equal missing-archive-effect-record "$effect_record_before" \
+  "$(sed -n 's/^effect.record=//p' "$root/after-missing-archive-effect.out")"
+require_absent missing-archive-target "$target/usr/bin/pkgctl-fixture"
+require_equal missing-archive-state "$initial_state" \
+  "$($state_inspect_fixture "$state")"
+
+mv "$root/$archive_name" "$archive_body"
+require_equal restored-archive "$archive_digest" \
+  "$(sha256sum "$archive_body")"
 
 capture_run resume 0 --resume "$run_nonce" 8
 require_contains resume "$root/resume.out" 'origin resumed'

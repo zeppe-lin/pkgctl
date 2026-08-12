@@ -49,10 +49,10 @@ composition defects are discovered. The same transaction must also cross
 functions. One bounded launch must execute dependency construction, package
 construction, check, application, and publication through that composition root.
 After the runtime object is destroyed and reopened over the same durable stores,
-driving the completed journal must rehydrate the exact retained per-dispatch
-operation observations and subordinate effect bodies, return quiescent, preserve
-the terminal record, and perform no second archive acquisition or target/state
-mutation. Future package/rootfs work should extend this in-process campaign
+driving the completed journal must rehydrate the exact retained admitted operation
+session and subordinate effect bodies, return quiescent, preserve the terminal
+record, and perform no second live operation specification, target observation,
+archive-path discovery, or target/state mutation. Future package/rootfs work should extend this in-process campaign
 before adding corresponding frontend behavior.
 
 ## Release 0.35.0 bounded native command qualification
@@ -115,10 +115,11 @@ The final command suite must prove:
 - native check execution resets the exact call-scoped temporary host resource
   and prepares `/tmp/home` before entering `libpkgcheck-exec`, while the
   caller-owned execution root view remains untouched;
-- target observations are per-dispatch; fresh operation observations are
-  retained before effect/run journals can name the admitted session, while
-  started or completed replay reloads that exact body by attempt-session and
-  performs no fresh target observation; ordinary runtime dependencies use the
+- target observations are per-dispatch; the complete admitted operation session is
+  retained before effect/run journals can name it, and an incoming operation also
+  retains its exact construction-artifact path binding. Started or completed replay
+  decodes those retained authorities and performs no live operation-specification
+  call, predecessor-construction lookup, or fresh target observation; ordinary runtime dependencies use the
   transitive resolver run-scope closure, and lifecycle execution capabilities do
   not become target-mutation identities;
 - operation preparation preserves caller-owned normalized path policy through
@@ -395,9 +396,9 @@ from the POSIX effect store by the admission's attempt identity and prove the
 terminal lease-loss outcome there. The same bounded drive that retains the run
 observation must report `external-resolution-required`; every later drive/reopen
 must report the same block with no durable successor. Before reopen the
-operation specification source has one fresh call and zero replay calls; reopen
-must reconstruct the retained session exactly once without reacquiring archive
-or physical execution authority. It must also preserve the same run head
+operation specification source has one fresh call and the retained-session store has
+zero loads; reopen must decode the retained session exactly once without another
+live specification call, archive-path discovery, or physical execution authority. It must also preserve the same run head
 without another build/check/lifecycle call, publication, or lock-file
 reacquisition. The first case keeps canonical state at the prior generation;
 the second deliberately leaves the resulting generation visible and still

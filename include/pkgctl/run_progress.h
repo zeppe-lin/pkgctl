@@ -76,8 +76,9 @@ public:
  *
  * Completed dispatches are replayed only when their graph unit becomes ready.
  * Construction and check bodies are decoded through their owning codecs.
- * Terminal operations are reconstructed from the exact latest effect record;
- * successful publication advances state through libpkgstate's pure projection.
+ * Terminal operations are rehydrated from the retained admitted operation
+ * session plus exact latest effect record; successful publication advances
+ * state through libpkgstate's pure projection.
  * Reserved, started, and released dispatches never become semantic progress.
  */
 class stored_transaction_progress_rehydration_source final

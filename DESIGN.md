@@ -213,12 +213,13 @@ authority; their retained admitted result is historical authority.
 
 The live operation authority observes the target only for a fresh exact current
 dispatch. Before an admitted operation session can be named by either effect or
-run journal, the command immutably retains that session's exact target
-observation set. Started and completed operation replay selects the body by the
-run-retained attempt-session identity and never re-observes a target already
-mutated by that operation. This remains per-dispatch authority: future reserved
-operations receive fresh observations rather than a transaction-wide frozen
-snapshot. Runtime dependency identity is the transitive resolver run-scope
+run journal, `pkgctl` canonically retains the complete admitted operation session.
+The command store also retains the exact incoming-authority-to-construction-artifact
+path binding required to reopen that admitted application. Started and completed
+operation recovery selects those bodies by retained session/incoming identity and
+never replays the live operation specification, predecessor construction lookup, or
+target observation. This remains per-dispatch authority: future reserved operations
+receive fresh observations rather than a transaction-wide frozen snapshot. Runtime dependency identity is the transitive resolver run-scope
 closure rooted at the acted package, not transaction SCC-cohort storage.
 Application target identity and lifecycle process capability remain independent
 authority domains.
@@ -254,10 +255,11 @@ outlives a store or authority it uses.
 
 Composition is not semantic ownership. Retained installed-package trees, live
 per-dispatch operation specifications, and subordinate effect-restart bodies
-remain borrowed from their owners. In particular, operation observations are
-requested against the exact progress of the current dispatch; they are not
-captured once for a transaction and allowed to become stale after earlier
-operations mutate the target. Backends, credentials, roots, archive coordinates,
+remain borrowed from their owners. Live operation specifications and observations
+are fresh-dispatch authority only. Once an operation starts, its complete admitted
+session and incoming archive coordinate are historical authority and are decoded
+without consulting those live providers. Future operations still observe against
+their exact current progress rather than a transaction-wide frozen target. Backends, credentials, roots, archive coordinates,
 and state storage are explicit inputs rather than discovered policy.
 
 Construction/check resource authority now consumes exact semantic progress

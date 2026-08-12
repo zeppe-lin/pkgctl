@@ -1655,7 +1655,7 @@ const pkgplan::upgrade_path_decision& upgrade_decision(
 class runtime_pipeline_operation_authority final
     : public pkgctl::transaction_operation_specification_source,
       public pkgctl::transaction_effect_archive_source,
-      public pkgctl::transaction_operation_session_sink {
+      public pkgctl::transaction_operation_session_store {
 public:
   runtime_pipeline_operation_authority(
       pkgctl::transaction_session transaction,
@@ -1697,60 +1697,40 @@ public:
     archive_image_ = artifact.authority().image().image().identity().string();
 
     const auto& retained = retained_dispatch(record, dispatch);
-    std::optional<pkgplan::target_observation_set> observations;
-    if (retained.state() == pkgctl::transaction_dispatch_state::reserved) {
-      observations = pkgctl::observe_native_target_paths(
-          record, progress, dispatch, target_system_, observer_,
-          pipeline_operation_paths());
-      pending_observations_ = observations;
-    } else if (retained.state() == pkgctl::transaction_dispatch_state::started ||
-               retained.state() == pkgctl::transaction_dispatch_state::completed) {
-      ++replay_calls_;
-      if (!retained.attempt_session())
-        throw std::runtime_error(
-            "runtime pipeline operation lacks retained replay authority");
-      const auto found = retained_observations_.find(
-          retained.attempt_session()->hex());
-      if (found == retained_observations_.end())
-        throw std::runtime_error(
-            "runtime pipeline operation lacks retained replay authority");
-      observations = found->second;
-    } else {
+    if (retained.state() != pkgctl::transaction_dispatch_state::reserved)
       throw std::runtime_error(
-          "runtime pipeline operation cannot replay a released dispatch");
-    }
-
-    if (!observations)
-      throw std::runtime_error(
-          "runtime pipeline operation lacks target observations");
+          "runtime pipeline operation source is fresh-dispatch authority only");
+    auto observations = pkgctl::observe_native_target_paths(
+        record, progress, dispatch, target_system_, observer_,
+        pipeline_operation_paths());
     return pkgctl::native_transaction_operation_specification::install(
-        action_node_, target_, execution_control(), *observations,
+        action_node_, target_, execution_control(), std::move(observations),
         plan_identity<pkgplan::runtime_dependency_closure_identity>(81),
         package_policy(), lifecycle_,
         pkgstate::installation_reason::explicit_request());
   }
 
   void retain(
-      const pkgctl::transaction_run_journal_record&,
-      const pkgctl::transaction_progress&,
-      const pkgctl::transaction_dispatch& dispatch,
-      const pkgctl::native_transaction_operation_specification& specification,
-      const pkgctl::effectful_operation_session& session) override
+      const pkgctl::effectful_operation_session& session,
+      pkgctl::operation_session_encoding encoding) override
   {
     ++retain_calls_;
-    if (dispatch.unit().primary_node() != action_node_ ||
-        specification.action_node() != action_node_ || !pending_observations_ ||
-        specification.observations().identity() !=
-            pending_observations_->identity())
-      throw std::runtime_error(
-          "runtime pipeline retained another operation specification");
-    const auto [found, inserted] = retained_observations_.emplace(
-        session.identity().hex(), *pending_observations_);
-    if (!inserted &&
-        found->second.identity() != pending_observations_->identity())
+    const auto key = session.identity().hex();
+    const auto found = retained_sessions_.find(key);
+    if (found != retained_sessions_.end() && found->second != encoding)
       throw std::runtime_error(
           "runtime pipeline operation session changed across retention");
-    pending_observations_.reset();
+    retained_sessions_[key] = std::move(encoding);
+  }
+
+  std::optional<pkgctl::operation_session_encoding> load(
+      const pkgctl::session_identity& session) override
+  {
+    ++session_load_calls_;
+    const auto found = retained_sessions_.find(session.hex());
+    if (found == retained_sessions_.end())
+      return std::nullopt;
+    return found->second;
   }
 
   std::unique_ptr<pkgimage::package_archive> open_archive(
@@ -1766,7 +1746,7 @@ public:
   }
 
   std::size_t operation_calls() const noexcept { return operation_calls_; }
-  std::size_t replay_calls() const noexcept { return replay_calls_; }
+  std::size_t session_load_calls() const noexcept { return session_load_calls_; }
   std::size_t retain_calls() const noexcept { return retain_calls_; }
   std::size_t archive_calls() const noexcept { return archive_calls_; }
 
@@ -1794,12 +1774,11 @@ private:
   pkgapply::application_target_context target_;
   pkgplan::target_system_context_identity target_system_;
   pkgctl::lifecycle_order lifecycle_;
-  std::optional<pkgplan::target_observation_set> pending_observations_;
-  std::map<std::string, pkgplan::target_observation_set> retained_observations_;
+  std::map<std::string, pkgctl::operation_session_encoding> retained_sessions_;
   std::optional<fs::path> archive_path_;
   std::optional<std::string> archive_image_;
   std::size_t operation_calls_ = 0U;
-  std::size_t replay_calls_ = 0U;
+  std::size_t session_load_calls_ = 0U;
   std::size_t retain_calls_ = 0U;
   std::size_t archive_calls_ = 0U;
 };
@@ -2780,7 +2759,7 @@ void check_native_runtime_package_pipeline()
   CHECK(launched.run().progress().status(tool_install.identity()) ==
         pkgctl::transaction_node_status::satisfied);
   CHECK(operations.operation_calls() == 1U);
-  CHECK(operations.replay_calls() == 0U);
+  CHECK(operations.session_load_calls() == 0U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == 1U);
   CHECK(effect_bodies.application().has_value());
@@ -2820,8 +2799,8 @@ void check_native_runtime_package_pipeline()
         pkgctl::transaction_run_advance_disposition::quiescent);
   CHECK(reopened.record().identity() == completed_record);
   CHECK(reopened.run().progress().complete());
-  CHECK(operations.operation_calls() >= 2U);
-  CHECK(operations.replay_calls() >= 1U);
+  CHECK(operations.operation_calls() == 1U);
+  CHECK(operations.session_load_calls() >= 1U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == 1U);
   CHECK(effect_bodies.load_count() >= 1U);
@@ -2958,7 +2937,7 @@ void check_native_runtime_pre_operation_failure(
         pkgctl::transaction_node_status::blocked);
   CHECK(launched.run().progress().ready_units().empty());
   CHECK(operations.operation_calls() == 0U);
-  CHECK(operations.replay_calls() == 0U);
+  CHECK(operations.session_load_calls() == 0U);
   CHECK(operations.retain_calls() == 0U);
   CHECK(operations.archive_calls() == 0U);
   CHECK(effect_bodies.lifecycle_count() == 0U);
@@ -3167,7 +3146,7 @@ void check_native_runtime_operation_failure(
   CHECK(backend.build_calls() == 2U);
   CHECK(backend.check_calls() == 1U);
   CHECK(operations.operation_calls() == 1U);
-  CHECK(operations.replay_calls() == 0U);
+  CHECK(operations.session_load_calls() == 0U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == 1U);
   CHECK(installed_packages.locate_calls() == 0U);
@@ -3325,8 +3304,8 @@ void check_native_runtime_operation_failure(
   CHECK(application_failure.resume_calls() == application_resume_calls);
   CHECK(application_failure.active_calls() == application_active_calls);
   CHECK(publication_failure.publication_calls() == publication_calls);
-  CHECK(operations.operation_calls() >= 2U);
-  CHECK(operations.replay_calls() >= 1U);
+  CHECK(operations.operation_calls() == 1U);
+  CHECK(operations.session_load_calls() >= 1U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == archive_calls);
   CHECK(effect_bodies.load_count() >= 1U);
@@ -3460,7 +3439,7 @@ void check_native_runtime_fresh_lease_contention(std::uint8_t nonce_marker)
   CHECK(backend.check_calls() == 1U);
   CHECK(backend.lifecycle_calls() == 0U);
   CHECK(operations.operation_calls() == 1U);
-  CHECK(operations.replay_calls() == 0U);
+  CHECK(operations.session_load_calls() == 0U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == 1U);
   CHECK(fs::is_empty(application.effect_journal_root));
@@ -3490,7 +3469,7 @@ void check_native_runtime_fresh_lease_contention(std::uint8_t nonce_marker)
   CHECK(resumed.run().progress().status(tool_install.identity()) ==
         pkgctl::transaction_node_status::satisfied);
   CHECK(operations.operation_calls() == 2U);
-  CHECK(operations.replay_calls() == 0U);
+  CHECK(operations.session_load_calls() == 0U);
   CHECK(operations.retain_calls() == 2U);
   CHECK(operations.archive_calls() == 2U);
   CHECK(fs::is_regular_file(application.target_root / "usr/bin/tool"));
@@ -3613,7 +3592,7 @@ void check_native_runtime_recovery_lease_contention(std::uint8_t nonce_marker)
   CHECK(holder->held());
 
   const auto operation_calls = operations.operation_calls();
-  const auto replay_calls = operations.replay_calls();
+  const auto session_load_calls = operations.session_load_calls();
   const auto archive_calls = operations.archive_calls();
   runtime = open_runtime();
   const auto blocked = runtime->drive(
@@ -3639,8 +3618,8 @@ void check_native_runtime_recovery_lease_contention(std::uint8_t nonce_marker)
   CHECK(retained_effect.has_value());
   if (retained_effect)
     CHECK(retained_effect->identity() == effect_identity);
-  CHECK(operations.operation_calls() == operation_calls + 1U);
-  CHECK(operations.replay_calls() == replay_calls + 1U);
+  CHECK(operations.operation_calls() == operation_calls);
+  CHECK(operations.session_load_calls() == session_load_calls + 1U);
   CHECK(operations.archive_calls() == archive_calls + 1U);
   CHECK(blocked.run().active_count(pkgctl::transaction_unit_kind::operation) ==
         1U);
@@ -3665,8 +3644,8 @@ void check_native_runtime_recovery_lease_contention(std::uint8_t nonce_marker)
       CHECK(resumed.steps().front().dispatch()->identity() == dispatch.identity());
   }
   CHECK(resumed.run().progress().complete());
-  CHECK(operations.operation_calls() == operation_calls + 2U);
-  CHECK(operations.replay_calls() == replay_calls + 2U);
+  CHECK(operations.operation_calls() == operation_calls);
+  CHECK(operations.session_load_calls() == session_load_calls + 2U);
   CHECK(operations.archive_calls() == archive_calls + 2U);
   CHECK(fs::is_regular_file(application.target_root / "usr/bin/tool"));
   CHECK(store.read().identity() != initial_state.identity());
@@ -3854,7 +3833,7 @@ void check_native_runtime_outer_lease_loss(
   CHECK(backend.build_calls() == 2U);
   CHECK(backend.check_calls() == 1U);
   CHECK(operations.operation_calls() == 1U);
-  CHECK(operations.replay_calls() == 0U);
+  CHECK(operations.session_load_calls() == 0U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == 1U);
   CHECK(fs::is_regular_file(application.target_root / "usr/bin/tool"));
@@ -3898,7 +3877,7 @@ void check_native_runtime_outer_lease_loss(
   const auto check_calls = backend.check_calls();
   const auto lifecycle_calls = backend.lifecycle_calls();
   const auto operation_calls = operations.operation_calls();
-  const auto replay_calls = operations.replay_calls();
+  const auto session_load_calls = operations.session_load_calls();
   const auto archive_calls = operations.archive_calls();
   const auto publication_calls = state_store.publication_calls();
 
@@ -3923,8 +3902,8 @@ void check_native_runtime_outer_lease_loss(
   CHECK(backend.build_calls() == build_calls);
   CHECK(backend.check_calls() == check_calls);
   CHECK(backend.lifecycle_calls() == lifecycle_calls);
-  CHECK(operations.operation_calls() == operation_calls + 1U);
-  CHECK(operations.replay_calls() == replay_calls + 1U);
+  CHECK(operations.operation_calls() == operation_calls);
+  CHECK(operations.session_load_calls() == session_load_calls + 1U);
   CHECK(operations.archive_calls() == archive_calls);
   CHECK(state_store.publication_calls() == publication_calls);
   CHECK(target_lock_count(application.lock_root) == 0U);
@@ -4054,7 +4033,7 @@ void check_native_runtime_publication_intent_uncertainty(
   auto authority = operation_authority.operation(
       reserved.record, reserved.run, dispatch);
   CHECK(operations.operation_calls() == 1U);
-  CHECK(operations.replay_calls() == 0U);
+  CHECK(operations.session_load_calls() == 0U);
   CHECK(operations.retain_calls() == 1U);
 
   reacquire_application_lease(application, target);
@@ -4167,8 +4146,8 @@ void check_native_runtime_publication_intent_uncertainty(
   CHECK(backend.lifecycle_calls() == 0U);
   CHECK(operations.archive_calls() == archive_calls);
   CHECK(state_store.publication_calls() == 1U);
-  CHECK(operations.operation_calls() >= 2U);
-  CHECK(operations.replay_calls() >= 1U);
+  CHECK(operations.operation_calls() == 1U);
+  CHECK(operations.session_load_calls() >= 1U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(effect_bodies.load_count() >= 1U);
   CHECK(effect_bodies.publication_receipt().has_value());
@@ -4331,7 +4310,7 @@ void check_native_runtime_terminal_indeterminate_publication(
 
   const auto load_count = effect_bodies.load_count();
   const auto operation_calls = operations.operation_calls();
-  const auto replay_calls = operations.replay_calls();
+  const auto session_load_calls = operations.session_load_calls();
   const auto repeated = runtime->drive(
       journal, pkgctl::transaction_run_drive_policy::make(1U));
   CHECK(repeated.disposition() ==
@@ -4347,8 +4326,8 @@ void check_native_runtime_terminal_indeterminate_publication(
   CHECK(repeated_operation != nullptr);
   if (repeated_operation != nullptr && unresolved_effect_record)
     CHECK(repeated_operation->record.identity() == *unresolved_effect_record);
-  CHECK(operations.operation_calls() > operation_calls);
-  CHECK(operations.replay_calls() > replay_calls);
+  CHECK(operations.operation_calls() == operation_calls);
+  CHECK(operations.session_load_calls() > session_load_calls);
   CHECK(effect_bodies.load_count() > load_count);
   CHECK(operations.archive_calls() == archive_calls);
   CHECK(state_store.publication_calls() == 1U);
@@ -4490,7 +4469,7 @@ void check_native_runtime_lifecycle_intent_external_resolution(
   CHECK(intent.stage() == pkgctl::effect_attempt_stage::before_lifecycle_intent);
   CHECK(backend.lifecycle_calls() == 0U);
   CHECK(operations.operation_calls() == 1U);
-  CHECK(operations.replay_calls() == 0U);
+  CHECK(operations.session_load_calls() == 0U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == 0U);
   CHECK(effect_bodies.lifecycle_count() == 0U);
@@ -4506,7 +4485,7 @@ void check_native_runtime_lifecycle_intent_external_resolution(
   const auto build_calls = backend.build_calls();
   const auto check_calls = backend.check_calls();
   const auto operation_calls = operations.operation_calls();
-  const auto replay_calls = operations.replay_calls();
+  const auto session_load_calls = operations.session_load_calls();
 
   runtime = open_runtime();
   const auto unresolved = runtime->drive(
@@ -4547,8 +4526,8 @@ void check_native_runtime_lifecycle_intent_external_resolution(
   CHECK(backend.check_calls() == check_calls);
   CHECK(backend.lifecycle_calls() == 0U);
   CHECK(operations.archive_calls() == 0U);
-  CHECK(operations.operation_calls() > operation_calls);
-  CHECK(operations.replay_calls() > replay_calls);
+  CHECK(operations.operation_calls() == operation_calls);
+  CHECK(operations.session_load_calls() > session_load_calls);
   CHECK(operations.retain_calls() == 1U);
   CHECK(effect_bodies.load_count() >= 1U);
   CHECK(lifecycle_session_count() == 0U);
@@ -4557,7 +4536,7 @@ void check_native_runtime_lifecycle_intent_external_resolution(
 
   const auto load_count = effect_bodies.load_count();
   const auto repeated_operation_calls = operations.operation_calls();
-  const auto repeated_replay_calls = operations.replay_calls();
+  const auto repeated_session_load_calls = operations.session_load_calls();
   const auto repeated = runtime->drive(
       journal, pkgctl::transaction_run_drive_policy::make(1U));
   CHECK(repeated.disposition() ==
@@ -4578,8 +4557,8 @@ void check_native_runtime_lifecycle_intent_external_resolution(
   CHECK(backend.check_calls() == check_calls);
   CHECK(backend.lifecycle_calls() == 0U);
   CHECK(operations.archive_calls() == 0U);
-  CHECK(operations.operation_calls() > repeated_operation_calls);
-  CHECK(operations.replay_calls() > repeated_replay_calls);
+  CHECK(operations.operation_calls() == repeated_operation_calls);
+  CHECK(operations.session_load_calls() > repeated_session_load_calls);
   CHECK(effect_bodies.load_count() > load_count);
   CHECK(lifecycle_session_count() == 0U);
   CHECK(store.read().identity() == initial_state.identity());

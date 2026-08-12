@@ -102,9 +102,9 @@ for evidence in \
   'effect_store.load_latest(observed->record.attempt())' \
   'latest_effect->stage() == pkgctl::effect_attempt_stage::terminal' \
   'operations.operation_calls() == 1U' \
-  'operations.replay_calls() == 0U' \
-  'operations.operation_calls() == operation_calls + 1U' \
-  'operations.replay_calls() == replay_calls + 1U' \
+  'operations.session_load_calls() == 0U' \
+  'operations.operation_calls() == operation_calls' \
+  'operations.session_load_calls() == session_load_calls + 1U' \
   'target_lock_count(application.lock_root) == 0U' \
   'record->observations().size() == 1U' \
   'check_native_runtime_outer_lease_loss' \
@@ -118,7 +118,7 @@ for evidence in \
   'blocked.drive().durable_step_count() == 4U' \
   'blocked.durable_step_count() == 0U' \
   'operations.retain_calls() == 2U' \
-  'operations.replay_calls() == replay_calls + 2U' \
+  'operations.session_load_calls() == session_load_calls + 2U' \
   'operations.archive_calls() == archive_calls + 2U' \
   'holder.reset()'; do
   grep -F -- "$evidence" "$test_source" >/dev/null || {

@@ -67,9 +67,10 @@ for required in \
   '--resume uses retained transaction semantics' \
   'class private_effect_body_store final' \
   'class live_operation_authority final' \
-  'public transaction_operation_session_sink' \
-  'PKGCTL-OPERATION-OBSERVATIONS-1' \
-  'retained.attempt_session()' \
+  'public transaction_operation_session_store' \
+  'PKGCTL-OPERATION-ARCHIVE-1' \
+  'operation-session' \
+  'operation-archive' \
   'record.stage() == effect_attempt_stage::application_intent' \
   'application_journals_.load_active(' \
   'result.application_journal->receipt()' \
@@ -374,9 +375,11 @@ for required_restart_test in \
   'effect.stage=application-intent' \
   'effect.disposition=resume-application' \
   'active-request-v1-sha256-*.ref' \
-  'operation-observations-*.bin' \
-  'private run object is absent:' \
-  'missing-observation-run-record' \
+  'operation-session-*.bin' \
+  'operation-archive-*.bin' \
+  'started operation lacks retained session authority' \
+  'missing-session-run-record' \
+  'missing-archive-run-record' \
   'effect.application-journal=$application_journal' \
   'not-an-application-journal-identity' \
   'durable-steps 0'; do

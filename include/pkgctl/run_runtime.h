@@ -173,7 +173,9 @@ private:
  * authority.  When absent, the selected live backend profile is used, which is
  * suitable for a fresh runtime that has not crossed execution contexts.  A
  * durable command may supply retained profiles so old evidence can be decoded
- * without pretending the current backend already owns execution authority.
+ * without pretending the current backend already owns execution authority. The
+ * operation-session store is historical session authority once an operation
+ * starts; the live operation-specification source remains fresh-dispatch only.
  */
 struct native_transaction_run_runtime_authorities final {
   retained_installed_package_tree_source& installed_packages;
@@ -181,7 +183,7 @@ struct native_transaction_run_runtime_authorities final {
   transaction_effect_restart_body_source& effect_restart_bodies;
   transaction_effect_archive_source* archives = nullptr;
   transaction_effect_body_sink* effect_bodies = nullptr;
-  transaction_operation_session_sink* operation_sessions = nullptr;
+  transaction_operation_session_store* operation_sessions = nullptr;
   const pkgexec::backend_capability_profile* construction_recovery_backend = nullptr;
   const pkgexec::backend_capability_profile* check_recovery_backend = nullptr;
 };
@@ -207,8 +209,9 @@ struct native_transaction_run_runtime_backends final {
  * The root opens or duplicates four existing POSIX namespaces and owns the
  * concrete native session locator, operation authority, archive map, semantic
  * progress rehydrator, restart chain, and effect drivers over explicitly
- * selected backends.  Live operation sensing and subordinate restart bodies
- * remain borrowed from their semantic owners and must outlive the runtime.
+ * selected backends. Live operation sensing is fresh-dispatch authority; the
+ * operation-session store and subordinate restart bodies remain borrowed from
+ * their semantic owners and must outlive the runtime.
  *
  * No directory is initialized, no backend is selected implicitly, and no
  * transaction is launched until launch() receives an explicit durable user

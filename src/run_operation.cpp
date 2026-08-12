@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <pkgctl/run_operation.h>
+#include <pkgctl/operation_codec.h>
 #include <pkgctl/preparation.h>
+
+#include "operation_admission.h"
 
 #include <algorithm>
 #include <sstream>
@@ -235,6 +238,66 @@ admit_lifecycle_sessions(
 
 } // namespace
 
+namespace detail {
+
+effectful_operation_session admit_native_operation_session(
+    const transaction_run_journal_record& record,
+    const transaction_progress& progress,
+    const transaction_dispatch& dispatch,
+    const native_transaction_operation_specification& specification,
+    const native_transaction_lifecycle_configuration& lifecycle)
+{
+  if (dispatch.unit().kind() != transaction_unit_kind::operation)
+    throw native_operation_authority_error(
+        native_operation_authority_error_code::operation_dispatch_required,
+        "native operation authority requires an operation dispatch");
+  validate_specification(
+      progress.transaction(), specification, dispatch.unit().primary_node());
+
+  try
+  {
+    native_operation_preparation_driver driver;
+    auto prepared = prepare_operation(
+        preparation_request(
+            progress, specification, specification.lifecycle()),
+        driver);
+    if (!prepared.prepared() || !prepared.effect() || !prepared.application())
+    {
+      std::ostringstream message;
+      message << "native operation planning refused";
+      if (prepared.refusal())
+        message << " with code "
+                << static_cast<unsigned>(prepared.refusal()->code());
+      throw native_operation_authority_error(
+          native_operation_authority_error_code::planning_refused,
+          message.str());
+    }
+
+    auto before = admit_lifecycle_sessions(
+        *prepared.application(), progress.transaction(),
+        dispatch.unit().primary_node(), prepared.effect()->lifecycle().before(),
+        lifecycle, record, dispatch, "before");
+    auto after = admit_lifecycle_sessions(
+        *prepared.application(), progress.transaction(),
+        dispatch.unit().primary_node(), prepared.effect()->lifecycle().after(),
+        lifecycle, record, dispatch, "after");
+    return effectful_operation_session::admit(
+        *prepared.effect(), std::move(before), std::move(after));
+  }
+  catch (const native_operation_authority_error&)
+  {
+    throw;
+  }
+  catch (const std::exception& problem)
+  {
+    throw native_operation_authority_error(
+        native_operation_authority_error_code::session_invalid,
+        std::string("native operation session is invalid: ") + problem.what());
+  }
+}
+
+} // namespace detail
+
 native_operation_authority_error::native_operation_authority_error(
     native_operation_authority_error_code code,
     std::string message)
@@ -422,7 +485,7 @@ native_transaction_operation_authority_source(
     transaction_operation_specification_source& specifications,
     effect_journal_store& effects,
     transaction_effect_restart_body_source& bodies,
-    transaction_operation_session_sink* sessions)
+    transaction_operation_session_store* sessions)
     : configuration_(std::move(configuration)),
       specifications_(specifications), effects_(effects), bodies_(bodies),
       sessions_(sessions)
@@ -430,71 +493,31 @@ native_transaction_operation_authority_source(
 }
 
 effectful_operation_session
-native_transaction_operation_authority_source::session(
+native_transaction_operation_authority_source::fresh_session(
     const transaction_run_journal_record& record,
     const transaction_progress& progress,
-    const transaction_dispatch& dispatch,
-    bool retain) const
+    const transaction_dispatch& dispatch) const
 {
   if (record.transaction() != configuration_.transaction().identity() ||
       progress.transaction().identity() !=
           configuration_.transaction().identity())
+  {
     throw native_operation_authority_error(
         native_operation_authority_error_code::transaction_mismatch,
         "native operation authority was supplied for another transaction");
-  if (dispatch.unit().kind() != transaction_unit_kind::operation)
-    throw native_operation_authority_error(
-        native_operation_authority_error_code::operation_dispatch_required,
-        "native operation authority requires an operation dispatch");
-
+  }
   auto specification = specifications_.operation(record, progress, dispatch);
-  validate_specification(
-      configuration_.transaction(), specification,
-      dispatch.unit().primary_node());
-
-  try
-  {
-    native_operation_preparation_driver driver;
-    auto prepared = prepare_operation(
-        preparation_request(
-            progress, specification, specification.lifecycle()),
-        driver);
-    if (!prepared.prepared() || !prepared.effect() || !prepared.application())
-    {
-      std::ostringstream message;
-      message << "native operation planning refused";
-      if (prepared.refusal())
-        message << " with code "
-                << static_cast<unsigned>(prepared.refusal()->code());
-      throw native_operation_authority_error(
-          native_operation_authority_error_code::planning_refused,
-          message.str());
-    }
-
-    auto before = admit_lifecycle_sessions(
-        *prepared.application(), configuration_.transaction(),
-        dispatch.unit().primary_node(), prepared.effect()->lifecycle().before(),
-        configuration_.lifecycle(), record, dispatch, "before");
-    auto after = admit_lifecycle_sessions(
-        *prepared.application(), configuration_.transaction(),
-        dispatch.unit().primary_node(), prepared.effect()->lifecycle().after(),
-        configuration_.lifecycle(), record, dispatch, "after");
-    auto admitted = effectful_operation_session::admit(
-        *prepared.effect(), std::move(before), std::move(after));
-    if (retain && sessions_ != nullptr)
-      sessions_->retain(record, progress, dispatch, specification, admitted);
-    return admitted;
-  }
-  catch (const native_operation_authority_error&)
-  {
-    throw;
-  }
-  catch (const std::exception& problem)
-  {
+  auto admitted = detail::admit_native_operation_session(
+      record, progress, dispatch, specification, configuration_.lifecycle());
+  if (sessions_ == nullptr)
     throw native_operation_authority_error(
-        native_operation_authority_error_code::session_invalid,
-        std::string("native operation session is invalid: ") + problem.what());
-  }
+        native_operation_authority_error_code::invalid_configuration,
+        "native operation authority lacks durable session store");
+  sessions_->retain(
+      admitted,
+      encode_operation_session(
+          dispatch, specification, configuration_.lifecycle(), admitted));
+  return admitted;
 }
 
 operation_dispatch_execution_authority
@@ -507,7 +530,7 @@ native_transaction_operation_authority_source::operation(
     throw native_operation_authority_error(
         native_operation_authority_error_code::transaction_mismatch,
         "native operation authority was supplied for another durable run");
-  auto value = session(record, run.progress(), dispatch, true);
+  auto value = fresh_session(record, run.progress(), dispatch);
   auto nonce = operation_nonce(record, run, dispatch, value);
   return {std::move(value), std::move(nonce)};
 }
@@ -525,8 +548,29 @@ native_transaction_operation_authority_source::operation(
         native_operation_authority_error_code::effect_attempt_mismatch,
         "restart assessment does not identify one operation attempt");
 
-  auto value = session(
-      checkpoint.record(), checkpoint.run().progress(), dispatch, false);
+  if (sessions_ == nullptr)
+    throw native_operation_authority_error(
+        native_operation_authority_error_code::session_invalid,
+        "started operation lacks durable session store");
+  const auto retained = sessions_->load(*assessment.attempt_session());
+  if (!retained)
+    throw native_operation_authority_error(
+        native_operation_authority_error_code::session_invalid,
+        "started operation lacks retained session authority");
+  effectful_operation_session value = [&]() {
+    try
+    {
+      return decode_operation_session(
+          *retained, checkpoint.record(), checkpoint.run().progress(), dispatch);
+    }
+    catch (const operation_codec_error& problem)
+    {
+      throw native_operation_authority_error(
+          native_operation_authority_error_code::session_invalid,
+          std::string("retained operation session is invalid: ") +
+              problem.what());
+    }
+  }();
   const auto record = effects_.load_latest(*assessment.effect_attempt());
   if (!record)
     throw native_operation_authority_error(
@@ -536,7 +580,7 @@ native_transaction_operation_authority_source::operation(
       record->session() != value.identity())
     throw native_operation_authority_error(
         native_operation_authority_error_code::effect_attempt_mismatch,
-        "effect journal attempt differs from reconstructed operation session");
+        "effect journal attempt differs from retained operation session");
 
   return this->checkpoint(std::move(value), *record);
 }
@@ -548,12 +592,33 @@ native_transaction_operation_authority_source::rehydrate(
     const transaction_dispatch& dispatch,
     const effect_attempt_record& evidence)
 {
-  auto value = session(record, progress, dispatch, false);
+  if (sessions_ == nullptr)
+    throw native_operation_authority_error(
+        native_operation_authority_error_code::session_invalid,
+        "terminal operation lacks durable session store");
+  const auto retained = sessions_->load(evidence.session());
+  if (!retained)
+    throw native_operation_authority_error(
+        native_operation_authority_error_code::session_invalid,
+        "terminal operation lacks retained session authority");
+  effectful_operation_session value = [&]() {
+    try
+    {
+      return decode_operation_session(*retained, record, progress, dispatch);
+    }
+    catch (const operation_codec_error& problem)
+    {
+      throw native_operation_authority_error(
+          native_operation_authority_error_code::session_invalid,
+          std::string("retained operation session is invalid: ") +
+              problem.what());
+    }
+  }();
   if (evidence.session() != value.identity() ||
       evidence.stage() != effect_attempt_stage::terminal)
     throw native_operation_authority_error(
         native_operation_authority_error_code::effect_attempt_mismatch,
-        "terminal effect evidence differs from reconstructed operation session");
+        "terminal effect evidence differs from retained operation session");
   return checkpoint(std::move(value), evidence);
 }
 

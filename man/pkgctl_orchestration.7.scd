@@ -43,7 +43,12 @@ source. Application-intent restart uses the direct
 *libpkgapply-posix* active-request index; no directory scan or controller-owned
 application-journal format is introduced.
 
-Target observations are acquired only for the current operation dispatch.
+Target observations are acquired only for the current operation dispatch. Before
+a started operation can be named durably, the command retains its complete admitted
+operation session and, for incoming operations, the exact construction-artifact
+path bound to that incoming authority. Restart decodes those retained authorities;
+it does not replay the live operation specification, target observation, or
+predecessor construction lookup.
 Runtime dependency authority is the exact transitive resolver *run*-scope
 closure rooted at that package, not transaction graph storage order or SCC
 cohort representation. Application mutation/observation identities remain
@@ -118,9 +123,10 @@ child identity is domain-separated by stable run journal, dispatch, lifecycle
 phase, and phase index; the source creates no directories, while
 *libpkgapply-exec* creates and protects the single-use leaf. It issues one
 domain-separated mechanical effect-attempt nonce for the exact durable head.
-Restart reconstructs the same session, loads
-the exact active effect record, obtains subordinate semantic bodies from their
-owner, and invokes the canonical effect checkpoint validator.
+Restart loads and decodes the retained admitted session, loads the exact active
+effect record, obtains subordinate semantic bodies from their owner, and invokes
+the canonical effect checkpoint validator. Live operation specification and target
+observation are fresh-dispatch authority only.
 
 An explicit replayable archive source maps one admitted incoming authority to
 one absolute retained path and opens it through a caller-selected *libpkgimage*

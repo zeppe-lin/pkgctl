@@ -153,8 +153,8 @@ grep -F 'runtime_pipeline_operation_authority' "$test_source" >/dev/null || {
   echo 'package-pipeline does not qualify caller-owned runtime operation authority' >&2
   exit 1
 }
-grep -F 'operations.replay_calls() >= 1U' "$test_source" >/dev/null || {
-  echo 'package-pipeline does not prove retained operation replay after target mutation' >&2
+grep -F 'operations.session_load_calls() >= 1U' "$test_source" >/dev/null || {
+  echo 'package-pipeline does not prove retained operation-session load after target mutation' >&2
   exit 1
 }
 grep -F 'effect_bodies.load_count() >= 1U' "$test_source" >/dev/null || {

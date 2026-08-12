@@ -149,7 +149,7 @@ private:
   native_transaction_lifecycle_configuration lifecycle_;
 };
 
-/*! \brief Replayable exact planning/application input for one dispatch. */
+/*! \brief Fresh-dispatch planning/application authority for one operation. */
 class transaction_operation_specification_source {
 public:
   virtual ~transaction_operation_specification_source() = default;
@@ -160,23 +160,25 @@ public:
       const transaction_dispatch& dispatch) = 0;
 };
 
-/*! \brief Durable owner for one admitted operation specification binding.
+using operation_session_encoding = std::vector<std::uint8_t>;
+
+/*! \brief Durable opaque store for one controller-owned operation session.
  *
- * Fresh operation authority may depend on live target facts that cannot be
- * reproduced after the operation mutates that target. The owner therefore
- * receives the exact specification together with the admitted session before
- * any effect-attempt or run journal is allowed to reference the session.
+ * The native operation authority encodes the exact admitted specification and
+ * lifecycle context before an effect attempt may name the session. Restart
+ * retrieves those owner bytes by session identity; the store never rebuilds
+ * semantic authority from the current target or command configuration.
  */
-class transaction_operation_session_sink {
+class transaction_operation_session_store {
 public:
-  virtual ~transaction_operation_session_sink() = default;
+  virtual ~transaction_operation_session_store() = default;
 
   virtual void retain(
-      const transaction_run_journal_record& record,
-      const transaction_progress& progress,
-      const transaction_dispatch& dispatch,
-      const native_transaction_operation_specification& specification,
-      const effectful_operation_session& session) = 0;
+      const effectful_operation_session& session,
+      operation_session_encoding encoding) = 0;
+
+  [[nodiscard]] virtual std::optional<operation_session_encoding> load(
+      const session_identity& session) = 0;
 };
 
 /*! \brief Exact subordinate values retained outside the effect journal. */
@@ -210,7 +212,7 @@ public:
       transaction_operation_specification_source& specifications,
       effect_journal_store& effects,
       transaction_effect_restart_body_source& bodies,
-      transaction_operation_session_sink* sessions = nullptr);
+      transaction_operation_session_store* sessions);
 
   [[nodiscard]] operation_dispatch_execution_authority operation(
       const transaction_run_journal_record& record,
@@ -222,7 +224,7 @@ public:
       const transaction_dispatch_restart_assessment& assessment,
       const transaction_dispatch& dispatch) override;
 
-  /*! \brief Reconstruct one exact terminal operation for progress replay. */
+  /*! \brief Rehydrate one exact terminal operation from retained authority. */
   [[nodiscard]] effect_restart_checkpoint rehydrate(
       const transaction_run_journal_record& record,
       const transaction_progress& progress,
@@ -230,11 +232,10 @@ public:
       const effect_attempt_record& evidence);
 
 private:
-  [[nodiscard]] effectful_operation_session session(
+  [[nodiscard]] effectful_operation_session fresh_session(
       const transaction_run_journal_record& record,
       const transaction_progress& progress,
-      const transaction_dispatch& dispatch,
-      bool retain) const;
+      const transaction_dispatch& dispatch) const;
 
   [[nodiscard]] effect_restart_checkpoint checkpoint(
       effectful_operation_session session,
@@ -244,7 +245,7 @@ private:
   transaction_operation_specification_source& specifications_;
   effect_journal_store& effects_;
   transaction_effect_restart_body_source& bodies_;
-  transaction_operation_session_sink* sessions_;
+  transaction_operation_session_store* sessions_;
 };
 
 /*! \brief Caller-retained pathname for one exact incoming authority. */

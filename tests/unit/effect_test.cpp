@@ -5463,43 +5463,50 @@ pkgplan::target_observation_set removal_observations(
       std::move(paths));
 }
 
-class recording_operation_session_sink final
-    : public pkgctl::transaction_operation_session_sink {
+class recording_operation_session_store final
+    : public pkgctl::transaction_operation_session_store {
 public:
   void retain(
-      const pkgctl::transaction_run_journal_record& record,
-      const pkgctl::transaction_progress& progress,
-      const pkgctl::transaction_dispatch& dispatch,
-      const pkgctl::native_transaction_operation_specification& specification,
-      const pkgctl::effectful_operation_session& session) override
+      const pkgctl::effectful_operation_session& session,
+      pkgctl::operation_session_encoding encoding) override
   {
-    ++calls_;
-    record_ = record.identity();
-    progress_ = progress.identity();
-    dispatch_ = dispatch.identity();
-    observation_ = specification.observations().identity();
+    ++retain_calls_;
+    const auto key = session.identity().hex();
+    const auto found = encodings_.find(key);
+    if (found != encodings_.end() && found->second != encoding)
+      throw std::runtime_error(
+          "operation session identity was retained with other bytes");
+    encodings_[key] = std::move(encoding);
     session_ = session.identity();
   }
 
-  std::size_t calls() const noexcept { return calls_; }
-  const std::optional<pkgctl::session_identity>& record() const noexcept
-  { return record_; }
-  const std::optional<pkgctl::session_identity>& progress() const noexcept
-  { return progress_; }
-  const std::optional<pkgctl::session_identity>& dispatch() const noexcept
-  { return dispatch_; }
-  const std::optional<pkgplan::observation_set_identity>&
-  observation() const noexcept
-  { return observation_; }
+  std::optional<pkgctl::operation_session_encoding> load(
+      const pkgctl::session_identity& session) override
+  {
+    ++load_calls_;
+    const auto found = encodings_.find(session.hex());
+    if (found == encodings_.end())
+      return std::nullopt;
+    return found->second;
+  }
+
+  std::size_t retain_calls() const noexcept { return retain_calls_; }
+  std::size_t load_calls() const noexcept { return load_calls_; }
   const std::optional<pkgctl::session_identity>& session() const noexcept
   { return session_; }
 
+  void corrupt(const pkgctl::session_identity& session)
+  {
+    auto found = encodings_.find(session.hex());
+    if (found == encodings_.end() || found->second.empty())
+      throw std::runtime_error("operation session fixture is absent");
+    found->second.front() ^= 0x01U;
+  }
+
 private:
-  std::size_t calls_ = 0U;
-  std::optional<pkgctl::session_identity> record_;
-  std::optional<pkgctl::session_identity> progress_;
-  std::optional<pkgctl::session_identity> dispatch_;
-  std::optional<pkgplan::observation_set_identity> observation_;
+  std::map<std::string, pkgctl::operation_session_encoding> encodings_;
+  std::size_t retain_calls_ = 0U;
+  std::size_t load_calls_ = 0U;
   std::optional<pkgctl::session_identity> session_;
 };
 
@@ -5571,10 +5578,9 @@ void check_native_operation_authority_source()
   memory_effect_journal_store effects;
   empty_restart_body_source bodies;
   auto observations = removal_observations(value, 80U, true);
-  const auto observation_identity = observations.identity();
   fixed_operation_specification_source specifications(
       removal_specification(value, std::move(observations)));
-  recording_operation_session_sink sessions;
+  recording_operation_session_store sessions;
   pkgctl::native_transaction_operation_authority_source source(
       removal_configuration(value, authority_root), specifications,
       effects, bodies, &sessions);
@@ -5607,18 +5613,8 @@ void check_native_operation_authority_source()
   CHECK(specifications.dispatch() ==
         std::optional<pkgctl::session_identity>(
             reservation.dispatch->identity()));
-  CHECK(sessions.calls() == 2U);
-  CHECK(sessions.record() ==
-        std::optional<pkgctl::session_identity>(reserved.identity()));
-  CHECK(sessions.progress() ==
-        std::optional<pkgctl::session_identity>(
-            reservation.run.progress().identity()));
-  CHECK(sessions.dispatch() ==
-        std::optional<pkgctl::session_identity>(
-            reservation.dispatch->identity()));
-  CHECK(sessions.observation() ==
-        std::optional<pkgplan::observation_set_identity>(
-            observation_identity));
+  CHECK(sessions.retain_calls() == 2U);
+  CHECK(sessions.load_calls() == 0U);
   CHECK(sessions.session() ==
         std::optional<pkgctl::session_identity>(fresh.session.identity()));
   CHECK(fresh.session.request().identity() == effect_request(value).identity());
@@ -5651,10 +5647,9 @@ void check_native_operation_authority_source()
   CHECK(recovered.session().identity() == fresh.session.identity());
   CHECK(recovered.record().identity() == started.effect_attempt.identity());
   CHECK(bodies.calls() == 1U);
-  CHECK(specifications.calls() == 3U);
-  CHECK(sessions.calls() == 2U);
-  CHECK(specifications.record() ==
-        std::optional<pkgctl::session_identity>(started_record.identity()));
+  CHECK(specifications.calls() == 2U);
+  CHECK(sessions.retain_calls() == 2U);
+  CHECK(sessions.load_calls() == 1U);
   CHECK(bodies.session() ==
         std::optional<pkgctl::session_identity>(fresh.session.identity()));
   CHECK(bodies.record() ==
@@ -5670,7 +5665,7 @@ void check_native_operation_authority_source()
   pkgctl::native_transaction_operation_authority_source missing(
       removal_configuration(
           value, value.temp.path() / "missing-operation-authority"),
-      missing_specifications, missing_effects, unused_bodies);
+      missing_specifications, missing_effects, unused_bodies, &sessions);
   bool missing_refused = false;
   try
   {
@@ -5693,21 +5688,39 @@ void check_native_operation_authority_source()
   pkgctl::native_transaction_operation_authority_source drifted(
       removal_configuration(
           value, value.temp.path() / "drifted-operation-authority"),
-      drift_specifications, effects, drift_bodies);
-  bool drift_refused = false;
+      drift_specifications, effects, drift_bodies, &sessions);
+  const auto drift_recovered = drifted.operation(
+      restart, restart.assessment().active().front(),
+      *reservation.dispatch);
+  CHECK(drift_recovered.session().identity() == fresh.session.identity());
+  CHECK(drift_specifications.calls() == 0U);
+  CHECK(drift_bodies.calls() == 1U);
+
+  auto corrupt_sessions = sessions;
+  corrupt_sessions.corrupt(fresh.session.identity());
+  empty_restart_body_source corrupt_bodies;
+  fixed_operation_specification_source corrupt_specifications(
+      removal_specification(
+          value, removal_observations(value, 82U, true)));
+  pkgctl::native_transaction_operation_authority_source corrupt_source(
+      removal_configuration(
+          value, value.temp.path() / "corrupt-operation-authority"),
+      corrupt_specifications, effects, corrupt_bodies, &corrupt_sessions);
+  bool corrupt_refused = false;
   try
   {
-    (void)drifted.operation(
+    (void)corrupt_source.operation(
         restart, restart.assessment().active().front(),
         *reservation.dispatch);
   }
   catch (const pkgctl::native_operation_authority_error& problem)
   {
-    drift_refused = problem.code() ==
-        pkgctl::native_operation_authority_error_code::effect_attempt_mismatch;
+    corrupt_refused = problem.code() ==
+        pkgctl::native_operation_authority_error_code::session_invalid;
   }
-  CHECK(drift_refused);
-  CHECK(drift_bodies.calls() == 0U);
+  CHECK(corrupt_refused);
+  CHECK(corrupt_specifications.calls() == 0U);
+  CHECK(corrupt_bodies.calls() == 0U);
 
   bool overlap_refused = false;
   try
@@ -5737,7 +5750,8 @@ void check_native_operation_authority_source()
   pkgctl::native_transaction_operation_authority_source incomplete_lifecycle(
       removal_configuration(
           value, value.temp.path() / "incomplete-lifecycle-authority"),
-      incomplete_lifecycle_specifications, effects, lifecycle_bodies);
+      incomplete_lifecycle_specifications, effects, lifecycle_bodies,
+      &sessions);
   bool lifecycle_refused = false;
   try
   {
@@ -5758,7 +5772,7 @@ void check_native_operation_authority_source()
   pkgctl::native_transaction_operation_authority_source refused(
       removal_configuration(
           value, value.temp.path() / "refused-operation-authority"),
-      refused_specifications, effects, refusal_bodies);
+      refused_specifications, effects, refusal_bodies, &sessions);
   bool planning_refused = false;
   try
   {
@@ -5841,8 +5855,10 @@ void check_native_incoming_operation_authority_source()
       {pkgexec::root_view_identity::from_sha256(hex_digest(93)),
        authority_root / "execution", authority_root / "target",
        authority_root / "sessions", test_lifecycle_execution_identity()});
+  recording_operation_session_store incoming_sessions;
   pkgctl::native_transaction_operation_authority_source authority(
-      std::move(configuration), specifications, effects, bodies);
+      std::move(configuration), specifications, effects, bodies,
+      &incoming_sessions);
 
   const auto fresh = authority.operation(
       reserved, reservation.run, *reservation.dispatch);
