@@ -1085,6 +1085,48 @@ void check_posix_store_contract()
       pkgctl::transaction_run_journal_error_code::store_corrupt,
       [&] { (void)symlink_head_store.load_latest(admitted.journal()); }));
 
+
+  const auto fifo_record_directory =
+      value.temporary.path() / "run-journal-fifo-record";
+  fs::create_directories(fifo_record_directory);
+  auto fifo_record_store = pkgctl::posix_transaction_run_journal_store::open(
+      fifo_record_directory.string());
+  CHECK(fifo_record_store.append(admitted).identity() == admitted.identity());
+  test_support::replace_with_fifo(
+      fifo_record_directory / journal_record_name(admitted));
+  CHECK(test_support::child_reports_without_blocking([&] {
+    return rejects(
+        pkgctl::transaction_run_journal_error_code::store_corrupt,
+        [&] { (void)fifo_record_store.load_latest(admitted.journal()); });
+  }));
+
+  const auto fifo_head_directory =
+      value.temporary.path() / "run-journal-fifo-head";
+  fs::create_directories(fifo_head_directory);
+  auto fifo_head_store = pkgctl::posix_transaction_run_journal_store::open(
+      fifo_head_directory.string());
+  CHECK(fifo_head_store.append(admitted).identity() == admitted.identity());
+  test_support::replace_with_fifo(
+      fifo_head_directory / journal_head_name(admitted));
+  CHECK(test_support::child_reports_without_blocking([&] {
+    return rejects(
+        pkgctl::transaction_run_journal_error_code::store_corrupt,
+        [&] { (void)fifo_head_store.load_latest(admitted.journal()); });
+  }));
+
+  const auto fifo_lock_directory =
+      value.temporary.path() / "run-journal-fifo-lock";
+  fs::create_directories(fifo_lock_directory);
+  auto fifo_lock_store = pkgctl::posix_transaction_run_journal_store::open(
+      fifo_lock_directory.string());
+  CHECK(::mkfifo(
+            (fifo_lock_directory / ".pkgctl-run.lock").c_str(), 0444) == 0);
+  CHECK(test_support::child_reports_without_blocking([&] {
+    return rejects(
+        pkgctl::transaction_run_journal_error_code::store_open_failed,
+        [&] { (void)fifo_lock_store.load_latest(admitted.journal()); });
+  }));
+
   const auto invalid_lock_directory =
       value.temporary.path() / "run-journal-invalid-lock";
   fs::create_directories(invalid_lock_directory / ".pkgctl-run.lock");

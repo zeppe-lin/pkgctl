@@ -124,7 +124,7 @@ std::optional<fd_guard> lock_store_read_only(int directory_fd)
 {
   fd_guard lock(::openat(
       directory_fd, ".pkgctl-run-evidence.lock",
-      O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+      O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK));
   if (lock.get() < 0)
   {
     if (errno == ENOENT)
@@ -248,7 +248,7 @@ std::optional<std::vector<std::uint8_t>> read_file(
     bool absent_allowed)
 {
   fd_guard file(::openat(
-      directory_fd, name.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+      directory_fd, name.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK));
   if (file.get() < 0)
   {
     if (absent_allowed && errno == ENOENT)

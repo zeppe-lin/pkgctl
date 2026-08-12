@@ -1,5 +1,14 @@
 # pkgctl changelog
 
+## 0.35.1 - 2026-08-12
+
+- Refuses corrupted transaction-run journal, effect-journal, and retained
+  run-evidence regular-file authority without blocking. Read-only lock, head,
+  index, snapshot, and evidence-body opens are nonblocking before regular-file
+  validation, so replacing retained private authority with a FIFO fails closed
+  instead of wedging restart or inspection. Alarm-guarded owner tests pin the
+  refusal path.
+
 ## 0.35.0 - 2026-08-12
 
 - Corrects progress-scoped execution qualification so live interpreter and supervisor

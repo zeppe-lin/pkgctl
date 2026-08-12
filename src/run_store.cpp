@@ -278,7 +278,7 @@ fd_guard lock_store(int directory_fd)
 std::optional<fd_guard> lock_store_read_only(int directory_fd)
 {
   fd_guard lock(::openat(directory_fd, ".pkgctl-run.lock",
-                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK));
   if (lock.get() < 0)
   {
     if (errno == ENOENT)
@@ -307,7 +307,7 @@ std::optional<fd_guard> lock_store_read_only(int directory_fd)
 transaction_run_encoding read_encoding(int directory_fd, const std::string& name)
 {
   fd_guard file(::openat(directory_fd, name.c_str(),
-                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK));
   if (file.get() < 0)
   {
     if (errno == ELOOP)
@@ -356,7 +356,7 @@ std::optional<journal_head> read_head(
 {
   const auto name = head_name(journal);
   fd_guard file(::openat(directory_fd, name.c_str(),
-                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK));
   if (file.get() < 0)
   {
     if (errno == ENOENT)

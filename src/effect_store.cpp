@@ -334,7 +334,7 @@ fd_guard lock_store(int directory_fd)
 std::optional<fd_guard> lock_store_read_only(int directory_fd)
 {
   fd_guard lock(::openat(directory_fd, ".pkgctl-effect.lock",
-                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK));
   if (lock.get() < 0)
   {
     if (errno == ENOENT)
@@ -363,7 +363,7 @@ std::optional<fd_guard> lock_store_read_only(int directory_fd)
 effect_attempt_encoding read_encoding(int directory_fd, const std::string& name)
 {
   fd_guard file(::openat(directory_fd, name.c_str(),
-                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK));
   if (file.get() < 0)
   {
     if (errno == ELOOP)
@@ -412,7 +412,7 @@ std::optional<effect_journal_head> read_head(
 {
   const auto name = head_name(attempt);
   fd_guard file(::openat(directory_fd, name.c_str(),
-                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+                         O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK));
   if (file.get() < 0)
   {
     if (errno == ENOENT)

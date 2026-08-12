@@ -72,7 +72,8 @@ for required in \
   '::linkat' \
   '::renameat' \
   '::fsync' \
-  'O_NOFOLLOW'; do
+  'O_NOFOLLOW' \
+  'O_NONBLOCK'; do
   grep -F -- "$required" \
       "$model" "$codec_header" "$store_header" "$commit_header" \
       "$restart_header" "$model_source" "$codec" "$store" "$commit" \
@@ -82,6 +83,11 @@ for required in \
     exit 1
   }
 done
+
+[ "$(grep -F -c 'O_NONBLOCK' "$store")" -eq 3 ] || {
+  echo 'transaction-run journal regular-file read authority is not uniformly nonblocking' >&2
+  exit 1
+}
 
 for forbidden in \
   'execute_construction(' \
@@ -113,6 +119,18 @@ if grep -R -n -E \
   echo 'transaction-run journal mutation must not acquire a command frontend' >&2
   exit 1
 fi
+
+for required_test in \
+  'run-journal-fifo-record' \
+  'run-journal-fifo-head' \
+  'run-journal-fifo-lock' \
+  'child_reports_without_blocking'; do
+  grep -F -- "$required_test" "$srcdir/tests/unit/run_journal_test.cpp" \
+      "$srcdir/tests/support/test_support.h" >/dev/null || {
+    echo "missing nonblocking run-journal refusal test: $required_test" >&2
+    exit 1
+  }
+done
 
 effect_line=$(awk '
   /commit_operation_dispatch_start\(/ { active = 1 }

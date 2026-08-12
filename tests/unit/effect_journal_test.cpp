@@ -500,6 +500,61 @@ void check_store()
     CHECK(corrupt);
   }
 
+
+  {
+    test_support::temporary_directory fifo_record_directory;
+    auto fifo_record_store = pkgctl::posix_effect_journal_store::open(
+        fifo_record_directory.path().string());
+    const auto value = pkgctl::effect_attempt_record::admit(
+        pkgctl::make_session_identity(
+            "pkgctl/test-effect-session/1", {"fifo-record"}),
+        0U, 0U, nonce(10));
+    CHECK(fifo_record_store.append(value).identity() == value.identity());
+    test_support::replace_with_fifo(
+        fifo_record_directory.path() / record_name(value));
+    CHECK(test_support::child_reports_without_blocking([&] {
+      return rejects(
+          pkgctl::effect_journal_error_code::store_corrupt,
+          [&] { (void)fifo_record_store.load_latest(value.attempt()); });
+    }));
+  }
+
+  {
+    test_support::temporary_directory fifo_head_directory;
+    auto fifo_head_store = pkgctl::posix_effect_journal_store::open(
+        fifo_head_directory.path().string());
+    const auto value = pkgctl::effect_attempt_record::admit(
+        pkgctl::make_session_identity(
+            "pkgctl/test-effect-session/1", {"fifo-head"}),
+        0U, 0U, nonce(11));
+    CHECK(fifo_head_store.append(value).identity() == value.identity());
+    test_support::replace_with_fifo(
+        fifo_head_directory.path() / head_name(value));
+    CHECK(test_support::child_reports_without_blocking([&] {
+      return rejects(
+          pkgctl::effect_journal_error_code::store_corrupt,
+          [&] { (void)fifo_head_store.load_latest(value.attempt()); });
+    }));
+  }
+
+  {
+    test_support::temporary_directory fifo_lock_directory;
+    auto fifo_lock_store = pkgctl::posix_effect_journal_store::open(
+        fifo_lock_directory.path().string());
+    const auto value = pkgctl::effect_attempt_record::admit(
+        pkgctl::make_session_identity(
+            "pkgctl/test-effect-session/1", {"fifo-lock"}),
+        0U, 0U, nonce(12));
+    CHECK(::mkfifo(
+              (fifo_lock_directory.path() / ".pkgctl-effect.lock").c_str(),
+              0444) == 0);
+    CHECK(test_support::child_reports_without_blocking([&] {
+      return rejects(
+          pkgctl::effect_journal_error_code::store_open_failed,
+          [&] { (void)fifo_lock_store.load_latest(value.attempt()); });
+    }));
+  }
+
   {
     test_support::temporary_directory invalid_lock_directory;
     std::filesystem::create_directory(

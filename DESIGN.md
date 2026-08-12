@@ -203,7 +203,10 @@ body sink. Each lifecycle result, application receipt, publication request, and
 publication receipt is owner-encoded and immutably retained before the effect
 journal records its identity. Application intent uses the direct
 `libpkgapply-posix` active-request index, so recovery needs no directory scan or
-controller-owned application format.
+controller-owned application format. Read-only reopening of private journal
+locks, heads, snapshots, evidence indexes, and evidence bodies is nonblocking
+before regular-file validation. A corrupted special-file slot therefore cannot
+turn retained authority into an unbounded wait.
 
 Construction and check have the same closed-history rule at the controller
 boundary. Once a construction attempt starts, its exact admitted

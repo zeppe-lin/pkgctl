@@ -59,6 +59,7 @@ for required in \
   'load_construction(' \
   'load_check(' \
   'O_NOFOLLOW' \
+  'O_NONBLOCK' \
   'F_DUPFD_CLOEXEC' \
   'flock(' \
   'LOCK_SH' \
@@ -92,6 +93,11 @@ for token in \
     exit 1
   }
 done
+
+[ "$(grep -F -c 'O_NONBLOCK' "$store_source")" -eq 2 ] || {
+  echo 'transaction-run evidence regular-file read authority is not uniformly nonblocking' >&2
+  exit 1
+}
 
 for forbidden in \
   'decode_build_execution_result(' \
@@ -128,7 +134,11 @@ for required_test in \
   'encode_check_dispatch_evidence' \
   'posix_transaction_run_evidence_store::open' \
   'injected construction-evidence failure' \
-  'injected check-evidence failure'; do
+  'injected check-evidence failure' \
+  'evidence-fifo-index' \
+  'evidence-fifo-object' \
+  'evidence-fifo-lock' \
+  'child_reports_without_blocking'; do
   grep -F -- "$required_test" "$construction_test" "$check_test" \
       "$srcdir/tests/support/run_execute_support.h" >/dev/null || {
     echo "missing transaction-run evidence test: $required_test" >&2

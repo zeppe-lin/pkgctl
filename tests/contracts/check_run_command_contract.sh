@@ -486,7 +486,7 @@ for documented in \
   'Release 0.35.0 closes the functional package-management chain' \
   'Release 0.35.0 bounded native command boundary' \
   'Release 0.35.0 bounded native command qualification' \
-  'Version 0.35.0 retains the native catalog' \
+  'Version 0.35.1 retains the native catalog' \
   'BOUNDED NATIVE TRANSACTION COMMAND' \
   'current private command-evidence format' \
   'retained transaction semantics'; do

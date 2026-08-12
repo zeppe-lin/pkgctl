@@ -758,6 +758,14 @@ Every release must establish:
   while successful terminal recovery may acquire one only to read resulting
   state;
 
+## Nonblocking retained-authority corruption
+
+The POSIX run journal, effect journal, and transaction-run evidence stores each
+replace real retained regular-file slots with FIFOs in forked alarm-guarded
+fixtures. Reads must return the owning typed corruption/contract error before
+the alarm fires. This proves that fail-closed validation cannot itself block on
+corrupted private authority.
+
 ## Exact effect-inspection command tests
 
 The command boundary must prove:

@@ -28,7 +28,7 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.35.0 retains the native catalog, resolution, transaction, and exact
+Version 0.35.1 retains the native catalog, resolution, transaction, and exact
 durable run/effect inspection commands and adds one bounded mutating command.
 *run* composes or recomposes one exact transaction, enters through the native
 runtime, and performs at most the positive *--max-steps* bound. Before a fresh

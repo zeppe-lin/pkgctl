@@ -36,6 +36,22 @@ using namespace construction_fixture;
 int failures = 0;
 #define CHECK(value) do { if (!(value)) { std::cerr << "CHECK failed: " #value "\n"; ++failures; } } while (false)
 
+template<typename Function>
+bool evidence_rejects(
+    pkgctl::transaction_run_evidence_error_code expected,
+    Function&& function)
+{
+  try
+  {
+    function();
+  }
+  catch (const pkgctl::transaction_run_evidence_error& problem)
+  {
+    return problem.code() == expected;
+  }
+  return false;
+}
+
 pkgctl::transaction_run_nonce journal_nonce(std::uint8_t marker)
 {
   pkgctl::transaction_run_nonce::byte_array bytes{};
@@ -1818,6 +1834,61 @@ void check_transaction_run_evidence_storage()
           pkgctl::transaction_run_evidence_error_code::store_corrupt;
     }
     CHECK(rejected);
+  }
+
+
+  {
+    const auto fifo_index_path = temporary.path() / "evidence-fifo-index";
+    std::filesystem::create_directory(fifo_index_path);
+    auto fifo_store = pkgctl::posix_transaction_run_evidence_store::open(
+        fifo_index_path.string());
+    (void)fifo_store.publish(record);
+    test_support::replace_with_fifo(
+        evidence_file_with_suffix(fifo_index_path, ".pci"));
+    CHECK(test_support::child_reports_without_blocking([&] {
+      return evidence_rejects(
+          pkgctl::transaction_run_evidence_error_code::store_corrupt,
+          [&] {
+            (void)fifo_store.load_construction(
+                record.journal(), record.dispatch(), record.attempt_session());
+          });
+    }));
+  }
+
+  {
+    const auto fifo_object_path = temporary.path() / "evidence-fifo-object";
+    std::filesystem::create_directory(fifo_object_path);
+    auto fifo_store = pkgctl::posix_transaction_run_evidence_store::open(
+        fifo_object_path.string());
+    (void)fifo_store.publish(record);
+    test_support::replace_with_fifo(
+        evidence_file_with_suffix(fifo_object_path, ".pce"));
+    CHECK(test_support::child_reports_without_blocking([&] {
+      return evidence_rejects(
+          pkgctl::transaction_run_evidence_error_code::store_corrupt,
+          [&] {
+            (void)fifo_store.load_construction(
+                record.journal(), record.dispatch(), record.attempt_session());
+          });
+    }));
+  }
+
+  {
+    const auto fifo_lock_path = temporary.path() / "evidence-fifo-lock";
+    std::filesystem::create_directory(fifo_lock_path);
+    auto fifo_store = pkgctl::posix_transaction_run_evidence_store::open(
+        fifo_lock_path.string());
+    CHECK(::mkfifo(
+              (fifo_lock_path / ".pkgctl-run-evidence.lock").c_str(), 0444) ==
+          0);
+    CHECK(test_support::child_reports_without_blocking([&] {
+      return evidence_rejects(
+          pkgctl::transaction_run_evidence_error_code::store_contract_violation,
+          [&] {
+            (void)fifo_store.load_construction(
+                record.journal(), record.dispatch(), record.attempt_session());
+          });
+    }));
   }
 
   flip_first_byte(evidence_file_with_suffix(selected_path, ".pce"));

@@ -91,7 +91,7 @@ read_lock=$(sed -n '/^std::optional<fd_guard> lock_store_read_only(/,/^}$/p' \
   "$store_source")
 for required in \
   '.pkgctl-effect.lock' \
-  'O_RDONLY | O_CLOEXEC | O_NOFOLLOW' \
+  'O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK' \
   'errno == ENOENT' \
   'LOCK_SH'; do
   printf '%s\n' "$read_lock" | grep -F -- "$required" >/dev/null || {
@@ -99,6 +99,11 @@ for required in \
     exit 1
   }
 done
+[ "$(grep -F -c 'O_NONBLOCK' "$store_source")" -eq 3 ] || {
+  echo 'effect journal regular-file read authority is not uniformly nonblocking' >&2
+  exit 1
+}
+
 for forbidden in 'O_RDWR' 'O_WRONLY' 'O_CREAT' 'LOCK_EX'; do
   if printf '%s\n' "$read_lock" | grep -F -- "$forbidden" >/dev/null 2>&1; then
     echo "read-only effect-store lock has writer authority: $forbidden" >&2
@@ -137,7 +142,11 @@ for required_test in \
   'store_contract_violation' \
   'append_calls() == 0U' \
   '!std::filesystem::exists(lock_path)' \
-  'std::filesystem::exists(lock_path)'; do
+  'std::filesystem::exists(lock_path)' \
+  'fifo-record' \
+  'fifo-head' \
+  'fifo-lock' \
+  'child_reports_without_blocking'; do
   grep -F -- "$required_test" "$test_source" "$store_test" >/dev/null || {
     echo "missing durable effect-attempt inspection test: $required_test" >&2
     exit 1

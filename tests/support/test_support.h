@@ -11,6 +11,8 @@
 #include <utility>
 #include <vector>
 
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <libpkgstate-posix/canonical_generation_store.h>
@@ -18,6 +20,43 @@
 #include <pkgctl/request.h>
 
 namespace test_support {
+
+inline void replace_with_fifo(const std::filesystem::path& path)
+{
+  if (!std::filesystem::remove(path))
+    throw std::runtime_error("cannot remove retained-authority fixture file: " +
+                             path.string());
+  if (::mkfifo(path.c_str(), 0444) != 0)
+    throw std::runtime_error("cannot create retained-authority FIFO: " +
+                             path.string());
+}
+
+template<typename Function>
+bool child_reports_without_blocking(Function&& function)
+{
+  const pid_t child = ::fork();
+  if (child < 0)
+    throw std::runtime_error("cannot fork nonblocking-refusal fixture");
+  if (child == 0)
+  {
+    ::alarm(2U);
+    bool accepted = false;
+    try
+    {
+      accepted = function();
+    }
+    catch (...)
+    {
+      accepted = false;
+    }
+    ::_exit(accepted ? 0 : 1);
+  }
+
+  int status = 0;
+  if (::waitpid(child, &status, 0) != child)
+    throw std::runtime_error("cannot wait for nonblocking-refusal fixture");
+  return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
 
 class temporary_directory final {
 public:

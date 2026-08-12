@@ -1,5 +1,8 @@
 # pkgctl
 
+Release 0.35.1 hardens retained private journal and evidence reopening so
+corrupted special-file authority fails closed without blocking recovery.
+
 `pkgctl` is the Zeppe-Lin package control plane.
 
 It coordinates sealed package authorities without reimplementing their
