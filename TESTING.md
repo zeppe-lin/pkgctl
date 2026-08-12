@@ -208,8 +208,10 @@ The progress suite proves that an admitted or ownership-only history performs no
 evidence lookup and reproduces the initial progress exactly. Completed
 construction evidence is selected by exact journal, dispatch, and attempt,
 decoded under caller-owned bodies, and reproduces the same progress after store
-reopen. Missing evidence fails with a typed error before context authority is
-consulted.
+reopen. Native construction recovery additionally proves that the original
+source tree, content store, and materialized object may all disappear before
+recovery: retained libpkgfetch evidence is decoded without reacquisition.
+Missing evidence fails with a typed error before context authority is consulted.
 
 The effect suite proves that an exact terminal checkpoint can reconstruct the
 canonical operation result without appending, continuing, observing state, or

@@ -12,6 +12,7 @@
 
 #include <libpkgbuild-exec/result_codec.h>
 #include <libpkgcheck-exec/result_codec.h>
+#include <libpkgfetch/materialization_codec.h>
 
 #include <pkgctl/check.h>
 #include <pkgctl/construction.h>
@@ -21,7 +22,7 @@ namespace pkgctl {
 
 struct detail_run_evidence_codec_access;
 
-inline constexpr std::uint16_t transaction_run_evidence_schema_version = 1;
+inline constexpr std::uint16_t transaction_run_evidence_schema_version = 2;
 
 enum class transaction_run_evidence_error_code : std::uint8_t {
   invalid_record = 1,
@@ -54,13 +55,14 @@ private:
   int system_error_;
 };
 
-/*! \brief Durable encoded build evidence for one started construction dispatch.
+/*! \brief Durable owner evidence for one started construction dispatch.
  *
- * The record intentionally does not reconstruct a construction_result by
- * itself. The subordinate codec requires the original build request,
- * execution request, and backend profile. Their identities are retained here
- * so a later native recovery provider can obtain those authorities and prove
- * that the decoded bytes belong to this exact attempt.
+ * The record retains canonical libpkgfetch materialization bytes and the
+ * canonical build-execution encoding. It still does not reconstruct a
+ * construction_result by itself: recovery must supply the exact source
+ * snapshot, build request, execution request, and backend profile bodies, then
+ * delegate each retained body to its semantic owner before admitting the
+ * historical result.
  */
 class construction_dispatch_evidence_record final {
 public:
@@ -81,6 +83,8 @@ public:
   [[nodiscard]] const session_identity& controller_request() const noexcept;
   [[nodiscard]] const pkgfetch::materialization_identity&
   materialization() const noexcept;
+  [[nodiscard]] const pkgfetch::source_materialization_encoding&
+  materialization_encoding() const noexcept;
   [[nodiscard]] const pkgbuild::build_request_identity&
   build_request() const noexcept;
   [[nodiscard]] const pkgexec::execution_request_identity&
@@ -107,6 +111,7 @@ private:
       session_identity result,
       session_identity controller_request,
       pkgfetch::materialization_identity materialization,
+      pkgfetch::source_materialization_encoding materialization_encoding,
       pkgbuild::build_request_identity build_request,
       pkgexec::execution_request_identity execution_request,
       pkgexec::backend_capability_profile_identity backend,
@@ -124,6 +129,7 @@ private:
   session_identity result_;
   session_identity controller_request_;
   pkgfetch::materialization_identity materialization_;
+  pkgfetch::source_materialization_encoding materialization_encoding_;
   pkgbuild::build_request_identity build_request_;
   pkgexec::execution_request_identity execution_request_;
   pkgexec::backend_capability_profile_identity backend_;

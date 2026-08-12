@@ -22,10 +22,14 @@ for file in "$model" "$codec" "$store" "$model_source" "$codec_source" \
 done
 
 for required in \
-  'transaction_run_evidence_schema_version = 1' \
+  'transaction_run_evidence_schema_version = 2' \
+  'pkgctl/construction-dispatch-evidence/2' \
+  'pkgctl/check-dispatch-evidence/2' \
   'construction_dispatch_evidence_record' \
   'check_dispatch_evidence_record' \
   'controller_request() const noexcept' \
+  'materialization_encoding() const noexcept' \
+  'encode_source_materialization' \
   'execution_request() const noexcept' \
   'backend() const noexcept' \
   'encoding() const noexcept' \

@@ -41,7 +41,7 @@ require_dependency_range()
 }
 
 require_dependency_range libpkgstate '>=3.1.0' '<4.0.0'
-require_dependency_range libpkgfetch '>=2.0.0' '<3.0.0'
+require_dependency_range libpkgfetch '>=2.1.0' '<3.0.0'
 require_dependency_range libpkgbuild-exec '>=2.2.0' '<3.0.0'
 require_dependency_range libpkgcheck-exec '>=0.4.0' '<1.0.0'
 require_dependency_range libpkgresolve '>=3.0.0' '<4.0.0'
@@ -87,7 +87,7 @@ for contract in \
   'libpkgstate-posix >= 3.0.0, < 4.0.0' \
   'libpkgstate-plan >= 3.0.0, < 4.0.0' \
   'libpkgstate-apply >= 3.1.0, < 4.0.0' \
-  'libpkgfetch >= 2.0.0, < 3.0.0' \
+  'libpkgfetch >= 2.1.0, < 3.0.0' \
   'libpkgbuild >= 3.0.0, < 4.0.0' \
   'libpkgbuild-exec >= 2.2.0, < 3.0.0' \
   'libpkgbuild-image >= 1.0.0, < 2.0.0' \

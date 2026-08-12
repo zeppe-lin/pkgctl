@@ -12,7 +12,7 @@ core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgs
 cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
 pipeline_modules='libpkgreconcile libpkgreconcile-apply libpkgreconcile-posix libpkgreconcile-apply-posix'
 pkg-config --exists \
-  'libpkgfetch >= 2.0.0' 'libpkgfetch < 3.0.0' \
+  'libpkgfetch >= 2.1.0' 'libpkgfetch < 3.0.0' \
   'libpkgbuild-exec >= 2.2.0' 'libpkgbuild-exec < 3.0.0' \
   'libpkgstate-apply >= 3.1.0' 'libpkgstate-apply < 4.0.0' \
   'libpkgexec >= 2.0.0' 'libpkgexec < 3.0.0' \

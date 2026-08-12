@@ -332,31 +332,38 @@ deterministic session source. Do not introduce a second recovery-only session,
 path, credential, root-view, package-input, or workspace provider. The exact
 execution request must be reproduced through the pure build/check adapter
 projection; recovery must never call effectful `prepare()` merely to obtain
-request authority. Construction may reacquire genuine source material through
-`libpkgfetch`; operation restart remains delegated to the effect journal.
+request authority. Construction recovery must decode the retained
+`libpkgfetch` materialization body under the exact source snapshot and must not
+call source materialization again. Operation restart remains delegated to the
+effect journal.
 
 The construction/check evidence layer may serialize only one exact typed
-dispatch-evidence record and the existing canonical subordinate result encoding.
-It must bind the run journal, transaction, dispatch, node, attempt, controller
-request/result, and subordinate context identities before publication. The
-content object must become durable before the typed index, and terminal run
-retirement must follow evidence publication. The store may validate encoding and
-index integrity but must not decode a build/check result without the complete
-original request, execution-request, backend-profile, source-materialization,
-and resource authorities. It must not discover those authorities, scan indexes,
-or promote an identity into semantic evidence.
+dispatch-evidence record and canonical owner encodings. Construction evidence
+retains the canonical libpkgfetch materialization encoding together with the
+existing build-execution encoding; check evidence retains its existing
+check-execution encoding. It must bind the run journal, transaction, dispatch,
+node, attempt, controller request/result, and subordinate context identities
+before publication. The content object must become durable before the typed
+index, and terminal run retirement must follow evidence publication. The store
+may validate encoding and index integrity but must not decode owner evidence or
+discover semantic authorities. In particular it must not reconstruct a source
+materialization from an identity, scan indexes, or promote an identity into
+semantic evidence. The current private transaction-run evidence schema is 2;
+schema-1 bytes are unsupported historical implementation data and must fail
+closed rather than trigger source reacquisition or reconstruction.
 
 The evidence-backed recovery layer may select only the exact typed index named
-by the committed journal, dispatch, and attempt. It must obtain complete context
-bodies from a caller-owned source, prove every body against the identities in the
-durable record, invoke the existing subordinate decoder, and reproduce the
-canonical controller-result identity before returning recovery authority. It
-must treat absent evidence as unresolved started ownership, not as a releasable
-reservation. It must not discover paths, reconstruct a request from identities,
-substitute a current backend profile, accept a semantically similar session, or
-parse subordinate bytes through a second codec. Operation recovery remains an
-effect-journal responsibility and must not be routed through construction/check
-objects.
+by the committed journal, dispatch, and attempt. It must obtain caller-owned
+semantic context, decode each retained owner body through that owner
+(`libpkgfetch`, build/check execution), prove every body against the identities
+in the durable record, and reproduce the canonical controller-result identity
+before returning recovery authority. It must treat absent evidence as unresolved
+started ownership, not as a releasable reservation. It must not discover paths,
+reconstruct a request or source materialization from identities, reopen source
+locators or content-store objects, substitute a current backend profile, accept
+a semantically similar session, or parse subordinate bytes through a second
+codec. Operation recovery remains an effect-journal responsibility and must not
+be routed through construction/check objects.
 
 The operation-driver source layer must acquire one call-scoped physical driver
 only from an exact validated execution or recovery handoff. Fresh acquisition

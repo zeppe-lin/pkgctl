@@ -295,11 +295,17 @@ detail::native_construction_recovery_context(
         "native construction context differs from retained evidence");
   }
 
-  auto materialization = pkgfetch::materialize(
-      pkgfetch::materialization_request::seal(
-          session.request().source(), session.paths().local_source_root,
-          session.paths().content_store_root,
-          session.request().acquisition_policy()));
+  auto materialization = [&]() {
+    try
+    {
+      return pkgfetch::decode_source_materialization(
+          evidence.materialization_encoding(), request.source());
+    }
+    catch (const std::exception& problem)
+    {
+      decode_failed("construction materialization", problem);
+    }
+  }();
   if (materialization.identity() != evidence.materialization())
     context_mismatch(
         "native construction materialization differs from retained evidence");

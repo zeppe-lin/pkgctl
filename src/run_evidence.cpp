@@ -85,6 +85,7 @@ session_identity construction_record_identity(
     const session_identity& result,
     const session_identity& controller_request,
     const pkgfetch::materialization_identity& materialization,
+    const pkgfetch::source_materialization_encoding& materialization_encoding,
     const pkgbuild::build_request_identity& build_request,
     const pkgexec::execution_request_identity& execution_request,
     const pkgexec::backend_capability_profile_identity& backend,
@@ -93,12 +94,13 @@ session_identity construction_record_identity(
     const pkgbuild_exec::build_execution_result_encoding& encoding)
 {
   return make_session_identity(
-      "pkgctl/construction-dispatch-evidence/1",
+      "pkgctl/construction-dispatch-evidence/2",
       {
           journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
           attempt_session.hex(), result.hex(), controller_request.hex(),
-          materialization.hex(), build_request.hex(), execution_request.hex(),
-          backend.hex(), execution.hex(), build.hex(), encoding_digest(encoding),
+          materialization.hex(), encoding_digest(materialization_encoding),
+          build_request.hex(), execution_request.hex(), backend.hex(),
+          execution.hex(), build.hex(), encoding_digest(encoding),
       });
 }
 
@@ -119,7 +121,7 @@ session_identity check_record_identity(
     const pkgcheck_exec::check_execution_result_encoding& encoding)
 {
   return make_session_identity(
-      "pkgctl/check-dispatch-evidence/1",
+      "pkgctl/check-dispatch-evidence/2",
       {
           journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
           attempt_session.hex(), result.hex(), controller_request.hex(),
@@ -160,6 +162,7 @@ construction_dispatch_evidence_record::construction_dispatch_evidence_record(
     session_identity result,
     session_identity controller_request,
     pkgfetch::materialization_identity materialization,
+    pkgfetch::source_materialization_encoding materialization_encoding,
     pkgbuild::build_request_identity build_request,
     pkgexec::execution_request_identity execution_request,
     pkgexec::backend_capability_profile_identity backend,
@@ -172,6 +175,7 @@ construction_dispatch_evidence_record::construction_dispatch_evidence_record(
       result_(std::move(result)),
       controller_request_(std::move(controller_request)),
       materialization_(std::move(materialization)),
+      materialization_encoding_(std::move(materialization_encoding)),
       build_request_(std::move(build_request)),
       execution_request_(std::move(execution_request)),
       backend_(std::move(backend)), execution_(std::move(execution)),
@@ -214,12 +218,15 @@ construction_dispatch_evidence_record::admit(
   if (result.identity() != expected_result)
     invalid_record("construction result identity is not canonical");
 
+  auto materialization_encoding =
+      pkgfetch::encode_source_materialization(result.materialization());
   auto encoding = pkgbuild_exec::encode_build_execution_result(build);
   auto identity = construction_record_identity(
       started_record.journal(), started_record.transaction(),
       dispatch.identity(), dispatch.unit().primary_node(), session.identity(),
       result.identity(), request.identity(), result.materialization().identity(),
-      request.build().identity(), build.execution().request().identity(),
+      materialization_encoding, request.build().identity(),
+      build.execution().request().identity(),
       build.execution().backend().identity(), build.execution().identity(),
       build.build().identity(), encoding);
   return construction_dispatch_evidence_record(
@@ -227,7 +234,8 @@ construction_dispatch_evidence_record::admit(
       started_record.transaction(), dispatch.identity(),
       dispatch.unit().primary_node(), session.identity(), result.identity(),
       request.identity(), result.materialization().identity(),
-      request.build().identity(), build.execution().request().identity(),
+      std::move(materialization_encoding), request.build().identity(),
+      build.execution().request().identity(),
       build.execution().backend().identity(), build.execution().identity(),
       build.build().identity(), std::move(encoding));
 }
@@ -256,6 +264,9 @@ construction_dispatch_evidence_record::controller_request() const noexcept
 const pkgfetch::materialization_identity&
 construction_dispatch_evidence_record::materialization() const noexcept
 { return materialization_; }
+const pkgfetch::source_materialization_encoding&
+construction_dispatch_evidence_record::materialization_encoding() const noexcept
+{ return materialization_encoding_; }
 const pkgbuild::build_request_identity&
 construction_dispatch_evidence_record::build_request() const noexcept
 { return build_request_; }

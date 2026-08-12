@@ -44,7 +44,10 @@
 - Retains lifecycle results, application receipts, publication requests, and
   publication receipts in a private immutable command store before an effect
   journal may name them. Bodies use their owning codecs and are validated again
-  by the existing restart checkpoint.
+  by the existing restart checkpoint. Construction dispatch evidence likewise
+  retains the canonical libpkgfetch materialization body; restart decodes that
+  historical fetch evidence under the exact retained source snapshot instead of
+  materializing the old source universe again.
 - Uses `libpkgapply-posix` 3.1.0 direct active-request lookup only to recover
   an unresolved application-intent journal, without scanning a journal
   directory or moving application-storage policy into the controller. Later
@@ -211,7 +214,7 @@ Current 0.35.0 source accepts exactly these direct dependency generations:
 - libpkgstate-posix >= 3.0.0, < 4.0.0
 - libpkgstate-plan >= 3.0.0, < 4.0.0
 - libpkgstate-apply >= 3.1.0, < 4.0.0
-- libpkgfetch >= 2.0.0, < 3.0.0
+- libpkgfetch >= 2.1.0, < 3.0.0
 - libpkgbuild >= 3.0.0, < 4.0.0
 - libpkgbuild-exec >= 2.2.0, < 3.0.0
 - libpkgbuild-image >= 1.0.0, < 2.0.0

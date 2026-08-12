@@ -545,9 +545,10 @@ commit terminal run successor
 The evidence record binds the exact run journal, transaction, dispatch, graph
 node, attempt session, controller result, original controller request, and every
 subordinate request/backend/execution/result identity needed to validate later
-rehydration. Its payload is the existing canonical encoding produced by
-`libpkgbuild-exec` or `libpkgcheck-exec`; `pkgctl` does not invent another build
-or check serialization.
+rehydration. Construction retains the canonical materialization encoding owned
+by `libpkgfetch` together with the canonical build-execution encoding; check
+retains the canonical check-execution encoding. `pkgctl` does not invent a
+second serialization for any subordinate body.
 
 The POSIX store publishes the content object before the typed index and
 synchronizes both directory transitions. Exact retries are idempotent. A
@@ -555,12 +556,15 @@ conflicting record for one journal/dispatch/attempt, a corrupt index, a missing
 indexed object, or altered content fails closed. Descriptor anchoring preserves
 the selected store authority if its original pathname is renamed or replaced.
 
-This closes durable observation, not semantic resurrection. The subordinate
-codecs require complete original request, execution-request, and backend-profile
-bodies; construction additionally requires genuine source-materialization
-authority. The store retains their identities so a future native recovery
-provider can obtain and prove those bodies. It deliberately does not promote an
-identity into a semantic result or search the host for missing authority.
+This closes durable observation, not semantic resurrection. Subordinate codecs
+require complete caller-owned semantic authorities. Construction recovery
+supplies the exact retained source snapshot to `libpkgfetch`, which decodes the
+retained historical materialization body without reopening source locators or
+content-store objects; build/check recovery likewise delegates their retained
+bytes to their owners. The store deliberately does not promote an identity into
+a semantic result or search the host for missing authority. Transaction-run
+evidence schema 2 is the only admitted private format; schema-1 bytes fail
+closed and have no reconstruction path.
 
 `posix_transaction_run_runtime` now retains four caller-opened directory
 authorities: a transaction-run journal directory, a

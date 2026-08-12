@@ -40,7 +40,7 @@ for required in \
   'recovery_context_mismatch' \
   'recovery_decode_failed' \
   'detail_run_recovery_access' \
-  'pkgfetch::materialize(' \
+  'pkgfetch::decode_source_materialization(' \
   'pkgbuild_exec::seal_execution_request(' \
   'pkgcheck_exec::seal_execution_request(' \
   'detail::native_construction_recovery_context(' \
@@ -80,6 +80,7 @@ for required_test in \
 done
 
 for forbidden in \
+  'pkgfetch::materialize(' \
   'pkgexec::execution_backend& construction_backend_' \
   'pkgexec::execution_backend& check_backend_' \
   'selected_backend.capabilities()' \

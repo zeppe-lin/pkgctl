@@ -1591,6 +1591,8 @@ void check_transaction_run_evidence_storage()
   CHECK(record.result() == result.identity());
   CHECK(record.controller_request() == session.request().identity());
   CHECK(record.materialization() == result.materialization().identity());
+  CHECK(record.materialization_encoding() ==
+        pkgfetch::encode_source_materialization(result.materialization()));
   CHECK(record.build_request() == session.request().build().identity());
   CHECK(record.execution_request() ==
         result.build().execution().request().identity());
@@ -1603,6 +1605,8 @@ void check_transaction_run_evidence_storage()
   const auto decoded =
       pkgctl::decode_construction_dispatch_evidence(encoding);
   CHECK(decoded.identity() == record.identity());
+  CHECK(decoded.materialization_encoding() ==
+        record.materialization_encoding());
   CHECK(decoded.encoding() == record.encoding());
   CHECK(pkgctl::encode_construction_dispatch_evidence(decoded) == encoding);
 
@@ -2251,6 +2255,15 @@ void check_stored_construction_recovery()
   CHECK(mismatched);
   CHECK(foreign_context.calls() == 1U);
 
+  const auto retained_materialization_encoding =
+      evidence.materialization_encoding();
+  std::filesystem::remove_all(session.paths().local_source_root);
+  std::filesystem::remove_all(session.paths().content_store_root);
+  CHECK(!std::filesystem::exists(session.paths().local_source_root));
+  CHECK(!std::filesystem::exists(session.paths().content_store_root));
+  CHECK(!std::filesystem::exists(
+      result.materialization().objects().front().object_path()));
+
   construction_execution_authority_source sessions(session);
   unreachable_operation_recovery_context_source operations;
   pkgctl::native_transaction_dispatch_recovery_context_source native_context(
@@ -2269,6 +2282,9 @@ void check_stored_construction_recovery()
           session.identity());
     CHECK(native_recovery.construction()->materialization().identity() ==
           result.materialization().identity());
+    CHECK(pkgfetch::encode_source_materialization(
+              native_recovery.construction()->materialization()) ==
+          retained_materialization_encoding);
   }
 }
 
@@ -2666,6 +2682,14 @@ void check_posix_transaction_run_runtime_recovery()
         evidence_path.string());
     CHECK(evidence_store.publish(evidence).identity() == evidence.identity());
   }
+
+  const auto materialized_object =
+      result.materialization().objects().front().object_path();
+  std::filesystem::remove_all(session.paths().local_source_root);
+  std::filesystem::remove_all(session.paths().content_store_root);
+  CHECK(!std::filesystem::exists(session.paths().local_source_root));
+  CHECK(!std::filesystem::exists(session.paths().content_store_root));
+  CHECK(!std::filesystem::exists(materialized_object));
 
   fixed_progress_source progress_source(started_run.progress());
   construction_execution_authority_source execution(session);
