@@ -3,6 +3,7 @@
 
 #include "support/construction_fixture.h"
 
+#include <pkgctl/construction_codec.h>
 #include <pkgctl/run_locator.h>
 
 #include <cstdint>
@@ -385,6 +386,15 @@ void check_installed_input_location()
   CHECK(session.package_inputs().front().resource == retained_resource);
   CHECK(session.package_inputs().front().path == retained_path);
   CHECK(!fs::exists(retained_path));
+
+  const auto retained_session = pkgctl::encode_construction_session(session);
+  auto decoded_session = pkgctl::decode_construction_session(
+      retained_session, transaction, dispatch.unit().primary_node());
+  CHECK(decoded_session.identity() == session.identity());
+  CHECK(decoded_session.package_inputs().size() == 1U);
+  CHECK(decoded_session.package_inputs().front().resource == retained_resource);
+  CHECK(decoded_session.package_inputs().front().path == retained_path);
+  CHECK(installed_packages.calls() == 1U);
 
   fixed_installed_package_source foreign_package(
       retained_package.identity(),

@@ -43,8 +43,9 @@ struct transaction_run_runtime_backends final {
 
 /*! \brief POSIX journal and native-driver composition for bounded run control.
  *
- * The caller supplies existing directory descriptors, one shared deterministic
- * construction/check session source, operation execution/recovery sources,
+ * The caller supplies existing directory descriptors, the fresh
+ * construction/check session source (also used by check recovery), operation
+ * execution/recovery sources,
  * archive authority, and already selected physical backends. The runtime
  * duplicates all four descriptors, owns one run store,
  * one construction/check evidence store, one effect store, native

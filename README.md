@@ -21,11 +21,15 @@ target binding comes from retained state evidence. Both enter only through
 `--max-steps` bound.
 
 The command retains subordinate effect bodies in owner encodings before the
-controller journal may reference them. Interrupted applications are reopened
-through the direct `libpkgapply-posix` request-to-journal index. Resume never
-reacquires collections, asks the operator to restate transaction semantics,
-substitutes current state for historical state, scans for journals, or silently
-replans. Private command evidence has one current admitted format. Bytes that do not
+controller journal may reference them. A started construction likewise retains
+the exact controller-owned admitted construction session plus owner-encoded
+fetch/build evidence before terminal retirement. Construction restart decodes
+that retained session under the admitted transaction/build node; it does not
+reconsult current construction configuration or retained-installed-package
+lookup. Interrupted applications are reopened through the direct
+`libpkgapply-posix` request-to-journal index. Resume never reacquires
+collections, asks the operator to restate transaction semantics, substitutes
+current state for historical state, scans for journals, or silently replans. Private command evidence has one current admitted format. Bytes that do not
 belong to that format are rejected rather than interpreted through a compatibility
 path. Resume uses the retained interpreter identity and backend profiles to validate
 historical execution evidence. Current interpreter observation, backend capability, and supervisor-credential

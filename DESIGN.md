@@ -200,6 +200,14 @@ journal records its identity. Application intent uses the direct
 `libpkgapply-posix` active-request index, so recovery needs no directory scan or
 controller-owned application format.
 
+Construction has the same closed-history rule at the controller boundary. Once
+a construction attempt starts, its exact admitted `construction_session` is
+canonically retained by `pkgctl` alongside the owner-encoded fetch and build
+evidence. Restart decodes that session under the retained transaction/build
+node and never reconsults the fresh session locator, current construction roots
+or policies, or retained-installed-package resource source. Those inputs remain
+fresh-attempt authority; their retained admitted result is historical authority.
+
 The live operation authority observes the target only for a fresh exact current
 dispatch. Before an admitted operation session can be named by either effect or
 run journal, the command immutably retains that session's exact target
@@ -545,10 +553,11 @@ commit terminal run successor
 The evidence record binds the exact run journal, transaction, dispatch, graph
 node, attempt session, controller result, original controller request, and every
 subordinate request/backend/execution/result identity needed to validate later
-rehydration. Construction retains the canonical materialization encoding owned
-by `libpkgfetch` together with the canonical build-execution encoding; check
-retains the canonical check-execution encoding. `pkgctl` does not invent a
-second serialization for any subordinate body.
+rehydration. Construction additionally retains a canonical controller-owned
+encoding of its exact admitted `construction_session`, the canonical
+materialization encoding owned by `libpkgfetch`, and the canonical
+build-execution encoding. Check retains the canonical check-execution encoding.
+`pkgctl` does not invent a second serialization for any subordinate body.
 
 The POSIX store publishes the content object before the typed index and
 synchronizes both directory transitions. Exact retries are idempotent. A
@@ -563,8 +572,8 @@ retained historical materialization body without reopening source locators or
 content-store objects; build/check recovery likewise delegates their retained
 bytes to their owners. The store deliberately does not promote an identity into
 a semantic result or search the host for missing authority. Transaction-run
-evidence schema 2 is the only admitted private format; schema-1 bytes fail
-closed and have no reconstruction path.
+evidence schema 3 is the only admitted private format; earlier schema bytes
+fail closed and have no reconstruction path.
 
 `posix_transaction_run_runtime` now retains four caller-opened directory
 authorities: a transaction-run journal directory, a

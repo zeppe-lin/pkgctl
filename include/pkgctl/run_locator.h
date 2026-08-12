@@ -116,8 +116,9 @@ private:
  *
  * Session acquisition performs no filesystem observation or mutation, source
  * materialization, backend construction, execution, journal I/O, or progress
- * advancement.  Reconsulting the source after restart reproduces the same
- * controller session for the same journal and dispatch.
+ * advancement. Fresh construction retains the exact admitted session in
+ * durable controller evidence; construction restart does not reconsult this
+ * source or the retained-installed-package source.
  */
 class native_transaction_dispatch_session_source final
     : public transaction_dispatch_session_source {

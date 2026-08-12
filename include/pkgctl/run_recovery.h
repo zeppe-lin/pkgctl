@@ -68,17 +68,19 @@ public:
       const transaction_dispatch& dispatch) = 0;
 };
 
-/*! \brief Reproduce construction/check recovery context from one session source.
+/*! \brief Reproduce construction/check recovery context from retained authority.
  *
- * The same deterministic session source used for fresh execution is consulted
- * again under the retained durable record and dispatch. Construction source
- * materialization is decoded from retained libpkgfetch-owned evidence under the
- * exact source snapshot; recovery does not reacquire source bytes. Execution
- * requests are reproduced through the pure build/check projections, and exact
- * historical backend capability profiles are supplied as retained evidence
- * authority. A live execution backend is therefore unnecessary merely to
- * decode old evidence. Operation recovery is delegated to its effect-journal
- * owner.
+ * Construction restart decodes the exact controller-owned construction session
+ * retained with the durable attempt and validates it against the retained
+ * transaction and build node. It therefore does not reconsult the fresh native
+ * session locator, current construction configuration, or installed-package
+ * resource source. Source materialization is then decoded from retained
+ * libpkgfetch-owned evidence under that session's exact source snapshot. Check
+ * recovery still consults the deterministic session source. Execution requests
+ * are reproduced through the pure build/check projections, and exact historical
+ * backend capability profiles are supplied as retained evidence authority. A
+ * live execution backend is unnecessary merely to decode old evidence.
+ * Operation recovery is delegated to its effect-journal owner.
  */
 class native_transaction_dispatch_recovery_context_source final
     : public transaction_dispatch_recovery_context_source {

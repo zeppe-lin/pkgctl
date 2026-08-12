@@ -46,13 +46,15 @@ public:
       const transaction_run_journal_record& record) = 0;
 };
 
-/*! \brief Deterministic construction/check sessions for one exact dispatch.
+/*! \brief Fresh construction/check sessions for one exact dispatch.
  *
  * Implementations select explicit paths and call-scoped resources but do not
- * execute the dispatch.  The same source may be consulted for fresh execution
- * and restart recovery; it must therefore reproduce the same session identity
- * from the same durable record, semantic progress, and dispatch.  User run
- * intent is deliberately outside construction/check resource authority.
+ * execute the dispatch. Fresh construction admits the resulting session into
+ * durable controller evidence before terminal retirement; construction restart
+ * consumes that retained session authority instead of consulting this source
+ * again. Check restart may still require this source until its own admitted
+ * session is retained. User run intent is deliberately outside
+ * construction/check resource authority.
  */
 class transaction_dispatch_session_source {
 public:

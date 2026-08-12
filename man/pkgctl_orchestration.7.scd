@@ -33,7 +33,11 @@ have no compatibility path.
 The command-private effect-body store is both durable sink and restart source.
 Lifecycle results, application receipts, publication requests, and publication
 receipts are retained through their owner codecs before an effect journal may
-name them. Application-intent restart uses the direct
+name them. Construction-run evidence also retains the exact admitted
+controller-owned construction session plus owner-encoded fetch/build evidence.
+Restart validates and decodes that session under the retained transaction/build
+node without reconsulting the current session locator or installed-package
+resource source. Application-intent restart uses the direct
 *libpkgapply-posix* active-request index; no directory scan or controller-owned
 application-journal format is introduced.
 

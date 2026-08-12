@@ -45,9 +45,12 @@
   publication receipts in a private immutable command store before an effect
   journal may name them. Bodies use their owning codecs and are validated again
   by the existing restart checkpoint. Construction dispatch evidence likewise
-  retains the canonical libpkgfetch materialization body; restart decodes that
-  historical fetch evidence under the exact retained source snapshot instead of
-  materializing the old source universe again.
+  retains the exact controller-owned admitted construction session and the
+  canonical libpkgfetch materialization body. Restart decodes both under the
+  retained transaction/build/source authority instead of reconsulting current
+  construction configuration, installed-package resource lookup, or the old
+  source universe. The private transaction-run evidence schema advances to 3;
+  earlier private bytes fail closed with no compatibility decoder.
 - Uses `libpkgapply-posix` 3.1.0 direct active-request lookup only to recover
   an unresolved application-intent journal, without scanning a journal
   directory or moving application-storage policy into the controller. Later

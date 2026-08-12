@@ -6,8 +6,10 @@ set -eu
 srcdir=${1:-.}
 header="$srcdir/include/pkgctl/construction.h"
 source="$srcdir/src/construction.cpp"
+codec="$srcdir/include/pkgctl/construction_codec.h"
+codec_source="$srcdir/src/construction_session_codec.cpp"
 
-for file in "$header" "$source"; do
+for file in "$header" "$source" "$codec" "$codec_source"; do
   [ -s "$file" ] || {
     echo "missing construction authority source: $file" >&2
     exit 1
@@ -17,6 +19,11 @@ done
 for required in \
   'class construction_request final' \
   'class construction_session final' \
+  'construction_session_encoding_version = 1' \
+  'construction_codec_error_code' \
+  'construction_codec_error final' \
+  'encode_construction_session' \
+  'decode_construction_session' \
   'class construction_driver' \
   'class native_construction_driver final' \
   'pkgfetch::materialize' \
@@ -27,7 +34,8 @@ for required in \
   'pkgbuild_exec::execute' \
   'construction_driver_contract_violation' \
   'image_authority'; do
-  grep -F -- "$required" "$header" "$source" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" "$codec" \
+      "$codec_source" >/dev/null || {
     echo "missing construction authority contract: $required" >&2
     exit 1
   }
@@ -50,6 +58,21 @@ for forbidden in \
   'pkgman'; do
   if grep -F -- "$forbidden" "$header" "$source" >/dev/null 2>&1; then
     echo "forbidden construction authority shortcut: $forbidden" >&2
+    exit 1
+  fi
+done
+
+
+for forbidden in \
+  'std::filesystem::exists(' \
+  'std::filesystem::status(' \
+  'std::ifstream' \
+  'std::ofstream' \
+  'opendir(' \
+  'readdir(' \
+  'glob('; do
+  if grep -F -- "$forbidden" "$codec_source" >/dev/null 2>&1; then
+    echo "construction codec must not observe host authority: $forbidden" >&2
     exit 1
   fi
 done

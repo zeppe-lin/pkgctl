@@ -6,15 +6,18 @@ set -eu
 srcdir=${1:-.}
 model="$srcdir/include/pkgctl/run_evidence.h"
 codec="$srcdir/include/pkgctl/run_evidence_codec.h"
+session_codec="$srcdir/include/pkgctl/construction_codec.h"
 store="$srcdir/include/pkgctl/run_evidence_store.h"
 model_source="$srcdir/src/run_evidence.cpp"
 codec_source="$srcdir/src/run_evidence_codec.cpp"
+session_codec_source="$srcdir/src/construction_session_codec.cpp"
 store_source="$srcdir/src/run_evidence_store.cpp"
 construction_test="$srcdir/tests/unit/construction_test.cpp"
 check_test="$srcdir/tests/unit/check_test.cpp"
 
-for file in "$model" "$codec" "$store" "$model_source" "$codec_source" \
-            "$store_source" "$construction_test" "$check_test"; do
+for file in "$model" "$codec" "$session_codec" "$store" "$model_source" \
+            "$codec_source" "$session_codec_source" "$store_source" \
+            "$construction_test" "$check_test"; do
   [ -s "$file" ] || {
     echo "missing transaction-run evidence source: $file" >&2
     exit 1
@@ -22,12 +25,15 @@ for file in "$model" "$codec" "$store" "$model_source" "$codec_source" \
 done
 
 for required in \
-  'transaction_run_evidence_schema_version = 2' \
-  'pkgctl/construction-dispatch-evidence/2' \
-  'pkgctl/check-dispatch-evidence/2' \
+  'transaction_run_evidence_schema_version = 3' \
+  'pkgctl/construction-dispatch-evidence/3' \
+  'pkgctl/check-dispatch-evidence/3' \
   'construction_dispatch_evidence_record' \
   'check_dispatch_evidence_record' \
   'controller_request() const noexcept' \
+  'session_encoding() const noexcept' \
+  'encode_construction_session' \
+  'decode_construction_session' \
   'materialization_encoding() const noexcept' \
   'encode_source_materialization' \
   'execution_request() const noexcept' \
@@ -35,6 +41,7 @@ for required in \
   'encoding() const noexcept' \
   'encode_construction_dispatch_evidence' \
   'decode_construction_dispatch_evidence' \
+  'decode_construction_session' \
   'encode_check_dispatch_evidence' \
   'decode_check_dispatch_evidence' \
   'transaction_run_evidence_store' \
@@ -54,8 +61,9 @@ for required in \
   'unlinkat(' \
   'store_conflict' \
   'store_corrupt'; do
-  grep -F -- "$required" "$model" "$codec" "$store" "$model_source" \
-      "$codec_source" "$store_source" >/dev/null || {
+  grep -F -- "$required" "$model" "$codec" "$session_codec" "$store" \
+      "$model_source" "$codec_source" "$session_codec_source" \
+      "$store_source" >/dev/null || {
     echo "missing transaction-run evidence contract: $required" >&2
     exit 1
   }
@@ -85,8 +93,9 @@ for forbidden in \
   'opendir(' \
   'readdir(' \
   'glob('; do
-  if grep -F -- "$forbidden" "$model" "$codec" "$store" "$model_source" \
-      "$codec_source" "$store_source" >/dev/null 2>&1; then
+  if grep -F -- "$forbidden" "$model" "$codec" "$session_codec" "$store" \
+      "$model_source" "$codec_source" "$session_codec_source" \
+      "$store_source" >/dev/null 2>&1; then
     echo "forbidden transaction-run evidence authority: $forbidden" >&2
     exit 1
   fi
@@ -95,6 +104,7 @@ done
 for required_test in \
   'check_transaction_run_evidence_storage' \
   'decode_construction_dispatch_evidence' \
+  'decode_construction_session' \
   'evidence-original' \
   'evidence-selected' \
   '.pkgctl-run-evidence.lock' \

@@ -606,6 +606,7 @@ if not get_option('tests').disabled()
   pkgctl_headers = [
     'check.h',
     'construction.h',
+    'construction_codec.h',
     'dispatch.h',
     'controller.h',
     'effect.h',

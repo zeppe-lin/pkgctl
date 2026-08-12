@@ -46,8 +46,11 @@ The command does not initialize or enumerate stores, discover journals, replan
 a resumed transaction from live catalog/state, loop without a bound, sleep,
 retry implicitly, schedule workers, roll back, repair, clean up, compact, or
 collect history. Effect restart bodies are retained in owner encodings before
-controller journals reference them. Interrupted application recovery uses the
-direct *libpkgapply-posix* active-request index.
+controller journals reference them. A started construction also retains its
+exact admitted controller session plus owner-encoded fetch/build evidence;
+restart decodes that session without reconsulting current construction
+configuration or retained-installed-package lookup. Interrupted application
+recovery uses the direct *libpkgapply-posix* active-request index.
 
 Version 0.21.0 introduced the exact durable effect-attempt inspection command
 alongside the existing run-inspection command; both remain read-only sensors.

@@ -1590,6 +1590,7 @@ void check_transaction_run_evidence_storage()
   CHECK(record.attempt_session() == session.identity());
   CHECK(record.result() == result.identity());
   CHECK(record.controller_request() == session.request().identity());
+  CHECK(record.session_encoding() == pkgctl::encode_construction_session(session));
   CHECK(record.materialization() == result.materialization().identity());
   CHECK(record.materialization_encoding() ==
         pkgfetch::encode_source_materialization(result.materialization()));
@@ -1605,10 +1606,56 @@ void check_transaction_run_evidence_storage()
   const auto decoded =
       pkgctl::decode_construction_dispatch_evidence(encoding);
   CHECK(decoded.identity() == record.identity());
+  CHECK(decoded.session_encoding() == record.session_encoding());
+  const auto decoded_session = pkgctl::decode_construction_session(
+      decoded.session_encoding(), transaction,
+      reservation.dispatch->unit().primary_node());
+  CHECK(decoded_session.identity() == session.identity());
+  CHECK(decoded_session.paths().local_source_root ==
+        session.paths().local_source_root);
+  CHECK(decoded_session.paths().content_store_root ==
+        session.paths().content_store_root);
+  CHECK(decoded_session.execution_identity().interpreter ==
+        session.execution_identity().interpreter);
   CHECK(decoded.materialization_encoding() ==
         record.materialization_encoding());
   CHECK(decoded.encoding() == record.encoding());
   CHECK(pkgctl::encode_construction_dispatch_evidence(decoded) == encoding);
+
+  {
+    auto corrupt_session = decoded.session_encoding();
+    corrupt_session.back() ^= 0x01U;
+    bool rejected = false;
+    try
+    {
+      (void)pkgctl::decode_construction_session(
+          corrupt_session, transaction,
+          reservation.dispatch->unit().primary_node());
+    }
+    catch (const pkgctl::construction_codec_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::construction_codec_error_code::corrupt_encoding;
+    }
+    CHECK(rejected);
+  }
+
+  {
+    bool rejected = false;
+    try
+    {
+      (void)pkgctl::decode_construction_session(
+          decoded.session_encoding(), transaction,
+          pkgtransaction::transaction_node_identity::from_sha256(
+              std::string(64U, 'f')));
+    }
+    catch (const pkgctl::construction_codec_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::construction_codec_error_code::authority_mismatch;
+    }
+    CHECK(rejected);
+  }
 
   {
     auto corrupt = encoding;
@@ -2273,7 +2320,7 @@ void check_stored_construction_recovery()
   auto native_recovery =
       pkgctl::acquire_transaction_dispatch_recovery_authority(
           checkpoint, *reservation.dispatch, native_source);
-  CHECK(sessions.calls() == 1U);
+  CHECK(sessions.calls() == 0U);
   CHECK(native_recovery.construction() != nullptr);
   if (native_recovery.construction())
   {
@@ -2727,7 +2774,7 @@ void check_posix_transaction_run_runtime_recovery()
   CHECK(recovered.record().sequence() == 3U);
   CHECK(recovered.run().progress().complete());
   CHECK(progress_source.calls() == 1U);
-  CHECK(execution.calls() == 1U);
+  CHECK(execution.calls() == 0U);
   CHECK(archives.calls() == 0U);
   CHECK(directory_entry_count(effect_path) == 0U);
   CHECK(directory_entry_count(lock_path) == 0U);

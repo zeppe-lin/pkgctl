@@ -208,10 +208,14 @@ The progress suite proves that an admitted or ownership-only history performs no
 evidence lookup and reproduces the initial progress exactly. Completed
 construction evidence is selected by exact journal, dispatch, and attempt,
 decoded under caller-owned bodies, and reproduces the same progress after store
-reopen. Native construction recovery additionally proves that the original
-source tree, content store, and materialized object may all disappear before
-recovery: retained libpkgfetch evidence is decoded without reacquisition.
-Missing evidence fails with a typed error before context authority is consulted.
+reopen. Native construction recovery additionally proves that the original source
+tree, content store, and materialized object may all disappear before recovery:
+retained libpkgfetch evidence is decoded without reacquisition. The recovery
+path also refuses to consult the fresh construction-session source; retained
+session bytes must reproduce the exact paths, policies, credentials, root view,
+and package-input resources, including an installed-selected input, without a
+second retained-package lookup. Missing evidence fails with a typed error before
+recovery context is consulted.
 
 The effect suite proves that an exact terminal checkpoint can reconstruct the
 canonical operation result without appending, continuing, observing state, or
@@ -564,7 +568,10 @@ The evidence-backed recovery suite must prove:
 - construction and check evidence are selected only by the exact durable run
   journal, dispatch, and attempt session;
 - missing evidence refuses recovery before the context source is called;
-- the caller supplies complete semantic bodies rather than result identities;
+- construction recovery decodes the exact retained controller session without
+  consulting the fresh session locator or retained-installed-package source;
+- the caller supplies complete retained transaction and backend authority rather
+  than result identities;
 - every controller session, transaction, graph node, request, materialization,
   execution request, backend profile, subordinate execution, and result identity
   agrees with the durable record;
@@ -573,9 +580,9 @@ The evidence-backed recovery suite must prove:
 - a recovered controller result reproduces the exact fresh canonical identity
   and canonical subordinate encoding after the POSIX store is closed and
   reopened;
-- foreign construction sessions, source materializations, execution requests,
-  backend profiles, build requests, check requests, or retained constructions
-  fail before transaction-run reconciliation;
+- foreign or corrupt construction-session bytes, source materializations,
+  execution requests, backend profiles, build requests, check requests, or
+  retained constructions fail before transaction-run reconciliation;
 - operation recovery bypasses the construction/check store and remains delegated
   to the exact effect-journal recovery authority;
 - the POSIX transaction runtime owns one store-backed recovery source and borrows

@@ -40,6 +40,7 @@ for required in \
   'recovery_context_mismatch' \
   'recovery_decode_failed' \
   'detail_run_recovery_access' \
+  'decode_construction_session(' \
   'pkgfetch::decode_source_materialization(' \
   'pkgbuild_exec::seal_execution_request(' \
   'pkgcheck_exec::seal_execution_request(' \
@@ -59,7 +60,9 @@ for required_test in \
   'stored_transaction_dispatch_recovery_authority_source recovery_source' \
   'transaction_run_evidence_error_code::evidence_missing' \
   'recovery_context_mismatch' \
-  'check_posix_transaction_run_runtime_recovery'; do
+  'check_posix_transaction_run_runtime_recovery' \
+  'CHECK(sessions.calls() == 0U)' \
+  'CHECK(execution.calls() == 0U)'; do
   grep -F -- "$required_test" "$construction" >/dev/null || {
     echo "missing construction evidence recovery test: $required_test" >&2
     exit 1
@@ -80,6 +83,7 @@ for required_test in \
 done
 
 for forbidden in \
+  'sessions.construction(' \
   'pkgfetch::materialize(' \
   'pkgexec::execution_backend& construction_backend_' \
   'pkgexec::execution_backend& check_backend_' \

@@ -5,6 +5,7 @@
 
 #include "run_recovery_detail.h"
 
+#include <pkgctl/construction_codec.h>
 #include <pkgctl/error.h>
 #include <pkgctl/identity.h>
 
@@ -279,10 +280,33 @@ detail::native_construction_recovery_context(
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
     const construction_dispatch_evidence_record& evidence,
-    transaction_dispatch_session_source& sessions,
     pkgexec::backend_capability_profile backend)
 {
-  auto session = sessions.construction(record, progress, dispatch);
+  if (record.transaction() != evidence.transaction() ||
+      progress.transaction().identity() != evidence.transaction())
+  {
+    context_mismatch(
+        "native construction semantics differ from retained evidence");
+  }
+
+  auto session = [&]() {
+    try
+    {
+      return decode_construction_session(
+          evidence.session_encoding(), progress.transaction(),
+          dispatch.unit().primary_node());
+    }
+    catch (const construction_codec_error& problem)
+    {
+      if (problem.code() == construction_codec_error_code::authority_mismatch)
+        context_mismatch(problem.what());
+      decode_failed("construction session", problem);
+    }
+    catch (const std::exception& problem)
+    {
+      decode_failed("construction session", problem);
+    }
+  }();
   const auto& request = session.request();
   if (session.identity() != evidence.attempt_session() ||
       request.identity() != evidence.controller_request() ||
@@ -375,7 +399,7 @@ native_transaction_dispatch_recovery_context_source::construction(
   const auto& attempt = require_attempt(assessment);
   auto context = detail::native_construction_recovery_context(
       checkpoint.record(), checkpoint.run().progress(), dispatch, evidence,
-      sessions_, construction_backend_);
+      construction_backend_);
   if (context.session.identity() != attempt)
     context_mismatch(
         "native construction context differs from restart assessment");

@@ -327,38 +327,48 @@ Descriptor-anchored authority must remain valid if the original pathname is
 renamed or replaced, and all four runtime namespaces must be disjoint both by
 selected path and retained filesystem identity.
 
-Fresh and recovered construction/check work must derive from one shared
-deterministic session source. Do not introduce a second recovery-only session,
-path, credential, root-view, package-input, or workspace provider. The exact
-execution request must be reproduced through the pure build/check adapter
-projection; recovery must never call effectful `prepare()` merely to obtain
-request authority. Construction recovery must decode the retained
-`libpkgfetch` materialization body under the exact source snapshot and must not
-call source materialization again. Operation restart remains delegated to the
-effect journal.
+Fresh construction/check work must derive from the deterministic session
+source. Once a construction attempt starts, however, the exact admitted
+`construction_session` is durable controller authority: recovery must decode it
+from the construction evidence under the retained transaction/build node and
+must not reconsult the session locator, current construction configuration, or
+retained-installed-package source. Check recovery still uses the deterministic
+session source until its own admitted session is retained. The exact execution
+request must be reproduced through the pure build/check adapter projection;
+recovery must never call effectful `prepare()` merely to obtain request
+authority. Construction recovery must decode the retained `libpkgfetch`
+materialization body under the retained session's exact source snapshot and
+must not call source materialization again. Operation restart remains delegated
+to the effect journal.
 
 The construction/check evidence layer may serialize only one exact typed
-dispatch-evidence record and canonical owner encodings. Construction evidence
-retains the canonical libpkgfetch materialization encoding together with the
-existing build-execution encoding; check evidence retains its existing
-check-execution encoding. It must bind the run journal, transaction, dispatch,
-node, attempt, controller request/result, and subordinate context identities
+dispatch-evidence record, controller-owned session evidence where the controller
+owns that value, and canonical subordinate owner encodings. Construction
+evidence retains the exact admitted controller `construction_session`, the
+canonical libpkgfetch materialization encoding, and the existing build-execution
+encoding; check evidence retains its existing check-execution encoding. It must
+bind the run journal, transaction, dispatch, node, attempt, controller
+request/result, and subordinate context identities
 before publication. The content object must become durable before the typed
 index, and terminal run retirement must follow evidence publication. The store
 may validate encoding and index integrity but must not decode owner evidence or
 discover semantic authorities. In particular it must not reconstruct a source
 materialization from an identity, scan indexes, or promote an identity into
-semantic evidence. The current private transaction-run evidence schema is 2;
-schema-1 bytes are unsupported historical implementation data and must fail
-closed rather than trigger source reacquisition or reconstruction.
+semantic evidence. The current private transaction-run evidence schema is 3;
+earlier schema bytes are unsupported historical implementation data and must
+fail closed rather than
+trigger session reconstruction, source reacquisition, or compatibility
+translation.
 
 The evidence-backed recovery layer may select only the exact typed index named
-by the committed journal, dispatch, and attempt. It must obtain caller-owned
-semantic context, decode each retained owner body through that owner
+by the committed journal, dispatch, and attempt. For construction it must first
+decode the retained controller session under the exact transaction/build node;
+it must then decode each subordinate retained body through that owner
 (`libpkgfetch`, build/check execution), prove every body against the identities
 in the durable record, and reproduce the canonical controller-result identity
 before returning recovery authority. It must treat absent evidence as unresolved
 started ownership, not as a releasable reservation. It must not discover paths,
+reconsult the construction session locator or installed-package resource source,
 reconstruct a request or source materialization from identities, reopen source
 locators or content-store objects, substitute a current backend profile, accept
 a semantically similar session, or parse subordinate bytes through a second

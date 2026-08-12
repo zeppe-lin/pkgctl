@@ -6,23 +6,24 @@
  */
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
-
 #include <libpkgbuild-exec/result_codec.h>
 #include <libpkgcheck-exec/result_codec.h>
 #include <libpkgfetch/materialization_codec.h>
 
 #include <pkgctl/check.h>
-#include <pkgctl/construction.h>
+#include <pkgctl/construction_codec.h>
 #include <pkgctl/run_journal.h>
 
 namespace pkgctl {
 
 struct detail_run_evidence_codec_access;
 
-inline constexpr std::uint16_t transaction_run_evidence_schema_version = 2;
+inline constexpr std::uint16_t transaction_run_evidence_schema_version = 3;
+
 
 enum class transaction_run_evidence_error_code : std::uint8_t {
   invalid_record = 1,
@@ -57,12 +58,12 @@ private:
 
 /*! \brief Durable owner evidence for one started construction dispatch.
  *
- * The record retains canonical libpkgfetch materialization bytes and the
- * canonical build-execution encoding. It still does not reconstruct a
- * construction_result by itself: recovery must supply the exact source
- * snapshot, build request, execution request, and backend profile bodies, then
- * delegate each retained body to its semantic owner before admitting the
- * historical result.
+ * The record retains the exact controller-owned construction-session bytes,
+ * canonical libpkgfetch materialization bytes, and canonical build-execution
+ * encoding. It still does not reconstruct a construction_result by itself:
+ * recovery supplies the exact transaction semantics and backend profile body,
+ * then delegates each retained body to its semantic owner before admitting the
+ * historical result. Fresh session location is not recovery authority.
  */
 class construction_dispatch_evidence_record final {
 public:
@@ -81,6 +82,8 @@ public:
   [[nodiscard]] const session_identity& attempt_session() const noexcept;
   [[nodiscard]] const session_identity& result() const noexcept;
   [[nodiscard]] const session_identity& controller_request() const noexcept;
+  [[nodiscard]] const construction_session_encoding&
+  session_encoding() const noexcept;
   [[nodiscard]] const pkgfetch::materialization_identity&
   materialization() const noexcept;
   [[nodiscard]] const pkgfetch::source_materialization_encoding&
@@ -110,6 +113,7 @@ private:
       session_identity attempt_session,
       session_identity result,
       session_identity controller_request,
+      construction_session_encoding session_encoding,
       pkgfetch::materialization_identity materialization,
       pkgfetch::source_materialization_encoding materialization_encoding,
       pkgbuild::build_request_identity build_request,
@@ -128,6 +132,7 @@ private:
   session_identity attempt_session_;
   session_identity result_;
   session_identity controller_request_;
+  construction_session_encoding session_encoding_;
   pkgfetch::materialization_identity materialization_;
   pkgfetch::source_materialization_encoding materialization_encoding_;
   pkgbuild::build_request_identity build_request_;

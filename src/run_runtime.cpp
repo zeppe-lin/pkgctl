@@ -284,8 +284,7 @@ public:
       const construction_dispatch_evidence_record& evidence) override
   {
     return detail::native_construction_recovery_context(
-        record, partial_progress, dispatch, evidence, sessions_,
-        construction_backend_);
+        record, partial_progress, dispatch, evidence, construction_backend_);
   }
 
   check_dispatch_recovery_context check(
