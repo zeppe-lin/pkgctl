@@ -34,10 +34,12 @@ The command-private effect-body store is both durable sink and restart source.
 Lifecycle results, application receipts, publication requests, and publication
 receipts are retained through their owner codecs before an effect journal may
 name them. Construction-run evidence also retains the exact admitted
-controller-owned construction session plus owner-encoded fetch/build evidence.
-Restart validates and decodes that session under the retained transaction/build
-node without reconsulting the current session locator or installed-package
-resource source. Application-intent restart uses the direct
+controller-owned construction session plus owner-encoded fetch/build evidence;
+check-run evidence retains its exact admitted controller session plus owner-
+encoded check evidence. Restart validates and decodes those sessions under the
+retained transaction/progress/node authority without reconsulting the current
+session locator, construction/check configuration, or installed-package resource
+source. Application-intent restart uses the direct
 *libpkgapply-posix* active-request index; no directory scan or controller-owned
 application-journal format is introduced.
 
@@ -84,10 +86,10 @@ created.
 Construction/check and lifecycle execution retain separate typed root-view
 authorities. If they deliberately name the same host path, their identities
 must agree. Build/check writable roots must not overlap lifecycle execution,
-target, or lifecycle session authority. Construction/check sessions depend on
-exact semantic
-progress rather than caller run intent, allowing completed evidence to be
-rehydrated through the same locator and backend profile. Terminal operations
+target, or lifecycle session authority. Fresh construction/check sessions depend on exact semantic progress rather than
+caller run intent. Once an attempt starts, its admitted controller session is
+retained with durable evidence; progress/restart rehydration decodes that exact
+session and no longer calls the fresh session locator. Terminal operations
 are reopened through the same native operation authority and canonical
 checkpoint validation.
 

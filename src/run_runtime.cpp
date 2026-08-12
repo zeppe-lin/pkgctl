@@ -268,11 +268,10 @@ class native_transaction_progress_rehydration_context_source final
     : public transaction_progress_rehydration_context_source {
 public:
   native_transaction_progress_rehydration_context_source(
-      transaction_dispatch_session_source& sessions,
       pkgexec::backend_capability_profile construction_backend,
       pkgexec::backend_capability_profile check_backend,
       native_transaction_operation_authority_source& operations)
-      : sessions_(sessions), construction_backend_(std::move(construction_backend)),
+      : construction_backend_(std::move(construction_backend)),
         check_backend_(std::move(check_backend)), operations_(operations)
   {
   }
@@ -294,8 +293,7 @@ public:
       const check_dispatch_evidence_record& evidence) override
   {
     return detail::native_check_recovery_context(
-        record, partial_progress, dispatch, evidence, sessions_,
-        check_backend_);
+        record, partial_progress, dispatch, evidence, check_backend_);
   }
 
   effect_restart_checkpoint operation(
@@ -309,7 +307,6 @@ public:
   }
 
 private:
-  transaction_dispatch_session_source& sessions_;
   pkgexec::backend_capability_profile construction_backend_;
   pkgexec::backend_capability_profile check_backend_;
   native_transaction_operation_authority_source& operations_;
@@ -334,7 +331,7 @@ public:
       : runs_(runs), evidence_(evidence), effects_(effects), progress_(progress),
         execution_(sessions, operation_execution),
         recovery_context_(
-            sessions, std::move(construction_recovery_backend),
+            std::move(construction_recovery_backend),
             std::move(check_recovery_backend), operation_recovery),
         recovery_(evidence_, recovery_context_),
         construction_(backends.construction), check_(backends.check),
@@ -613,7 +610,7 @@ public:
         check_recovery_backend_(native_recovery_profile(
             authorities.check_recovery_backend, backends.check, "check")),
         progress_context_(
-            sessions_, construction_recovery_backend_, check_recovery_backend_,
+            construction_recovery_backend_, check_recovery_backend_,
             operations_),
         progress_(
             configuration_.transaction(), evidence_, effects_,

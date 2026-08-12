@@ -95,7 +95,7 @@ session_identity construction_record_identity(
     const pkgbuild_exec::build_execution_result_encoding& encoding)
 {
   return make_session_identity(
-      "pkgctl/construction-dispatch-evidence/3",
+      "pkgctl/construction-dispatch-evidence/1",
       {
           journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
           attempt_session.hex(), result.hex(), controller_request.hex(),
@@ -115,6 +115,7 @@ session_identity check_record_identity(
     const session_identity& result,
     const session_identity& controller_request,
     const session_identity& construction,
+    const check_session_encoding& session_encoding,
     const pkgcheck::check_request_identity& check_request,
     const pkgexec::execution_request_identity& execution_request,
     const pkgexec::backend_capability_profile_identity& backend,
@@ -123,11 +124,12 @@ session_identity check_record_identity(
     const pkgcheck_exec::check_execution_result_encoding& encoding)
 {
   return make_session_identity(
-      "pkgctl/check-dispatch-evidence/3",
+      "pkgctl/check-dispatch-evidence/1",
       {
           journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
           attempt_session.hex(), result.hex(), controller_request.hex(),
-          construction.hex(), check_request.hex(), execution_request.hex(),
+          construction.hex(), encoding_digest(session_encoding),
+          check_request.hex(), execution_request.hex(),
           backend.hex(), execution.hex(), check.hex(), encoding_digest(encoding),
       });
 }
@@ -306,6 +308,7 @@ check_dispatch_evidence_record::check_dispatch_evidence_record(
     session_identity result,
     session_identity controller_request,
     session_identity construction,
+    check_session_encoding session_encoding,
     pkgcheck::check_request_identity check_request,
     pkgexec::execution_request_identity execution_request,
     pkgexec::backend_capability_profile_identity backend,
@@ -318,6 +321,7 @@ check_dispatch_evidence_record::check_dispatch_evidence_record(
       result_(std::move(result)),
       controller_request_(std::move(controller_request)),
       construction_(std::move(construction)),
+      session_encoding_(std::move(session_encoding)),
       check_request_(std::move(check_request)),
       execution_request_(std::move(execution_request)),
       backend_(std::move(backend)), execution_(std::move(execution)),
@@ -359,12 +363,14 @@ check_dispatch_evidence_record check_dispatch_evidence_record::admit(
   if (result.identity() != expected_result)
     invalid_record("check result identity is not canonical");
 
+  auto session_encoding = encode_check_session(session);
   auto encoding = pkgcheck_exec::encode_check_execution_result(execution);
   auto identity = check_record_identity(
       started_record.journal(), started_record.transaction(),
       dispatch.identity(), dispatch.unit().primary_node(), session.identity(),
       result.identity(), request.identity(), request.construction().identity(),
-      request.check().identity(), execution.execution().request().identity(),
+      session_encoding, request.check().identity(),
+      execution.execution().request().identity(),
       execution.execution().backend().identity(),
       execution.execution().identity(), execution.check().identity(), encoding);
   return check_dispatch_evidence_record(
@@ -372,7 +378,8 @@ check_dispatch_evidence_record check_dispatch_evidence_record::admit(
       started_record.transaction(), dispatch.identity(),
       dispatch.unit().primary_node(), session.identity(), result.identity(),
       request.identity(), request.construction().identity(),
-      request.check().identity(), execution.execution().request().identity(),
+      std::move(session_encoding), request.check().identity(),
+      execution.execution().request().identity(),
       execution.execution().backend().identity(),
       execution.execution().identity(), execution.check().identity(),
       std::move(encoding));
@@ -399,6 +406,9 @@ const session_identity& check_dispatch_evidence_record::controller_request() con
 { return controller_request_; }
 const session_identity& check_dispatch_evidence_record::construction() const noexcept
 { return construction_; }
+const check_session_encoding&
+check_dispatch_evidence_record::session_encoding() const noexcept
+{ return session_encoding_; }
 const pkgcheck::check_request_identity&
 check_dispatch_evidence_record::check_request() const noexcept
 { return check_request_; }

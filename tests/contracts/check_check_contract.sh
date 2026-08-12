@@ -6,9 +6,11 @@ set -eu
 srcdir=${1:-.}
 header="$srcdir/include/pkgctl/check.h"
 source="$srcdir/src/check.cpp"
+codec="$srcdir/include/pkgctl/check_codec.h"
+codec_source="$srcdir/src/check_session_codec.cpp"
 progression="$srcdir/src/progression.cpp"
 
-for file in "$header" "$source" "$progression"; do
+for file in "$header" "$source" "$codec" "$codec_source" "$progression"; do
   [ -s "$file" ] || {
     echo "missing transaction check authority source: $file" >&2
     exit 1
@@ -20,6 +22,11 @@ for required in \
   'transaction_check_request make' \
   'class transaction_check_session final' \
   'transaction_check_session admit' \
+  'check_session_encoding_version = 1' \
+  'check_codec_error_code' \
+  'check_codec_error final' \
+  'encode_check_session' \
+  'decode_check_session' \
   'class transaction_check_driver' \
   'class transaction_check_result final' \
   'execute_transaction_check' \
@@ -32,10 +39,24 @@ for required in \
   'session.execution_request()' \
   'pkgcheck_exec::admitted_check_session::admit' \
   'pkgcheck_exec::seal_execution_request'; do
-  grep -F -- "$required" "$header" "$source" "$progression" >/dev/null || {
+  grep -F -- "$required" "$header" "$source" "$codec" "$codec_source" "$progression" >/dev/null || {
     echo "missing transaction check contract: $required" >&2
     exit 1
   }
+done
+
+for forbidden in \
+  'std::filesystem::exists(' \
+  'std::filesystem::status(' \
+  'std::ifstream' \
+  'std::ofstream' \
+  'opendir(' \
+  'readdir(' \
+  'glob('; do
+  if grep -F -- "$forbidden" "$codec_source" >/dev/null 2>&1; then
+    echo "check codec must not observe host authority: $forbidden" >&2
+    exit 1
+  fi
 done
 
 if grep -F 'prepared_from_progress() != progress.identity()' \

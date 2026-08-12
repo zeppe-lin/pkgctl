@@ -25,7 +25,6 @@ for required in \
   'class transaction_dispatch_recovery_context_source' \
   'class transaction_operation_recovery_authority_source' \
   'class native_transaction_dispatch_recovery_context_source final' \
-  'transaction_dispatch_session_source& sessions_' \
   'pkgexec::backend_capability_profile construction_backend_' \
   'pkgexec::backend_capability_profile check_backend_' \
   'transaction_operation_recovery_authority_source& operations_' \
@@ -41,11 +40,13 @@ for required in \
   'recovery_decode_failed' \
   'detail_run_recovery_access' \
   'decode_construction_session(' \
+  'decode_check_session(' \
   'pkgfetch::decode_source_materialization(' \
   'pkgbuild_exec::seal_execution_request(' \
   'pkgcheck_exec::seal_execution_request(' \
   'detail::native_construction_recovery_context(' \
   'detail::native_check_recovery_context(' \
+  'transaction_check_request::make(' \
   'checkpoint.run().progress()'; do
   grep -F -- "$required" "$header" "$source" \
       "$srcdir/include/pkgctl/run_evidence.h" >/dev/null || {
@@ -61,7 +62,6 @@ for required_test in \
   'transaction_run_evidence_error_code::evidence_missing' \
   'recovery_context_mismatch' \
   'check_posix_transaction_run_runtime_recovery' \
-  'CHECK(sessions.calls() == 0U)' \
   'CHECK(execution.calls() == 0U)'; do
   grep -F -- "$required_test" "$construction" >/dev/null || {
     echo "missing construction evidence recovery test: $required_test" >&2
@@ -75,7 +75,9 @@ for required_test in \
   'stored_transaction_dispatch_recovery_authority_source recovery_source' \
   'transaction_run_evidence_error_code::evidence_missing' \
   'recovery_context_mismatch' \
-  'native_transaction_dispatch_recovery_context_source'; do
+  'native_transaction_dispatch_recovery_context_source' \
+  'check_durable_session_codec' \
+  'encode_check_session(native_recovery.check()->session())'; do
   grep -F -- "$required_test" "$check" >/dev/null || {
     echo "missing check evidence recovery test: $required_test" >&2
     exit 1
@@ -84,6 +86,7 @@ done
 
 for forbidden in \
   'sessions.construction(' \
+  'sessions.check(' \
   'pkgfetch::materialize(' \
   'pkgexec::execution_backend& construction_backend_' \
   'pkgexec::execution_backend& check_backend_' \

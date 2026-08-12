@@ -2311,16 +2311,14 @@ void check_stored_construction_recovery()
   CHECK(!std::filesystem::exists(
       result.materialization().objects().front().object_path()));
 
-  construction_execution_authority_source sessions(session);
   unreachable_operation_recovery_context_source operations;
   pkgctl::native_transaction_dispatch_recovery_context_source native_context(
-      sessions, backend.capabilities(), backend.capabilities(), operations);
+      backend.capabilities(), backend.capabilities(), operations);
   pkgctl::stored_transaction_dispatch_recovery_authority_source native_source(
       evidence_store, native_context);
   auto native_recovery =
       pkgctl::acquire_transaction_dispatch_recovery_authority(
           checkpoint, *reservation.dispatch, native_source);
-  CHECK(sessions.calls() == 0U);
   CHECK(native_recovery.construction() != nullptr);
   if (native_recovery.construction())
   {

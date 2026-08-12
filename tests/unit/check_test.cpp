@@ -5,6 +5,7 @@
 #include "support/run_execute_support.h"
 
 #include <pkgctl/check.h>
+#include <pkgctl/check_codec.h>
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
 #include <pkgctl/run_authority.h>
@@ -713,6 +714,102 @@ pkgctl::transaction_check_session admit_check(
       make_check_request(progress, transaction), std::move(resources));
 }
 
+void check_durable_session_codec()
+{
+  test_support::temporary_directory temporary;
+  ready_check_options options;
+  options.check_dependencies = {"dep"};
+  auto fixture = make_ready_check(temporary.path() / "retained", options);
+  const auto check_root = temporary.path() / "retained-check";
+  auto resources = resources_for(fixture.construction, check_root, '5');
+  resources.execution_identity.supplementary_groups = {
+      static_cast<std::uint64_t>(::getegid()) + 1000U,
+      static_cast<std::uint64_t>(::getegid()) + 2000U,
+  };
+  resources.limits = pkgexec::resource_limits::make(
+      5000U, 64U * 1024U * 1024U, 32U * 1024U * 1024U, 64U, 16U);
+  auto session = admit_check(
+      fixture.progress, fixture.transaction, std::move(resources));
+  const auto encoding = pkgctl::encode_check_session(session);
+
+  const auto retained_source = session.execution_session().source().path;
+  const auto retained_package = session.execution_session().package().path;
+  const auto retained_root_view =
+      session.execution_session().paths().root_view_path;
+  const auto retained_temporary =
+      session.execution_session().paths().temporary_root;
+  std::vector<fs::path> retained_inputs;
+  retained_inputs.reserve(session.execution_session().inputs().size());
+  for (const auto& input : session.execution_session().inputs())
+    retained_inputs.push_back(input.path);
+
+  fs::remove_all(check_root);
+  for (const auto& input : retained_inputs)
+    fs::remove_all(input);
+  CHECK(!fs::exists(retained_source));
+  CHECK(!fs::exists(retained_package));
+  CHECK(!fs::exists(retained_root_view));
+  CHECK(!fs::exists(retained_temporary));
+  for (const auto& input : retained_inputs)
+    CHECK(!fs::exists(input));
+
+  auto request = make_check_request(fixture.progress, fixture.transaction);
+  auto decoded = pkgctl::decode_check_session(encoding, std::move(request));
+  CHECK(decoded.identity() == session.identity());
+  CHECK(decoded.execution_request() == session.execution_request());
+  CHECK(decoded.execution_session().source().path == retained_source);
+  CHECK(decoded.execution_session().package().path == retained_package);
+  CHECK(decoded.execution_session().paths().root_view_path == retained_root_view);
+  CHECK(decoded.execution_session().paths().temporary_root == retained_temporary);
+  CHECK(decoded.execution_session().inputs().size() == retained_inputs.size());
+  if (decoded.execution_session().inputs().size() == retained_inputs.size())
+  {
+    for (std::size_t index = 0U; index < retained_inputs.size(); ++index)
+      CHECK(decoded.execution_session().inputs()[index].path ==
+            retained_inputs[index]);
+  }
+  CHECK(decoded.execution_session().limits().identity() ==
+        session.execution_session().limits().identity());
+  CHECK(pkgctl::encode_check_session(decoded) == encoding);
+
+  {
+    auto corrupt = encoding;
+    corrupt.back() ^= 0x01U;
+    bool rejected = false;
+    try
+    {
+      (void)pkgctl::decode_check_session(
+          corrupt, make_check_request(fixture.progress, fixture.transaction));
+    }
+    catch (const pkgctl::check_codec_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::check_codec_error_code::corrupt_encoding;
+    }
+    CHECK(rejected);
+  }
+
+  {
+    ready_check_options foreign_options;
+    foreign_options.version = "2.0";
+    auto foreign = make_ready_check(
+        temporary.path() / "foreign", std::move(foreign_options));
+    bool rejected = false;
+    try
+    {
+      (void)pkgctl::decode_check_session(
+          encoding, make_check_request(foreign.progress, foreign.transaction));
+    }
+    catch (const pkgctl::check_codec_error& problem)
+    {
+      rejected = problem.code() ==
+          pkgctl::check_codec_error_code::authority_mismatch;
+    }
+    CHECK(rejected);
+  }
+}
+
+
 pkgctl::construction_session independent_construction_session(
     const pkgctl::transaction_session& transaction,
     const fs::path& root,
@@ -886,9 +983,10 @@ void check_failure_blocks_target()
 {
   test_support::temporary_directory temporary;
   auto fixture = make_ready_check(temporary.path());
+  const auto check_root = temporary.path() / "check";
   auto session = admit_check(
       fixture.progress, fixture.transaction,
-      resources_for(fixture.construction, temporary.path() / "check"));
+      resources_for(fixture.construction, check_root));
 
   check_backend backend(check_backend_mode::program_failed);
   pkgctl::native_transaction_check_driver driver(backend);
@@ -1238,6 +1336,9 @@ void check_durable_dispatch_execution()
         completed.evidence);
     const auto decoded = pkgctl::decode_check_dispatch_evidence(encoding);
     CHECK(decoded.identity() == completed.evidence.identity());
+    CHECK(completed.evidence.session_encoding() ==
+          pkgctl::encode_check_session(session));
+    CHECK(decoded.session_encoding() == completed.evidence.session_encoding());
     CHECK(decoded.encoding() == completed.evidence.encoding());
     CHECK(pkgctl::encode_check_dispatch_evidence(decoded) == encoding);
 
@@ -1632,10 +1733,13 @@ void check_run_authority_rehydration()
 void check_stored_check_recovery()
 {
   test_support::temporary_directory temporary;
-  auto fixture = make_ready_check(temporary.path());
+  ready_check_options options;
+  options.check_dependencies = {"dep"};
+  auto fixture = make_ready_check(temporary.path(), std::move(options));
+  const auto check_root = temporary.path() / "check";
   auto session = admit_check(
       fixture.progress, fixture.transaction,
-      resources_for(fixture.construction, temporary.path() / "check"));
+      resources_for(fixture.construction, check_root));
   check_backend backend(check_backend_mode::pass);
   pkgctl::native_transaction_check_driver driver(backend);
   auto result = pkgctl::execute_transaction_check(session, driver);
@@ -1728,21 +1832,43 @@ void check_stored_check_recovery()
   CHECK(mismatched);
   CHECK(foreign_context.calls() == 1U);
 
-  check_execution_authority_source sessions(session);
+  const auto retained_session_encoding = evidence.session_encoding();
+  const auto retained_source = session.execution_session().source().path;
+  const auto retained_package = session.execution_session().package().path;
+  const auto retained_root_view =
+      session.execution_session().paths().root_view_path;
+  const auto retained_temporary =
+      session.execution_session().paths().temporary_root;
+  std::vector<fs::path> retained_inputs;
+  retained_inputs.reserve(session.execution_session().inputs().size());
+  for (const auto& input : session.execution_session().inputs())
+    retained_inputs.push_back(input.path);
+
+  fs::remove_all(check_root);
+  for (const auto& input : retained_inputs)
+    fs::remove_all(input);
+  CHECK(!fs::exists(retained_source));
+  CHECK(!fs::exists(retained_package));
+  CHECK(!fs::exists(retained_root_view));
+  CHECK(!fs::exists(retained_temporary));
+  for (const auto& input : retained_inputs)
+    CHECK(!fs::exists(input));
+
   unreachable_operation_recovery_context_source operations;
   pkgctl::native_transaction_dispatch_recovery_context_source native_context(
-      sessions, backend.capabilities(), backend.capabilities(), operations);
+      backend.capabilities(), backend.capabilities(), operations);
   pkgctl::stored_transaction_dispatch_recovery_authority_source native_source(
       evidence_store, native_context);
   auto native_recovery =
       pkgctl::acquire_transaction_dispatch_recovery_authority(
           checkpoint, *reservation.dispatch, native_source);
-  CHECK(sessions.calls() == 1U);
   CHECK(native_recovery.check() != nullptr);
   if (native_recovery.check())
   {
     CHECK(native_recovery.check()->identity() == result.identity());
     CHECK(native_recovery.check()->session().identity() == session.identity());
+    CHECK(pkgctl::encode_check_session(native_recovery.check()->session()) ==
+          retained_session_encoding);
   }
 }
 
@@ -1835,6 +1961,7 @@ int main()
 {
   try {
     check_successful_session_and_progression();
+    check_durable_session_codec();
     check_native_driver_prepares_temporary_resource();
     check_failure_blocks_target();
     check_unavailable_is_terminal_failure();

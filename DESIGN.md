@@ -200,13 +200,16 @@ journal records its identity. Application intent uses the direct
 `libpkgapply-posix` active-request index, so recovery needs no directory scan or
 controller-owned application format.
 
-Construction has the same closed-history rule at the controller boundary. Once
-a construction attempt starts, its exact admitted `construction_session` is
-canonically retained by `pkgctl` alongside the owner-encoded fetch and build
-evidence. Restart decodes that session under the retained transaction/build
-node and never reconsults the fresh session locator, current construction roots
-or policies, or retained-installed-package resource source. Those inputs remain
-fresh-attempt authority; their retained admitted result is historical authority.
+Construction and check have the same closed-history rule at the controller
+boundary. Once a construction attempt starts, its exact admitted
+`construction_session` is canonically retained by `pkgctl` alongside the
+owner-encoded fetch and build evidence. Once a check attempt starts, its exact
+admitted `transaction_check_session` is likewise retained beside the
+owner-encoded check result. Restart decodes either controller-owned session
+under the retained transaction/progress/node authority and never reconsults the
+fresh session locator, current construction/check roots or policies, or the
+retained-installed-package resource source. Those inputs remain fresh-attempt
+authority; their retained admitted result is historical authority.
 
 The live operation authority observes the target only for a fresh exact current
 dispatch. Before an admitted operation session can be named by either effect or
@@ -572,8 +575,8 @@ retained historical materialization body without reopening source locators or
 content-store objects; build/check recovery likewise delegates their retained
 bytes to their owners. The store deliberately does not promote an identity into
 a semantic result or search the host for missing authority. Transaction-run
-evidence schema 3 is the only admitted private format; earlier schema bytes
-fail closed and have no reconstruction path.
+evidence schema 1 is the only admitted private format; incompatible development
+bytes fail closed and have no reconstruction path.
 
 `posix_transaction_run_runtime` now retains four caller-opened directory
 authorities: a transaction-run journal directory, a

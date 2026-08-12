@@ -148,6 +148,21 @@ for forbidden_authority in \
   fi
 done
 
+
+progress_recovery_body=$(sed -n \
+  '/class native_transaction_progress_rehydration_context_source final/,/^};/p' \
+  "$source")
+if printf '%s\n' "$progress_recovery_body" | grep -F 'transaction_dispatch_session_source' \
+    >/dev/null 2>&1; then
+  echo 'progress recovery must not borrow the fresh construction/check session source' >&2
+  exit 1
+fi
+if printf '%s\n' "$progress_recovery_body" | grep -F 'sessions_' \
+    >/dev/null 2>&1; then
+  echo 'progress recovery retains a fresh session-source dependency' >&2
+  exit 1
+fi
+
 for forbidden in \
   'create_director' \
   'remove_all(' \

@@ -94,9 +94,12 @@ The final command suite must prove:
   build, or target paths; a malformed caller-owned execution root is retained
   as terminal construction evidence and the command surfaces its durable backend
   diagnostic instead of reporting only a generic failed disposition;
-- resume recovery decodes retained construction/check and lifecycle bodies against
-  the backend capability profiles admitted in command evidence rather than the live
-  backend profile. An incomplete run with remaining lifecycle process work still refuses
+- resume recovery decodes retained construction/check sessions and subordinate
+  construction/check/lifecycle bodies against the backend capability profiles admitted
+  in command evidence rather than the live backend profile. Construction/check recovery
+  must not consult the fresh session locator; codec tests remove the concrete retained
+  check paths before decode and still reproduce the exact admitted session. An incomplete
+  run with remaining lifecycle process work still refuses
   a changed supervisor/current execution authority before journal advancement; after
   completion,
   the same changed supervisor context must reopen with zero durable steps because no

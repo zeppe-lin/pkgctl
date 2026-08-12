@@ -264,7 +264,7 @@ session_identity construction_record_identity(
     const pkgbuild_exec::build_execution_result_encoding& encoding)
 {
   return make_session_identity(
-      "pkgctl/construction-dispatch-evidence/3",
+      "pkgctl/construction-dispatch-evidence/1",
       {journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
        attempt_session.hex(), result.hex(), controller_request.hex(),
        encoding_digest(session_encoding), materialization.hex(),
@@ -282,6 +282,7 @@ session_identity check_record_identity(
     const session_identity& result,
     const session_identity& controller_request,
     const session_identity& construction,
+    const check_session_encoding& session_encoding,
     const pkgcheck::check_request_identity& check_request,
     const pkgexec::execution_request_identity& execution_request,
     const pkgexec::backend_capability_profile_identity& backend,
@@ -290,10 +291,11 @@ session_identity check_record_identity(
     const pkgcheck_exec::check_execution_result_encoding& encoding)
 {
   return make_session_identity(
-      "pkgctl/check-dispatch-evidence/3",
+      "pkgctl/check-dispatch-evidence/1",
       {journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
        attempt_session.hex(), result.hex(), controller_request.hex(),
-       construction.hex(), check_request.hex(), execution_request.hex(),
+       construction.hex(), encoding_digest(session_encoding),
+       check_request.hex(), execution_request.hex(),
        backend.hex(), execution.hex(), check.hex(), encoding_digest(encoding)});
 }
 
@@ -340,6 +342,7 @@ struct detail_run_evidence_codec_access final {
       session_identity result,
       session_identity controller_request,
       session_identity construction,
+      check_session_encoding session_encoding,
       pkgcheck::check_request_identity check_request,
       pkgexec::execution_request_identity execution_request,
       pkgexec::backend_capability_profile_identity backend,
@@ -351,7 +354,8 @@ struct detail_run_evidence_codec_access final {
         std::move(identity), std::move(journal), std::move(transaction),
         std::move(dispatch), std::move(node), std::move(attempt_session),
         std::move(result), std::move(controller_request),
-        std::move(construction), std::move(check_request),
+        std::move(construction), std::move(session_encoding),
+        std::move(check_request),
         std::move(execution_request), std::move(backend),
         std::move(execution), std::move(check), std::move(encoding));
   }
@@ -459,7 +463,8 @@ transaction_run_evidence_encoding encode_check_dispatch_evidence(
   const auto expected = check_record_identity(
       record.journal(), record.transaction(), record.dispatch(), record.node(),
       record.attempt_session(), record.result(), record.controller_request(),
-      record.construction(), record.check_request(), record.execution_request(),
+      record.construction(), record.session_encoding(), record.check_request(),
+      record.execution_request(),
       record.backend(), record.execution(), record.check(), record.encoding());
   if (record.schema_version() != transaction_run_evidence_schema_version ||
       record.identity() != expected)
@@ -481,6 +486,7 @@ transaction_run_evidence_encoding encode_check_dispatch_evidence(
   output.identity(record.result().hex());
   output.identity(record.controller_request().hex());
   output.identity(record.construction().hex());
+  output.bytes(record.session_encoding());
   output.identity(record.check_request().hex());
   output.identity(record.execution_request().hex());
   output.identity(record.backend().hex());
@@ -507,6 +513,7 @@ check_dispatch_evidence_record decode_check_dispatch_evidence(
   auto result = session_identity::from_hex(input.identity());
   auto request = session_identity::from_hex(input.identity());
   auto construction = session_identity::from_hex(input.identity());
+  auto session_encoding = input.bytes(maximum_check_session_encoding_size);
   auto check_request = pkgcheck::check_request_identity::from_sha256(
       input.identity());
   auto execution_request = pkgexec::execution_request_identity::from_sha256(
@@ -522,7 +529,7 @@ check_dispatch_evidence_record decode_check_dispatch_evidence(
 
   auto expected = check_record_identity(
       journal, transaction, dispatch, node, attempt, result, request,
-      construction, check_request, execution_request, backend, execution,
+      construction, session_encoding, check_request, execution_request, backend, execution,
       check, nested);
   if (retained_identity != expected)
     corrupt("check evidence record identity mismatch");
@@ -531,7 +538,8 @@ check_dispatch_evidence_record decode_check_dispatch_evidence(
       std::move(retained_identity), std::move(journal),
       std::move(transaction), std::move(dispatch), std::move(node),
       std::move(attempt), std::move(result), std::move(request),
-      std::move(construction), std::move(check_request),
+      std::move(construction), std::move(session_encoding),
+      std::move(check_request),
       std::move(execution_request), std::move(backend),
       std::move(execution), std::move(check), std::move(nested));
   if (encode_check_dispatch_evidence(record) != encoding)

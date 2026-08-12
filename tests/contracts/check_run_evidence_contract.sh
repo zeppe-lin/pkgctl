@@ -6,17 +6,21 @@ set -eu
 srcdir=${1:-.}
 model="$srcdir/include/pkgctl/run_evidence.h"
 codec="$srcdir/include/pkgctl/run_evidence_codec.h"
-session_codec="$srcdir/include/pkgctl/construction_codec.h"
+construction_session_codec="$srcdir/include/pkgctl/construction_codec.h"
+check_session_codec="$srcdir/include/pkgctl/check_codec.h"
 store="$srcdir/include/pkgctl/run_evidence_store.h"
 model_source="$srcdir/src/run_evidence.cpp"
 codec_source="$srcdir/src/run_evidence_codec.cpp"
-session_codec_source="$srcdir/src/construction_session_codec.cpp"
+construction_session_codec_source="$srcdir/src/construction_session_codec.cpp"
+check_session_codec_source="$srcdir/src/check_session_codec.cpp"
 store_source="$srcdir/src/run_evidence_store.cpp"
 construction_test="$srcdir/tests/unit/construction_test.cpp"
 check_test="$srcdir/tests/unit/check_test.cpp"
 
-for file in "$model" "$codec" "$session_codec" "$store" "$model_source" \
-            "$codec_source" "$session_codec_source" "$store_source" \
+for file in "$model" "$codec" "$construction_session_codec" "$check_session_codec" \
+            "$store" "$model_source" "$codec_source" \
+            "$construction_session_codec_source" "$check_session_codec_source" \
+            "$store_source" \
             "$construction_test" "$check_test"; do
   [ -s "$file" ] || {
     echo "missing transaction-run evidence source: $file" >&2
@@ -25,15 +29,17 @@ for file in "$model" "$codec" "$session_codec" "$store" "$model_source" \
 done
 
 for required in \
-  'transaction_run_evidence_schema_version = 3' \
-  'pkgctl/construction-dispatch-evidence/3' \
-  'pkgctl/check-dispatch-evidence/3' \
+  'transaction_run_evidence_schema_version = 1' \
+  'pkgctl/construction-dispatch-evidence/1' \
+  'pkgctl/check-dispatch-evidence/1' \
   'construction_dispatch_evidence_record' \
   'check_dispatch_evidence_record' \
   'controller_request() const noexcept' \
   'session_encoding() const noexcept' \
   'encode_construction_session' \
   'decode_construction_session' \
+  'encode_check_session' \
+  'decode_check_session' \
   'materialization_encoding() const noexcept' \
   'encode_source_materialization' \
   'execution_request() const noexcept' \
@@ -41,7 +47,6 @@ for required in \
   'encoding() const noexcept' \
   'encode_construction_dispatch_evidence' \
   'decode_construction_dispatch_evidence' \
-  'decode_construction_session' \
   'encode_check_dispatch_evidence' \
   'decode_check_dispatch_evidence' \
   'transaction_run_evidence_store' \
@@ -61,8 +66,9 @@ for required in \
   'unlinkat(' \
   'store_conflict' \
   'store_corrupt'; do
-  grep -F -- "$required" "$model" "$codec" "$session_codec" "$store" \
-      "$model_source" "$codec_source" "$session_codec_source" \
+  grep -F -- "$required" "$model" "$codec" "$construction_session_codec" \
+      "$check_session_codec" "$store" "$model_source" "$codec_source" \
+      "$construction_session_codec_source" "$check_session_codec_source" \
       "$store_source" >/dev/null || {
     echo "missing transaction-run evidence contract: $required" >&2
     exit 1
@@ -93,8 +99,9 @@ for forbidden in \
   'opendir(' \
   'readdir(' \
   'glob('; do
-  if grep -F -- "$forbidden" "$model" "$codec" "$session_codec" "$store" \
-      "$model_source" "$codec_source" "$session_codec_source" \
+  if grep -F -- "$forbidden" "$model" "$codec" "$construction_session_codec" \
+      "$check_session_codec" "$store" "$model_source" "$codec_source" \
+      "$construction_session_codec_source" "$check_session_codec_source" \
       "$store_source" >/dev/null 2>&1; then
     echo "forbidden transaction-run evidence authority: $forbidden" >&2
     exit 1
@@ -113,6 +120,8 @@ for required_test in \
   'evidence-corrupt-index' \
   'store_conflict' \
   'corrupt_encoding' \
+  'encode_check_session' \
+  'decode_check_session' \
   'encode_check_dispatch_evidence' \
   'posix_transaction_run_evidence_store::open' \
   'injected construction-evidence failure' \
@@ -122,6 +131,21 @@ for required_test in \
     echo "missing transaction-run evidence test: $required_test" >&2
     exit 1
   }
+done
+
+for retired_private_format in \
+  'transaction_run_evidence_schema_version = 2' \
+  'transaction_run_evidence_schema_version = 3' \
+  'pkgctl/construction-dispatch-evidence/2' \
+  'pkgctl/construction-dispatch-evidence/3' \
+  'pkgctl/check-dispatch-evidence/2' \
+  'pkgctl/check-dispatch-evidence/3'; do
+  if grep -R -F -- "$retired_private_format" "$srcdir/include" "$srcdir/src" \
+      "$srcdir/README.md" "$srcdir/DESIGN.md" "$srcdir/TESTING.md" \
+      "$srcdir/MAINTAINING.md" "$srcdir/man" >/dev/null 2>&1; then
+    echo "retired private run-evidence history remains: $retired_private_format" >&2
+    exit 1
+  fi
 done
 
 if grep -R -n -E 'run_evidence|transaction_run_evidence' "$srcdir/cli" \

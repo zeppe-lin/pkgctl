@@ -28,7 +28,6 @@ native_construction_recovery_context(
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
     const check_dispatch_evidence_record& evidence,
-    transaction_dispatch_session_source& sessions,
     pkgexec::backend_capability_profile backend);
 
 } // namespace pkgctl::detail

@@ -5,6 +5,7 @@ pkgctl_core = static_library(
   'pkgctl-core',
   [
     'check.cpp',
+    'check_session_codec.cpp',
     'construction.cpp',
     'construction_session_codec.cpp',
     'dispatch.cpp',

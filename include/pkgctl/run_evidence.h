@@ -14,7 +14,7 @@
 #include <libpkgcheck-exec/result_codec.h>
 #include <libpkgfetch/materialization_codec.h>
 
-#include <pkgctl/check.h>
+#include <pkgctl/check_codec.h>
 #include <pkgctl/construction_codec.h>
 #include <pkgctl/run_journal.h>
 
@@ -22,7 +22,7 @@ namespace pkgctl {
 
 struct detail_run_evidence_codec_access;
 
-inline constexpr std::uint16_t transaction_run_evidence_schema_version = 3;
+inline constexpr std::uint16_t transaction_run_evidence_schema_version = 1;
 
 
 enum class transaction_run_evidence_error_code : std::uint8_t {
@@ -162,6 +162,7 @@ public:
   [[nodiscard]] const session_identity& result() const noexcept;
   [[nodiscard]] const session_identity& controller_request() const noexcept;
   [[nodiscard]] const session_identity& construction() const noexcept;
+  [[nodiscard]] const check_session_encoding& session_encoding() const noexcept;
   [[nodiscard]] const pkgcheck::check_request_identity&
   check_request() const noexcept;
   [[nodiscard]] const pkgexec::execution_request_identity&
@@ -187,6 +188,7 @@ private:
       session_identity result,
       session_identity controller_request,
       session_identity construction,
+      check_session_encoding session_encoding,
       pkgcheck::check_request_identity check_request,
       pkgexec::execution_request_identity execution_request,
       pkgexec::backend_capability_profile_identity backend,
@@ -204,6 +206,7 @@ private:
   session_identity result_;
   session_identity controller_request_;
   session_identity construction_;
+  check_session_encoding session_encoding_;
   pkgcheck::check_request_identity check_request_;
   pkgexec::execution_request_identity execution_request_;
   pkgexec::backend_capability_profile_identity backend_;

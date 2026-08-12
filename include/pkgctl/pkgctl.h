@@ -7,7 +7,9 @@
 #pragma once
 
 #include <pkgctl/check.h>
+#include <pkgctl/check_codec.h>
 #include <pkgctl/construction.h>
+#include <pkgctl/construction_codec.h>
 #include <pkgctl/dispatch.h>
 #include <pkgctl/controller.h>
 #include <pkgctl/effect.h>

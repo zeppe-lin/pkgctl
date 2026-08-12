@@ -23,10 +23,11 @@ target binding comes from retained state evidence. Both enter only through
 The command retains subordinate effect bodies in owner encodings before the
 controller journal may reference them. A started construction likewise retains
 the exact controller-owned admitted construction session plus owner-encoded
-fetch/build evidence before terminal retirement. Construction restart decodes
-that retained session under the admitted transaction/build node; it does not
-reconsult current construction configuration or retained-installed-package
-lookup. Interrupted applications are reopened through the direct
+fetch/build evidence before terminal retirement, and a started check retains its
+exact admitted controller session beside owner-encoded check evidence.
+Construction/check restart decodes those retained sessions under the exact
+retained transaction/progress/node authority; it does not reconsult current
+construction/check configuration, the fresh session locator, or retained-installed-package lookup. Interrupted applications are reopened through the direct
 `libpkgapply-posix` request-to-journal index. Resume never reacquires
 collections, asks the operator to restate transaction semantics, substitutes
 current state for historical state, scans for journals, or silently replans. Private command evidence has one current admitted format. Bytes that do not

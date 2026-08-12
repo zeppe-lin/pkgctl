@@ -328,13 +328,13 @@ renamed or replaced, and all four runtime namespaces must be disjoint both by
 selected path and retained filesystem identity.
 
 Fresh construction/check work must derive from the deterministic session
-source. Once a construction attempt starts, however, the exact admitted
-`construction_session` is durable controller authority: recovery must decode it
-from the construction evidence under the retained transaction/build node and
-must not reconsult the session locator, current construction configuration, or
-retained-installed-package source. Check recovery still uses the deterministic
-session source until its own admitted session is retained. The exact execution
-request must be reproduced through the pure build/check adapter projection;
+source. Once either attempt starts, however, its exact admitted controller
+session is durable authority: construction recovery must decode its retained
+`construction_session` under the exact transaction/build node, and check
+recovery must decode its retained `transaction_check_session` under the exact
+retained progress/check request. Neither recovery path may reconsult the fresh
+session locator, current construction/check configuration, or retained-installed-package source. The exact execution request must be reproduced through the pure
+build/check adapter projection;
 recovery must never call effectful `prepare()` merely to obtain request
 authority. Construction recovery must decode the retained `libpkgfetch`
 materialization body under the retained session's exact source snapshot and
@@ -346,8 +346,9 @@ dispatch-evidence record, controller-owned session evidence where the controller
 owns that value, and canonical subordinate owner encodings. Construction
 evidence retains the exact admitted controller `construction_session`, the
 canonical libpkgfetch materialization encoding, and the existing build-execution
-encoding; check evidence retains its existing check-execution encoding. It must
-bind the run journal, transaction, dispatch, node, attempt, controller
+encoding; check evidence retains the exact admitted controller check-session
+encoding plus its existing check-execution encoding. It must bind the run
+journal, transaction, dispatch, node, attempt, controller
 request/result, and subordinate context identities
 before publication. The content object must become durable before the typed
 index, and terminal run retirement must follow evidence publication. The store

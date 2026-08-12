@@ -5,6 +5,7 @@
 
 #include "run_recovery_detail.h"
 
+#include <pkgctl/check_codec.h>
 #include <pkgctl/construction_codec.h>
 #include <pkgctl/error.h>
 #include <pkgctl/identity.h>
@@ -353,17 +354,50 @@ check_dispatch_recovery_context detail::native_check_recovery_context(
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
     const check_dispatch_evidence_record& evidence,
-    transaction_dispatch_session_source& sessions,
     pkgexec::backend_capability_profile backend)
 {
-  auto session = sessions.check(record, progress, dispatch);
-  const auto& request = session.request();
+  if (record.transaction() != evidence.transaction() ||
+      progress.transaction().identity() != evidence.transaction())
+  {
+    context_mismatch("native check semantics differ from retained evidence");
+  }
+
+  auto request = [&]() {
+    try
+    {
+      return transaction_check_request::make(
+          progress, dispatch.unit().primary_node());
+    }
+    catch (const std::exception& problem)
+    {
+      decode_failed("check request", problem);
+    }
+  }();
+  auto session = [&]() {
+    try
+    {
+      return decode_check_session(
+          evidence.session_encoding(), std::move(request));
+    }
+    catch (const check_codec_error& problem)
+    {
+      if (problem.code() == check_codec_error_code::authority_mismatch)
+        context_mismatch(problem.what());
+      decode_failed("check session", problem);
+    }
+    catch (const std::exception& problem)
+    {
+      decode_failed("check session", problem);
+    }
+  }();
+
+  const auto& retained_request = session.request();
   if (session.identity() != evidence.attempt_session() ||
-      request.identity() != evidence.controller_request() ||
-      request.transaction().identity() != evidence.transaction() ||
-      request.check_node() != evidence.node() ||
-      request.construction().identity() != evidence.construction() ||
-      request.check().identity() != evidence.check_request() ||
+      retained_request.identity() != evidence.controller_request() ||
+      retained_request.transaction().identity() != evidence.transaction() ||
+      retained_request.check_node() != evidence.node() ||
+      retained_request.construction().identity() != evidence.construction() ||
+      retained_request.check().identity() != evidence.check_request() ||
       backend.identity() != evidence.backend())
   {
     context_mismatch("native check context differs from retained evidence");
@@ -380,11 +414,10 @@ check_dispatch_recovery_context detail::native_check_recovery_context(
 
 native_transaction_dispatch_recovery_context_source::
 native_transaction_dispatch_recovery_context_source(
-    transaction_dispatch_session_source& sessions,
     pkgexec::backend_capability_profile construction_backend,
     pkgexec::backend_capability_profile check_backend,
     transaction_operation_recovery_authority_source& operations)
-    : sessions_(sessions), construction_backend_(std::move(construction_backend)),
+    : construction_backend_(std::move(construction_backend)),
       check_backend_(std::move(check_backend)), operations_(operations)
 {
 }
@@ -416,7 +449,7 @@ native_transaction_dispatch_recovery_context_source::check(
   const auto& attempt = require_attempt(assessment);
   auto context = detail::native_check_recovery_context(
       checkpoint.record(), checkpoint.run().progress(), dispatch, evidence,
-      sessions_, check_backend_);
+      check_backend_);
   if (context.session.identity() != attempt)
     context_mismatch("native check context differs from restart assessment");
   return context;
