@@ -477,8 +477,10 @@ require_contains resumed-effect "$root/resumed-effect.out" \
 effect_record_terminal=$(sed -n 's/^effect.record=//p' "$root/resumed-effect.out")
 [ "${#effect_record_terminal}" -eq 64 ] || \
   fail "terminal effect record identity has length ${#effect_record_terminal}, expected 64"
-require_equal retained-observation-after-resume "$observation_digest" \
-  "$(sha256sum "$observation_body")"
+require_equal retained-session-after-resume "$session_digest" \
+  "$(sha256sum "$session_body")"
+require_equal retained-archive-after-resume "$archive_digest" \
+  "$(sha256sum "$archive_body")"
 
 # Terminal replay must not consult the historical active application-journal
 # locator. Poisoning it after completion makes any out-of-scope load explicit.
