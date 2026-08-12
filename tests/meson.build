@@ -899,6 +899,24 @@ if not get_option('tests').disabled()
     suite: 'contract',
   )
 
+  repository_contract = find_program('contracts/check_repository_contract.sh')
+  test(
+    'repository-contract',
+    repository_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  documentation_source_contract = find_program(
+    'contracts/check_documentation_source.sh',
+  )
+  test(
+    'documentation-source-contract',
+    documentation_source_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
   release_metadata = find_program('contracts/check_release_metadata.sh')
   test('release-metadata', release_metadata, args: [meson.project_source_root()], suite: 'contract')
 

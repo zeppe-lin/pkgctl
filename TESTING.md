@@ -1,3 +1,5 @@
+# pkgctl testing
+
 ## Library-level package campaign qualification
 
 Before a user-facing construction command is extended, the non-CLI integration
@@ -280,8 +282,6 @@ The shared-session suite must prove:
   sources;
 - the POSIX runtime recovers a started construction from a reopened evidence
   store without consulting a separate construction recovery provider.
-
-# pkgctl testing
 
 ## Qualification roles
 

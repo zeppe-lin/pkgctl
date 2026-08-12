@@ -92,3 +92,18 @@ grep -F "'fetch-generation-contract'" "$meson" >/dev/null || {
   echo 'missing categorized shared construction fixture' >&2
   exit 1
 }
+
+# Every executable source contract belongs to the Meson contract suite.  Direct
+# qualification executes the directory wholesale; Meson must not silently own a
+# smaller policy surface.
+for contract in "$srcdir"/tests/contracts/*.sh; do
+  [ -x "$contract" ] || {
+    echo "contract is not executable: $contract" >&2
+    exit 1
+  }
+  name=$(basename "$contract")
+  grep -F -- "$name" "$meson" >/dev/null || {
+    echo "Meson omits source contract: $name" >&2
+    exit 1
+  }
+done

@@ -17,6 +17,7 @@ require_line()
 }
 
 require_line "$srcdir/meson.build" "  version: '$version',"
+require_line "$srcdir/meson.build" "  meson_version: '>=1.6.0',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
@@ -52,7 +53,7 @@ require_dependency_range libpkgapply-posix '>=3.1.0' '<4.0.0'
 require_dependency_range libpkgcatalog-codec '>=3.0.0' '<4.0.0'
 require_dependency_range libpkgexec-linux '>=0.6.0' '<1.0.0'
 
-grep -F '## 0.35.0 - 2026-08-07' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F '## 0.35.0 - 2026-08-12' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
 grep -F 'Version 0.35.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 

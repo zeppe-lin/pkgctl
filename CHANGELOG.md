@@ -1,4 +1,6 @@
-## 0.35.0 - 2026-08-07
+# pkgctl changelog
+
+## 0.35.0 - 2026-08-12
 
 - Corrects progress-scoped execution qualification so live interpreter and supervisor
   authority are required only by a resume that still owns unexecuted process work.
@@ -209,6 +211,14 @@
   domain-separated by run journal, dispatch, phase, and index, so
   `libpkgapply-exec` can materialize its single-use leaf without requiring
   unowned intermediate directories or filesystem mutation in operation authority.
+
+### Release qualification
+
+- Raises the declared Meson floor to 1.6.0, matching the integration test graph's
+  use of executable targets as `test()` arguments instead of advertising an older
+  configure-time contract that Meson itself warns is unsupported.
+- Restores canonical ATX document hierarchy and pins `meson.options`, documentation
+  structure, and complete contract-test registration as release-source invariants.
 
 ### Dependency contract
 
@@ -948,8 +958,6 @@ Current 0.35.0 source accepts exactly these direct dependency generations:
 - libpkgtransaction >= 2.1.0
 - libpkgcheck >= 0.1.0
 - libpkgcheck-exec >= 0.1.1
-
-# pkgctl changelog
 
 ## 0.17.0 - 2026-07-31
 

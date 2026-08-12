@@ -769,6 +769,8 @@ order and the controller binds it into the effect request identity.
 
 ## Building
 
+`pkgctl` requires Meson 1.6.0 or newer.
+
 ```sh
 meson setup build \
   -Dlink_mode=shared \

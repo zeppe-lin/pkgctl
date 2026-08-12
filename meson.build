@@ -6,7 +6,7 @@ project(
   'cpp',
   version: '0.35.0',
   license: 'GPL-3.0-or-later',
-  meson_version: '>=1.2.0',
+  meson_version: '>=1.6.0',
   default_options: [
     'cpp_std=c++17',
     'warning_level=3',
