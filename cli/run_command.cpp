@@ -785,11 +785,9 @@ class private_effect_body_store final
 public:
   private_effect_body_store(
       const std::filesystem::path& directory,
-      pkgapply::posix::application_journal_store& application_journals,
-      pkgexec::backend_capability_profile lifecycle_capabilities)
+      pkgapply::posix::application_journal_store& application_journals)
       : directory_(open_directory(directory)),
-        application_journals_(application_journals),
-        lifecycle_capabilities_(std::move(lifecycle_capabilities))
+        application_journals_(application_journals)
   {
   }
 
@@ -862,7 +860,7 @@ public:
           read_all(
               directory_.get(),
               private_body_name("lifecycle", fact.result().hex())),
-          session.before()[index], lifecycle_capabilities_);
+          session.before()[index]);
       if (body.identity().hex() != fact.result().hex() ||
           body.succeeded() != fact.succeeded())
         throw std::runtime_error(
@@ -893,7 +891,7 @@ public:
           read_all(
               directory_.get(),
               private_body_name("lifecycle", fact.result().hex())),
-          session.after()[index], lifecycle_capabilities_);
+          session.after()[index]);
       if (body.identity().hex() != fact.result().hex() ||
           body.succeeded() != fact.succeeded())
         throw std::runtime_error(
@@ -970,7 +968,6 @@ public:
 private:
   fd_guard directory_;
   pkgapply::posix::application_journal_store& application_journals_;
-  pkgexec::backend_capability_profile lifecycle_capabilities_;
 };
 
 
@@ -2349,8 +2346,7 @@ int execute_transaction_run(transaction_run_command command)
       pkgapply::posix::application_journal_store::from_directory_fd(
           application_journal_directory.get());
   private_effect_body_store effect_bodies(
-      runtime_path(command, "effect-bodies"), application_journals,
-      admitted_execution_profiles.lifecycle);
+      runtime_path(command, "effect-bodies"), application_journals);
   auto application_backend =
       pkgapply::posix::application_posix_backend::from_directory_fds(
           application_target, target_root.get(),

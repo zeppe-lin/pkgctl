@@ -146,7 +146,7 @@ libpkgapply_posix_dep = dependency(
 )
 libpkgapply_exec_dep = dependency(
   'libpkgapply-exec',
-  version: ['>=2.0.0', '<3.0.0'],
+  version: ['>=3.0.0', '<4.0.0'],
   required: true,
   static: want_static,
 )

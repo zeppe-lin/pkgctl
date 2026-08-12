@@ -26,8 +26,10 @@ pathname as live physical authority while taking its target binding from retaine
 state evidence. It does not reacquire collections or substitute current state for
 the historical epoch. Command evidence retains its admitted backend profiles through
 the libpkgexec owner codec. Construction/check attempt evidence separately retains the
-exact libpkgexec-owned profile body required to decode its historical result, so recovery
-does not query a current backend or inject a command-level recovery profile. Current
+exact libpkgexec-owned profile body required to decode its historical result. Lifecycle
+result evidence carries that exact profile body inside the libpkgapply-exec owner
+encoding. Recovery therefore does not query a current backend or inject a command-level
+profile as historical result authority. Current
 interpreter observation, live capability, and supervisor-credential preflight are
 required only for execution scopes that can still run. Bytes outside the current private command-evidence format
 have no compatibility path.

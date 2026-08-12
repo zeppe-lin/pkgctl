@@ -98,7 +98,7 @@ for contract in \
   'libpkgexec-linux >= 0.6.0, < 1.0.0 (CLI only)' \
   'libpkgapply >= 3.0.0, < 4.0.0' \
   'libpkgapply-posix >= 3.1.0, < 4.0.0' \
-  'libpkgapply-exec >= 2.0.0, < 3.0.0' \
+  'libpkgapply-exec >= 3.0.0, < 4.0.0' \
   'libpkgresolve >= 3.0.0, < 4.0.0' \
   'libpkgtransaction >= 3.0.0, < 4.0.0' \
   'libpkgcheck >= 0.2.0, < 1.0.0' \

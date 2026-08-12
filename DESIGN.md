@@ -171,9 +171,11 @@ run is refused by start; a missing run is refused by resume.
 The command envelope retains its admitted construction/check/lifecycle profiles using
 the canonical libpkgexec owner encoding. Historical construction/check attempt evidence
 also retains the exact libpkgexec-owned backend-profile body beside the subordinate
-result encoding, so rehydration decodes that body directly instead of re-observing the
-old interpreter pathname, querying a live backend, or injecting a command-level recovery
-profile. Current interpreter observation, the live backend report, and supervisor credentials are
+result encoding. Historical lifecycle execution evidence is self-contained at the
+libpkgapply-exec owner boundary and carries the exact libpkgexec profile bytes that
+produced its embedded execution result. Rehydration therefore does not re-observe the
+old interpreter pathname, query a live backend, or inject a command-level profile as
+historical decode authority. Current interpreter observation, the live backend report, and supervisor credentials are
 execute-now authority: resume preflights them only for construction/check/lifecycle
 scopes that can still run. Completed, failed/stopped, and already externally blocked
 durable states therefore reopen without proving capabilities for actuators they cannot

@@ -516,3 +516,17 @@ for operation_only_recovery_proof in \
     exit 1
   }
 done
+
+# Completed lifecycle bodies own the exact backend-profile bytes that produced them.
+! grep -F 'lifecycle_capabilities_' "$command" >/dev/null || {
+  echo 'command effect-body store still injects command-level lifecycle profile into historical decode' >&2
+  exit 1
+}
+grep -F 'session.before()[index]);' "$command" >/dev/null || {
+  echo 'pre-lifecycle body decode does not consume only retained body plus exact admitted session' >&2
+  exit 1
+}
+grep -F 'session.after()[index]);' "$command" >/dev/null || {
+  echo 'post-lifecycle body decode does not consume only retained body plus exact admitted session' >&2
+  exit 1
+}

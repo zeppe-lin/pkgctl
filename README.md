@@ -39,9 +39,10 @@ current state for historical state, scans for journals, or silently replans. Pri
 belong to that format are rejected rather than interpreted through a compatibility
 path. Command evidence uses libpkgexec-owned backend-profile encodings for the
 admitted construction/check/lifecycle profiles. Historical construction/check result
-evidence retains the exact owner-encoded profile body with each durable attempt and
-decodes it without consulting a current backend or injecting a command-level recovery
-profile. Current interpreter observation, backend capability, and supervisor-credential
+evidence retains the exact owner-encoded profile body with each durable attempt.
+Historical lifecycle results likewise carry the exact libpkgexec-owned profile bytes
+inside the libpkgapply-exec owner encoding. None of those completed result paths consults
+a current backend or injects a command-level profile as historical decode authority. Current interpreter observation, backend capability, and supervisor-credential
 preflight are execute-now authority required only for construction, check, or lifecycle work that can still
 execute; an operation-only, completed, or already externally blocked run does not
 reacquire unused execute-now process authority merely to explain durable history. The

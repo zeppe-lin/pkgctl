@@ -171,9 +171,11 @@ add a compatibility decoder or migration path: bytes outside the current private
 format are not authority and must fail closed. Encode backend capability profiles only
 through libpkgexec's owner codec. Construction/check attempt evidence must retain the
 exact owner-encoded profile body needed to decode historical results; never substitute a
-freshly probed backend profile or a command-level recovery injection. Command evidence
-may retain the admitted owner-encoded profiles for execute-now comparison and the
-command-owned lifecycle effect-body decoder. Treat current
+freshly probed backend profile or a command-level recovery injection. Lifecycle result
+evidence must remain self-contained through libpkgapply-exec and retain the exact
+libpkgexec-owned profile body that produced its execution evidence. Command evidence may
+retain the admitted owner-encoded lifecycle profile only for fresh executor identity and
+execute-now resume comparison; it is not historical lifecycle-result decode authority. Treat current
 interpreter observation, capability reports, and
 current-supervisor credential equality as execute-now authority: require them only for
 scopes that durable progress/recovery can still invoke. Retained interpreter identity
