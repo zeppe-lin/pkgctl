@@ -630,6 +630,16 @@ const pkgbuild_exec::package_input_resource& concrete_input_resource(
   return *found;
 }
 
+void remove_retained_package_input(const fs::path& path)
+{
+  fs::permissions(
+      path, fs::perms::owner_write, fs::perm_options::add);
+  const auto removed = fs::remove_all(path);
+  if (removed == 0U)
+    throw std::runtime_error(
+        "retained package input fixture was not removed");
+}
+
 std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
     const pkgctl::construction_result& construction,
     char seed)
@@ -745,7 +755,7 @@ void check_durable_session_codec()
 
   fs::remove_all(check_root);
   for (const auto& input : retained_inputs)
-    fs::remove_all(input);
+    remove_retained_package_input(input);
   CHECK(!fs::exists(retained_source));
   CHECK(!fs::exists(retained_package));
   CHECK(!fs::exists(retained_root_view));
@@ -1846,7 +1856,7 @@ void check_stored_check_recovery()
 
   fs::remove_all(check_root);
   for (const auto& input : retained_inputs)
-    fs::remove_all(input);
+    remove_retained_package_input(input);
   CHECK(!fs::exists(retained_source));
   CHECK(!fs::exists(retained_package));
   CHECK(!fs::exists(retained_root_view));
