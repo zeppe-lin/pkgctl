@@ -90,6 +90,7 @@ session_identity construction_record_identity(
     const pkgbuild::build_request_identity& build_request,
     const pkgexec::execution_request_identity& execution_request,
     const pkgexec::backend_capability_profile_identity& backend,
+    const pkgexec::backend_capability_profile_encoding& backend_encoding,
     const pkgexec::execution_evidence_identity& execution,
     const pkgbuild::build_result_identity& build,
     const pkgbuild_exec::build_execution_result_encoding& encoding)
@@ -102,7 +103,8 @@ session_identity construction_record_identity(
           encoding_digest(session_encoding), materialization.hex(),
           encoding_digest(materialization_encoding),
           build_request.hex(), execution_request.hex(), backend.hex(),
-          execution.hex(), build.hex(), encoding_digest(encoding),
+          encoding_digest(backend_encoding), execution.hex(), build.hex(),
+          encoding_digest(encoding),
       });
 }
 
@@ -119,6 +121,7 @@ session_identity check_record_identity(
     const pkgcheck::check_request_identity& check_request,
     const pkgexec::execution_request_identity& execution_request,
     const pkgexec::backend_capability_profile_identity& backend,
+    const pkgexec::backend_capability_profile_encoding& backend_encoding,
     const pkgexec::execution_evidence_identity& execution,
     const pkgcheck::check_result_identity& check,
     const pkgcheck_exec::check_execution_result_encoding& encoding)
@@ -130,7 +133,8 @@ session_identity check_record_identity(
           attempt_session.hex(), result.hex(), controller_request.hex(),
           construction.hex(), encoding_digest(session_encoding),
           check_request.hex(), execution_request.hex(),
-          backend.hex(), execution.hex(), check.hex(), encoding_digest(encoding),
+          backend.hex(), encoding_digest(backend_encoding), execution.hex(),
+          check.hex(), encoding_digest(encoding),
       });
 }
 
@@ -171,6 +175,7 @@ construction_dispatch_evidence_record::construction_dispatch_evidence_record(
     pkgbuild::build_request_identity build_request,
     pkgexec::execution_request_identity execution_request,
     pkgexec::backend_capability_profile_identity backend,
+    pkgexec::backend_capability_profile_encoding backend_encoding,
     pkgexec::execution_evidence_identity execution,
     pkgbuild::build_result_identity build,
     pkgbuild_exec::build_execution_result_encoding encoding)
@@ -184,7 +189,9 @@ construction_dispatch_evidence_record::construction_dispatch_evidence_record(
       materialization_encoding_(std::move(materialization_encoding)),
       build_request_(std::move(build_request)),
       execution_request_(std::move(execution_request)),
-      backend_(std::move(backend)), execution_(std::move(execution)),
+      backend_(std::move(backend)),
+      backend_encoding_(std::move(backend_encoding)),
+      execution_(std::move(execution)),
       build_(std::move(build)), encoding_(std::move(encoding))
 {
 }
@@ -227,6 +234,8 @@ construction_dispatch_evidence_record::admit(
   auto session_encoding = encode_construction_session(session);
   auto materialization_encoding =
       pkgfetch::encode_source_materialization(result.materialization());
+  auto backend_encoding = pkgexec::encode_backend_capability_profile(
+      build.execution().backend());
   auto encoding = pkgbuild_exec::encode_build_execution_result(build);
   auto identity = construction_record_identity(
       started_record.journal(), started_record.transaction(),
@@ -235,7 +244,8 @@ construction_dispatch_evidence_record::admit(
       result.materialization().identity(), materialization_encoding,
       request.build().identity(),
       build.execution().request().identity(),
-      build.execution().backend().identity(), build.execution().identity(),
+      build.execution().backend().identity(), backend_encoding,
+      build.execution().identity(),
       build.build().identity(), encoding);
   return construction_dispatch_evidence_record(
       std::move(identity), started_record.journal(),
@@ -245,7 +255,8 @@ construction_dispatch_evidence_record::admit(
       result.materialization().identity(), std::move(materialization_encoding),
       request.build().identity(),
       build.execution().request().identity(),
-      build.execution().backend().identity(), build.execution().identity(),
+      build.execution().backend().identity(), std::move(backend_encoding),
+      build.execution().identity(),
       build.build().identity(), std::move(encoding));
 }
 
@@ -288,6 +299,9 @@ construction_dispatch_evidence_record::execution_request() const noexcept
 const pkgexec::backend_capability_profile_identity&
 construction_dispatch_evidence_record::backend() const noexcept
 { return backend_; }
+const pkgexec::backend_capability_profile_encoding&
+construction_dispatch_evidence_record::backend_encoding() const noexcept
+{ return backend_encoding_; }
 const pkgexec::execution_evidence_identity&
 construction_dispatch_evidence_record::execution() const noexcept
 { return execution_; }
@@ -312,6 +326,7 @@ check_dispatch_evidence_record::check_dispatch_evidence_record(
     pkgcheck::check_request_identity check_request,
     pkgexec::execution_request_identity execution_request,
     pkgexec::backend_capability_profile_identity backend,
+    pkgexec::backend_capability_profile_encoding backend_encoding,
     pkgexec::execution_evidence_identity execution,
     pkgcheck::check_result_identity check,
     pkgcheck_exec::check_execution_result_encoding encoding)
@@ -324,7 +339,9 @@ check_dispatch_evidence_record::check_dispatch_evidence_record(
       session_encoding_(std::move(session_encoding)),
       check_request_(std::move(check_request)),
       execution_request_(std::move(execution_request)),
-      backend_(std::move(backend)), execution_(std::move(execution)),
+      backend_(std::move(backend)),
+      backend_encoding_(std::move(backend_encoding)),
+      execution_(std::move(execution)),
       check_(std::move(check)), encoding_(std::move(encoding))
 {
 }
@@ -364,6 +381,8 @@ check_dispatch_evidence_record check_dispatch_evidence_record::admit(
     invalid_record("check result identity is not canonical");
 
   auto session_encoding = encode_check_session(session);
+  auto backend_encoding = pkgexec::encode_backend_capability_profile(
+      execution.execution().backend());
   auto encoding = pkgcheck_exec::encode_check_execution_result(execution);
   auto identity = check_record_identity(
       started_record.journal(), started_record.transaction(),
@@ -371,7 +390,7 @@ check_dispatch_evidence_record check_dispatch_evidence_record::admit(
       result.identity(), request.identity(), request.construction().identity(),
       session_encoding, request.check().identity(),
       execution.execution().request().identity(),
-      execution.execution().backend().identity(),
+      execution.execution().backend().identity(), backend_encoding,
       execution.execution().identity(), execution.check().identity(), encoding);
   return check_dispatch_evidence_record(
       std::move(identity), started_record.journal(),
@@ -380,7 +399,7 @@ check_dispatch_evidence_record check_dispatch_evidence_record::admit(
       request.identity(), request.construction().identity(),
       std::move(session_encoding), request.check().identity(),
       execution.execution().request().identity(),
-      execution.execution().backend().identity(),
+      execution.execution().backend().identity(), std::move(backend_encoding),
       execution.execution().identity(), execution.check().identity(),
       std::move(encoding));
 }
@@ -418,6 +437,9 @@ check_dispatch_evidence_record::execution_request() const noexcept
 const pkgexec::backend_capability_profile_identity&
 check_dispatch_evidence_record::backend() const noexcept
 { return backend_; }
+const pkgexec::backend_capability_profile_encoding&
+check_dispatch_evidence_record::backend_encoding() const noexcept
+{ return backend_encoding_; }
 const pkgexec::execution_evidence_identity&
 check_dispatch_evidence_record::execution() const noexcept
 { return execution_; }

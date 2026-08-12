@@ -25,8 +25,6 @@ for required in \
   'class transaction_dispatch_recovery_context_source' \
   'class transaction_operation_recovery_authority_source' \
   'class native_transaction_dispatch_recovery_context_source final' \
-  'pkgexec::backend_capability_profile construction_backend_' \
-  'pkgexec::backend_capability_profile check_backend_' \
   'transaction_operation_recovery_authority_source& operations_' \
   'class stored_transaction_dispatch_recovery_authority_source final' \
   'transaction_run_evidence_store& evidence_' \
@@ -41,6 +39,8 @@ for required in \
   'detail_run_recovery_access' \
   'decode_construction_session(' \
   'decode_check_session(' \
+  'pkgexec::decode_backend_capability_profile(' \
+  'evidence.backend_encoding()' \
   'pkgfetch::decode_source_materialization(' \
   'pkgbuild_exec::seal_execution_request(' \
   'pkgcheck_exec::seal_execution_request(' \
@@ -91,6 +91,7 @@ for forbidden in \
   'pkgexec::execution_backend& construction_backend_' \
   'pkgexec::execution_backend& check_backend_' \
   'selected_backend.capabilities()' \
+  '.capabilities()' \
   'from_sha256(evidence' \
   'materialization_identity::from_sha256' \
   'build_request_identity::from_sha256' \

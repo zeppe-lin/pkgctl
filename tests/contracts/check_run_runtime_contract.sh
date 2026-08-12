@@ -42,7 +42,6 @@ for required in \
   'pkgexec::execution_backend* construction;' \
   'pkgexec::execution_backend* check;' \
   'pkgexec::execution_backend* lifecycle;' \
-  'native_recovery_profile(' \
   'current execution backend is unavailable for durable recovery' \
   'class native_posix_transaction_run_runtime final' \
   'native_posix_transaction_run_runtime::open(' \
@@ -57,13 +56,10 @@ for required in \
   'native_transaction_operation_authority_source operations_' \
   'std::unique_ptr<explicit_transaction_effect_archive_source> owned_archives_' \
   'transaction_effect_archive_source* archives_' \
-  'construction_recovery_backend' \
-  'check_recovery_backend' \
-  'pkgexec::backend_capability_profile construction_recovery_backend_' \
-  'pkgexec::backend_capability_profile check_recovery_backend_' \
   'native_transaction_progress_rehydration_context_source progress_context_' \
   'detail::native_construction_recovery_context(' \
   'detail::native_check_recovery_context(' \
+  'progress_context_(operations_)' \
   'operations_.rehydrate(' \
   'stored_transaction_progress_rehydration_source progress_' \
   'transaction_progress::begin(configuration_.transaction())' \
@@ -86,8 +82,6 @@ for token in \
   'operations_(' \
   'owned_archives_(' \
   'archives_(' \
-  'construction_recovery_backend_(' \
-  'check_recovery_backend_(' \
   'progress_context_(' \
   'progress_(' \
   'unavailable_execution_backend_()' \
@@ -120,6 +114,9 @@ for required_test in \
   'installed_packages.calls() == 0U' \
   'operation_specifications.calls() == 0U' \
   'effect_restart_bodies.calls() == 0U' \
+  'forbidden_recovery_execution_backend' \
+  'recovery_backend.capability_calls() == 0U' \
+  'recovery_backend.execution_calls() == 0U' \
   'artifacts == 1U'; do
   grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing transaction-run runtime test: $required_test" >&2
@@ -162,6 +159,19 @@ if printf '%s\n' "$progress_recovery_body" | grep -F 'sessions_' \
   echo 'progress recovery retains a fresh session-source dependency' >&2
   exit 1
 fi
+
+
+for forbidden_recovery_profile in \
+  'native_recovery_profile(' \
+  'construction_recovery_backend' \
+  'check_recovery_backend' \
+  'backends.construction.capabilities()' \
+  'backends.check.capabilities()'; do
+  if grep -F -- "$forbidden_recovery_profile" "$header" "$source" >/dev/null 2>&1; then
+    echo "runtime must not reconstruct historical backend profile: $forbidden_recovery_profile" >&2
+    exit 1
+  fi
+done
 
 for forbidden in \
   'create_director' \

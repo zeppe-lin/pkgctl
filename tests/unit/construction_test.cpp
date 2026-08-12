@@ -838,6 +838,32 @@ private:
   pkgapply::execution_capability_profile_identity capabilities_;
 };
 
+class forbidden_recovery_execution_backend final
+    : public pkgexec::execution_backend {
+public:
+  pkgexec::backend_capability_profile capabilities() const override
+  {
+    ++capability_calls_;
+    throw std::runtime_error(
+        "durable recovery queried current execution capabilities");
+  }
+
+  pkgexec::execution_result execute(
+      const pkgexec::execution_request&,
+      const pkgexec::execution_resources&) override
+  {
+    ++execution_calls_;
+    throw std::runtime_error("durable recovery reached current execution");
+  }
+
+  std::size_t capability_calls() const noexcept { return capability_calls_; }
+  std::size_t execution_calls() const noexcept { return execution_calls_; }
+
+private:
+  mutable std::size_t capability_calls_ = 0U;
+  std::size_t execution_calls_ = 0U;
+};
+
 int open_runtime_directory(const std::filesystem::path& path)
 {
   const int fd = ::open(
@@ -1598,6 +1624,8 @@ void check_transaction_run_evidence_storage()
   CHECK(record.execution_request() ==
         result.build().execution().request().identity());
   CHECK(record.backend() == result.build().execution().backend().identity());
+  CHECK(record.backend_encoding() == pkgexec::encode_backend_capability_profile(
+        result.build().execution().backend()));
   CHECK(record.execution() == result.build().execution().identity());
   CHECK(record.build() == result.build().build().identity());
 
@@ -1619,6 +1647,9 @@ void check_transaction_run_evidence_storage()
         session.execution_identity().interpreter);
   CHECK(decoded.materialization_encoding() ==
         record.materialization_encoding());
+  CHECK(decoded.backend_encoding() == record.backend_encoding());
+  CHECK(pkgexec::decode_backend_capability_profile(decoded.backend_encoding()) ==
+        result.build().execution().backend());
   CHECK(decoded.encoding() == record.encoding());
   CHECK(pkgctl::encode_construction_dispatch_evidence(decoded) == encoding);
 
@@ -2313,7 +2344,7 @@ void check_stored_construction_recovery()
 
   unreachable_operation_recovery_context_source operations;
   pkgctl::native_transaction_dispatch_recovery_context_source native_context(
-      backend.capabilities(), backend.capabilities(), operations);
+      operations);
   pkgctl::stored_transaction_dispatch_recovery_authority_source native_source(
       evidence_store, native_context);
   auto native_recovery =
@@ -2742,6 +2773,7 @@ void check_posix_transaction_run_runtime_recovery()
   unreachable_operation_recovery_context_source operation_recovery;
   forbidden_runtime_archive_source archives;
   unreachable_runtime_application_backend application_backend;
+  forbidden_recovery_execution_backend recovery_backend;
 
   const int run_fd = open_runtime_directory(run_path);
   const int evidence_fd = open_runtime_directory(evidence_path);
@@ -2751,8 +2783,8 @@ void check_posix_transaction_run_runtime_recovery()
       run_fd, evidence_fd, effect_fd, lock_fd,
       {progress_source, execution, operation_execution, operation_recovery,
        archives},
-      {execution_backend, execution_backend, application_backend,
-       execution_backend, state_store});
+      {recovery_backend, recovery_backend, application_backend,
+       recovery_backend, state_store});
   CHECK(::close(run_fd) == 0);
   CHECK(::close(evidence_fd) == 0);
   CHECK(::close(effect_fd) == 0);
@@ -2773,6 +2805,8 @@ void check_posix_transaction_run_runtime_recovery()
   CHECK(recovered.run().progress().complete());
   CHECK(progress_source.calls() == 1U);
   CHECK(execution.calls() == 0U);
+  CHECK(recovery_backend.capability_calls() == 0U);
+  CHECK(recovery_backend.execution_calls() == 0U);
   CHECK(archives.calls() == 0U);
   CHECK(directory_entry_count(effect_path) == 0U);
   CHECK(directory_entry_count(lock_path) == 0U);

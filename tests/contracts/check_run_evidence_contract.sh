@@ -44,11 +44,14 @@ for required in \
   'encode_source_materialization' \
   'execution_request() const noexcept' \
   'backend() const noexcept' \
+  'backend_encoding() const noexcept' \
+  'encode_backend_capability_profile' \
   'encoding() const noexcept' \
   'encode_construction_dispatch_evidence' \
   'decode_construction_dispatch_evidence' \
   'encode_check_dispatch_evidence' \
   'decode_check_dispatch_evidence' \
+  'maximum_backend_capability_profile_encoding_size' \
   'transaction_run_evidence_store' \
   'posix_transaction_run_evidence_store' \
   'publish(const construction_dispatch_evidence_record& record)' \

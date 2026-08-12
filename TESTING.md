@@ -75,7 +75,8 @@ The final command suite must prove:
   usage error and bytes outside the one current private command-evidence format
   fail closed without a compatibility decoder;
 - completed/native-runtime reopen is qualified with null construction/check/lifecycle
-  backends plus retained recovery profiles, proving historical evidence is not
+  backends and no injected recovery profiles; construction/check attempt evidence decodes
+  its libpkgexec-owned retained backend-profile bytes, proving historical evidence is not
   masqueraded as a current executable mechanism;
 - resume with remaining executable lifecycle work rejects a current interpreter whose
   exact inspected identity differs from the one retained at admission and leaves the run
@@ -95,9 +96,12 @@ The final command suite must prove:
   as terminal construction evidence and the command surfaces its durable backend
   diagnostic instead of reporting only a generic failed disposition;
 - resume recovery decodes retained construction/check sessions and subordinate
-  construction/check/lifecycle bodies against the backend capability profiles admitted
-  in command evidence rather than the live backend profile. Construction/check recovery
-  must not consult the fresh session locator; codec tests remove the concrete retained
+  construction/check bodies against the libpkgexec-owned backend-profile bytes retained
+  with each exact attempt rather than a live backend report or command-level recovery
+  profile. Command evidence still retains owner-encoded construction/check/lifecycle
+  profiles for execute-now admission comparison and for the command-owned lifecycle
+  effect-body decoder. Construction/check recovery must not
+  consult the fresh session locator; codec tests remove the concrete retained
   check paths before decode and still reproduce the exact admitted session. An incomplete
   run with remaining lifecycle process work still refuses
   a changed supervisor/current execution authority before journal advancement; after

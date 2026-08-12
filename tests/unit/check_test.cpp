@@ -1349,6 +1349,13 @@ void check_durable_dispatch_execution()
     CHECK(completed.evidence.session_encoding() ==
           pkgctl::encode_check_session(session));
     CHECK(decoded.session_encoding() == completed.evidence.session_encoding());
+    CHECK(completed.evidence.backend_encoding() ==
+          pkgexec::encode_backend_capability_profile(
+              completed.result.execution().execution().backend()));
+    CHECK(decoded.backend_encoding() == completed.evidence.backend_encoding());
+    CHECK(pkgexec::decode_backend_capability_profile(
+              decoded.backend_encoding()) ==
+          completed.result.execution().execution().backend());
     CHECK(decoded.encoding() == completed.evidence.encoding());
     CHECK(pkgctl::encode_check_dispatch_evidence(decoded) == encoding);
 
@@ -1866,7 +1873,7 @@ void check_stored_check_recovery()
 
   unreachable_operation_recovery_context_source operations;
   pkgctl::native_transaction_dispatch_recovery_context_source native_context(
-      backend.capabilities(), backend.capabilities(), operations);
+      operations);
   pkgctl::stored_transaction_dispatch_recovery_authority_source native_source(
       evidence_store, native_context);
   auto native_recovery =

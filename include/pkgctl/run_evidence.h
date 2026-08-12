@@ -12,6 +12,7 @@
 #include <string>
 #include <libpkgbuild-exec/result_codec.h>
 #include <libpkgcheck-exec/result_codec.h>
+#include <libpkgexec/profile_codec.h>
 #include <libpkgfetch/materialization_codec.h>
 
 #include <pkgctl/check_codec.h>
@@ -60,10 +61,11 @@ private:
  *
  * The record retains the exact controller-owned construction-session bytes,
  * canonical libpkgfetch materialization bytes, and canonical build-execution
- * encoding. It still does not reconstruct a construction_result by itself:
- * recovery supplies the exact transaction semantics and backend profile body,
- * then delegates each retained body to its semantic owner before admitting the
- * historical result. Fresh session location is not recovery authority.
+ * encoding, including libpkgexec-owned backend-profile bytes. It still does
+ * not reconstruct a construction_result by itself: recovery delegates each
+ * retained body to its semantic owner before admitting the historical result.
+ * Fresh session location and current backend capabilities are not recovery
+ * authority.
  */
 class construction_dispatch_evidence_record final {
 public:
@@ -94,6 +96,8 @@ public:
   execution_request() const noexcept;
   [[nodiscard]] const pkgexec::backend_capability_profile_identity&
   backend() const noexcept;
+  [[nodiscard]] const pkgexec::backend_capability_profile_encoding&
+  backend_encoding() const noexcept;
   [[nodiscard]] const pkgexec::execution_evidence_identity&
   execution() const noexcept;
   [[nodiscard]] const pkgbuild::build_result_identity&
@@ -119,6 +123,7 @@ private:
       pkgbuild::build_request_identity build_request,
       pkgexec::execution_request_identity execution_request,
       pkgexec::backend_capability_profile_identity backend,
+      pkgexec::backend_capability_profile_encoding backend_encoding,
       pkgexec::execution_evidence_identity execution,
       pkgbuild::build_result_identity build,
       pkgbuild_exec::build_execution_result_encoding encoding);
@@ -138,6 +143,7 @@ private:
   pkgbuild::build_request_identity build_request_;
   pkgexec::execution_request_identity execution_request_;
   pkgexec::backend_capability_profile_identity backend_;
+  pkgexec::backend_capability_profile_encoding backend_encoding_;
   pkgexec::execution_evidence_identity execution_;
   pkgbuild::build_result_identity build_;
   pkgbuild_exec::build_execution_result_encoding encoding_;
@@ -169,6 +175,8 @@ public:
   execution_request() const noexcept;
   [[nodiscard]] const pkgexec::backend_capability_profile_identity&
   backend() const noexcept;
+  [[nodiscard]] const pkgexec::backend_capability_profile_encoding&
+  backend_encoding() const noexcept;
   [[nodiscard]] const pkgexec::execution_evidence_identity&
   execution() const noexcept;
   [[nodiscard]] const pkgcheck::check_result_identity& check() const noexcept;
@@ -192,6 +200,7 @@ private:
       pkgcheck::check_request_identity check_request,
       pkgexec::execution_request_identity execution_request,
       pkgexec::backend_capability_profile_identity backend,
+      pkgexec::backend_capability_profile_encoding backend_encoding,
       pkgexec::execution_evidence_identity execution,
       pkgcheck::check_result_identity check,
       pkgcheck_exec::check_execution_result_encoding encoding);
@@ -210,6 +219,7 @@ private:
   pkgcheck::check_request_identity check_request_;
   pkgexec::execution_request_identity execution_request_;
   pkgexec::backend_capability_profile_identity backend_;
+  pkgexec::backend_capability_profile_encoding backend_encoding_;
   pkgexec::execution_evidence_identity execution_;
   pkgcheck::check_result_identity check_;
   pkgcheck_exec::check_execution_result_encoding encoding_;

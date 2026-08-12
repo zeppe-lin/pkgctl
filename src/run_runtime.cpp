@@ -268,11 +268,8 @@ class native_transaction_progress_rehydration_context_source final
     : public transaction_progress_rehydration_context_source {
 public:
   native_transaction_progress_rehydration_context_source(
-      pkgexec::backend_capability_profile construction_backend,
-      pkgexec::backend_capability_profile check_backend,
       native_transaction_operation_authority_source& operations)
-      : construction_backend_(std::move(construction_backend)),
-        check_backend_(std::move(check_backend)), operations_(operations)
+      : operations_(operations)
   {
   }
 
@@ -283,7 +280,7 @@ public:
       const construction_dispatch_evidence_record& evidence) override
   {
     return detail::native_construction_recovery_context(
-        record, partial_progress, dispatch, evidence, construction_backend_);
+        record, partial_progress, dispatch, evidence);
   }
 
   check_dispatch_recovery_context check(
@@ -293,7 +290,7 @@ public:
       const check_dispatch_evidence_record& evidence) override
   {
     return detail::native_check_recovery_context(
-        record, partial_progress, dispatch, evidence, check_backend_);
+        record, partial_progress, dispatch, evidence);
   }
 
   effect_restart_checkpoint operation(
@@ -307,8 +304,6 @@ public:
   }
 
 private:
-  pkgexec::backend_capability_profile construction_backend_;
-  pkgexec::backend_capability_profile check_backend_;
   native_transaction_operation_authority_source& operations_;
 };
 
@@ -324,15 +319,11 @@ public:
       transaction_operation_execution_authority_source& operation_execution,
       transaction_operation_recovery_authority_source& operation_recovery,
       transaction_effect_archive_source& archives,
-      pkgexec::backend_capability_profile construction_recovery_backend,
-      pkgexec::backend_capability_profile check_recovery_backend,
       transaction_run_runtime_backends backends,
       transaction_effect_body_sink* effect_bodies)
       : runs_(runs), evidence_(evidence), effects_(effects), progress_(progress),
         execution_(sessions, operation_execution),
-        recovery_context_(
-            std::move(construction_recovery_backend),
-            std::move(check_recovery_backend), operation_recovery),
+        recovery_context_(operation_recovery),
         recovery_(evidence_, recovery_context_),
         construction_(backends.construction), check_(backends.check),
         operation_(
@@ -485,8 +476,7 @@ public:
             runs_, evidence_, effects_, target_lock_directory_fd,
             authorities_.progress, authorities_.sessions,
             authorities_.operation_execution, authorities_.operation_recovery,
-            authorities_.archives, backends.construction.capabilities(),
-            backends.check.capabilities(), backends, nullptr)
+            authorities_.archives, backends, nullptr)
   {
   }
 
@@ -559,21 +549,6 @@ transaction_run_drive_result posix_transaction_run_runtime::drive(
   return state_->drive(std::move(journal), std::move(drive_policy));
 }
 
-[[nodiscard]] pkgexec::backend_capability_profile native_recovery_profile(
-    const pkgexec::backend_capability_profile* retained,
-    pkgexec::execution_backend* current,
-    std::string_view role)
-{
-  if (retained != nullptr)
-    return *retained;
-  if (current != nullptr)
-    return current->capabilities();
-  throw native_transaction_run_runtime_error(
-      native_transaction_run_runtime_error_code::invalid_configuration, 0,
-      "native runtime lacks " + std::string(role) +
-          " recovery profile and current execution backend");
-}
-
 class native_posix_transaction_run_runtime::implementation final {
 public:
   implementation(
@@ -604,14 +579,7 @@ public:
         archives_(authorities.archives != nullptr
                 ? authorities.archives
                 : owned_archives_.get()),
-        construction_recovery_backend_(native_recovery_profile(
-            authorities.construction_recovery_backend,
-            backends.construction, "construction")),
-        check_recovery_backend_(native_recovery_profile(
-            authorities.check_recovery_backend, backends.check, "check")),
-        progress_context_(
-            construction_recovery_backend_, check_recovery_backend_,
-            operations_),
+        progress_context_(operations_),
         progress_(
             configuration_.transaction(), evidence_, effects_,
             progress_context_),
@@ -619,7 +587,6 @@ public:
         engine_(
             runs_, evidence_, effects_, target_lock_directory_fd, progress_,
             sessions_, operations_, operations_, *archives_,
-            construction_recovery_backend_, check_recovery_backend_,
             {backends.construction != nullptr
                     ? *backends.construction
                     : static_cast<pkgexec::execution_backend&>(
@@ -665,8 +632,6 @@ private:
   native_transaction_operation_authority_source operations_;
   std::unique_ptr<explicit_transaction_effect_archive_source> owned_archives_;
   transaction_effect_archive_source* archives_;
-  pkgexec::backend_capability_profile construction_recovery_backend_;
-  pkgexec::backend_capability_profile check_recovery_backend_;
   native_transaction_progress_rehydration_context_source progress_context_;
   stored_transaction_progress_rehydration_source progress_;
   class unavailable_execution_backend final : public pkgexec::execution_backend {

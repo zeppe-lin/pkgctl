@@ -47,7 +47,7 @@ require_dependency_range libpkgcheck-exec '>=0.4.0' '<1.0.0'
 require_dependency_range libpkgresolve '>=3.0.0' '<4.0.0'
 require_dependency_range libpkgtransaction '>=3.0.0' '<4.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
-require_dependency_range libpkgexec '>=2.0.0' '<3.0.0'
+require_dependency_range libpkgexec '>=2.1.0' '<3.0.0'
 require_dependency_range libpkgapply-posix '>=3.1.0' '<4.0.0'
 require_dependency_range libpkgcatalog-codec '>=3.0.0' '<4.0.0'
 require_dependency_range libpkgexec-linux '>=0.6.0' '<1.0.0'
@@ -94,7 +94,7 @@ for contract in \
   'libpkgbuild-plan >= 1.0.0, < 2.0.0' \
   'libpkgimage >= 0.4.0, < 1.0.0' \
   'libpkgplan >= 0.3.0, < 1.0.0' \
-  'libpkgexec >= 2.0.0, < 3.0.0' \
+  'libpkgexec >= 2.1.0, < 3.0.0' \
   'libpkgexec-linux >= 0.6.0, < 1.0.0 (CLI only)' \
   'libpkgapply >= 3.0.0, < 4.0.0' \
   'libpkgapply-posix >= 3.1.0, < 4.0.0' \

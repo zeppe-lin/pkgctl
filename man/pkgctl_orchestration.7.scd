@@ -24,10 +24,12 @@ Catalog acquisition, target-binding, architecture, goal, resolution-policy, and
 convergence options are start-only. Resume accepts the current canonical-store
 pathname as live physical authority while taking its target binding from retained
 state evidence. It does not reacquire collections or substitute current state for
-the historical epoch. Recovery validates historical execution evidence against the
-retained interpreter identity and backend profiles; current interpreter observation,
-live capability, and supervisor-credential preflight are required only for execution
-scopes that can still run. Bytes outside the current private command-evidence format
+the historical epoch. Command evidence retains its admitted backend profiles through
+the libpkgexec owner codec. Construction/check attempt evidence separately retains the
+exact libpkgexec-owned profile body required to decode its historical result, so recovery
+does not query a current backend or inject a command-level recovery profile. Current
+interpreter observation, live capability, and supervisor-credential preflight are
+required only for execution scopes that can still run. Bytes outside the current private command-evidence format
 have no compatibility path.
 
 The command-private effect-body store is both durable sink and restart source.

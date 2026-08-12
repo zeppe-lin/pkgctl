@@ -165,11 +165,10 @@ grep -F 'pkgctl::transaction_run_advance_disposition::quiescent' "$test_source" 
   echo 'package-pipeline does not prove completed-journal quiescence after runtime reopen' >&2
   exit 1
 }
-grep -F 'const auto retained_execution_profile = backend.capabilities()' \
-  "$test_source" >/dev/null || {
-  echo 'package-pipeline does not retain historical execution-profile authority for reopen' >&2
+if grep -F 'retained_execution_profile' "$test_source" >/dev/null 2>&1; then
+  echo 'package-pipeline still injects command-level historical execution-profile authority' >&2
   exit 1
-}
+fi
 grep -F '{nullptr, nullptr, *application.backend, nullptr, store,' \
   "$test_source" >/dev/null || {
   echo 'package-pipeline completed reopen still supplies unused live process backends' >&2

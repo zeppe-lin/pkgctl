@@ -280,8 +280,7 @@ detail::native_construction_recovery_context(
     const transaction_run_journal_record& record,
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
-    const construction_dispatch_evidence_record& evidence,
-    pkgexec::backend_capability_profile backend)
+    const construction_dispatch_evidence_record& evidence)
 {
   if (record.transaction() != evidence.transaction() ||
       progress.transaction().identity() != evidence.transaction())
@@ -309,6 +308,17 @@ detail::native_construction_recovery_context(
     }
   }();
   const auto& request = session.request();
+  auto backend = [&]() {
+    try
+    {
+      return pkgexec::decode_backend_capability_profile(
+          evidence.backend_encoding());
+    }
+    catch (const std::exception& problem)
+    {
+      decode_failed("construction backend profile", problem);
+    }
+  }();
   if (session.identity() != evidence.attempt_session() ||
       request.identity() != evidence.controller_request() ||
       request.transaction().identity() != evidence.transaction() ||
@@ -353,8 +363,7 @@ check_dispatch_recovery_context detail::native_check_recovery_context(
     const transaction_run_journal_record& record,
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
-    const check_dispatch_evidence_record& evidence,
-    pkgexec::backend_capability_profile backend)
+    const check_dispatch_evidence_record& evidence)
 {
   if (record.transaction() != evidence.transaction() ||
       progress.transaction().identity() != evidence.transaction())
@@ -392,6 +401,17 @@ check_dispatch_recovery_context detail::native_check_recovery_context(
   }();
 
   const auto& retained_request = session.request();
+  auto backend = [&]() {
+    try
+    {
+      return pkgexec::decode_backend_capability_profile(
+          evidence.backend_encoding());
+    }
+    catch (const std::exception& problem)
+    {
+      decode_failed("check backend profile", problem);
+    }
+  }();
   if (session.identity() != evidence.attempt_session() ||
       retained_request.identity() != evidence.controller_request() ||
       retained_request.transaction().identity() != evidence.transaction() ||
@@ -414,11 +434,8 @@ check_dispatch_recovery_context detail::native_check_recovery_context(
 
 native_transaction_dispatch_recovery_context_source::
 native_transaction_dispatch_recovery_context_source(
-    pkgexec::backend_capability_profile construction_backend,
-    pkgexec::backend_capability_profile check_backend,
     transaction_operation_recovery_authority_source& operations)
-    : construction_backend_(std::move(construction_backend)),
-      check_backend_(std::move(check_backend)), operations_(operations)
+    : operations_(operations)
 {
 }
 
@@ -431,8 +448,7 @@ native_transaction_dispatch_recovery_context_source::construction(
 {
   const auto& attempt = require_attempt(assessment);
   auto context = detail::native_construction_recovery_context(
-      checkpoint.record(), checkpoint.run().progress(), dispatch, evidence,
-      construction_backend_);
+      checkpoint.record(), checkpoint.run().progress(), dispatch, evidence);
   if (context.session.identity() != attempt)
     context_mismatch(
         "native construction context differs from restart assessment");
@@ -448,8 +464,7 @@ native_transaction_dispatch_recovery_context_source::check(
 {
   const auto& attempt = require_attempt(assessment);
   auto context = detail::native_check_recovery_context(
-      checkpoint.record(), checkpoint.run().progress(), dispatch, evidence,
-      check_backend_);
+      checkpoint.record(), checkpoint.run().progress(), dispatch, evidence);
   if (context.session.identity() != attempt)
     context_mismatch("native check context differs from restart assessment");
   return context;

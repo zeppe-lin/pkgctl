@@ -2697,7 +2697,6 @@ void check_native_runtime_package_pipeline()
   recording_effect_body_store effect_bodies;
   refusing_installed_package_source installed_packages;
   pipeline_backend backend;
-  const auto retained_execution_profile = backend.capabilities();
 
   const fs::path authority_root = root / "runtime-authority";
   const auto sessions = configuration(authority_root / "construction");
@@ -2786,8 +2785,7 @@ void check_native_runtime_package_pipeline()
        application.lock_root},
       make_runtime_configuration(),
       {installed_packages, operations, effect_bodies, &operations,
-       &effect_bodies, &operations, &retained_execution_profile,
-       &retained_execution_profile},
+       &effect_bodies, &operations},
       {nullptr, nullptr, *application.backend, nullptr, store,
        archive_backend});
   const auto reopened = runtime->drive(

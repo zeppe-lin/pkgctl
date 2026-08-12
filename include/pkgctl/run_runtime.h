@@ -169,13 +169,12 @@ private:
 
 /*! \brief Live semantic owners bound into one native composition root.
  *
- * Optional construction/check recovery profiles are historical evidence
- * authority.  When absent, the selected live backend profile is used, which is
- * suitable for a fresh runtime that has not crossed execution contexts.  A
- * durable command may supply retained profiles so old evidence can be decoded
- * without pretending the current backend already owns execution authority. The
- * operation-session store is historical session authority once an operation
- * starts; the live operation-specification source remains fresh-dispatch only.
+ * Construction/check backend profiles needed for recovery are retained with
+ * their durable evidence and decoded by libpkgexec. They are therefore absent
+ * here: current backends are execution mechanisms, not historical decode
+ * authority. The operation-session store is historical session authority once
+ * an operation starts; the live operation-specification source remains
+ * fresh-dispatch only.
  */
 struct native_transaction_run_runtime_authorities final {
   retained_installed_package_tree_source& installed_packages;
@@ -184,16 +183,14 @@ struct native_transaction_run_runtime_authorities final {
   transaction_effect_archive_source* archives = nullptr;
   transaction_effect_body_sink* effect_bodies = nullptr;
   transaction_operation_session_store* operation_sessions = nullptr;
-  const pkgexec::backend_capability_profile* construction_recovery_backend = nullptr;
-  const pkgexec::backend_capability_profile* check_recovery_backend = nullptr;
 };
 
 /*! \brief Explicit selected physical mechanisms for one native runtime.
  *
  * Process backends are nullable because durable recovery may prove that no
- * current process execution can occur.  A null process backend is not
- * historical authority and cannot execute; retained recovery profiles belong
- * to native_transaction_run_runtime_authorities instead.
+ * current process execution can occur. A null process backend is not
+ * historical authority and cannot execute; retained construction/check
+ * evidence remains independently decodable without one.
  */
 struct native_transaction_run_runtime_backends final {
   pkgexec::execution_backend* construction;

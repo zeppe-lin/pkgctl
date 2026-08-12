@@ -20,14 +20,12 @@ native_construction_recovery_context(
     const transaction_run_journal_record& record,
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
-    const construction_dispatch_evidence_record& evidence,
-    pkgexec::backend_capability_profile backend);
+    const construction_dispatch_evidence_record& evidence);
 
 [[nodiscard]] check_dispatch_recovery_context native_check_recovery_context(
     const transaction_run_journal_record& record,
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
-    const check_dispatch_evidence_record& evidence,
-    pkgexec::backend_capability_profile backend);
+    const check_dispatch_evidence_record& evidence);
 
 } // namespace pkgctl::detail

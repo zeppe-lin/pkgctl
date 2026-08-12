@@ -31,9 +31,12 @@
 - Uses one current fail-closed private command-evidence proof format. Before run
   admission it retains the complete start-only
   transaction inputs, the exact admitted interpreter identity, the exact admitted
-  construction/check/lifecycle backend capability profiles, and the original
-  owner-encoded catalog and canonical-state snapshots. Resume supplies only the
-  current canonical-store pathname plus live runtime/actuator authority; retained
+  construction/check/lifecycle backend capability profiles through the canonical
+  libpkgexec owner encoding, and the original owner-encoded catalog and canonical-state
+  snapshots. Each durable construction/check attempt also retains the exact owner-encoded
+  backend profile required by its historical result decoder; recovery does not query a
+  current execution backend or inject a command-level recovery profile. Resume supplies
+  only the current canonical-store pathname plus live runtime/actuator authority; retained
   state supplies target binding and retained transaction semantics recompose the same
   transaction identity. Historical execution evidence is validated against retained
   profiles, while current interpreter/backend/credential preflight is required only
@@ -226,7 +229,7 @@ Current 0.35.0 source accepts exactly these direct dependency generations:
 - libpkgbuild-plan >= 1.0.0, < 2.0.0
 - libpkgimage >= 0.4.0, < 1.0.0
 - libpkgplan >= 0.3.0, < 1.0.0
-- libpkgexec >= 2.0.0, < 3.0.0
+- libpkgexec >= 2.1.0, < 3.0.0
 - libpkgexec-linux >= 0.6.0, < 1.0.0 (CLI only)
 - libpkgapply >= 3.0.0, < 4.0.0
 - libpkgapply-posix >= 3.1.0, < 4.0.0

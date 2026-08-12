@@ -122,7 +122,7 @@ libpkgplan_dep = dependency(
 )
 libpkgexec_dep = dependency(
   'libpkgexec',
-  version: ['>=2.0.0', '<3.0.0'],
+  version: ['>=2.1.0', '<3.0.0'],
   required: true,
   static: want_static,
 )

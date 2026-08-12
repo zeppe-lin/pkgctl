@@ -37,9 +37,12 @@ authority. Interrupted applications are reopened through the direct
 collections, asks the operator to restate transaction semantics, substitutes
 current state for historical state, scans for journals, or silently replans. Private command evidence has one current admitted format. Bytes that do not
 belong to that format are rejected rather than interpreted through a compatibility
-path. Resume uses the retained interpreter identity and backend profiles to validate
-historical execution evidence. Current interpreter observation, backend capability, and supervisor-credential
-preflight are required only for construction, check, or lifecycle work that can still
+path. Command evidence uses libpkgexec-owned backend-profile encodings for the
+admitted construction/check/lifecycle profiles. Historical construction/check result
+evidence retains the exact owner-encoded profile body with each durable attempt and
+decodes it without consulting a current backend or injecting a command-level recovery
+profile. Current interpreter observation, backend capability, and supervisor-credential
+preflight are execute-now authority required only for construction, check, or lifecycle work that can still
 execute; an operation-only, completed, or already externally blocked run does not
 reacquire unused execute-now process authority merely to explain durable history. The
 retained interpreter identity is historical evidence authority, not an observation that the old pathname still exists.

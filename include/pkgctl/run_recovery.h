@@ -79,17 +79,15 @@ public:
  * restart likewise decodes the exact controller-owned check session retained
  * with the durable attempt and validates it against the retained progress/check
  * request. Execution requests are reproduced through the pure build/check
- * projections, and exact historical
- * backend capability profiles are supplied as retained evidence authority. A
- * live execution backend is unnecessary merely to decode old evidence.
+ * projections, while exact historical backend capability profiles are decoded
+ * from libpkgexec-owned bytes retained in the durable attempt. A live
+ * execution backend is unnecessary merely to decode old evidence.
  * Operation recovery is delegated to its effect-journal owner.
  */
 class native_transaction_dispatch_recovery_context_source final
     : public transaction_dispatch_recovery_context_source {
 public:
   native_transaction_dispatch_recovery_context_source(
-      pkgexec::backend_capability_profile construction_backend,
-      pkgexec::backend_capability_profile check_backend,
       transaction_operation_recovery_authority_source& operations);
 
   [[nodiscard]] construction_dispatch_recovery_context construction(
@@ -110,8 +108,6 @@ public:
       const transaction_dispatch& dispatch) override;
 
 private:
-  pkgexec::backend_capability_profile construction_backend_;
-  pkgexec::backend_capability_profile check_backend_;
   transaction_operation_recovery_authority_source& operations_;
 };
 

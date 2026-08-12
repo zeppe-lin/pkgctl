@@ -168,10 +168,12 @@ usage error. Bytes outside the one current private command-evidence format fail
 closed; there is no compatibility decoder or migration path. An already admitted
 run is refused by start; a missing run is refused by resume.
 
-Historical execution evidence is decoded against the retained interpreter identity and
-backend profiles, never by re-observing the old interpreter pathname or substituting
-whatever capability profile a live backend happens to expose during resume. Current
-interpreter observation, the live backend report, and supervisor credentials are
+The command envelope retains its admitted construction/check/lifecycle profiles using
+the canonical libpkgexec owner encoding. Historical construction/check attempt evidence
+also retains the exact libpkgexec-owned backend-profile body beside the subordinate
+result encoding, so rehydration decodes that body directly instead of re-observing the
+old interpreter pathname, querying a live backend, or injecting a command-level recovery
+profile. Current interpreter observation, the live backend report, and supervisor credentials are
 execute-now authority: resume preflights them only for construction/check/lifecycle
 scopes that can still run. Completed, failed/stopped, and already externally blocked
 durable states therefore reopen without proving capabilities for actuators they cannot
@@ -181,8 +183,9 @@ match the current supervisor. Conversely, once construction has completed and on
 application/publication work remains, the interpreter coordinate is outside the live
 scope and must not be re-observed merely because it was part of historical execution
 authority. The native composition root represents absent current
-process authority as null construction/check/lifecycle backends; retained profiles stay
-on the recovery-authority side and are never wrapped as executable backend objects.
+process authority as null construction/check/lifecycle backends; historical
+construction/check profiles stay inside their durable attempt evidence and are never
+wrapped as executable backend objects.
 
 Construction/check execution and lifecycle execution remain separate command
 authority domains. The CLI therefore accepts distinct existing root views and

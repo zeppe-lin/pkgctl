@@ -168,14 +168,19 @@ architecture, goals, resolution preference, and convergence policy; explicit
 re-declaration is a usage error. The canonical-store pathname remains live physical
 authority on resume, but its target binding comes from retained state evidence. Do not
 add a compatibility decoder or migration path: bytes outside the current private
-format are not authority and must fail closed. Historical execution evidence must be
-decoded against retained interpreter/profile authority, never a freshly probed
-substitute. Treat current interpreter observation, capability reports, and
+format are not authority and must fail closed. Encode backend capability profiles only
+through libpkgexec's owner codec. Construction/check attempt evidence must retain the
+exact owner-encoded profile body needed to decode historical results; never substitute a
+freshly probed backend profile or a command-level recovery injection. Command evidence
+may retain the admitted owner-encoded profiles for execute-now comparison and the
+command-owned lifecycle effect-body decoder. Treat current
+interpreter observation, capability reports, and
 current-supervisor credential equality as execute-now authority: require them only for
 scopes that durable progress/recovery can still invoke. Retained interpreter identity
 is historical evidence authority only; do not use it to claim that a pathname is
 currently resolvable or executable. Do not wrap retained profiles in an execution-
-backend adapter merely to satisfy composition types; absence of current process
+backend adapter merely to satisfy composition types and do not duplicate libpkgexec's
+profile serialization inside pkgctl; absence of current process
 authority is represented by null native process backends. A completed or externally
 blocked run must not be made unrecoverable merely because an unused actuator is no
 longer executable in the current process context. Keep both sides process-qualified:

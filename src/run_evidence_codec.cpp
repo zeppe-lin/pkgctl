@@ -259,6 +259,7 @@ session_identity construction_record_identity(
     const pkgbuild::build_request_identity& build_request,
     const pkgexec::execution_request_identity& execution_request,
     const pkgexec::backend_capability_profile_identity& backend,
+    const pkgexec::backend_capability_profile_encoding& backend_encoding,
     const pkgexec::execution_evidence_identity& execution,
     const pkgbuild::build_result_identity& build,
     const pkgbuild_exec::build_execution_result_encoding& encoding)
@@ -270,7 +271,8 @@ session_identity construction_record_identity(
        encoding_digest(session_encoding), materialization.hex(),
        encoding_digest(materialization_encoding),
        build_request.hex(), execution_request.hex(), backend.hex(),
-       execution.hex(), build.hex(), encoding_digest(encoding)});
+       encoding_digest(backend_encoding), execution.hex(), build.hex(),
+       encoding_digest(encoding)});
 }
 
 session_identity check_record_identity(
@@ -286,6 +288,7 @@ session_identity check_record_identity(
     const pkgcheck::check_request_identity& check_request,
     const pkgexec::execution_request_identity& execution_request,
     const pkgexec::backend_capability_profile_identity& backend,
+    const pkgexec::backend_capability_profile_encoding& backend_encoding,
     const pkgexec::execution_evidence_identity& execution,
     const pkgcheck::check_result_identity& check,
     const pkgcheck_exec::check_execution_result_encoding& encoding)
@@ -296,7 +299,8 @@ session_identity check_record_identity(
        attempt_session.hex(), result.hex(), controller_request.hex(),
        construction.hex(), encoding_digest(session_encoding),
        check_request.hex(), execution_request.hex(),
-       backend.hex(), execution.hex(), check.hex(), encoding_digest(encoding)});
+       backend.hex(), encoding_digest(backend_encoding), execution.hex(),
+       check.hex(), encoding_digest(encoding)});
 }
 
 } // namespace
@@ -317,6 +321,7 @@ struct detail_run_evidence_codec_access final {
       pkgbuild::build_request_identity build_request,
       pkgexec::execution_request_identity execution_request,
       pkgexec::backend_capability_profile_identity backend,
+      pkgexec::backend_capability_profile_encoding backend_encoding,
       pkgexec::execution_evidence_identity execution,
       pkgbuild::build_result_identity build,
       pkgbuild_exec::build_execution_result_encoding encoding)
@@ -328,7 +333,7 @@ struct detail_run_evidence_codec_access final {
         std::move(session_encoding), std::move(materialization),
         std::move(materialization_encoding),
         std::move(build_request), std::move(execution_request),
-        std::move(backend),
+        std::move(backend), std::move(backend_encoding),
         std::move(execution), std::move(build), std::move(encoding));
   }
 
@@ -346,6 +351,7 @@ struct detail_run_evidence_codec_access final {
       pkgcheck::check_request_identity check_request,
       pkgexec::execution_request_identity execution_request,
       pkgexec::backend_capability_profile_identity backend,
+      pkgexec::backend_capability_profile_encoding backend_encoding,
       pkgexec::execution_evidence_identity execution,
       pkgcheck::check_result_identity check,
       pkgcheck_exec::check_execution_result_encoding encoding)
@@ -357,6 +363,7 @@ struct detail_run_evidence_codec_access final {
         std::move(construction), std::move(session_encoding),
         std::move(check_request),
         std::move(execution_request), std::move(backend),
+        std::move(backend_encoding),
         std::move(execution), std::move(check), std::move(encoding));
   }
 };
@@ -370,7 +377,8 @@ transaction_run_evidence_encoding encode_construction_dispatch_evidence(
       record.session_encoding(), record.materialization(),
       record.materialization_encoding(),
       record.build_request(), record.execution_request(), record.backend(),
-      record.execution(), record.build(), record.encoding());
+      record.backend_encoding(), record.execution(), record.build(),
+      record.encoding());
   if (record.schema_version() != transaction_run_evidence_schema_version ||
       record.identity() != expected)
   {
@@ -396,6 +404,7 @@ transaction_run_evidence_encoding encode_construction_dispatch_evidence(
   output.identity(record.build_request().hex());
   output.identity(record.execution_request().hex());
   output.identity(record.backend().hex());
+  output.bytes(record.backend_encoding());
   output.identity(record.execution().hex());
   output.identity(record.build().hex());
   output.bytes(record.encoding());
@@ -429,6 +438,8 @@ construction_dispatch_evidence_record decode_construction_dispatch_evidence(
       input.identity());
   auto backend = pkgexec::backend_capability_profile_identity::from_sha256(
       input.identity());
+  auto backend_encoding = input.bytes(
+      pkgexec::maximum_backend_capability_profile_encoding_size);
   auto execution = pkgexec::execution_evidence_identity::from_sha256(
       input.identity());
   auto build = pkgbuild::build_result_identity::from_sha256(input.identity());
@@ -439,7 +450,7 @@ construction_dispatch_evidence_record decode_construction_dispatch_evidence(
   auto expected = construction_record_identity(
       journal, transaction, dispatch, node, attempt, result, request,
       session_encoding, materialization, materialization_encoding, build_request,
-      execution_request, backend, execution, build, nested);
+      execution_request, backend, backend_encoding, execution, build, nested);
   if (retained_identity != expected)
     corrupt("construction evidence record identity mismatch");
 
@@ -450,7 +461,8 @@ construction_dispatch_evidence_record decode_construction_dispatch_evidence(
       std::move(session_encoding), std::move(materialization),
       std::move(materialization_encoding),
       std::move(build_request), std::move(execution_request),
-      std::move(backend), std::move(execution), std::move(build),
+      std::move(backend), std::move(backend_encoding), std::move(execution),
+      std::move(build),
       std::move(nested));
   if (encode_construction_dispatch_evidence(record) != encoding)
     corrupt("construction evidence encoding is not canonical");
@@ -465,7 +477,8 @@ transaction_run_evidence_encoding encode_check_dispatch_evidence(
       record.attempt_session(), record.result(), record.controller_request(),
       record.construction(), record.session_encoding(), record.check_request(),
       record.execution_request(),
-      record.backend(), record.execution(), record.check(), record.encoding());
+      record.backend(), record.backend_encoding(), record.execution(),
+      record.check(), record.encoding());
   if (record.schema_version() != transaction_run_evidence_schema_version ||
       record.identity() != expected)
   {
@@ -490,6 +503,7 @@ transaction_run_evidence_encoding encode_check_dispatch_evidence(
   output.identity(record.check_request().hex());
   output.identity(record.execution_request().hex());
   output.identity(record.backend().hex());
+  output.bytes(record.backend_encoding());
   output.identity(record.execution().hex());
   output.identity(record.check().hex());
   output.bytes(record.encoding());
@@ -520,6 +534,8 @@ check_dispatch_evidence_record decode_check_dispatch_evidence(
       input.identity());
   auto backend = pkgexec::backend_capability_profile_identity::from_sha256(
       input.identity());
+  auto backend_encoding = input.bytes(
+      pkgexec::maximum_backend_capability_profile_encoding_size);
   auto execution = pkgexec::execution_evidence_identity::from_sha256(
       input.identity());
   auto check = pkgcheck::check_result_identity::from_sha256(input.identity());
@@ -529,8 +545,8 @@ check_dispatch_evidence_record decode_check_dispatch_evidence(
 
   auto expected = check_record_identity(
       journal, transaction, dispatch, node, attempt, result, request,
-      construction, session_encoding, check_request, execution_request, backend, execution,
-      check, nested);
+      construction, session_encoding, check_request, execution_request, backend,
+      backend_encoding, execution, check, nested);
   if (retained_identity != expected)
     corrupt("check evidence record identity mismatch");
 
@@ -541,6 +557,7 @@ check_dispatch_evidence_record decode_check_dispatch_evidence(
       std::move(construction), std::move(session_encoding),
       std::move(check_request),
       std::move(execution_request), std::move(backend),
+      std::move(backend_encoding),
       std::move(execution), std::move(check), std::move(nested));
   if (encode_check_dispatch_evidence(record) != encoding)
     corrupt("check evidence encoding is not canonical");

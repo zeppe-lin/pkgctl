@@ -53,12 +53,10 @@ for required in \
   'current_execution_backend.get()' \
   'require_native_execution_credentials(' \
   'current interpreter differs from admitted run authority' \
-  'append_backend_profile' \
-  'read_backend_profile' \
   'resume_native_execution_scopes(' \
   'admitted_execution_profiles.lifecycle' \
-  '&admitted_execution_profiles.construction' \
-  '&admitted_execution_profiles.check' \
+  'pkgexec::encode_backend_capability_profile(' \
+  'pkgexec::decode_backend_capability_profile(' \
   'append_transaction_request_inputs' \
   'read_transaction_request_inputs' \
   'command_evidence.load(command.nonce, command.canonical_store)' \
@@ -300,6 +298,18 @@ for sanitizer_order_contract in \
     echo "credential-context runner omits sanitizer-safe preload ordering: $sanitizer_order_contract" >&2
     exit 1
   }
+done
+
+
+for forbidden_profile_codec in \
+  'append_backend_profile' \
+  'read_backend_profile' \
+  'execution_guarantee_tag(' \
+  'read_execution_guarantee('; do
+  if grep -F -- "$forbidden_profile_codec" "$command" >/dev/null 2>&1; then
+    echo "run command duplicates libpkgexec backend-profile codec: $forbidden_profile_codec" >&2
+    exit 1
+  fi
 done
 
 preflight_line=$(grep -n -F 'require_native_execution_preflight(' \

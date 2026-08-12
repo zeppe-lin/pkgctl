@@ -322,96 +322,6 @@ void append_bytes(
     std::size_t& offset,
     std::string_view description);
 
-[[nodiscard]] std::uint64_t execution_guarantee_tag(
-    pkgexec::execution_guarantee guarantee)
-{
-  switch (guarantee)
-  {
-    case pkgexec::execution_guarantee::exact_interpreter: return 1U;
-    case pkgexec::execution_guarantee::closed_environment: return 2U;
-    case pkgexec::execution_guarantee::root_view: return 3U;
-    case pkgexec::execution_guarantee::read_only_resources: return 4U;
-    case pkgexec::execution_guarantee::writable_resources: return 5U;
-    case pkgexec::execution_guarantee::fixed_credentials: return 6U;
-    case pkgexec::execution_guarantee::network_denied: return 7U;
-    case pkgexec::execution_guarantee::loopback_isolated: return 8U;
-    case pkgexec::execution_guarantee::resource_limits: return 9U;
-    case pkgexec::execution_guarantee::cancellation: return 10U;
-    case pkgexec::execution_guarantee::complete_stdout_capture: return 11U;
-    case pkgexec::execution_guarantee::complete_stderr_capture: return 12U;
-    case pkgexec::execution_guarantee::cleanup_verified: return 13U;
-    case pkgexec::execution_guarantee::cpu_time_limit: return 14U;
-    case pkgexec::execution_guarantee::address_space_limit: return 15U;
-    case pkgexec::execution_guarantee::file_size_limit: return 16U;
-    case pkgexec::execution_guarantee::open_files_limit: return 17U;
-    case pkgexec::execution_guarantee::process_count_limit: return 18U;
-  }
-  throw std::runtime_error(
-      "retained backend profile has an unknown execution guarantee");
-}
-
-[[nodiscard]] pkgexec::execution_guarantee read_execution_guarantee(
-    const std::vector<std::uint8_t>& bytes,
-    std::size_t& offset)
-{
-  switch (read_u64(bytes, offset))
-  {
-    case 1U: return pkgexec::execution_guarantee::exact_interpreter;
-    case 2U: return pkgexec::execution_guarantee::closed_environment;
-    case 3U: return pkgexec::execution_guarantee::root_view;
-    case 4U: return pkgexec::execution_guarantee::read_only_resources;
-    case 5U: return pkgexec::execution_guarantee::writable_resources;
-    case 6U: return pkgexec::execution_guarantee::fixed_credentials;
-    case 7U: return pkgexec::execution_guarantee::network_denied;
-    case 8U: return pkgexec::execution_guarantee::loopback_isolated;
-    case 9U: return pkgexec::execution_guarantee::resource_limits;
-    case 10U: return pkgexec::execution_guarantee::cancellation;
-    case 11U: return pkgexec::execution_guarantee::complete_stdout_capture;
-    case 12U: return pkgexec::execution_guarantee::complete_stderr_capture;
-    case 13U: return pkgexec::execution_guarantee::cleanup_verified;
-    case 14U: return pkgexec::execution_guarantee::cpu_time_limit;
-    case 15U: return pkgexec::execution_guarantee::address_space_limit;
-    case 16U: return pkgexec::execution_guarantee::file_size_limit;
-    case 17U: return pkgexec::execution_guarantee::open_files_limit;
-    case 18U: return pkgexec::execution_guarantee::process_count_limit;
-    default:
-      throw std::runtime_error(
-          "private run execution-guarantee tag is invalid");
-  }
-}
-
-void append_backend_profile(
-    std::vector<std::uint8_t>& output,
-    const pkgexec::backend_capability_profile& profile)
-{
-  append_text(output, profile.backend().hex());
-  append_u64(output, profile.guarantees().size());
-  for (const auto guarantee : profile.guarantees())
-    append_u64(output, execution_guarantee_tag(guarantee));
-  append_text(output, profile.identity().hex());
-}
-
-[[nodiscard]] pkgexec::backend_capability_profile read_backend_profile(
-    const std::vector<std::uint8_t>& bytes,
-    std::size_t& offset)
-{
-  auto backend = pkgexec::backend_identity::from_sha256(read_text(bytes, offset));
-  const auto count = read_count(bytes, offset, "backend guarantee");
-  std::vector<pkgexec::execution_guarantee> guarantees;
-  guarantees.reserve(count);
-  for (std::size_t index = 0U; index < count; ++index)
-    guarantees.push_back(read_execution_guarantee(bytes, offset));
-  auto profile = pkgexec::backend_capability_profile::seal(
-      std::move(backend), std::move(guarantees));
-  const auto retained_identity =
-      pkgexec::backend_capability_profile_identity::from_sha256(
-          read_text(bytes, offset));
-  if (profile.identity() != retained_identity)
-    throw std::runtime_error(
-        "private run backend profile identity is invalid");
-  return profile;
-}
-
 void append_command_optional_text(
     std::vector<std::uint8_t>& output,
     const std::optional<std::string>& value)
@@ -759,9 +669,12 @@ public:
     append_bytes(bytes, state);
     append_bytes(bytes, request);
     append_text(bytes, interpreter.hex());
-    append_backend_profile(bytes, execution_profiles.construction);
-    append_backend_profile(bytes, execution_profiles.check);
-    append_backend_profile(bytes, execution_profiles.lifecycle);
+    append_bytes(bytes, pkgexec::encode_backend_capability_profile(
+        execution_profiles.construction));
+    append_bytes(bytes, pkgexec::encode_backend_capability_profile(
+        execution_profiles.check));
+    append_bytes(bytes, pkgexec::encode_backend_capability_profile(
+        execution_profiles.lifecycle));
     append_text(bytes, checksum(command_evidence_checksum_domain, bytes));
     retain_immutable(
         directory_.get(), name(nonce), bytes, "command-evidence");
@@ -781,9 +694,13 @@ public:
     const auto request_encoding = read_bytes(bytes, offset);
     auto interpreter = pkgexec::interpreter_identity::from_sha256(
         read_text(bytes, offset));
+    const auto construction_profile_encoding = read_bytes(bytes, offset);
+    const auto check_profile_encoding = read_bytes(bytes, offset);
+    const auto lifecycle_profile_encoding = read_bytes(bytes, offset);
     retained_native_execution_profiles execution_profiles{
-        read_backend_profile(bytes, offset), read_backend_profile(bytes, offset),
-        read_backend_profile(bytes, offset)};
+        pkgexec::decode_backend_capability_profile(construction_profile_encoding),
+        pkgexec::decode_backend_capability_profile(check_profile_encoding),
+        pkgexec::decode_backend_capability_profile(lifecycle_profile_encoding)};
     const auto checksum_offset = offset;
     const auto expected_checksum = read_text(bytes, offset);
     if (offset != bytes.size())
@@ -2465,9 +2382,7 @@ int execute_transaction_run(transaction_run_command command)
       run_store.get(), evidence_store.get(), effect_store.get(),
       target_locks.get(), std::move(configuration),
       {installed_packages, operation_authority, effect_bodies,
-       &operation_authority, &effect_bodies, &operation_authority,
-       &admitted_execution_profiles.construction,
-       &admitted_execution_profiles.check},
+       &operation_authority, &effect_bodies, &operation_authority},
       {current_execution_backend.get(), current_execution_backend.get(),
        *application_backend, current_execution_backend.get(), state_store,
        archive_backend});
