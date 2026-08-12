@@ -123,7 +123,7 @@ struct continuation_runtime final {
   continuation_runtime(
       std::unique_ptr<pkgapply::posix::target_mutation_lease> lease_value,
       pkgstate::apply_adapter::lease_bound_application_state state_value,
-      std::optional<pkgstate::apply_adapter::lease_bound_application_state>
+      std::optional<pkgapply::lease_bound_state_projection>
           publication_state_value,
       std::unique_ptr<pkgimage::package_archive> archive_value,
       pkgapply::application_backend& application_value,
@@ -138,8 +138,7 @@ struct continuation_runtime final {
 
   std::unique_ptr<pkgapply::posix::target_mutation_lease> lease;
   pkgstate::apply_adapter::lease_bound_application_state state;
-  std::optional<pkgstate::apply_adapter::lease_bound_application_state>
-      publication_state;
+  std::optional<pkgapply::lease_bound_state_projection> publication_state;
   std::unique_ptr<pkgimage::package_archive> archive;
   pkgapply::application_backend& application;
   pkgexec::execution_backend& lifecycle;
@@ -154,8 +153,7 @@ public:
             runtime_->state.projection(), *runtime_->lease,
             runtime_->application, runtime_->archive.get(),
             runtime_->lifecycle, runtime_->store,
-            runtime_->publication_state
-                ? &runtime_->publication_state->projection() : nullptr)
+            runtime_->publication_state ? &*runtime_->publication_state : nullptr)
   {
   }
 
@@ -363,14 +361,9 @@ public:
     auto lease = acquire_target_lease(request.target(), lock_directory_fd_);
     auto state = pkgstate::apply_adapter::read_application_state(
         request, *lease, state_store_);
-    std::optional<pkgstate::apply_adapter::lease_bound_application_state>
-        publication_state;
+    std::optional<pkgapply::lease_bound_state_projection> publication_state;
     if (historical != nullptr)
-    {
-      publication_state =
-          pkgstate::apply_adapter::read_historical_application_state(
-              request, *historical, *lease, state_store_);
-    }
+      publication_state = historical->admitted_state_projection();
     return std::make_shared<continuation_runtime>(
         std::move(lease), std::move(state), std::move(publication_state),
         std::move(archive), application_backend_, lifecycle_backend_,

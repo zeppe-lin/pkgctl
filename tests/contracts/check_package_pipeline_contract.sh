@@ -176,6 +176,19 @@ grep -F '{nullptr, nullptr, *application.backend, nullptr, store,' \
   exit 1
 }
 
+grep -F 'header().admitted_state_projection()' "$test_source" >/dev/null || {
+  echo 'package-pipeline restart does not consume journal-owned historical projection evidence' >&2
+  exit 1
+}
+grep -F 'resumed_upgrade_projection.projection().identity() !=' "$test_source" >/dev/null || {
+  echo 'package-pipeline restart does not distinguish current projection from historical evidence' >&2
+  exit 1
+}
+if grep -F 'read_historical_application_state' "$test_source" >/dev/null 2>&1; then
+  echo 'package-pipeline resurrected historical projection from current canonical state' >&2
+  exit 1
+fi
+
 if grep -R -F 'libpkgreconcile' "$srcdir/meson.build" "$srcdir/src" >/dev/null 2>&1; then
   echo 'reconciliation qualification leaked into pkgctl production dependencies' >&2
   exit 1

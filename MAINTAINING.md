@@ -529,3 +529,10 @@ legacy behavior.
 6. update release metadata and manuals together;
 7. compare independently replayed trees and stable patch IDs;
 8. tag signed releases only from a clean tree.
+
+Historical evidence rule:
+
+- application restart must consume the exact admitted state-projection body from
+  the durable libpkgapply journal; a current canonical-state observation may
+  validate present pre-state but must never regenerate historical projection
+  evidence from an old lease identity.

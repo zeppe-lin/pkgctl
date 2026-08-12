@@ -32,7 +32,7 @@ for required in \
   'transaction_effect_authority_unavailable' \
   'target_mutation_lease_error_code::lock_busy' \
   'pkgstate::apply_adapter::read_application_state' \
-  'pkgstate::apply_adapter::read_historical_application_state' \
+  'historical->admitted_state_projection()' \
   'native_transaction_effect_driver' \
   'native_transaction_effect_publication_driver' \
   'archive_image_mismatch' \
@@ -147,6 +147,14 @@ for required_doc in \
     exit 1
   }
 done
+
+if grep -R -F 'read_historical_application_state' \
+    "$srcdir/src" "$srcdir/tests/integration" "$srcdir/tests/unit" \
+    >/dev/null 2>&1; then
+  echo 'native recovery reconstructs historical application state from current truth' \
+    >&2
+  exit 1
+fi
 
 for forbidden in \
   'std::thread' \
