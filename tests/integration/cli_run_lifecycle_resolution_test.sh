@@ -299,6 +299,35 @@ capture_command_as()
   unset supervisor_uid supervisor_gid
 }
 
+capture_native_start_or_skip()
+{
+  name=$1
+  nonce=$2
+  maximum_steps=$3
+  stdout_file=$case_root/$name.out
+  stderr_file=$case_root/$name.err
+  set +e
+  run_command --start "$nonce" "$maximum_steps" \
+    >"$stdout_file" 2>"$stderr_file"
+  status=$?
+  set -e
+  if [ "$status" -eq 0 ]; then
+    return
+  fi
+  if grep -F -- 'native execution unavailable before transaction execution;' \
+      "$stderr_file" >/dev/null; then
+    if [ "${PKGCTL_REQUIRE_NATIVE_INTEGRATION:-0}" = 1 ]; then
+      dump_file "$case_name/$name stdout" "$stdout_file"
+      dump_file "$case_name/$name stderr" "$stderr_file"
+      fail 'release qualification requires the privileged native CLI integration path'
+    fi
+    exit 77
+  fi
+  dump_file "$case_name/$name stdout" "$stdout_file"
+  dump_file "$case_name/$name stderr" "$stderr_file"
+  fail "$case_name/$name: expected status 0, got $status"
+}
+
 capture_resume()
 {
   name=$1
@@ -389,7 +418,7 @@ qualify_live_execution_authority()
   require_absent live-authority-target "$target/usr/bin/pkgctl-fixture"
 
   run_nonce=$(printf '%064d' 7)
-  capture_command start 0 --start "$run_nonce" 1
+  capture_native_start_or_skip start "$run_nonce" 1
   require_contains live-authority-start "$case_root/start.out" \
     'disposition step-limit-reached'
   require_contains live-authority-start "$case_root/start.out" 'durable-steps 1'

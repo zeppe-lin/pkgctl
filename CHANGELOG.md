@@ -5,6 +5,10 @@
   The lifecycle-resolution campaign now proves wrong interpreter and lifecycle credentials
   are refused before advancement, while the simple install campaign proves operation-only
   resume ignores an unrelated interpreter coordinate after construction has completed.
+- Keeps that lifecycle authority campaign capability-gated when the full test set is
+  run without privileged native execution. Its live-work setup now treats native preflight
+  unavailability exactly like the other privileged verticals: skip in development runs,
+  fail loudly when `PKGCTL_REQUIRE_NATIVE_INTEGRATION=1`.
 
 ### Bounded native transaction command
 

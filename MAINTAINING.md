@@ -181,8 +181,11 @@ blocked run must not be made unrecoverable merely because an unused actuator is 
 longer executable in the current process context. Keep both sides process-qualified:
 remaining lifecycle process work must reject a changed supervisor, while operation-only,
 completed, and retained outer-lease-loss runs must not demand process authority they
-cannot exercise. Completed and retained outer-lease-loss runs must reopen under that
-changed supervisor without journal advancement. The privileged credential-context
+cannot exercise. The privileged live-work setup must capability-gate its own fresh native
+start before making those assertions; do not rely on a later subcase to return 77, because
+Meson runs suite-tagged tests in the default test set unless explicitly filtered. Completed
+and retained outer-lease-loss runs must reopen under that changed supervisor without
+journal advancement. The privileged credential-context
 fixture must perform the uid/gid transition only after the dynamic loader has mapped
 the build-tree CLI dependency closure. A pre-exec credential drop accidentally tests pathname accessibility of the
 developer build root and is not valid execution-authority qualification. Do not break

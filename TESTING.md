@@ -79,11 +79,13 @@ The final command suite must prove:
   masqueraded as a current executable mechanism;
 - resume with remaining executable lifecycle work rejects a current interpreter whose
   exact inspected identity differs from the one retained at admission and leaves the run
-  head unchanged; the same live-work case rejects changed lifecycle supervisor credentials;
-  an operation-only resume after construction deliberately completes with an unrelated
-  interpreter pathname because no process authority remains to exercise; completed and
-  externally blocked resumes are separately exercised under a supervisor that cannot
-  traverse the original build-tree interpreter pathname;
+  head unchanged; the same live-work case rejects changed lifecycle supervisor credentials.
+  That setup is itself capability-gated: an unprivileged host that cannot establish the
+  native execution guarantees returns Meson's skip status unless release qualification is
+  explicitly required. An operation-only resume after construction deliberately completes
+  with an unrelated interpreter pathname because no process authority remains to exercise;
+  completed and externally blocked resumes are separately exercised under a supervisor that
+  cannot traverse the original build-tree interpreter pathname;
 - effect bodies are durably retained through owner codecs before journal records
   name them, interrupted application recovery uses direct active-request lookup
   rather than enumeration, and later application/terminal replay does not feed
@@ -1273,6 +1275,11 @@ userspace marker.
 The privileged `pkgctl:cli-run-lifecycle-resolution` vertical qualifies the
 existing conservative restart policy at both lifecycle intent stages without
 adding a subordinate lifecycle journal or automatic replay rule.
+It also carries the live-process-authority resume qualification introduced by the
+progress-scoped execution boundary. Because Meson suite membership is classification
+rather than an execution guard, that setup performs the same native-capability gate as
+the other privileged CLI verticals: capability-unavailable development hosts return 77,
+while `PKGCTL_REQUIRE_NATIVE_INTEGRATION=1` makes the same condition a release failure.
 
 The CLI fixture requests lifecycle authority explicitly in addition to its
 normal run goal: `lifecycle:pre-install=fixture` for the pre-install case and

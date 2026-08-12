@@ -190,6 +190,24 @@ grep -F "'cli-run-publication-restart'" "$tests_meson" >/dev/null || {
   echo 'bounded run command has no publication-restart process-level integration test' >&2
   exit 1
 }
+live_authority_gate=$(sed -n \
+  '/^capture_native_start_or_skip()/,/^capture_resume()/p' \
+  "$lifecycle_resolution_integration")
+for required in \
+  'run_command --start "$nonce" "$maximum_steps"' \
+  'native execution unavailable before transaction execution;' \
+  'PKGCTL_REQUIRE_NATIVE_INTEGRATION' \
+  'exit 77'; do
+  printf '%s\n' "$live_authority_gate" | grep -F -- "$required" >/dev/null || {
+    echo "live execution authority case lacks capability-aware skip gate: $required" >&2
+    exit 1
+  }
+done
+grep -F -- 'capture_native_start_or_skip start "$run_nonce" 1' \
+    "$lifecycle_resolution_integration" >/dev/null || {
+  echo 'live execution authority case bypasses capability-aware native start' >&2
+  exit 1
+}
 grep -F "suite: 'integration-privileged'" "$tests_meson" >/dev/null || {
   echo 'native mutating CLI test is not isolated as privileged integration' >&2
   exit 1
