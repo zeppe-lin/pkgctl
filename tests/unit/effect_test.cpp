@@ -1740,7 +1740,7 @@ application_restart_journal(const fixture& value)
   const auto header = pkgapply::application_journal_header::make(
       pkgplan::operation_kind::install, value.application.identity(),
       value.application.plan().identity(), attempt, value.target.identity(),
-      value.application.control().identity(), value.projection.identity(),
+      value.application.control().identity(), value.projection,
       value.outer_lease.identity(), value.target.mutation_backend());
   return pkgapply::application_journal_record::make(
       header, pkgapply::application_journal_state::preparing, {}, {});
@@ -1763,7 +1763,7 @@ completed_application_restart_journal(const fixture& value)
   const auto header = pkgapply::application_journal_header::make(
       pkgplan::operation_kind::install, value.application.identity(),
       value.application.plan().identity(), attempt, value.target.identity(),
-      value.application.control().identity(), value.projection.identity(),
+      value.application.control().identity(), value.projection,
       value.outer_lease.identity(), value.target.mutation_backend());
   const auto evidence = pkgapply::completed_application_evidence::installation(
       value.application, attempt.identity(), value.projection.identity(),

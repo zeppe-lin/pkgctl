@@ -11,9 +11,10 @@ restart="$srcdir/src/effect_restart.cpp"
 effect="$srcdir/src/effect.cpp"
 store="$srcdir/src/effect_store.cpp"
 codec="$srcdir/src/effect_journal_codec.cpp"
+effect_test="$srcdir/tests/unit/effect_test.cpp"
 
 for file in "$model" "$model_source" "$codec_header" "$restart" \
-            "$effect" "$store" "$codec"; do
+            "$effect" "$store" "$codec" "$effect_test"; do
   [ -s "$file" ] || {
     echo "missing durable effect authority source: $file" >&2
     exit 1
@@ -113,6 +114,22 @@ check_order execute_effectful_operation_durable \
 check_order execute_effectful_operation_durable \
   'bodies->retain_publication_receipt(' \
   'journal.complete_publication(publication_receipt)'
+
+projection_body_admissions=$(
+  grep -F -c -- 'value.application.control().identity(), value.projection,' \
+    "$effect_test" || true
+)
+[ "$projection_body_admissions" -ge 2 ] || {
+  echo 'restart fixtures do not admit journal-owned projection evidence bodies' >&2
+  exit 1
+}
+
+if grep -F -- \
+    'value.application.control().identity(), value.projection.identity(),' \
+    "$effect_test" >/dev/null 2>&1; then
+  echo 'restart fixture still admits an application journal from a projection digest' >&2
+  exit 1
+fi
 
 for forbidden in \
   'libpkgexec-linux' \
