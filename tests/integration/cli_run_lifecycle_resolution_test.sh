@@ -8,9 +8,11 @@ state_fixture=$2
 state_inspect_fixture=$3
 interpreter=$4
 interrupt_fixture=$5
-pre_collection_fixture=$6
-post_collection_fixture=$7
-root_view_fixture=$8
+credential_context_runner=$6
+credential_context_preload=$7
+pre_collection_fixture=$8
+post_collection_fixture=$9
+root_view_fixture=${10}
 case $interpreter in
   /*)
     ;;
@@ -37,6 +39,16 @@ groups=$(id -G | tr ' ' '\n' | sort -nu)
 build_uid=$uid
 build_gid=$gid
 build_groups=$groups
+
+invoke_pkgctl()
+{
+  if [ -n "${supervisor_uid:-}" ]; then
+    "$credential_context_runner" "$supervisor_uid" "$supervisor_gid" \
+      "$credential_context_preload" "$pkgctl" "$@"
+  else
+    "$pkgctl" "$@"
+  fi
+}
 
 fail()
 {
@@ -173,6 +185,7 @@ run_command()
   intent=$1
   nonce=$2
   maximum_steps=$3
+  selected_interpreter=${interpreter_override:-$interpreter}
   set -- run --canonical-store "$state"
   if [ "$intent" = --start ]; then
     set -- "$@" \
@@ -188,7 +201,7 @@ run_command()
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
     --target-root "$target" \
-    --interpreter "$interpreter" \
+    --interpreter "$selected_interpreter" \
     --build-user-id "$build_uid" \
     --build-group-id "$build_gid" \
     --lifecycle-user-id "$uid" \
@@ -207,9 +220,9 @@ run_command()
   done
   if [ "$intent" = --start ]; then
     # shellcheck disable=SC2086
-    "$pkgctl" "$@" $binding
+    invoke_pkgctl "$@" $binding
   else
-    "$pkgctl" "$@"
+    invoke_pkgctl "$@"
   fi
 }
 
@@ -250,6 +263,40 @@ run_interrupted_command()
   done
   # shellcheck disable=SC2086
   "$interrupt_fixture" "$mode" "$runtime/effects" -- "$pkgctl" "$@" $binding
+}
+
+capture_command()
+{
+  name=$1
+  expected_status=$2
+  intent=$3
+  nonce=$4
+  maximum_steps=$5
+  stdout_file=$case_root/$name.out
+  stderr_file=$case_root/$name.err
+  set +e
+  run_command "$intent" "$nonce" "$maximum_steps" \
+    >"$stdout_file" 2>"$stderr_file"
+  status=$?
+  set -e
+  if [ "$status" -ne "$expected_status" ]; then
+    dump_file "$case_name/$name stdout" "$stdout_file"
+    dump_file "$case_name/$name stderr" "$stderr_file"
+    fail "$case_name/$name: expected status $expected_status, got $status"
+  fi
+}
+
+capture_command_as()
+{
+  name=$1
+  expected_status=$2
+  intent=$3
+  nonce=$4
+  maximum_steps=$5
+  supervisor_uid=$6
+  supervisor_gid=$7
+  capture_command "$name" "$expected_status" "$intent" "$nonce" "$maximum_steps"
+  unset supervisor_uid supervisor_gid
 }
 
 capture_resume()
@@ -332,6 +379,58 @@ check_records_unchanged()
     "effect.stage=$expected_stage"
   require_contains "$label-effect" "$case_root/$label-effect.out" \
     'effect.disposition=external-resolution-required'
+}
+
+qualify_live_execution_authority()
+{
+  initialize_case live-execution-authority "$pre_collection_fixture" \
+    'lifecycle:pre-install=fixture'
+  initial_state=$($state_inspect_fixture "$state")
+  require_absent live-authority-target "$target/usr/bin/pkgctl-fixture"
+
+  run_nonce=$(printf '%064d' 7)
+  capture_command start 0 --start "$run_nonce" 1
+  require_contains live-authority-start "$case_root/start.out" \
+    'disposition step-limit-reached'
+  require_contains live-authority-start "$case_root/start.out" 'durable-steps 1'
+  require_contains live-authority-start "$case_root/start.out" 'complete no'
+
+  run_head=$(single_file live-authority-run-head "$runtime/run" '*.pjh')
+  journal=$(basename "$run_head" .pjh)
+  "$pkgctl" inspect-run --run-store "$runtime/run" --journal "$journal" \
+    >"$case_root/run-before.out"
+  run_record_before=$(sed -n 's/^run.record=//p' "$case_root/run-before.out")
+  [ "${#run_record_before}" -eq 64 ] || \
+    fail 'live-execution-authority: missing durable run record before refusal'
+
+  interpreter_override=/bin/false
+  capture_command interpreter-refusal 1 --resume "$run_nonce" 1
+  unset interpreter_override
+  require_contains live-authority-interpreter \
+    "$case_root/interpreter-refusal.err" \
+    'current interpreter differs from admitted run authority'
+  "$pkgctl" inspect-run --run-store "$runtime/run" --journal "$journal" \
+    >"$case_root/run-after-interpreter.out"
+  require_equal live-authority-interpreter-run-head "$run_record_before" \
+    "$(sed -n 's/^run.record=//p' "$case_root/run-after-interpreter.out")"
+
+  if [ "$uid" -eq 0 ]; then
+    chown -R 65534:65534 "$root"
+    capture_command_as credential-refusal 1 --resume "$run_nonce" 1 \
+      65534 65534
+    require_contains live-authority-credentials \
+      "$case_root/credential-refusal.err" \
+      'lifecycle credentials must match the native supervisor'
+    chown -R "$uid:$gid" "$root"
+    "$pkgctl" inspect-run --run-store "$runtime/run" --journal "$journal" \
+      >"$case_root/run-after-credentials.out"
+    require_equal live-authority-credential-run-head "$run_record_before" \
+      "$(sed -n 's/^run.record=//p' "$case_root/run-after-credentials.out")"
+  fi
+
+  require_absent live-authority-refusal-target "$target/usr/bin/pkgctl-fixture"
+  require_equal live-authority-refusal-state "$initial_state" \
+    "$($state_inspect_fixture "$state")"
 }
 
 qualify_pre_lifecycle()
@@ -465,5 +564,6 @@ qualify_post_lifecycle()
   require_equal repeat-resume-state "$initial_state" "$($state_inspect_fixture "$state")"
 }
 
+qualify_live_execution_authority
 qualify_pre_lifecycle
 qualify_post_lifecycle

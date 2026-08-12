@@ -197,6 +197,8 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
 "$srcdir/tests/integration/cli_run_lifecycle_resolution_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" "$tmp/lifecycle-intent-interrupt-fixture" \
+  "$tmp/native-credential-context-runner" \
+  "$tmp/native-credential-context-preload.so" \
   "$srcdir/tests/fixtures/collections/lifecycle-pre-install" \
   "$srcdir/tests/fixtures/collections/lifecycle-post-install" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"

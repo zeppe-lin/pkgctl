@@ -323,33 +323,6 @@ printf '%s\n' "$inspection" >"$root/inspection.out"
 require_contains run-inspection "$root/inspection.out" "run.journal=$journal"
 require_contains run-inspection "$root/inspection.out" 'run.complete=false'
 
-interpreter_override=/bin/false
-capture_run resume-requires-admitted-interpreter 1 --resume "$run_nonce" 1
-unset interpreter_override
-require_contains resume-requires-admitted-interpreter-stderr \
-  "$root/resume-requires-admitted-interpreter.err" \
-  'current interpreter differs from admitted run authority'
-inspection_after_interpreter_refusal=$(
-  "$pkgctl" inspect-run --run-store "$runtime/run" --journal "$journal"
-)
-require_equal resume-interpreter-run-head "$inspection" \
-  "$inspection_after_interpreter_refusal"
-
-if [ "$uid" -eq 0 ]; then
-  chown -R 65534:65534 "$root"
-  capture_run_as resume-requires-current-authority 1 --resume "$run_nonce" 1 \
-    65534 65534
-  require_contains resume-requires-current-authority-stderr \
-    "$root/resume-requires-current-authority.err" \
-    'construction/check credentials must match the native supervisor'
-  chown -R "$uid:$gid" "$root"
-  inspection_after_refusal=$(
-    "$pkgctl" inspect-run --run-store "$runtime/run" --journal "$journal"
-  )
-  require_equal resume-current-authority-run-head "$inspection" \
-    "$inspection_after_refusal"
-fi
-
 capture_run second-start 1 --start "$run_nonce" 1
 require_contains second-start-stderr "$root/second-start.err" \
   'exact transaction run is already admitted; use --resume'
@@ -368,7 +341,9 @@ require_contains resume-semantic-stderr "$root/resume-semantic.err" \
   '--resume uses retained transaction semantics'
 
 rm -rf "$collection"
+interpreter_override=/bin/false
 capture_run resume 0 --resume "$run_nonce" 8
+unset interpreter_override
 require_contains resume "$root/resume.out" "transaction $transaction"
 require_contains resume "$root/resume.out" "journal $journal"
 require_contains resume "$root/resume.out" 'origin resumed'

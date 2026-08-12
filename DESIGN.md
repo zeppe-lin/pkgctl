@@ -176,7 +176,10 @@ scopes that can still run. Completed, failed/stopped, and already externally blo
 durable states therefore reopen without proving capabilities for actuators they cannot
 invoke. Remaining executable work still requires the current interpreter identity and
 profile to equal their admitted identities and the relevant explicit credentials to
-match the current supervisor. The native composition root represents absent current
+match the current supervisor. Conversely, once construction has completed and only
+application/publication work remains, the interpreter coordinate is outside the live
+scope and must not be re-observed merely because it was part of historical execution
+authority. The native composition root represents absent current
 process authority as null construction/check/lifecycle backends; retained profiles stay
 on the recovery-authority side and are never wrapped as executable backend objects.
 

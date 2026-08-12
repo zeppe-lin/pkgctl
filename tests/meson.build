@@ -579,6 +579,8 @@ if not get_option('tests').disabled()
       state_inspect_fixture,
       native_interpreter,
       lifecycle_intent_interrupt_fixture,
+      native_credential_context_runner,
+      native_credential_context_preload.full_path(),
       join_paths(
         meson.project_source_root(),
         'tests/fixtures/collections/lifecycle-pre-install',
@@ -592,7 +594,12 @@ if not get_option('tests').disabled()
         'tests/fixtures/native_root_view_fixture.sh',
       ),
     ],
-    depends: [native_interpreter, lifecycle_intent_interrupt_fixture],
+    depends: [
+      native_interpreter,
+      lifecycle_intent_interrupt_fixture,
+      native_credential_context_runner,
+      native_credential_context_preload,
+    ],
     suite: 'integration-privileged',
   )
 

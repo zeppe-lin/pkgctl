@@ -77,10 +77,13 @@ The final command suite must prove:
 - completed/native-runtime reopen is qualified with null construction/check/lifecycle
   backends plus retained recovery profiles, proving historical evidence is not
   masqueraded as a current executable mechanism;
-- resume with remaining executable work rejects a current interpreter whose exact
-  inspected identity differs from the one retained at admission and leaves the run head
-  unchanged; completed and externally blocked resumes are separately exercised under a
-  supervisor that cannot traverse the original build-tree interpreter pathname;
+- resume with remaining executable lifecycle work rejects a current interpreter whose
+  exact inspected identity differs from the one retained at admission and leaves the run
+  head unchanged; the same live-work case rejects changed lifecycle supervisor credentials;
+  an operation-only resume after construction deliberately completes with an unrelated
+  interpreter pathname because no process authority remains to exercise; completed and
+  externally blocked resumes are separately exercised under a supervisor that cannot
+  traverse the original build-tree interpreter pathname;
 - effect bodies are durably retained through owner codecs before journal records
   name them, interrupted application recovery uses direct active-request lookup
   rather than enumeration, and later application/terminal replay does not feed
@@ -91,8 +94,9 @@ The final command suite must prove:
   diagnostic instead of reporting only a generic failed disposition;
 - resume recovery decodes retained construction/check and lifecycle bodies against
   the backend capability profiles admitted in command evidence rather than the live
-  backend profile. An incomplete run with remaining check work still refuses a changed
-  supervisor/current execution authority before journal advancement; after completion,
+  backend profile. An incomplete run with remaining lifecycle process work still refuses
+  a changed supervisor/current execution authority before journal advancement; after
+  completion,
   the same changed supervisor context must reopen with zero durable steps because no
   execution scope remains. The privileged outer-lease-loss vertical repeats its
   externally blocked resume under the same changed supervisor context and must

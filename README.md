@@ -30,9 +30,9 @@ belong to that format are rejected rather than interpreted through a compatibili
 path. Resume uses the retained interpreter identity and backend profiles to validate
 historical execution evidence. Current interpreter observation, backend capability, and supervisor-credential
 preflight are required only for construction, check, or lifecycle work that can still
-execute; a completed or already externally blocked run does not reacquire execute-now
-authority merely to explain durable history. The retained interpreter identity is
-historical evidence authority, not an observation that the old pathname still exists.
+execute; an operation-only, completed, or already externally blocked run does not
+reacquire unused execute-now process authority merely to explain durable history. The
+retained interpreter identity is historical evidence authority, not an observation that the old pathname still exists.
 Target observations are live only for the current operation dispatch.
 
 Construction/check and lifecycle execution keep separate existing root views

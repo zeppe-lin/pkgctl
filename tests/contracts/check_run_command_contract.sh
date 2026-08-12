@@ -238,13 +238,15 @@ grep -F 'lifecycle credentials must match the native supervisor' \
   exit 1
 }
 for progress_scope_contract in \
-  'resume-requires-current-authority' \
+  'live-execution-authority' \
+  'credential-refusal' \
   'completed-resume-without-execution-authority' \
   'native_credential_context_runner' \
   'native_credential_context_preload' \
-  'capture_run_as' \
+  'capture_command_as' \
   '65534 65534'; do
-  grep -F -- "$progress_scope_contract" "$integration" "$tests_meson" >/dev/null || {
+  grep -F -- "$progress_scope_contract" "$integration" \
+      "$lifecycle_resolution_integration" "$tests_meson" >/dev/null || {
     echo "missing progress-scoped resume execution qualification: $progress_scope_contract" >&2
     exit 1
   }
@@ -468,9 +470,18 @@ done
 for interpreter_recovery_proof in \
   'interpreter_override=/bin/false' \
   'current interpreter differs from admitted run authority' \
-  'resume-interpreter-run-head'; do
-  grep -F -- "$interpreter_recovery_proof" "$integration" >/dev/null || {
-    echo "missing retained-interpreter recovery proof: $interpreter_recovery_proof" >&2
+  'live-authority-interpreter-run-head'; do
+  grep -F -- "$interpreter_recovery_proof" "$lifecycle_resolution_integration" \
+      >/dev/null || {
+    echo "missing retained-interpreter live-authority proof: $interpreter_recovery_proof" >&2
+    exit 1
+  }
+done
+for operation_only_recovery_proof in \
+  'interpreter_override=/bin/false' \
+  'capture_run resume 0 --resume'; do
+  grep -F -- "$operation_only_recovery_proof" "$integration" >/dev/null || {
+    echo "missing operation-only resume proof without process authority: $operation_only_recovery_proof" >&2
     exit 1
   }
 done

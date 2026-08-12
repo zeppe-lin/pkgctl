@@ -179,11 +179,12 @@ backend adapter merely to satisfy composition types; absence of current process
 authority is represented by null native process backends. A completed or externally
 blocked run must not be made unrecoverable merely because an unused actuator is no
 longer executable in the current process context. Keep both sides process-qualified:
-remaining check work must reject a changed supervisor, while completed and retained
-outer-lease-loss runs must reopen under that changed supervisor without journal
-advancement. The privileged credential-context fixture must perform the uid/gid
-transition only after the dynamic loader has mapped the build-tree CLI dependency
-closure. A pre-exec credential drop accidentally tests pathname accessibility of the
+remaining lifecycle process work must reject a changed supervisor, while operation-only,
+completed, and retained outer-lease-loss runs must not demand process authority they
+cannot exercise. Completed and retained outer-lease-loss runs must reopen under that
+changed supervisor without journal advancement. The privileged credential-context
+fixture must perform the uid/gid transition only after the dynamic loader has mapped
+the build-tree CLI dependency closure. A pre-exec credential drop accidentally tests pathname accessibility of the
 developer build root and is not valid execution-authority qualification. Do not break
 sanitizer startup to reach that boundary: if dynamic AddressSanitizer is active, its
 already-loaded runtime must remain first, and the credential hook must not discard or

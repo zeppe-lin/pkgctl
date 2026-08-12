@@ -1,5 +1,11 @@
 ## 0.35.0 - 2026-08-07
 
+- Corrects progress-scoped execution qualification so live interpreter and supervisor
+  authority are required only by a resume that still owns unexecuted process work.
+  The lifecycle-resolution campaign now proves wrong interpreter and lifecycle credentials
+  are refused before advancement, while the simple install campaign proves operation-only
+  resume ignores an unrelated interpreter coordinate after construction has completed.
+
 ### Bounded native transaction command
 
 - Adds `pkgctl run`, the first and only effect-implying frontend in this
