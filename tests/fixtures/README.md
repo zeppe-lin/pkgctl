@@ -7,6 +7,13 @@ operator-facing executable boundary.
 source package, no dependencies, no sources, no checks, and no lifecycle
 programs. Its payload is `/usr/bin/pkgctl-fixture` with fixed bytes.
 
+`collections/native-construction` is the process-reality construction fixture.
+`dep` and `tool` each carry one digest-pinned local source; `tool` has a build
+requirement on `dep` and a check program. The recipes use only shell builtins so
+the root view needs no ambient utility set. Successful output can exist only if
+the production adapters mounted the fetched source, predecessor package tree,
+constructed package tree, and check source at their declared logical paths.
+
 `collections/lifecycle-pre-install` and
 `collections/lifecycle-post-install` keep that same payload while adding exactly
 one lifecycle declaration on the named side of application. They exist only to
@@ -36,3 +43,11 @@ destinations required by the native build, check, and lifecycle adapters. The
 root view itself remains caller-owned fiction: the production Linux backend is
 expected to reject missing destinations rather than silently populate them.
 Scenario-specific dependency input leaves are not invented by this fixture.
+
+
+`native_runtime_root_fixture.cpp` adds one explicitly selected real executable
+to such a caller-owned root view. For the native-construction campaign it
+canonicalizes `/bin/sh`, copies that exact ELF executable, its program
+interpreter, and its `ldd`-reported shared-library closure to the same logical
+paths, and reports the canonical interpreter path used by `pkgctl`. It does not
+copy host commands or an ambient filesystem tree.

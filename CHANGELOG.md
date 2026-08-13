@@ -21,6 +21,15 @@
   construction-only CLI campaign proves one package archive is produced while
   those namespaces remain absent, canonical target state remains unchanged, and
   terminal resume needs no reconstructed collection semantics.
+- Adds a privileged native-construction campaign that executes actual
+  POSIX-shell recipe bodies through `libpkgexec-linux` rather than the synthetic
+  static interpreter fixture. The caller-owned build root receives only the exact
+  canonical shell plus its ELF runtime closure. A fetched local-source dependency
+  is built first, the selected package consumes that predecessor package tree as a
+  read-only build input, its real check consumes the staged source and constructed
+  package tree, and both immutable package archives are inspected for the bytes
+  produced by those programs. Canonical target state and all target-operation
+  namespaces remain untouched.
 
 ## 0.35.1 - 2026-08-12
 

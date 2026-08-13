@@ -41,6 +41,7 @@ for path in \
   'unit/construction_test.cpp' \
   'fixtures/state_fixture.cpp' \
   'fixtures/native_root_view_fixture.sh' \
+  'fixtures/native_runtime_root_fixture.cpp' \
   'fixtures/native_target_lock_holder.cpp' \
   'fixtures/native_credential_context_runner.cpp' \
   'fixtures/native_credential_context_preload.cpp' \
@@ -53,6 +54,7 @@ for path in \
   'fixtures/lifecycle_intent_interrupt_fixture.cpp' \
   'fixtures/lifecycle_intent_interrupt_probe.cpp' \
   'fixtures/collections/lifecycle-pre-install' \
+  'fixtures/collections/native-construction' \
   'fixtures/collections/lifecycle-post-install' \
   'integration/application_intent_interrupt_fixture_test.sh' \
   'integration/publication_intent_interrupt_fixture_test.sh' \
@@ -61,6 +63,7 @@ for path in \
   'integration/package_pipeline_test.cpp' \
   'integration/cli_readonly_test.sh' \
   'integration/cli_run_construction_only_test.sh' \
+  'integration/cli_run_native_construction_test.sh' \
   'integration/cli_run_lease_contention_test.sh' \
   'integration/cli_run_removal_test.sh' \
   'integration/cli_run_application_restart_test.sh' \
@@ -70,6 +73,7 @@ for path in \
   'contracts/check_package_pipeline_contract.sh' \
   'contracts/check_package_fault_matrix_contract.sh' \
   'contracts/check_cli_lease_contention_contract.sh' \
+  'contracts/check_cli_native_construction_contract.sh' \
   'contracts/check_target_observation_contract.sh' \
   'contracts/check_test_layout_contract.sh' \
   'contracts/check_fetch_generation_contract.sh'; do

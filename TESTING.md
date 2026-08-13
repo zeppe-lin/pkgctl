@@ -1,5 +1,33 @@
 # pkgctl testing
 
+## Release 0.36.0 real native construction qualification
+
+The privileged `cli-run-native-construction` campaign closes the remaining gap
+between the in-process package campaign and the native CLI execution path. Its
+caller-owned build root receives the stable adapter mount destinations plus only
+the exact canonical `/bin/sh` executable, its ELF program interpreter, and the
+shared-library closure reported for that executable. No compiler, package tool,
+or general host `/usr` tree is made visible. The fixture recipes therefore use
+only POSIX-shell builtins.
+
+The transaction is `check=tool`. `dep` declares one local source with a pinned
+SHA-256, reads it through `PKG_SOURCE_ROOT`, and emits `dep-token`. `tool` declares
+its own pinned local source plus a build dependency on `dep`; its recipe must read
+the predecessor package through `PKG_BUILD_INPUT_ROOT/dep`, combine those exact
+bytes with its materialized source, and emit `tool-token`. The real check then
+reads its source through `ZEPPE_LIN_CHECK_SOURCE`, reads the constructed package
+through `ZEPPE_LIN_CHECK_ROOT`, and leaves one marker in its private temporary
+resource only after both values match.
+
+One bounded start must complete in exactly three durable dispatches: dependency
+construction, dependent construction, and check. It must retain exactly two
+package archives whose payloads contain the recipe-produced tokens, retain the
+single successful check marker, leave canonical target state byte-equivalent to
+the initial empty generation, and never create lifecycle, target, target-lock,
+application, publication, rejected/completed, effect-body, or lifecycle-session
+authority. Native isolation unavailability may skip an ordinary development run;
+`PKGCTL_REQUIRE_NATIVE_INTEGRATION=1` turns that absence into a release failure.
+
 ## Release 0.36.0 construction-only authority qualification
 
 The native runtime unit campaign now seals a build-only transaction through the

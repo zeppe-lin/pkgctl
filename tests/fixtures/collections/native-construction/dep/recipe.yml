@@ -1,0 +1,30 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: dep
+  version: 1.0
+  release: 1
+  summary: native construction dependency fixture
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  {}
+
+sources:
+  - path: files/source.txt
+    name: source.txt
+    sha256: 1d70be42fce0076cb450831f76ab01c73d9c2c136847646d8e43a6e48700d978
+
+build:
+  language: posix-shell
+  script: |
+    IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
+    [ "$source" = dependency-source ]
+    printf '%s\n' "$source" >"$PKG_DESTDIR/dep-token"
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64

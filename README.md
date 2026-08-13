@@ -9,6 +9,13 @@ configuration error rather than harmless surplus capability. The bounded CLI
 selects this reduced composition after sealing the transaction; privileged
 qualification builds one real package archive while the target-operation
 namespaces remain absent and canonical target state remains unchanged.
+A sibling privileged native-construction campaign crosses the process boundary
+with an actual POSIX shell: local sources are materialized through `libpkgfetch`,
+a predecessor package is constructed and mounted as the dependent build input,
+the dependent recipe consumes both authorities, and its real check executes
+against the staged source and constructed package tree before both archives are
+verified. The synthetic static interpreter remains only the smaller isolation and
+restart fixture; it is not the construction-reality proof.
 
 Release 0.35.1 hardens retained private journal and evidence reopening so
 corrupted special-file authority fails closed without blocking recovery.

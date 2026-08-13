@@ -81,6 +81,10 @@ done
   "$srcdir/tests/fixtures/native_credential_context_preload.cpp" \
   -o "$tmp/native-credential-context-preload.so"
 
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/native_runtime_root_fixture.cpp" \
+  -o "$tmp/native-runtime-root-fixture"
+
 "$cxx" -nostdlib -static -Wl,-e,_start \
   "$srcdir/tests/fixtures/native_interpreter_x86_64.S" \
   -o "$tmp/native-test-interpreter"
@@ -147,6 +151,18 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
   "$tmp/native-test-interpreter" "$tmp/native-credential-context-runner" \
   "$tmp/native-credential-context-preload.so" \
   "$srcdir/tests/fixtures/collections/simple-install" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
+"$srcdir/tests/integration/cli_run_construction_only_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-test-interpreter" \
+  "$srcdir/tests/fixtures/collections/simple-install" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
+"$srcdir/tests/integration/cli_run_native_construction_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-runtime-root-fixture" \
+  "$srcdir/tests/fixtures/collections/native-construction" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
 "$srcdir/tests/integration/cli_run_lease_contention_test.sh" "$tmp/pkgctl" \

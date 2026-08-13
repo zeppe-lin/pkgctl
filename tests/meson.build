@@ -211,6 +211,11 @@ if not get_option('tests').disabled()
     override_options: ['b_sanitize=none'],
   )
 
+  native_runtime_root_fixture = executable(
+    'native-runtime-root-fixture',
+    'fixtures/native_runtime_root_fixture.cpp',
+  )
+
   cpp = meson.get_compiler('cpp')
   native_interpreter = custom_target(
     'native-test-interpreter',
@@ -409,6 +414,30 @@ if not get_option('tests').disabled()
       ),
     ],
     depends: native_interpreter,
+    suite: 'integration-privileged',
+  )
+
+  cli_run_native_construction_test = find_program(
+    'integration/cli_run_native_construction_test.sh',
+  )
+  test(
+    'cli-run-native-construction',
+    cli_run_native_construction_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_runtime_root_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/native-construction',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: native_runtime_root_fixture,
     suite: 'integration-privileged',
   )
 
@@ -842,6 +871,16 @@ if not get_option('tests').disabled()
   test(
     'effect-inspect-cli-contract',
     effect_inspect_cli_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_native_construction_contract = find_program(
+    'contracts/check_cli_native_construction_contract.sh',
+  )
+  test(
+    'cli-native-construction-contract',
+    cli_native_construction_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )
