@@ -34,6 +34,11 @@ enum class transaction_run_command_intent {
   resume,
 };
 
+enum class transaction_run_command_frontend {
+  run,
+  build,
+};
+
 struct installed_tree_option final {
   pkgstate::installed_package_identity package;
   pkgexec::resource_identity resource;
@@ -41,17 +46,19 @@ struct installed_tree_option final {
 };
 
 struct transaction_run_command final {
+  transaction_run_command_frontend frontend;
   std::optional<transaction_request> transaction;
   std::filesystem::path canonical_store;
   transaction_run_command_intent intent;
   transaction_run_nonce nonce;
   std::filesystem::path runtime_root;
   std::filesystem::path build_root;
-  std::filesystem::path lifecycle_root;
-  std::filesystem::path target_root;
+  std::filesystem::path artifact_root;
+  std::optional<std::filesystem::path> lifecycle_root;
+  std::optional<std::filesystem::path> target_root;
   std::filesystem::path interpreter;
   pkgexec::credential_policy build_credentials;
-  pkgexec::credential_policy lifecycle_credentials;
+  std::optional<pkgexec::credential_policy> lifecycle_credentials;
   std::uint64_t source_date_epoch;
   std::size_t maximum_steps;
   std::vector<installed_tree_option> installed_trees;

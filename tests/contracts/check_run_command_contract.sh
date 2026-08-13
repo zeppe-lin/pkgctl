@@ -169,9 +169,9 @@ grep -F "'cli-run-construction-only'" "$tests_meson" >/dev/null || {
 
 construction_branch_line=$(grep -n -F 'if (!operation_runtime)' "$command" \
   | tail -1 | cut -d: -f1)
-lifecycle_open_line=$(grep -n -F 'open_directory(command.lifecycle_root)' "$command" \
+lifecycle_open_line=$(grep -n -F 'open_directory(*command.lifecycle_root)' "$command" \
   | tail -1 | cut -d: -f1)
-target_open_line=$(grep -n -F 'open_directory(command.target_root)' "$command" \
+target_open_line=$(grep -n -F 'open_directory(*command.target_root)' "$command" \
   | tail -1 | cut -d: -f1)
 [ -n "$construction_branch_line" ] && [ -n "$lifecycle_open_line" ] && \
   [ -n "$target_open_line" ] && \
@@ -527,7 +527,7 @@ for documented in \
   'Release 0.35.0 closes the functional package-management chain' \
   'Release 0.35.0 bounded native command boundary' \
   'Release 0.35.0 bounded native command qualification' \
-  'Version 0.36.0 retains the native catalog' \
+  'Version 0.37.0 retains the native catalog' \
   'Release 0.36.0 construction-only runtime authority' \
   'Release 0.36.0 construction-only authority qualification' \
   'BOUNDED NATIVE TRANSACTION COMMAND' \

@@ -1,5 +1,27 @@
 # pkgctl
 
+Release 0.37.0 adds `pkgctl build PACKAGE`, the first package-artifact
+frontend. It is a constrained caller of the same sealed transaction and durable
+native run kernel as `pkgctl run`: the exact package becomes a build goal,
+`--check` adds its check goal, catalog authority is preferred, and the composed
+transaction must contain a catalog-backed build node for that exact package (plus
+its check node when requested). Installed authority therefore cannot silently
+satisfy a build request without construction. The frontend carries no lifecycle
+root, managed target root, lifecycle credentials,
+state-publication backend, target lock, or convergence policy.
+
+The final immutable package archives are published beneath one explicit existing
+`--artifact-root`, separate from the private runtime hierarchy. Frontend kind and
+artifact-root coordinate are retained in command evidence; resume refuses either
+a frontend mismatch or artifact-root redirection before durable advancement.
+Build output reports the exact retained artifact path and release/artifact/build
+identities, digest, size, and image/binding identities as historical admitted
+authority; it does not reopen a completed archive merely to claim present truth.
+Privileged qualification
+drives a real shell/source/dependency/check campaign across bounded start/resume,
+then removes the live collection and proves terminal replay returns the same
+artifact inventory with zero durable work and unchanged canonical target state.
+
 Release 0.36.0 removes target-operation authority from native
 construction/check-only runs. Such a sealed transaction enters the same durable
 run kernel without opening lifecycle or target roots, target-lock authority,
@@ -83,11 +105,12 @@ required when current execution is possible, alongside explicit numeric
 credentials, source-date epoch, retained installed-package trees, canonical state
 binding, and a caller-issued run nonce. The command creates no namespace, starts no daemon, waits on no timer,
 loops beyond the bound, retries implicitly, rolls back, repairs, cleans up, or
-collects history. Package management is now functionally closed; remaining work
-is one coordinated whole-zoo qualification and publication pass.
+collects history. At 0.35.0 this closed the functional package-management
+chain; later releases reduce construction-only authority and expose that path
+through the constrained build frontend.
 
-Before new package-construction frontend surface is added, the same controller
-core is qualified in-process against disposable roots. That campaign now drives
+The package-construction frontend is backed by the same controller core already
+qualified in-process against disposable roots. That campaign drives
 real acquisition, resolution, dependency construction, checking, target
 observation, installation, protected upgrade, rejected-object evidence, state
 publication, exact-convergence removal, and reconciliation-store persistence.
@@ -719,13 +742,14 @@ construction and the target-effect kernel. Release 0.5.0 established one exact
 package-construction session, and 0.4.0 closed the restart loop for one target
 mutation sequence.
 
-The executable exposes only the read-only command surface:
+The executable exposes this command surface:
 
 ```text
 pkgctl catalog
 pkgctl resolve
 pkgctl transaction
 pkgctl run
+pkgctl build
 pkgctl inspect-run
 pkgctl inspect-effect
 ```
@@ -733,8 +757,10 @@ pkgctl inspect-effect
 Every collection root, target-state binding identity, architecture, goal scope,
 selected durable journal, and destructive convergence choice is explicit.
 `transaction` defaults to `preserve-unselected`; exact convergence requires
-`--converge-exact`. The inspection commands open only the exact existing store
-and identity supplied by the caller.
+`--converge-exact`. Catalog, resolution, transaction composition, and both
+inspection commands are read-only. `run` enters the general native transaction
+runtime; `build` enters the construction/check-only shape with its explicit
+public artifact root.
 
 `pkgctl run` is the sole effect-implying command in 0.35.0. It composes one
 sealed transaction and advances one exact durable run under the caller's

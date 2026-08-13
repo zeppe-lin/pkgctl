@@ -1,5 +1,36 @@
 # pkgctl testing
 
+## Release 0.37.0 build frontend qualification
+
+The privileged `cli-build` campaign promotes the already-qualified native
+construction vertical to public CLI authority without adding another execution
+path. It uses the real `native-construction` collection and minimal shell runtime,
+first refuses an artifact root nested beneath the private runtime before command
+evidence or run admission, then starts `pkgctl build tool --check` with a
+one-step bound and requires exactly one dependency archive beneath the
+caller-selected public artifact root. The
+private runtime has no `artifacts` namespace and no lifecycle, target-lock,
+application, publication, rejected/completed, effect-body, or lifecycle-session
+authority. Canonical installed state remains the original empty generation.
+
+Before the correct resume, the campaign presents a different existing artifact
+root and requires refusal before durable progress. Resuming with the admitted
+root performs exactly the remaining selected-package construction and check,
+reports two deterministic retained artifacts, and verifies the dependency and
+selected-package payloads plus the real check marker. The exact reported archive
+paths must remain beneath the caller-selected artifact root. Finally the live
+collection is removed and a terminal resume must complete with zero durable
+steps and byte-for-byte identical artifact-report lines. This proves retained
+command/session/evidence authority, not live catalog reconstruction, is sufficient
+to explain completed build output.
+
+The source contract additionally pins that `build` synthesizes its own build and
+optional check goals, implies catalog preference, rejects generic resolution or
+convergence overrides, validates that the composed direct subject has
+catalog-backed construction (and a check node when requested), carries no
+target-operation command authority, binds the frontend and artifact root into
+command evidence, and uses the shared native run runtime.
+
 ## Release 0.36.0 real native construction qualification
 
 The privileged `cli-run-native-construction` campaign closes the remaining gap

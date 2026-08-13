@@ -98,6 +98,25 @@ private:
   throw std::runtime_error(message + ": " + std::strerror(value));
 }
 
+[[nodiscard]] bool path_prefix(
+    const std::filesystem::path& prefix,
+    const std::filesystem::path& value)
+{
+  auto left = prefix.begin();
+  auto right = value.begin();
+  for (; left != prefix.end(); ++left, ++right)
+    if (right == value.end() || *left != *right)
+      return false;
+  return true;
+}
+
+[[nodiscard]] bool paths_overlap(
+    const std::filesystem::path& first,
+    const std::filesystem::path& second)
+{
+  return path_prefix(first, second) || path_prefix(second, first);
+}
+
 [[nodiscard]] fd_guard open_directory(const std::filesystem::path& path)
 {
   if (!path.is_absolute() || path.empty() || path != path.lexically_normal())
@@ -634,7 +653,32 @@ struct retained_native_execution_profiles final {
   pkgexec::backend_capability_profile lifecycle;
 };
 
+[[nodiscard]] std::uint64_t command_frontend_tag(
+    transaction_run_command_frontend frontend) noexcept
+{
+  switch (frontend)
+  {
+    case transaction_run_command_frontend::run: return 1U;
+    case transaction_run_command_frontend::build: return 2U;
+  }
+  return 0U;
+}
+
+[[nodiscard]] transaction_run_command_frontend command_frontend_from_tag(
+    std::uint64_t tag)
+{
+  switch (tag)
+  {
+    case 1U: return transaction_run_command_frontend::run;
+    case 2U: return transaction_run_command_frontend::build;
+    default:
+      throw std::runtime_error("command evidence frontend tag is invalid");
+  }
+}
+
 struct retained_command_evidence final {
+  transaction_run_command_frontend frontend;
+  std::filesystem::path artifact_root;
   session_identity transaction;
   transaction_request request;
   pkgcatalog::catalog_snapshot catalog;
@@ -652,6 +696,8 @@ public:
 
   void retain(
       const transaction_run_nonce& nonce,
+      transaction_run_command_frontend frontend,
+      const std::filesystem::path& artifact_root,
       const transaction_session& transaction,
       const pkgexec::interpreter_identity& interpreter,
       const retained_native_execution_profiles& execution_profiles)
@@ -662,6 +708,8 @@ public:
         transaction.resolution().installed());
     std::vector<std::uint8_t> bytes;
     append_text(bytes, command_evidence_magic);
+    append_u64(bytes, command_frontend_tag(frontend));
+    append_text(bytes, artifact_root.string());
     std::vector<std::uint8_t> request;
     append_transaction_request_inputs(request, transaction.request());
     append_text(bytes, transaction.identity().hex());
@@ -688,6 +736,8 @@ public:
     std::size_t offset = 0U;
     if (read_text(bytes, offset) != command_evidence_magic)
       throw std::runtime_error("command evidence has invalid magic");
+    const auto frontend = command_frontend_from_tag(read_u64(bytes, offset));
+    const std::filesystem::path artifact_root(read_text(bytes, offset));
     const auto transaction = session_identity::from_hex(read_text(bytes, offset));
     const auto catalog_encoding = read_bytes(bytes, offset);
     const auto state_encoding = read_bytes(bytes, offset);
@@ -721,8 +771,8 @@ public:
         state.target_binding());
     if (request_offset != request_encoding.size())
       throw std::runtime_error("command evidence request has trailing bytes");
-    return {transaction, std::move(request), std::move(catalog),
-            std::move(state), std::move(interpreter),
+    return {frontend, artifact_root, transaction, std::move(request),
+            std::move(catalog), std::move(state), std::move(interpreter),
             std::move(execution_profiles)};
   }
 
@@ -758,6 +808,81 @@ private:
       std::move(program));
 }
 
+[[nodiscard]] pkgsource::package_reference require_build_frontend_transaction(
+    const transaction_session& transaction)
+{
+  const auto& resolution_request =
+      transaction.resolution().resolution().request();
+  if (resolution_request.policy().preference() !=
+      pkgresolve::installed_preference::prefer_catalog)
+  {
+    throw std::runtime_error(
+        "build frontend transaction lacks catalog preference authority");
+  }
+  if (transaction.request().convergence().mode() !=
+      pkgtransaction::convergence_mode::preserve_unselected)
+  {
+    throw std::runtime_error(
+        "build frontend transaction carries target convergence authority");
+  }
+
+  std::optional<pkgsource::package_reference> build_subject;
+  std::optional<pkgsource::package_reference> check_subject;
+  for (const auto& goal : resolution_request.goals())
+  {
+    if (goal.subject().kind() != pkgsource::requirement_subject_kind::package)
+      throw std::runtime_error(
+          "build frontend transaction contains a profile goal");
+    const auto package = goal.subject().package();
+    switch (goal.scope().kind())
+    {
+      case pkgsource::requirement_scope_kind::build:
+        if (build_subject)
+          throw std::runtime_error(
+              "build frontend transaction contains multiple build goals");
+        build_subject = package;
+        break;
+      case pkgsource::requirement_scope_kind::check:
+        if (check_subject)
+          throw std::runtime_error(
+              "build frontend transaction contains multiple check goals");
+        check_subject = package;
+        break;
+      case pkgsource::requirement_scope_kind::run:
+      case pkgsource::requirement_scope_kind::lifecycle:
+        throw std::runtime_error(
+            "build frontend transaction contains a target-operation goal");
+    }
+  }
+  if (!build_subject)
+    throw std::runtime_error(
+        "build frontend transaction lacks one exact package build goal");
+  if (check_subject && *check_subject != *build_subject)
+    throw std::runtime_error(
+        "build frontend check goal names another package");
+
+  bool direct_build = false;
+  bool direct_check = false;
+  for (const auto* node : transaction.program().nodes_for(*build_subject))
+  {
+    if (node->environment() != pkgresolve::resolution_environment::build ||
+        node->selection() == nullptr)
+    {
+      continue;
+    }
+    if (node->action() == pkgtransaction::transaction_action_kind::build)
+      direct_build = true;
+    if (node->action() == pkgtransaction::transaction_action_kind::check)
+      direct_check = true;
+  }
+  if (!direct_build)
+    throw std::runtime_error(
+        "build frontend direct subject lacks catalog-backed construction");
+  if (check_subject && !direct_check)
+    throw std::runtime_error(
+        "build frontend requested check lacks an executable check node");
+  return *build_subject;
+}
 
 [[nodiscard]] std::string private_body_name(
     std::string_view role,
@@ -1832,7 +1957,7 @@ void require_native_execution_preflight(
 void require_native_execution_credentials(
     const native_execution_scope& scopes,
     const pkgexec::credential_policy& build_credentials,
-    const pkgexec::credential_policy& lifecycle_credentials)
+    const std::optional<pkgexec::credential_policy>& lifecycle_credentials)
 {
   std::vector<std::string> missing;
   if ((scopes.construction || scopes.check) &&
@@ -1841,8 +1966,14 @@ void require_native_execution_credentials(
     missing.push_back(
         "construction/check credentials must match the native supervisor");
   }
-  if (scopes.lifecycle && !current_credentials(lifecycle_credentials))
-    missing.push_back("lifecycle credentials must match the native supervisor");
+  if (scopes.lifecycle)
+  {
+    if (!lifecycle_credentials)
+      missing.push_back("lifecycle credentials are absent");
+    else if (!current_credentials(*lifecycle_credentials))
+      missing.push_back(
+          "lifecycle credentials must match the native supervisor");
+  }
 
   if (missing.empty())
     return;
@@ -1870,6 +2001,17 @@ template<typename Destination, typename Source>
   return pkgexec::root_view_identity::from_sha256(text.substr(prefix.size()));
 }
 
+void require_operation_command_authority(
+    const transaction_run_command& command)
+{
+  if (!command.lifecycle_root || !command.target_root ||
+      !command.lifecycle_credentials)
+  {
+    throw std::runtime_error(
+        "target-operation transaction lacks explicit command authority");
+  }
+}
+
 [[nodiscard]] pkgapply::application_target_context command_application_target(
     const transaction_run_command& command,
     const transaction_session& transaction,
@@ -1877,9 +2019,13 @@ template<typename Destination, typename Source>
     const pkgexec::interpreter_identity& interpreter,
     const pkgexec::backend_capability_profile& execution_capabilities)
 {
+  require_operation_command_authority(command);
+  const auto& lifecycle_root = *command.lifecycle_root;
+  const auto& target_root = *command.target_root;
+  const auto& lifecycle_credentials = *command.lifecycle_credentials;
   const std::vector<std::string> common{
       transaction.identity().hex(), binding.identity().string(),
-      command.target_root.string(), command.runtime_root.string(),
+      target_root.string(), command.runtime_root.string(),
       "libpkgapply-posix/3.1"};
   auto fields = [&](std::string role, std::filesystem::path path = {}) {
     auto result = common;
@@ -1897,9 +2043,9 @@ template<typename Destination, typename Source>
       translate_identity<pkgapply::root_view_identity>(binding.root_view()),
       derived_digest_identity<pkgapply::observation_backend_identity>(
           "pkgctl/native-command-observation-backend/1",
-          fields("observation", command.target_root)),
+          fields("observation", target_root)),
       [&]() {
-        auto mutation_fields = fields("mutation", command.target_root);
+        auto mutation_fields = fields("mutation", target_root);
         for (const auto* name : {
                  "application-journals", "application-checkpoints", "payload",
                  "capture", "rejected", "completed"})
@@ -1912,7 +2058,7 @@ template<typename Destination, typename Source>
           fields("mutation-domain", runtime_path(command, "target-locks"))),
       derived_digest_identity<pkgapply::active_object_namespace_identity>(
           "pkgctl/native-command-active-namespace/1",
-          fields("active", command.target_root)),
+          fields("active", target_root)),
       derived_digest_identity<pkgapply::rejected_object_store_identity>(
           "pkgctl/native-command-rejected-store/1",
           fields("rejected", runtime_path(command, "rejected"))),
@@ -1928,11 +2074,11 @@ template<typename Destination, typename Source>
       [&]() {
         std::vector<std::string> lifecycle_fields{
             transaction.identity().hex(), interpreter.hex(),
-            std::to_string(command.lifecycle_credentials.user_id()),
-            std::to_string(command.lifecycle_credentials.group_id()),
-            command.lifecycle_root.string(), command.target_root.string(),
+            std::to_string(lifecycle_credentials.user_id()),
+            std::to_string(lifecycle_credentials.group_id()),
+            lifecycle_root.string(), target_root.string(),
             execution_capabilities.identity().hex()};
-        for (const auto group : command.lifecycle_credentials.supplementary_groups())
+        for (const auto group : lifecycle_credentials.supplementary_groups())
           lifecycle_fields.push_back("supplementary:" + std::to_string(group));
         return derived_digest_identity<pkgapply::lifecycle_executor_identity>(
             "pkgctl/native-command-lifecycle-executor/1", lifecycle_fields);
@@ -1949,7 +2095,7 @@ template<typename Destination, typename Source>
           runtime_path(command, "content"),
           runtime_path(command, "construction-sessions"),
           runtime_path(command, "package-outputs"),
-          runtime_path(command, "artifacts"),
+          command.artifact_root,
           runtime_path(command, "check-temporary"),
           execution_root_identity(binding),
           command.build_root,
@@ -1976,16 +2122,18 @@ template<typename Destination, typename Source>
     const pkgstate::state_target_binding& binding,
     const pkgexec::interpreter_identity& interpreter)
 {
+  require_operation_command_authority(command);
+  const auto& lifecycle_credentials = *command.lifecycle_credentials;
   return native_transaction_operation_configuration::make(
       transaction,
       {
           execution_root_identity(binding),
-          command.lifecycle_root,
-          command.target_root,
+          *command.lifecycle_root,
+          *command.target_root,
           runtime_path(command, "lifecycle-sessions"),
-          {interpreter, command.lifecycle_credentials.user_id(),
-           command.lifecycle_credentials.group_id(),
-           command.lifecycle_credentials.supplementary_groups()},
+          {interpreter, lifecycle_credentials.user_id(),
+           lifecycle_credentials.group_id(),
+           lifecycle_credentials.supplementary_groups()},
       });
 }
 
@@ -2205,6 +2353,64 @@ void render_run_result(
             << '\n';
 }
 
+void render_build_artifacts(const transaction_run_drive_result& result)
+{
+  std::vector<const construction_result*> constructions;
+  for (const auto& construction : result.run().progress().constructions())
+  {
+    if (construction.succeeded())
+      constructions.push_back(&construction);
+  }
+  std::sort(
+      constructions.begin(), constructions.end(),
+      [](const construction_result* lhs, const construction_result* rhs) {
+        const auto& left = lhs->build().build().request().release();
+        const auto& right = rhs->build().build().request().release();
+        if (left.package().name() != right.package().name())
+          return left.package().name() < right.package().name();
+        if (left.version() != right.version())
+          return left.version() < right.version();
+        return left.release() < right.release();
+      });
+
+  std::cout << "frontend build\n"
+            << "artifacts " << constructions.size() << '\n';
+  for (std::size_t index = 0U; index < constructions.size(); ++index)
+  {
+    const auto& construction = *constructions[index];
+    const auto& build_execution = construction.build();
+    const auto& build = build_execution.build();
+    if (!build.artifact() || !build.artifact_binding() ||
+        !build_execution.image_authority())
+    {
+      throw std::runtime_error(
+          "successful construction lacks complete retained artifact authority");
+    }
+    const auto& artifact = *build.artifact();
+    const auto& binding = *build.artifact_binding();
+    const auto& image = *build_execution.image_authority();
+    const auto& release = build.request().release();
+    const auto prefix = "artifact." + std::to_string(index) + ".";
+    std::cout << prefix << "package " << release.package().name() << '\n'
+              << prefix << "version " << release.version() << '\n'
+              << prefix << "release " << release.release() << '\n'
+              << prefix << "release-identity " << release.identity().hex()
+              << '\n'
+              << prefix << "path "
+              << construction.session().paths().build.artifact_path.string()
+              << '\n'
+              << prefix << "identity " << artifact.identity().hex() << '\n'
+              << prefix << "sha256 " << artifact.complete_digest().hex()
+              << '\n'
+              << prefix << "bytes " << artifact.byte_count() << '\n'
+              << prefix << "build-result-identity " << build.identity().hex()
+              << '\n'
+              << prefix << "binding-identity " << binding.hex() << '\n'
+              << prefix << "image-identity " << image.identity().hex()
+              << '\n';
+  }
+}
+
 [[nodiscard]] int drive_status(
     transaction_run_drive_disposition disposition) noexcept
 {
@@ -2228,6 +2434,13 @@ int execute_transaction_run(transaction_run_command command)
 {
   (void)open_directory(command.runtime_root);
   (void)open_directory(command.build_root);
+  (void)open_directory(command.artifact_root);
+  if (command.frontend == transaction_run_command_frontend::build &&
+      paths_overlap(command.runtime_root, command.artifact_root))
+  {
+    throw std::runtime_error(
+        "build artifact root must be disjoint from private runtime root");
+  }
 
   command_evidence_store command_evidence(
       runtime_path(command, "command-evidence"));
@@ -2245,6 +2458,12 @@ int execute_transaction_run(transaction_run_command command)
           "resumed run carries duplicate transaction authority");
     retained_evidence.emplace(
         command_evidence.load(command.nonce, command.canonical_store));
+    if (retained_evidence->frontend != command.frontend)
+      throw std::runtime_error(
+          "retained command evidence belongs to another frontend");
+    if (retained_evidence->artifact_root != command.artifact_root)
+      throw std::runtime_error(
+          "current artifact root differs from admitted command authority");
     auto composed = recompose_transaction(
         std::move(retained_evidence->request),
         std::move(retained_evidence->catalog),
@@ -2255,6 +2474,9 @@ int execute_transaction_run(transaction_run_command command)
     return composed;
   }();
 
+  if (command.frontend == transaction_run_command_frontend::build)
+    (void)require_build_frontend_transaction(transaction);
+
   const auto& binding = transaction.resolution().installed().target_binding();
 
   auto run_store = open_directory(runtime_path(command, "run"));
@@ -2262,6 +2484,18 @@ int execute_transaction_run(transaction_run_command command)
   auto effect_store = open_directory(runtime_path(command, "effects"));
   const bool operation_runtime =
       native_transaction_requires_target_operation_authority(transaction);
+  if (command.frontend == transaction_run_command_frontend::build)
+  {
+    if (operation_runtime)
+      throw std::runtime_error(
+          "build frontend composed target-operation transaction authority");
+    if (command.lifecycle_root || command.target_root ||
+        command.lifecycle_credentials)
+    {
+      throw std::runtime_error(
+          "build frontend carries surplus target-operation authority");
+    }
+  }
 
   const auto dispatch_policy = transaction_dispatch_policy::make(1U, 1U);
   const auto expected_admission = transaction_run_journal_record::admit(
@@ -2310,6 +2544,8 @@ int execute_transaction_run(transaction_run_command command)
   const auto admitted_interpreter = retained_evidence
       ? retained_evidence->interpreter
       : current_interpreter->identity();
+  auto session_configuration =
+      command_sessions(command, binding, admitted_interpreter);
 
   if (current_execution_backend)
   {
@@ -2333,8 +2569,8 @@ int execute_transaction_run(transaction_run_command command)
   if (command.intent == transaction_run_command_intent::start)
   {
     command_evidence.retain(
-        command.nonce, transaction, admitted_interpreter,
-        admitted_execution_profiles);
+        command.nonce, command.frontend, command.artifact_root, transaction,
+        admitted_interpreter, admitted_execution_profiles);
   }
 
   const auto drive_policy =
@@ -2345,6 +2581,8 @@ int execute_transaction_run(transaction_run_command command)
       const auto result = runtime.launch(
           dispatch_policy, command.nonce, drive_policy);
       render_run_result(transaction, result.drive(), true);
+      if (command.frontend == transaction_run_command_frontend::build)
+        render_build_artifacts(result.drive());
       render_terminal_failure(result.drive());
       return drive_status(result.drive().disposition());
     }
@@ -2352,6 +2590,8 @@ int execute_transaction_run(transaction_run_command command)
     const auto result = runtime.drive(
         expected_admission.journal(), drive_policy);
     render_run_result(transaction, result, false);
+    if (command.frontend == transaction_run_command_frontend::build)
+      render_build_artifacts(result);
     render_terminal_failure(result);
     return drive_status(result.disposition());
   };
@@ -2359,7 +2599,7 @@ int execute_transaction_run(transaction_run_command command)
   if (!operation_runtime)
   {
     auto configuration = native_transaction_run_runtime_configuration::make(
-        transaction, command_sessions(command, binding, admitted_interpreter));
+        transaction, std::move(session_configuration));
     auto runtime = native_posix_transaction_run_runtime::from_directory_fds(
         run_store.get(), evidence_store.get(), effect_store.get(),
         std::move(configuration), {installed_packages},
@@ -2369,8 +2609,9 @@ int execute_transaction_run(transaction_run_command command)
   }
   else
   {
-    (void)open_directory(command.lifecycle_root);
-    auto target_root = open_directory(command.target_root);
+    require_operation_command_authority(command);
+    (void)open_directory(*command.lifecycle_root);
+    auto target_root = open_directory(*command.target_root);
     auto target_locks = open_directory(runtime_path(command, "target-locks"));
     auto application_journal_directory = open_directory(
         runtime_path(command, "application-journals"));
@@ -2407,7 +2648,7 @@ int execute_transaction_run(transaction_run_command command)
         runtime_path(command, "effect-bodies"));
 
     auto configuration = native_transaction_run_runtime_configuration::make(
-        transaction, command_sessions(command, binding, admitted_interpreter),
+        transaction, std::move(session_configuration),
         command_operations(command, transaction, binding, admitted_interpreter),
         {});
     auto runtime = native_posix_transaction_run_runtime::from_directory_fds(

@@ -13,6 +13,43 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.37.0 build frontend authority
+
+`pkgctl build PACKAGE` is not a second construction orchestrator. It constructs
+one ordinary transaction request and enters the same durable transaction-run
+kernel used by `pkgctl run`. The frontend owns only policy that belongs to its
+public verb: the exact package is a build goal, `--check` adds the corresponding
+check goal, and catalog authority is preferred. The composed transaction is then
+validated as frontend authority: it must retain exactly that package build goal,
+optional same-package check goal, preserve-unselected convergence, and a
+catalog-backed build node for the direct subject (plus its check node when
+requested). Installed state therefore cannot silently satisfy the public build
+verb without construction. Caller-supplied goals, convergence policy, and
+target-operation authority are invalid.
+
+The build frontend has an explicit public artifact authority distinct from the
+private runtime hierarchy. `--artifact-root` names an existing absolute normalized root
+used by the ordinary native construction-session locator. The session root set
+must remain pairwise disjoint, and build additionally refuses lexical overlap
+between the public artifact root and the private runtime root. The frontend kind
+and exact artifact-root coordinate are retained in immutable command evidence
+with the transaction universe and execution authority. Resume must present the
+same frontend and artifact coordinate before the transaction can advance; it
+cannot redirect future publication or reinterpret retained `run` evidence as a
+`build` request.
+
+A build command is therefore structurally incapable of target mutation. Its
+command object has no lifecycle root, target root, or lifecycle credentials, and
+a recomposed build transaction containing target-operation nodes is refused. The
+canonical state store remains resolution input only. Successful construction
+results are projected from durable transaction progress into a deterministic
+artifact report; no new artifact database, scan, or truth-reconstruction layer is
+introduced. The reported path and identities describe admitted historical
+artifact authority, not a fresh observation that those bytes still exist.
+Terminal replay derives the same report from retained construction evidence even
+when the live collection has disappeared and does not reopen completed archives
+to manufacture present truth.
+
 ## Release 0.36.0 construction-only runtime authority
 
 A sealed transaction that contains only construction, check, and retain nodes

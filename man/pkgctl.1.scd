@@ -2,7 +2,7 @@ PKGCTL(1)
 
 # NAME
 
-pkgctl - inspect or boundedly execute native package authority
+pkgctl - inspect, build, or boundedly execute native package authority
 
 # SYNOPSIS
 
@@ -18,6 +18,12 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* *run* *--canonical-store* _path_ *--resume* _identity_ _run-authority_
 
+*pkgctl* *build* _package_ [*--check*] _catalog-options_ _state-options_ \
+_build-authority_ *--start* _identity_
+
+*pkgctl* *build* *--canonical-store* _path_ *--resume* _identity_ \
+_build-authority_
+
 *pkgctl* *inspect-run* *--run-store* _path_ *--journal* _identity_
 
 *pkgctl* *inspect-effect* *--effect-store* _path_ *--attempt* _identity_
@@ -28,16 +34,20 @@ _resolution-options_ [*--converge-exact*]
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.36.0 retains the native catalog, resolution, transaction, and exact
-durable run/effect inspection commands and adds one bounded mutating command.
-*run* composes or recomposes one exact transaction, enters through the native
-runtime, and performs at most the positive *--max-steps* bound. A sealed
-construction/check-only transaction does not open lifecycle or target roots,
-target-lock authority, application storage, or canonical-state publication
-authority; supplying that target-operation runtime authority is refused by the
-native composition root. Before a fresh
-run is retained or admitted, the command proves that the selected native Linux
-backend can establish the execution guarantees implied by the transaction.
+Version 0.37.0 retains the native catalog, resolution, transaction, exact
+durable run/effect inspection, and bounded *run* command, and adds the
+construction-only *build* frontend. *build package* owns the exact package build
+goal; *--check* adds its exact check goal, and catalog authority is preferred so
+compatible installed state cannot satisfy a build request without producing an
+archive. The command enters through the same sealed transaction and durable native
+run kernel as *run* but carries no lifecycle root, target root, lifecycle
+credentials, target-lock, application, or canonical-state publication authority.
+Its explicit existing *--artifact-root* is public package-output authority and is
+retained with the frontend kind in immutable command evidence; resume cannot
+redirect it. Both *run* and *build* perform at most the positive *--max-steps*
+bound. Before fresh executable work is retained or admitted, the command proves
+that the selected native Linux backend can establish the execution guarantees
+implied by the transaction.
 Capability absence is reported as control-plane unavailability rather than a
 package build/check failure. *--start* then retains the current private
 command-evidence format: the complete start-only transaction inputs, exact admitted
@@ -63,9 +73,10 @@ alongside the existing run-inspection command; both remain read-only sensors.
 
 The controller library defines exact construction, check, operation,
 progression, dispatch, journal, restart, and bounded-drive authorities. The
-*inspect-run* and *inspect-effect* commands remain read-only sensors. *run* is
-the sole effect-implying frontend and may realize only the already sealed native
-transaction through those reviewed authorities. It does not bypass progression,
+*inspect-run* and *inspect-effect* commands remain read-only sensors. *run* and
+*build* are the effect-implying frontends and may realize only the already sealed
+native transaction through those reviewed authorities. *build* is restricted to
+construction/check authority. Neither bypasses progression,
 call the single-dispatch advancement functions directly, or own package-source,
 resolver, planner, application, execution, or state semantics.
 
@@ -131,6 +142,13 @@ and the read-only command surface is unchanged.
 	changes, and publish installed state, but only beneath the explicit positive
 	step bound and explicit authority supplied on the command line.
 
+*build*
+	Start or resume one exact construction/check transaction through that same
+	native runtime. Fresh start takes one exact package subject; *--check* adds
+	its check action. The frontend owns catalog preference and cannot receive
+	target-operation or convergence authority. Immutable package archives are
+	published only beneath the explicit *--artifact-root*.
+
 *inspect-run*
 	Open one explicitly named existing POSIX transaction-run store, inspect one
 	exact journal head, and print the deterministic durable-run report. The
@@ -155,9 +173,10 @@ and the read-only command surface is unchanged.
 
 # STATE OPTIONS
 
-The following options are all required by *resolve*, *transaction*, and
-*run --start*. Only *--canonical-store* remains a live state option for
-*run --resume*; the target binding is recovered from retained command evidence.
+The following options are all required by *resolve*, *transaction*,
+*run --start*, and *build --start*. Only *--canonical-store* remains a live
+state option for *run --resume* and *build --resume*; the target binding is
+recovered from retained command evidence.
 
 *--canonical-store* _path_
 	Open the existing canonical generation store at the absolute _path_. Missing
@@ -196,15 +215,30 @@ The following options are all required by *resolve*, *transaction*, and
 	Prefer the effective catalog candidate over compatible installed authority.
 	The default is to retain compatible installed authority.
 
+# BUILD OPTIONS
+
+_package_
+	Fresh *build* accepts exactly one package name. The frontend converts it to
+	an exact build-scope resolver goal and always prefers catalog authority. The
+	composed transaction must contain catalog-backed construction for that exact
+	package; installed authority cannot silently satisfy the build verb.
+	Caller-supplied *--goal*, *--prefer-catalog*, and *--converge-exact* policy
+	are invalid for this command. Resume does not repeat the package subject.
+
+*--check*
+	Fresh *build* also admits the exact package check-scope goal. Build and check
+	resolver scopes remain independent; this option does not replace the build
+	goal. Resume does not repeat this option.
+
 # TRANSACTION OPTIONS
 
 *--converge-exact*
 	Treat the selected target closure as complete and compose removals for other
 	installed packages. This destructive policy is never enabled by default.
 
-# RUN OPTIONS
+# RUN AND BUILD OPTIONS
 
-Exactly one of the following is required:
+Exactly one of the following is required by *run* and *build*:
 
 *--start* _identity_
 	Admit one new run with the exact lowercase SHA-256 nonce. If that run is
@@ -213,26 +247,34 @@ Exactly one of the following is required:
 *--resume* _identity_
 	Resume the exact retained run nonce. The immutable command evidence and
 	admitted journal must both already exist. Collection, target-binding,
-	architecture, goal, resolution-policy, and convergence options are invalid on
-	resume: their exact admitted values are decoded from the retained current command
-	evidence. The current *--canonical-store* pathname remains caller authority for the
+	architecture, goal, build subject/check, resolution-policy, and convergence
+	options are invalid on resume: their exact admitted values are decoded from
+	the retained current command evidence. The current *--canonical-store* pathname remains caller authority for the
 	existing physical store. Bytes outside the current private command-evidence format
 	are rejected; there is no compatibility decoder or migration path.
 
-The following run authorities are also required:
+The following construction/check authorities are required by both frontends:
 
 *--runtime-root* _path_
-	Existing absolute private runtime hierarchy. The command requires these
-	pre-created children: *run*, *evidence*, *effects*, *target-locks*,
-	*command-evidence*, *effect-bodies*, *content*,
-	*construction-sessions*, *package-outputs*, *artifacts*,
-	*check-temporary*, *lifecycle-sessions*, *application-journals*,
-	*application-checkpoints*, *payload*, *capture*, *rejected*, and
-	*completed*. None is created, enumerated, repaired, or cleaned.
+	Existing absolute private runtime hierarchy. Construction/check execution
+	requires pre-created *run*, *evidence*, *effects*, *command-evidence*,
+	*content*, *construction-sessions*, *package-outputs*, and *check-temporary*
+	children. Operation-capable *run* additionally requires its target-lock,
+	application, lifecycle, effect-body, rejected/completed, and related private
+	children. *build* does not create or open those target-operation namespaces.
 
 *--build-root* _path_
 	Existing construction/check execution root view. The command never creates or
 	populates it.
+
+*--artifact-root* _path_
+	Required only by *build*. Name the existing absolute normalized public package-artifact root. It
+	must be disjoint from the private runtime hierarchy and the other native
+	construction-session roots. The exact coordinate is retained at fresh
+	admission and must be repeated unchanged on resume.
+
+The following target-operation authorities are required by *run* and invalid for
+*build*:
 
 *--lifecycle-root* _path_
 	Existing lifecycle execution root view. It is independent from the
@@ -305,8 +347,15 @@ credential transition that the backend cannot establish.
 
 The output is a deterministic line-oriented diagnostic report containing exact
 controller-session and subordinate authority identities plus normalized
-summaries. *run* reports the transaction, journal, committed record, sequence,
-start/resume origin, drive disposition, step counts, and terminal progress. It is not a persistent state format or a versioned IPC protocol.
+summaries. *run* and *build* report the transaction, journal, committed record,
+sequence, start/resume origin, drive disposition, step counts, and terminal
+progress. *build* additionally reports every successful retained construction in
+deterministic package/version/release order with its exact artifact path, release
+and artifact identities, SHA-256, byte count, build-result identity, and
+binding/image identities. Those fields report retained admitted historical
+authority, not a new observation that the completed archive still exists;
+terminal reporting does not rescan or reopen artifact paths. The output is not a
+persistent state format or a versioned IPC protocol.
 
 # EXIT STATUS
 

@@ -85,6 +85,9 @@ require_help_text()
 }
 require_help_text 'pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] --start SHA256 RUN-AUTHORITY'
 require_help_text 'pkgctl run --canonical-store PATH --resume SHA256 RUN-AUTHORITY'
+require_help_text 'pkgctl build PACKAGE [--check] OPTIONS --start SHA256 BUILD-AUTHORITY'
+require_help_text 'pkgctl build --canonical-store PATH --resume SHA256 BUILD-AUTHORITY'
+require_help_text '--artifact-root PATH'
 require_help_text 'performs at most --max-steps controller advances'
 require_help_text 'pkgctl inspect-run --run-store PATH --journal SHA256'
 require_help_text 'pkgctl inspect-effect --effect-store PATH --attempt SHA256'
@@ -100,9 +103,73 @@ if $pkgctl catalog --collection "core=$collection" --lifecycle-root "$root/ignor
 else
   [ "$?" -eq 2 ]
 fi
-grep -F 'run authority options are valid only for run' \
+grep -F 'native execution authority options are valid only for run or build' \
   "$root/run-only.err" >/dev/null
 [ ! -e "$root/ignored" ]
+
+build_nonce=$(printf '%064d' 9)
+# Build owns its exact build/check goals; generic goal policy is not a second
+# route into the frontend. This refusal happens at parse time and creates none
+# of the supplied runtime coordinates.
+# shellcheck disable=SC2086
+if $pkgctl build app \
+    --collection "core=$collection" \
+    --canonical-store "$state" $binding \
+    --build-architecture x86_64 --target-architecture x86_64 \
+    --goal 'build=app' \
+    --start "$build_nonce" \
+    --runtime-root "$root/build-policy-runtime" \
+    --build-root "$root/build-policy-root" \
+    --artifact-root "$root/build-policy-artifacts" \
+    --interpreter /bin/false \
+    --build-user-id 0 --build-group-id 0 \
+    --source-date-epoch 0 --max-steps 1 \
+    >"$root/build-policy.out" 2>"$root/build-policy.err"; then
+  echo 'build unexpectedly accepted caller-supplied goal policy' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F 'build owns its build/check goals; --goal is invalid' \
+  "$root/build-policy.err" >/dev/null
+[ ! -e "$root/build-policy-runtime" ]
+[ ! -e "$root/build-policy-root" ]
+[ ! -e "$root/build-policy-artifacts" ]
+
+# Target-operation authority is structurally invalid for the build frontend.
+# shellcheck disable=SC2086
+if $pkgctl build app \
+    --collection "core=$collection" \
+    --canonical-store "$state" $binding \
+    --build-architecture x86_64 --target-architecture x86_64 \
+    --start "$build_nonce" \
+    --runtime-root "$root/build-target-runtime" \
+    --build-root "$root/build-target-root" \
+    --artifact-root "$root/build-target-artifacts" \
+    --target-root "$root/build-forbidden-target" \
+    --interpreter /bin/false \
+    --build-user-id 0 --build-group-id 0 \
+    --source-date-epoch 0 --max-steps 1 \
+    >"$root/build-target.out" 2>"$root/build-target.err"; then
+  echo 'build unexpectedly accepted target-operation authority' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F 'target-operation authority options are invalid for build' \
+  "$root/build-target.err" >/dev/null
+[ ! -e "$root/build-forbidden-target" ]
+
+if $pkgctl build app --check --canonical-store "$state" \
+    --resume "$build_nonce" >"$root/build-resume-policy.out" \
+    2>"$root/build-resume-policy.err"; then
+  echo 'build resume unexpectedly accepted fresh package/check semantics' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F -- '--resume uses retained transaction semantics' \
+  "$root/build-resume-policy.err" >/dev/null
 
 invalid_collection=$root/invalid-collection
 mkdir -p "$invalid_collection/broken"

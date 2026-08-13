@@ -10,6 +10,36 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+# PACKAGE BUILD FRONTEND
+
+Version 0.37.0 exposes *pkgctl build package* as a constrained frontend over
+the existing transaction/run composition. It does not call construction
+adapters directly or introduce another scheduler. Fresh admission synthesizes
+the exact package build goal, optionally the exact package check goal, and
+selects catalog preference. The resulting transaction is admitted as build
+frontend authority only when the direct subject has a catalog-backed build node
+and, when requested, its check node. Compatible installed authority therefore
+cannot silently satisfy the build verb. Generic goal, convergence, lifecycle,
+target, and publication policy remain outside the frontend.
+
+The caller supplies one existing public artifact root in addition to the private
+runtime and construction/check roots. Native session qualification keeps those
+roots disjoint. The command retains the frontend kind and exact artifact-root
+coordinate in the same immutable command evidence as the transaction universe
+and execution profiles. Resume must reproduce both before durable advancement;
+it cannot redirect later archive publication or reinterpret retained *run*
+authority as *build*. A recomposed build transaction containing a target
+operation is refused.
+
+Successful construction records are reported from retained transaction progress
+in deterministic package/version/release order. The report names the exact
+archive coordinate and owner identities/digest already admitted by the build and
+image boundaries; it scans no artifact directory and invents no second artifact
+state model. The retained path and identities are historical admitted authority,
+not an observation of present filesystem truth. Completed replay therefore needs
+neither a live collection, an artifact rescan, nor a new construction attempt to
+report historical build output.
+
 # CONSTRUCTION-ONLY NATIVE AUTHORITY
 
 Version 0.36.0 distinguishes a construction/check-only native runtime from an
@@ -99,8 +129,9 @@ but those paths are not opened as authority. One
 invocation performs at most the positive *--max-steps* drive policy. It starts
 no daemon, discovers no journal, performs no unbounded loop, timer retry,
 implicit replanning, rollback, repair, cleanup, compaction, or garbage
-collection. This is the final functional package-management boundary; the next
-work is coordinated qualification and publication.
+collection. At 0.35.0 this closed the functional package-management chain;
+0.36.0 and 0.37.0 subsequently reduce construction-only authority and expose it
+through the constrained package-build frontend.
 
 # NATIVE TARGET AND RUNTIME COMPOSITION
 

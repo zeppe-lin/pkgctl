@@ -15,6 +15,7 @@ for command in \
   'pkgctl resolve' \
   'pkgctl transaction' \
   'pkgctl run' \
+  'pkgctl build' \
   'pkgctl inspect-run' \
   'pkgctl inspect-effect'; do
   grep -F -- "$command" "$readme" >/dev/null || {
@@ -41,10 +42,14 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.36.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.37.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_' \
   "$srcdir/man/pkgctl.1.scd" >/dev/null
-grep -F '# RUN OPTIONS' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '# RUN AND BUILD OPTIONS' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '*pkgctl* *build* _package_ [*--check*]' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '*--artifact-root* _path_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'PACKAGE BUILD FRONTEND' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.37.0 exposes *pkgctl build package*' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'BOUNDED NATIVE TRANSACTION COMMAND' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.35.0 exposes *pkgctl run*' \

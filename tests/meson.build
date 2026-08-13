@@ -441,6 +441,30 @@ if not get_option('tests').disabled()
     suite: 'integration-privileged',
   )
 
+  cli_build_test = find_program(
+    'integration/cli_build_test.sh',
+  )
+  test(
+    'cli-build',
+    cli_build_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_runtime_root_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/native-construction',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: native_runtime_root_fixture,
+    suite: 'integration-privileged',
+  )
+
   cli_run_lease_contention_test = find_program(
     'integration/cli_run_lease_contention_test.sh',
   )
@@ -881,6 +905,16 @@ if not get_option('tests').disabled()
   test(
     'cli-native-construction-contract',
     cli_native_construction_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_build_contract = find_program(
+    'contracts/check_cli_build_contract.sh',
+  )
+  test(
+    'cli-build-contract',
+    cli_build_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

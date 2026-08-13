@@ -4,4 +4,4 @@
 #include <pkgctl/pkgctl.h>
 
 static_assert(pkgctl::version_major == 0);
-static_assert(pkgctl::version_minor == 36);
+static_assert(pkgctl::version_minor == 37);

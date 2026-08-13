@@ -4,7 +4,7 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.36.0
+version=0.37.0
 
 require_line()
 {
@@ -21,13 +21,13 @@ require_line "$srcdir/meson.build" "  meson_version: '>=1.6.0',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 36;'
+  'inline constexpr unsigned version_minor = 37;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.36.0";'
+  'inline constexpr const char* version_string = "0.37.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 36);'
+  'static_assert(pkgctl::version_minor == 37);'
 
 require_dependency_range()
 {
@@ -53,12 +53,15 @@ require_dependency_range libpkgapply-posix '>=3.1.0' '<4.0.0'
 require_dependency_range libpkgcatalog-codec '>=3.0.0' '<4.0.0'
 require_dependency_range libpkgexec-linux '>=0.6.0' '<1.0.0'
 
+grep -F '## 0.37.0 - 2026-08-13' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F '## 0.36.0 - 2026-08-13' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F '## 0.35.1 - 2026-08-12' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F '## 0.35.0 - 2026-08-12' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Release 0.37.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.36.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
-grep -F 'Version 0.36.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.37.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.36.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 grep -F 'Bounded native transaction command' "$srcdir/CHANGELOG.md" >/dev/null
 grep -F '`pkgctl run`' "$srcdir/CHANGELOG.md" >/dev/null

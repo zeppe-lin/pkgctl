@@ -23,6 +23,7 @@ enum class command_kind {
   resolve,
   transaction,
   run,
+  build,
   inspect_run,
   inspect_effect,
 };
@@ -54,6 +55,7 @@ struct raw_options final {
   std::optional<std::string> run_nonce;
   std::optional<std::string> runtime_root;
   std::optional<std::string> build_root_path;
+  std::optional<std::string> artifact_root_path;
   std::optional<std::string> lifecycle_root_path;
   std::optional<std::string> target_root_path;
   std::optional<std::string> interpreter;
@@ -66,6 +68,10 @@ struct raw_options final {
   std::optional<std::uint64_t> source_date_epoch;
   std::optional<std::uint64_t> maximum_steps;
   std::vector<installed_tree_option> installed_trees;
+  std::optional<std::string> build_subject;
+  std::optional<int> build_subject_argument_index;
+  bool build_check = false;
+  std::optional<int> build_check_argument_index;
 };
 
 [[noreturn]] void fail(const std::string& message)
@@ -162,6 +168,7 @@ command_kind parse_kind(std::string_view value)
   if (value == "resolve") return command_kind::resolve;
   if (value == "transaction") return command_kind::transaction;
   if (value == "run") return command_kind::run;
+  if (value == "build") return command_kind::build;
   if (value == "inspect-run") return command_kind::inspect_run;
   if (value == "inspect-effect") return command_kind::inspect_effect;
   fail("unknown command: " + std::string(value));
@@ -286,6 +293,25 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
   for (int index = 2; index < argc; ++index)
   {
     const std::string argument(argv[index]);
+    if (kind == command_kind::build && !argument.empty() &&
+        argument.front() != '-')
+    {
+      if (parsed.build_subject)
+        fail("build accepts exactly one package subject");
+      parsed.build_subject = argument;
+      parsed.build_subject_argument_index = index;
+      continue;
+    }
+    if (argument == "--check")
+    {
+      if (kind != command_kind::build)
+        fail("--check is valid only for build");
+      if (parsed.build_check)
+        fail("--check specified more than once");
+      parsed.build_check = true;
+      parsed.build_check_argument_index = index;
+      continue;
+    }
     if (argument == "--collection")
     {
       auto [name, root] = assignment(
@@ -408,6 +434,12 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
                require_value(argc, argv, index, argument), argument);
       continue;
     }
+    if (argument == "--artifact-root")
+    {
+      set_once(parsed.artifact_root_path,
+               require_value(argc, argv, index, argument), argument);
+      continue;
+    }
     if (argument == "--lifecycle-root")
     {
       set_once(parsed.lifecycle_root_path,
@@ -496,17 +528,21 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
     fail("unknown option: " + argument);
   }
 
-  if (kind == command_kind::run && (!parsed.run_intent || !parsed.run_nonce))
-    fail("run requires exactly one --start or --resume nonce");
+  const bool run_like =
+      kind == command_kind::run || kind == command_kind::build;
+  if (run_like && (!parsed.run_intent || !parsed.run_nonce))
+    fail(std::string(kind == command_kind::build ? "build" : "run") +
+         " requires exactly one --start or --resume nonce");
 
-  const bool resume = kind == command_kind::run &&
+  const bool resume = run_like &&
       *parsed.run_intent == transaction_run_command_intent::resume;
   const bool has_start_semantics = !parsed.collections.empty() ||
       !parsed.external_revisions.empty() || parsed.max_document_bytes_explicit ||
       parsed.managed_target || parsed.state_store || parsed.root_view ||
       parsed.state_backend || parsed.publication_domain ||
       parsed.build_architecture || parsed.target_architecture ||
-      !parsed.goals.empty() || parsed.prefer_catalog || parsed.converge_exact;
+      !parsed.goals.empty() || parsed.prefer_catalog || parsed.converge_exact ||
+      parsed.build_subject || parsed.build_check;
 
   if (resume)
   {
@@ -515,8 +551,9 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
     if (has_start_semantics)
     {
       fail("--resume uses retained transaction semantics; catalog, "
-           "target-binding, architecture, goal, resolution-policy, and "
-           "convergence options are valid only with --start");
+           "target-binding, architecture, goal, resolution-policy, build "
+           "subject/check, and convergence options are valid only with "
+           "--start");
     }
   }
   else
@@ -556,16 +593,31 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
         fail("all canonical state options are required");
       if (!parsed.build_architecture || !parsed.target_architecture)
         fail("both architecture options are required");
-      if (parsed.goals.empty())
-        fail("at least one --goal is required");
-      if (kind != command_kind::transaction && kind != command_kind::run &&
-          parsed.converge_exact)
-        fail("--converge-exact is valid only for transaction or run");
+
+      if (kind == command_kind::build)
+      {
+        if (!parsed.build_subject)
+          fail("build --start requires exactly one package subject");
+        if (!parsed.goals.empty())
+          fail("build owns its build/check goals; --goal is invalid");
+        if (parsed.prefer_catalog)
+          fail("build already requires catalog authority; --prefer-catalog is invalid");
+        if (parsed.converge_exact)
+          fail("--converge-exact is invalid for build");
+      }
+      else
+      {
+        if (parsed.goals.empty())
+          fail("at least one --goal is required");
+        if (kind != command_kind::transaction && kind != command_kind::run &&
+            parsed.converge_exact)
+          fail("--converge-exact is valid only for transaction or run");
+      }
     }
   }
 
-  const bool has_run_options = parsed.run_intent || parsed.run_nonce ||
-      parsed.runtime_root || parsed.build_root_path ||
+  const bool has_native_execution_options = parsed.run_intent || parsed.run_nonce ||
+      parsed.runtime_root || parsed.build_root_path || parsed.artifact_root_path ||
       parsed.lifecycle_root_path || parsed.target_root_path ||
       parsed.interpreter || parsed.build_user_id || parsed.build_group_id ||
       !parsed.build_supplementary_groups.empty() || parsed.lifecycle_user_id ||
@@ -575,6 +627,8 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
       !parsed.installed_trees.empty();
   if (kind == command_kind::run)
   {
+    if (parsed.artifact_root_path)
+      fail("--artifact-root is valid only for build");
     if (!parsed.runtime_root || !parsed.build_root_path ||
         !parsed.lifecycle_root_path || !parsed.target_root_path ||
         !parsed.interpreter || !parsed.build_user_id.has_value() ||
@@ -583,12 +637,30 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
         !parsed.lifecycle_group_id.has_value() ||
         !parsed.source_date_epoch.has_value() || !parsed.maximum_steps)
       fail("run requires roots, interpreter, build/lifecycle credentials, epoch, and bound");
-    if (*parsed.maximum_steps >
-        static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
-      fail("maximum step count is too large for this platform");
   }
-  else if (has_run_options)
-    fail("run authority options are valid only for run");
+  else if (kind == command_kind::build)
+  {
+    if (!parsed.runtime_root || !parsed.build_root_path ||
+        !parsed.artifact_root_path || !parsed.interpreter ||
+        !parsed.build_user_id.has_value() || !parsed.build_group_id.has_value() ||
+        !parsed.source_date_epoch.has_value() || !parsed.maximum_steps)
+    {
+      fail("build requires runtime/build/artifact roots, interpreter, build "
+           "credentials, epoch, and bound");
+    }
+    if (parsed.lifecycle_root_path || parsed.target_root_path ||
+        parsed.lifecycle_user_id || parsed.lifecycle_group_id ||
+        !parsed.lifecycle_supplementary_groups.empty())
+    {
+      fail("target-operation authority options are invalid for build");
+    }
+  }
+  else if (has_native_execution_options)
+    fail("native execution authority options are valid only for run or build");
+
+  if (run_like && *parsed.maximum_steps >
+      static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
+    fail("maximum step count is too large for this platform");
 
   return parsed;
 }
@@ -638,24 +710,47 @@ resolution_request resolution_from(raw_options& parsed)
       std::move(parsed.goals), std::move(policy));
 }
 
-transaction_run_command run_from(
+transaction_run_command transaction_run_from(
+    command_kind kind,
     raw_options& parsed,
     std::optional<transaction_request> transaction,
     std::filesystem::path canonical_store)
 {
+  const auto frontend = kind == command_kind::build
+      ? transaction_run_command_frontend::build
+      : transaction_run_command_frontend::run;
+  std::filesystem::path runtime_root(std::move(*parsed.runtime_root));
+  std::filesystem::path artifact_root = frontend == transaction_run_command_frontend::build
+      ? std::filesystem::path(std::move(*parsed.artifact_root_path))
+      : runtime_root / "artifacts";
+
+  std::optional<pkgexec::credential_policy> lifecycle_credentials;
+  if (parsed.lifecycle_user_id && parsed.lifecycle_group_id)
+  {
+    lifecycle_credentials.emplace(pkgexec::credential_policy::fixed(
+        *parsed.lifecycle_user_id, *parsed.lifecycle_group_id,
+        std::move(parsed.lifecycle_supplementary_groups), true));
+  }
+
   return transaction_run_command{
-      std::move(transaction), std::move(canonical_store), *parsed.run_intent,
+      frontend, std::move(transaction), std::move(canonical_store),
+      *parsed.run_intent,
       transaction_run_nonce::from_hex(std::move(*parsed.run_nonce)),
-      std::move(*parsed.runtime_root), std::move(*parsed.build_root_path),
-      std::move(*parsed.lifecycle_root_path),
-      std::move(*parsed.target_root_path), std::move(*parsed.interpreter),
+      std::move(runtime_root), std::move(*parsed.build_root_path),
+      std::move(artifact_root),
+      parsed.lifecycle_root_path
+          ? std::optional<std::filesystem::path>(
+                std::move(*parsed.lifecycle_root_path))
+          : std::nullopt,
+      parsed.target_root_path
+          ? std::optional<std::filesystem::path>(
+                std::move(*parsed.target_root_path))
+          : std::nullopt,
+      std::move(*parsed.interpreter),
       pkgexec::credential_policy::fixed(
           *parsed.build_user_id, *parsed.build_group_id,
           std::move(parsed.build_supplementary_groups), true),
-      pkgexec::credential_policy::fixed(
-          *parsed.lifecycle_user_id, *parsed.lifecycle_group_id,
-          std::move(parsed.lifecycle_supplementary_groups), true),
-      *parsed.source_date_epoch,
+      std::move(lifecycle_credentials), *parsed.source_date_epoch,
       static_cast<std::size_t>(*parsed.maximum_steps),
       std::move(parsed.installed_trees)};
 }
@@ -680,17 +775,49 @@ command parse_command(int argc, char** argv)
   if (kind == command_kind::catalog)
     return catalog_from(parsed);
 
-  if (kind == command_kind::run &&
+  const bool run_like =
+      kind == command_kind::run || kind == command_kind::build;
+  if (run_like &&
       *parsed.run_intent == transaction_run_command_intent::resume)
   {
     try
     {
-      return run_from(
-          parsed, std::nullopt, std::filesystem::path(*parsed.canonical_store));
+      return transaction_run_from(
+          kind, parsed, std::nullopt,
+          std::filesystem::path(*parsed.canonical_store));
     }
     catch (const std::exception& problem)
     {
-      fail(std::string("invalid run authority: ") + problem.what());
+      fail(std::string(kind == command_kind::build
+                           ? "invalid build authority: "
+                           : "invalid run authority: ") +
+           problem.what());
+    }
+  }
+
+  if (kind == command_kind::build)
+  {
+    try
+    {
+      const auto package = pkgsource::package_reference(*parsed.build_subject);
+      parsed.goals.emplace_back(
+          pkgsource::requirement_scope::build(),
+          pkgsource::requirement_subject(package),
+          "<command-line>:" +
+              std::to_string(*parsed.build_subject_argument_index));
+      if (parsed.build_check)
+      {
+        parsed.goals.emplace_back(
+            pkgsource::requirement_scope::check(),
+            pkgsource::requirement_subject(package),
+            "<command-line>:" +
+                std::to_string(*parsed.build_check_argument_index));
+      }
+      parsed.prefer_catalog = true;
+    }
+    catch (const std::exception& problem)
+    {
+      fail(std::string("invalid build subject: ") + problem.what());
     }
   }
 
@@ -707,13 +834,17 @@ command parse_command(int argc, char** argv)
     return transaction;
   try
   {
-    return run_from(
-        parsed, std::move(transaction), std::move(canonical_store));
+    return transaction_run_from(
+        kind, parsed, std::move(transaction), std::move(canonical_store));
   }
   catch (const std::exception& problem)
   {
-    fail(std::string("invalid run authority: ") + problem.what());
+    fail(std::string(kind == command_kind::build
+                         ? "invalid build authority: "
+                         : "invalid run authority: ") +
+         problem.what());
   }
+
 }
 
 std::string help_text()
@@ -724,6 +855,8 @@ std::string help_text()
   pkgctl transaction OPTIONS --goal SCOPE=SUBJECT [--goal ...]
   pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] --start SHA256 RUN-AUTHORITY
   pkgctl run --canonical-store PATH --resume SHA256 RUN-AUTHORITY
+  pkgctl build PACKAGE [--check] OPTIONS --start SHA256 BUILD-AUTHORITY
+  pkgctl build --canonical-store PATH --resume SHA256 BUILD-AUTHORITY
   pkgctl inspect-run --run-store PATH --journal SHA256
   pkgctl inspect-effect --effect-store PATH --attempt SHA256
 
@@ -734,7 +867,7 @@ Catalog options:
   --external-revision NAME=VALUE  diagnostic revision provenance
   --max-document-bytes N          per-document acquisition limit
 
-State options required by resolve, transaction, and run --start:
+State options required by resolve, transaction, run --start, and build --start:
   --canonical-store PATH           existing store path; also required by --resume
   --managed-target ID
   --state-store ID
@@ -752,35 +885,48 @@ SCOPE is build, run, check, or lifecycle:ACTION. SUBJECT is an exact package
 name or authoritative @profile. ACTION is pre-install, post-install,
 pre-remove, or post-remove.
 
+Build start owns its resolution goals. PACKAGE becomes an exact build goal;
+--check adds the exact check goal, and catalog construction authority is
+preferred over an already installed package. --goal, --prefer-catalog, and
+--converge-exact are therefore invalid for build.
+
 Transaction options:
   --converge-exact                remove installed packages outside the exact
                                   selected target closure; never the default
 
-Run intent:
-  --start SHA256                  admit a new explicit semantic run request
-  --resume SHA256                 resume retained semantic request and run intent
+Run/build intent:
+  --start SHA256                  admit a new explicit semantic request
+  --resume SHA256                 resume retained semantic request and intent
 
-Catalog acquisition, target-binding, architecture, goal, resolution-policy,
-and convergence options are start-only. Resume refuses their re-declaration and
-uses command-evidence retained at admission. --canonical-store remains live
-resume authority naming the existing physical canonical state store.
+Catalog acquisition, target-binding, architecture, goal, build subject/check,
+resolution-policy, and convergence options are start-only. Resume refuses their
+re-declaration and uses command-evidence retained at admission.
+--canonical-store remains live resume authority naming the existing physical
+canonical state store.
 
-Run authority:
+Shared native execution authority:
   --runtime-root PATH             existing private runtime hierarchy
   --build-root PATH               existing construction/check root view
-  --lifecycle-root PATH           existing lifecycle execution root view
-  --target-root PATH              existing managed target root
   --interpreter PATH              interpreter coordinate; inspected when executable work remains
   --build-user-id N               construction/check execution user id
   --build-group-id N              construction/check execution group id
   --build-supplementary-group N   repeatable construction/check group id
+  --source-date-epoch N           hermetic construction epoch
+  --max-steps N                   positive bound for this invocation
+  --installed-tree P=R,PATH       retained installed package/resource tree
+
+Build-only authority:
+  --artifact-root PATH            existing absolute public artifact hierarchy; retained
+                                  as exact command authority and disjoint from
+                                  the private runtime hierarchy
+
+Additional run authority for target operations:
+  --lifecycle-root PATH           existing lifecycle execution root view
+  --target-root PATH              existing managed target root
   --lifecycle-user-id N           lifecycle execution user id
   --lifecycle-group-id N          lifecycle execution group id
   --lifecycle-supplementary-group N
                                   repeatable lifecycle group id
-  --source-date-epoch N           hermetic construction epoch
-  --max-steps N                   positive bound for this invocation
-  --installed-tree P=R,PATH       retained installed package/resource tree
 
 Run inspection options:
   --run-store PATH                existing POSIX transaction-run store
@@ -795,10 +941,13 @@ Global options:
   -V, --version
 
 The catalog, resolve, transaction, and inspection commands are read-only.
-The run command mutates only through one explicitly retained native runtime and
-performs at most --max-steps controller advances. It never initializes or scans
-stores, replans a resumed transaction from live catalog/state, loops without a
-bound, retries on a timer, cleans up, rolls back, or discovers a journal.
+The run and build commands execute only through one explicitly retained native
+runtime and perform at most --max-steps controller advances. Build admits only
+construction/check authority, publishes immutable package archives beneath the
+explicit --artifact-root, and never owns target mutation, lifecycle, or state
+publication authority. Neither frontend initializes or scans stores, replans a
+resumed transaction from live catalog/state, loops without a bound, retries on
+a timer, cleans up, rolls back, or discovers a journal.
 )";
 }
 

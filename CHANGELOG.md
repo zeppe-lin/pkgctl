@@ -1,5 +1,31 @@
 # pkgctl changelog
 
+## 0.37.0 - 2026-08-13
+
+- Adds `pkgctl build PACKAGE`, a constrained construction/check frontend over
+  the same sealed transaction and durable native run kernel as `pkgctl run`.
+  The command owns the exact package build goal, optionally adds its check goal,
+  and prefers catalog construction authority. After composition the frontend
+  requires a catalog-backed build node for that exact package (and a check node
+  when requested), so installed authority cannot silently satisfy the public
+  build verb without construction. It accepts no lifecycle,
+  target-mutation, state-publication, convergence, or caller-supplied goal policy.
+- Makes the caller-selected existing `--artifact-root` explicit public build
+  authority. It is disjoint from the private runtime hierarchy, participates in
+  native construction-session root qualification, and is retained with the
+  frontend kind in immutable command evidence. Resume refuses a different
+  artifact root or another frontend before durable advancement, while terminal
+  replay reports the same retained artifact inventory without reacquiring live
+  catalog semantics.
+- Reports successful construction artifacts deterministically with package
+  release identity, exact retained archive path, sealed artifact identity and
+  digest, byte count, build-result identity, and binding/image identities. A
+  privileged build campaign crosses a bounded start/resume boundary through the
+  real POSIX-shell native construction fixture, verifies dependency and selected
+  package archives beneath the public artifact root, executes the selected check,
+  leaves canonical target state unchanged, and proves target-operation/private
+  artifact namespaces remain absent.
+
 ## 0.36.0 - 2026-08-13
 
 - Separates construction/check-only native run composition from target-operation
