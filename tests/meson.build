@@ -465,6 +465,30 @@ if not get_option('tests').disabled()
     suite: 'integration-privileged',
   )
 
+  cli_run_rootfs_campaign_test = find_program(
+    'integration/cli_run_rootfs_campaign_test.sh',
+  )
+  test(
+    'cli-run-rootfs-campaign',
+    cli_run_rootfs_campaign_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_runtime_root_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/rootfs-campaign',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: native_runtime_root_fixture,
+    suite: 'integration-privileged',
+  )
+
   cli_run_lease_contention_test = find_program(
     'integration/cli_run_lease_contention_test.sh',
   )
@@ -915,6 +939,16 @@ if not get_option('tests').disabled()
   test(
     'cli-build-contract',
     cli_build_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_run_rootfs_campaign_contract = find_program(
+    'contracts/check_cli_run_rootfs_campaign_contract.sh',
+  )
+  test(
+    'cli-run-rootfs-campaign-contract',
+    cli_run_rootfs_campaign_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

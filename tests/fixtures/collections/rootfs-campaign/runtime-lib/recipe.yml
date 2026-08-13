@@ -1,0 +1,30 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: runtime-lib
+  version: 1.0
+  release: 1
+  summary: rootfs campaign runtime-only dependency
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  {}
+
+sources:
+  - path: files/source.txt
+    name: source.txt
+    sha256: a9023aea03b0989693d312a3537d167e44b3f0173a083ca269db8db1f5a9f982
+
+build:
+  language: posix-shell
+  script: |
+    IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
+    [ "$source" = runtime-lib-source ]
+    printf '%s\n' "$source" >"$PKG_DESTDIR/runtime-lib-marker"
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64

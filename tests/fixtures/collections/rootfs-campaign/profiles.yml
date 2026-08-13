@@ -1,0 +1,7 @@
+format: zeppe-lin.profiles/1
+
+profiles:
+  rootfs-test:
+    members:
+      - package: base-files
+      - package: rootfs-probe

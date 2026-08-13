@@ -1,5 +1,32 @@
 # pkgctl testing
 
+## Empty-target rootfs campaign qualification
+
+The privileged `cli-run-rootfs-campaign` vertical is the first whole-root
+qualification rather than a single-package installation fixture. It begins with
+an absent canonical store, explicitly admits one empty canonical generation
+through the provider constructor used by the state test harness, and requires
+an empty managed target before transaction execution. Production
+`pkgstate-init` is qualified in `libpkgstate-posix`; this test deliberately does
+not depend on installation of that optional reference client.
+
+The fixture profile names only `base-files` and `rootfs-probe`.
+`rootfs-probe` declares `build-tool` only in its build requirements and
+`runtime-lib` only in its run requirements. The campaign requests exact
+build/run profile authority plus the probe check, executes with the real native
+Linux backend and a minimal real POSIX shell closure in both build and
+lifecycle root views, and uses exact target convergence.
+
+A successful terminal run must retain four construction archives but publish
+exactly three installed packages and three target payloads: `base-files`,
+`runtime-lib`, and `rootfs-probe`. The transitive runtime dependency must
+therefore enter target/state even though it is not a profile member, while the
+constructed build-only dependency must remain absent from both. The probe build
+must consume the exact `build-tool` package input and its real check must consume
+the constructed probe package. This campaign is the release gate before a
+rootfs-specific CLI frontend: it proves the existing transaction/run kernel can
+materialize an empty target without collapsing build and target authority.
+
 ## Release 0.37.0 build frontend qualification
 
 The privileged `cli-build` campaign promotes the already-qualified native

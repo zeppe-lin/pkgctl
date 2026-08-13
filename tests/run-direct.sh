@@ -171,6 +171,12 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
   "$srcdir/tests/fixtures/collections/native-construction" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
+"$srcdir/tests/integration/cli_run_rootfs_campaign_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/native-runtime-root-fixture" \
+  "$srcdir/tests/fixtures/collections/rootfs-campaign" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
 "$srcdir/tests/integration/cli_run_lease_contention_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
   "$tmp/native-test-interpreter" "$tmp/native-target-lock-holder" \

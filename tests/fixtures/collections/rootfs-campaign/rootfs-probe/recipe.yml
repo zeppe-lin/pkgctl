@@ -1,0 +1,44 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: rootfs-probe
+  version: 1.0
+  release: 1
+  summary: rootfs campaign scope-separation probe
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  build:
+    - package: build-tool
+  run:
+    - package: runtime-lib
+
+sources:
+  - path: files/source.txt
+    name: source.txt
+    sha256: 91648736c6da1d5b8bdbc69d85d0fdf702d5322e05ca9a1df53eac67c62f7cbd
+
+build:
+  language: posix-shell
+  script: |
+    IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
+    IFS= read -r tool <"$PKG_BUILD_INPUT_ROOT/build-tool/build-tool-token"
+    [ "$source" = rootfs-probe-source ]
+    [ "$tool" = build-tool-source ]
+    printf '%s+%s\n' "$source" "$tool" >"$PKG_DESTDIR/rootfs-probe-marker"
+
+check:
+  language: posix-shell
+  script: |
+    IFS= read -r source <"$ZEPPE_LIN_CHECK_SOURCE/source.txt"
+    IFS= read -r payload <"$ZEPPE_LIN_CHECK_ROOT/rootfs-probe-marker"
+    [ "$source" = rootfs-probe-source ]
+    [ "$payload" = rootfs-probe-source+build-tool-source ]
+    printf 'checked:%s\n' "$payload" >/tmp/rootfs-check-ran
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64

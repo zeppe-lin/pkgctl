@@ -1,0 +1,30 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: build-tool
+  version: 1.0
+  release: 1
+  summary: rootfs campaign build-only dependency
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  {}
+
+sources:
+  - path: files/source.txt
+    name: source.txt
+    sha256: e11eb9fd4da72815471835dc481f0c6fd366c4de23a63b61892d57e767038aeb
+
+build:
+  language: posix-shell
+  script: |
+    IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
+    [ "$source" = build-tool-source ]
+    printf '%s\n' "$source" >"$PKG_DESTDIR/build-tool-token"
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64
