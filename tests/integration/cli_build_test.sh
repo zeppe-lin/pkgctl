@@ -93,7 +93,15 @@ for directory in \
 done
 "$root_view_fixture" "$build"
 mkdir "$build/build/inputs/build/dep"
-interpreter=$("$runtime_root_fixture" "$build" /bin/sh)
+chmod_program=$(command -v chmod) || fail 'host chmod is unavailable for runtime fixture'
+case $chmod_program in
+  /*)
+    ;;
+  *)
+    fail "host chmod did not resolve to an absolute path: $chmod_program"
+    ;;
+esac
+interpreter=$("$runtime_root_fixture" "$build" /bin/sh "$chmod_program")
 case $interpreter in
   /*)
     ;;

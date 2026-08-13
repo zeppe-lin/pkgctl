@@ -79,20 +79,24 @@ nodes; it must not infer construction authority from the environment label.
 
 The privileged `cli-run-native-construction` campaign closes the remaining gap
 between the in-process package campaign and the native CLI execution path. Its
-caller-owned build root receives the stable adapter mount destinations plus only
-the exact canonical `/bin/sh` executable, its ELF program interpreter, and the
-shared-library closure reported for that executable. No compiler, package tool,
-or general host `/usr` tree is made visible. The fixture recipes therefore use
-only POSIX-shell builtins.
+caller-owned build root receives the stable adapter mount destinations plus the
+exact requested `/bin/sh` runtime and one explicit `chmod` runtime used only to
+seal an executable fixture payload; each copied executable brings only its ELF
+program interpreter and reported shared-library closure. No compiler, package
+tool, or general host `/usr` tree is made visible.
 
 The transaction requests both `build=tool` and `check=tool`. Resolver scopes are
 independent: the build goal admits `tool`'s declared build-input closure, while
 the check goal admits the check action and any declared check-input closure.
 `dep` declares one local source with a pinned SHA-256, reads it through
-`PKG_SOURCE_ROOT`, and emits `dep-token`. `tool` declares
-its own pinned local source plus a build dependency on `dep`; its recipe must read
-the predecessor package through `PKG_BUILD_INPUT_ROOT/dep`, combine those exact
-bytes with its materialized source, and emit `tool-token`. The real check then
+`PKG_SOURCE_ROOT`, emits `dep-token`, and seals an executable `dep-tool` whose
+output is derived from those source bytes. `tool` declares its own pinned local
+source plus a build dependency on `dep`; its recipe must read the predecessor
+package data and directly execute `PKG_BUILD_INPUT_ROOT/dep/dep-tool` from the
+read-only package-input resource. The two results must agree before it combines
+them with its materialized source and emits `tool-token`. This proves declared
+package-input resources are executable according to admitted file mode rather
+than inheriting `noexec` from their host staging filesystem. The real check then
 reads its source through `ZEPPE_LIN_CHECK_SOURCE`, reads the constructed package
 through `ZEPPE_LIN_CHECK_ROOT`, and leaves one marker in its private temporary
 resource only after both values match.

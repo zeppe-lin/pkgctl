@@ -22,6 +22,11 @@ build:
     IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
     [ "$source" = dependency-source ]
     printf '%s\n' "$source" >"$PKG_DESTDIR/dep-token"
+    {
+      printf '%s\n' '#!/bin/sh'
+      printf '%s\n' "printf '%s\\n' '$source'"
+    } >"$PKG_DESTDIR/dep-tool"
+    chmod 0555 "$PKG_DESTDIR/dep-tool"
 
 architectures:
   build:

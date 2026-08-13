@@ -29,10 +29,14 @@ for required in \
   }
 done
 
-grep -F -- '"$runtime_root_fixture" "$build" /bin/sh' "$test_source" >/dev/null || {
-  echo 'native construction does not realize a real shell runtime' >&2
-  exit 1
-}
+for required in \
+  'command -v chmod' \
+  '"$runtime_root_fixture" "$build" /bin/sh "$chmod_program"'; do
+  grep -F -- "$required" "$test_source" >/dev/null || {
+    echo "native construction does not realize required runtime tool: $required" >&2
+    exit 1
+  }
+done
 if grep -F -- 'native-test-interpreter' "$test_source" >/dev/null; then
   echo 'native construction regressed to the synthetic interpreter fixture' >&2
   exit 1
@@ -56,7 +60,9 @@ for required in \
   'path: files/source.txt' \
   'sha256: 1d70be42fce0076cb450831f76ab01c73d9c2c136847646d8e43a6e48700d978' \
   '$PKG_SOURCE_ROOT/source.txt' \
-  '$PKG_DESTDIR/dep-token'; do
+  '$PKG_DESTDIR/dep-token' \
+  '$PKG_DESTDIR/dep-tool' \
+  'chmod 0555 "$PKG_DESTDIR/dep-tool"'; do
   grep -F -- "$required" "$dep" >/dev/null || {
     echo "native dependency recipe omits: $required" >&2
     exit 1
@@ -69,6 +75,7 @@ for required in \
   'path: files/source.txt' \
   'sha256: 42d26b2e82cf8ed42651ab63ec29927658d2e15f91c72d3ffd72a3755eb1f66f' \
   '$PKG_BUILD_INPUT_ROOT/dep/dep-token' \
+  '$PKG_BUILD_INPUT_ROOT/dep/dep-tool' \
   '$ZEPPE_LIN_CHECK_SOURCE/source.txt' \
   '$ZEPPE_LIN_CHECK_ROOT/tool-token' \
   '/tmp/check-ran'; do
@@ -81,6 +88,8 @@ done
 for required in \
   'program_interpreter' \
   'copy_runtime' \
+  'copy_requested_runtime' \
+  '[EXECUTABLE ...]' \
   'ldd ' \
   'copy_one(root, interpreter, interpreter)' \
   'std::cout << interpreter.string()'; do

@@ -137,29 +137,56 @@ void copy_runtime(const fs::path& root, const fs::path& executable)
   }
 }
 
+fs::path resolve_executable(const fs::path& requested)
+{
+  if (!requested.is_absolute()) {
+    throw std::runtime_error("runtime executable path must be absolute");
+  }
+
+  std::error_code ec;
+  const auto executable = fs::canonical(requested, ec);
+  if (ec || !fs::is_regular_file(executable)) {
+    throw std::runtime_error("cannot resolve real executable runtime");
+  }
+  return executable;
+}
+
+void copy_requested_runtime(const fs::path& root,
+                            const fs::path& requested,
+                            const fs::path& executable)
+{
+  copy_runtime(root, executable);
+  if (requested != executable) {
+    copy_one(root, executable, requested);
+  }
+}
+
 int run(int argc, char** argv)
 {
-  if (argc != 3) {
-    std::cerr << "usage: native-runtime-root-fixture ROOT INTERPRETER\n";
+  if (argc < 3) {
+    std::cerr <<
+        "usage: native-runtime-root-fixture ROOT INTERPRETER [EXECUTABLE ...]\n";
     return 2;
   }
 
-  fs::path root(argv[1]);
-  const fs::path requested(argv[2]);
-  if (!root.is_absolute() || !requested.is_absolute()) {
-    throw std::runtime_error("root and interpreter paths must be absolute");
+  const fs::path root(argv[1]);
+  const fs::path requested_interpreter(argv[2]);
+  if (!root.is_absolute()) {
+    throw std::runtime_error("runtime root path must be absolute");
   }
   if (!fs::is_directory(root)) {
     throw std::runtime_error("runtime root is not an existing directory");
   }
 
-  std::error_code ec;
-  const auto interpreter = fs::canonical(requested, ec);
-  if (ec || !fs::is_regular_file(interpreter)) {
-    throw std::runtime_error("cannot resolve real interpreter runtime");
+  const auto interpreter = resolve_executable(requested_interpreter);
+  copy_requested_runtime(root, requested_interpreter, interpreter);
+
+  for (int index = 3; index < argc; ++index) {
+    const fs::path requested(argv[index]);
+    const auto executable = resolve_executable(requested);
+    copy_requested_runtime(root, requested, executable);
   }
 
-  copy_runtime(root, interpreter);
   std::cout << interpreter.string() << '\n';
   return 0;
 }

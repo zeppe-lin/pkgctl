@@ -80,6 +80,8 @@ done
 
 for required in \
   'build tool --check' \
+  'command -v chmod' \
+  '"$runtime_root_fixture" "$build" /bin/sh "$chmod_program"' \
   '--artifact-root "$runtime/content"' \
   'build artifact root must be disjoint from private runtime root' \
   '--artifact-root "$artifacts"' \

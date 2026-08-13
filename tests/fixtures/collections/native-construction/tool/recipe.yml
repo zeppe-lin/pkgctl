@@ -21,9 +21,11 @@ build:
   language: posix-shell
   script: |
     IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
-    IFS= read -r dependency <"$PKG_BUILD_INPUT_ROOT/dep/dep-token"
+    IFS= read -r recorded_dependency <"$PKG_BUILD_INPUT_ROOT/dep/dep-token"
+    dependency=$("$PKG_BUILD_INPUT_ROOT/dep/dep-tool")
     [ "$source" = tool-source ]
-    [ "$dependency" = dependency-source ]
+    [ "$recorded_dependency" = dependency-source ]
+    [ "$dependency" = "$recorded_dependency" ]
     printf '%s+%s\n' "$source" "$dependency" >"$PKG_DESTDIR/tool-token"
 
 check:

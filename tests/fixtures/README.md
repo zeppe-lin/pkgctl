@@ -11,10 +11,12 @@ programs. Its payload is `/usr/bin/pkgctl-fixture` with fixed bytes.
 `dep` and `tool` each carry one digest-pinned local source; `tool` has a build
 requirement on `dep` and a check program. The campaign requests both build and
 check resolver scopes explicitly, so each durable input/action is backed by its
-own admitted resolver authority. The recipes use only shell builtins so
-the root view needs no ambient utility set. Successful output can exist only if
-the production adapters mounted the fetched source, predecessor package tree,
-constructed package tree, and check source at their declared logical paths.
+own admitted resolver authority. `dep` uses the one explicitly provisioned
+`chmod` runtime to seal an executable source-derived `dep-tool`; `tool` then
+executes that program directly from its read-only build-input tree. Successful
+output can exist only if the production adapters mounted executable package
+inputs plus the fetched source, predecessor package tree, constructed package
+tree, and check source at their declared logical paths.
 
 `collections/lifecycle-pre-install` and
 `collections/lifecycle-post-install` keep that same payload while adding exactly
@@ -47,9 +49,10 @@ expected to reject missing destinations rather than silently populate them.
 Scenario-specific dependency input leaves are not invented by this fixture.
 
 
-`native_runtime_root_fixture.cpp` adds one explicitly selected real executable
-to such a caller-owned root view. For the native-construction campaign it
-canonicalizes `/bin/sh`, copies that exact ELF executable, its program
-interpreter, and its `ldd`-reported shared-library closure to the same logical
-paths, and reports the canonical interpreter path used by `pkgctl`. It does not
-copy host commands or an ambient filesystem tree.
+`native_runtime_root_fixture.cpp` adds explicitly selected real executables
+to such a caller-owned root view. It canonicalizes `/bin/sh`, copies that exact
+ELF executable plus its requested logical spelling, and may copy additional
+caller-named executable runtimes. Each executable brings only its program
+interpreter and `ldd`-reported shared-library closure. The fixture reports the
+canonical interpreter path used by `pkgctl`; it never copies an ambient command
+set or filesystem tree.
