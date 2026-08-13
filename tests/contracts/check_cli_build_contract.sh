@@ -54,6 +54,9 @@ for required in \
   'build frontend composed target-operation transaction authority' \
   'build frontend carries surplus target-operation authority' \
   'require_build_frontend_transaction' \
+  'goal.members().size() != 1U' \
+  'selection->identity() == *build_selection' \
+  'selection->identity() == *check_selection' \
   'build frontend direct subject lacks catalog-backed construction' \
   'build frontend requested check lacks an executable check node' \
   'render_build_artifacts' \

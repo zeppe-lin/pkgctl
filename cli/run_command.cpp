@@ -861,19 +861,71 @@ private:
     throw std::runtime_error(
         "build frontend check goal names another package");
 
+  std::optional<pkgresolve::package_selection_identity> build_selection;
+  std::optional<pkgresolve::package_selection_identity> check_selection;
+  for (const auto& goal : transaction.resolution().resolution().goals())
+  {
+    if (goal.goal().subject().kind() !=
+        pkgsource::requirement_subject_kind::package)
+    {
+      throw std::runtime_error(
+          "build frontend resolved a profile goal");
+    }
+    if (goal.members().size() != 1U)
+      throw std::runtime_error(
+          "build frontend direct package goal has ambiguous resolver membership");
+    const auto& goal_package = goal.goal().subject().package();
+    const auto& member = goal.members().front();
+    if (member.package() != goal_package)
+      throw std::runtime_error(
+          "build frontend direct goal resolver member names another package");
+    switch (goal.goal().scope().kind())
+    {
+      case pkgsource::requirement_scope_kind::build:
+        if (build_selection || goal_package != *build_subject)
+          throw std::runtime_error(
+              "build frontend resolved another build goal");
+        build_selection = member.selection();
+        break;
+      case pkgsource::requirement_scope_kind::check:
+        if (!check_subject || check_selection ||
+            goal_package != *check_subject)
+        {
+          throw std::runtime_error(
+              "build frontend resolved another check goal");
+        }
+        check_selection = member.selection();
+        break;
+      case pkgsource::requirement_scope_kind::run:
+      case pkgsource::requirement_scope_kind::lifecycle:
+        throw std::runtime_error(
+            "build frontend resolved a target-operation goal");
+    }
+  }
+  if (!build_selection)
+    throw std::runtime_error(
+        "build frontend direct build goal lacks resolved selection authority");
+  if (check_subject && !check_selection)
+    throw std::runtime_error(
+        "build frontend direct check goal lacks resolved selection authority");
+
   bool direct_build = false;
   bool direct_check = false;
   for (const auto* node : transaction.program().nodes_for(*build_subject))
   {
-    if (node->environment() != pkgresolve::resolution_environment::build ||
-        node->selection() == nullptr)
-    {
+    const auto* selection = node->selection();
+    if (selection == nullptr || selection->candidate() == nullptr)
       continue;
-    }
-    if (node->action() == pkgtransaction::transaction_action_kind::build)
+    if (node->action() == pkgtransaction::transaction_action_kind::build &&
+        selection->identity() == *build_selection)
+    {
       direct_build = true;
-    if (node->action() == pkgtransaction::transaction_action_kind::check)
+    }
+    if (node->action() == pkgtransaction::transaction_action_kind::check &&
+        check_selection && selection->identity() == *check_selection)
+    {
       direct_check = true;
+    }
   }
   if (!direct_build)
     throw std::runtime_error(

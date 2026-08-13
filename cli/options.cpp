@@ -942,7 +942,7 @@ Global options:
 
 The catalog, resolve, transaction, and inspection commands are read-only.
 The run and build commands execute only through one explicitly retained native
-runtime and perform at most --max-steps controller advances. Build admits only
+runtime. Each performs at most --max-steps controller advances. Build admits only
 construction/check authority, publishes immutable package archives beneath the
 explicit --artifact-root, and never owns target mutation, lifecycle, or state
 publication authority. Neither frontend initializes or scans stores, replans a

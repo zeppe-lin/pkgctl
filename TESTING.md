@@ -29,7 +29,11 @@ optional check goals, implies catalog preference, rejects generic resolution or
 convergence overrides, validates that the composed direct subject has
 catalog-backed construction (and a check node when requested), carries no
 target-operation command authority, binds the frontend and artifact root into
-command evidence, and uses the shared native run runtime.
+command evidence, and uses the shared native run runtime. The direct package
+selection is resolver-target-qualified by design, while requirements expanded by
+a build/check scope are build-environment selections. The frontend contract pins
+exact resolved goal-member selection identity when locating the direct build/check
+nodes; it must not infer construction authority from the environment label.
 
 ## Release 0.36.0 real native construction qualification
 

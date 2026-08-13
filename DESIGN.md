@@ -25,7 +25,13 @@ optional same-package check goal, preserve-unselected convergence, and a
 catalog-backed build node for the direct subject (plus its check node when
 requested). Installed state therefore cannot silently satisfy the public build
 verb without construction. Caller-supplied goals, convergence policy, and
-target-operation authority are invalid.
+target-operation authority are invalid. A direct package goal is resolver-
+target-qualified even when its scope is `build`; only dependencies admitted by
+that scope are build-environment selections. Frontend validation therefore binds
+the direct build/check nodes to the exact resolved goal-member selection identity
+and catalog candidate, rather than treating the resolver environment label as the
+construction authority. Target qualification of that selection does not grant a
+target-operation node or target mutation authority.
 
 The build frontend has an explicit public artifact authority distinct from the
 private runtime hierarchy. `--artifact-root` names an existing absolute normalized root
