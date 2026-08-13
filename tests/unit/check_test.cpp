@@ -1871,9 +1871,7 @@ void check_stored_check_recovery()
   for (const auto& input : retained_inputs)
     CHECK(!fs::exists(input));
 
-  unreachable_operation_recovery_context_source operations;
-  pkgctl::native_transaction_dispatch_recovery_context_source native_context(
-      operations);
+  pkgctl::native_transaction_dispatch_recovery_context_source native_context;
   pkgctl::stored_transaction_dispatch_recovery_authority_source native_source(
       evidence_store, native_context);
   auto native_recovery =

@@ -60,6 +60,7 @@ for path in \
   'integration/lifecycle_intent_interrupt_fixture_test.sh' \
   'integration/package_pipeline_test.cpp' \
   'integration/cli_readonly_test.sh' \
+  'integration/cli_run_construction_only_test.sh' \
   'integration/cli_run_lease_contention_test.sh' \
   'integration/cli_run_removal_test.sh' \
   'integration/cli_run_application_restart_test.sh' \

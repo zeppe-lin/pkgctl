@@ -2413,9 +2413,7 @@ void check_stored_construction_recovery()
   CHECK(!std::filesystem::exists(
       result.materialization().objects().front().object_path()));
 
-  unreachable_operation_recovery_context_source operations;
-  pkgctl::native_transaction_dispatch_recovery_context_source native_context(
-      operations);
+  pkgctl::native_transaction_dispatch_recovery_context_source native_context;
   pkgctl::stored_transaction_dispatch_recovery_authority_source native_source(
       evidence_store, native_context);
   auto native_recovery =
@@ -3037,14 +3035,37 @@ void check_native_posix_transaction_run_runtime()
   const auto authority_root = root / "native-authority";
   auto session_configuration =
       native_runtime_session_configuration(authority_root);
-  auto operation_configuration = native_runtime_operation_configuration(
-      transaction, authority_root);
+
+  tool_source_options target_source_options;
+  target_source_options.with_build_dependency = false;
+  target_source_options.source_document =
+      (collection / "tool" / "recipe.yml").generic_string();
+  auto target_transaction = transaction_session(
+      tool_source(sha256_text(payload), std::move(target_source_options)), {},
+      state_store.read(), state_path, true, false, false, collection);
+
+  bool surplus_operation_authority_refused = false;
+  try
+  {
+    auto surplus_operation = native_runtime_operation_configuration(
+        transaction, authority_root / "surplus-operation");
+    (void)pkgctl::native_transaction_run_runtime_configuration::make(
+        transaction, session_configuration, std::move(surplus_operation), {});
+  }
+  catch (const pkgctl::native_transaction_run_runtime_error& problem)
+  {
+    surplus_operation_authority_refused = problem.code() ==
+        pkgctl::native_transaction_run_runtime_error_code::
+            invalid_configuration;
+  }
+  CHECK(surplus_operation_authority_refused);
+
   bool contradictory_root_refused = false;
   try
   {
     auto contradictory_operation =
         pkgctl::native_transaction_operation_configuration::make(
-            transaction,
+            target_transaction,
             {
                 pkgexec::root_view_identity::from_sha256(
                     std::string(64U, '7')),
@@ -3054,7 +3075,7 @@ void check_native_posix_transaction_run_runtime()
                 native_runtime_lifecycle_execution_identity(),
             });
     (void)pkgctl::native_transaction_run_runtime_configuration::make(
-        transaction, session_configuration,
+        target_transaction, session_configuration,
         std::move(contradictory_operation), {});
   }
   catch (const pkgctl::native_transaction_run_runtime_error& problem)
@@ -3070,7 +3091,7 @@ void check_native_posix_transaction_run_runtime()
   {
     auto overlapping_operation =
         pkgctl::native_transaction_operation_configuration::make(
-            transaction,
+            target_transaction,
             {
                 pkgexec::root_view_identity::from_sha256(
                     std::string(64U, '8')),
@@ -3080,7 +3101,7 @@ void check_native_posix_transaction_run_runtime()
                 native_runtime_lifecycle_execution_identity(),
             });
     (void)pkgctl::native_transaction_run_runtime_configuration::make(
-        transaction, session_configuration,
+        target_transaction, session_configuration,
         std::move(overlapping_operation), {});
   }
   catch (const pkgctl::native_transaction_run_runtime_error& problem)
@@ -3091,9 +3112,15 @@ void check_native_posix_transaction_run_runtime()
   }
   CHECK(mutable_overlap_refused);
 
+  auto operation_configuration = native_runtime_operation_configuration(
+      target_transaction, authority_root);
+  auto operation_runtime_configuration =
+      pkgctl::native_transaction_run_runtime_configuration::make(
+          target_transaction, session_configuration, operation_configuration,
+          {});
   auto configuration =
       pkgctl::native_transaction_run_runtime_configuration::make(
-          transaction, session_configuration, operation_configuration, {});
+          transaction, session_configuration);
 
   refusing_native_installed_package_source installed_packages;
   unreachable_native_operation_specification_source operation_specifications;
@@ -3107,17 +3134,19 @@ void check_native_posix_transaction_run_runtime()
   const auto evidence_path = root / "evidence-store";
   const auto selected_evidence_path = root / "evidence-store-selected";
   const auto effect_path = root / "effect-store";
-  const auto lock_path = root / "target-locks";
+  const auto operation_lock_path = root / "operation-target-locks";
+  const auto construction_lock_path = root / "construction-target-locks";
   std::filesystem::create_directory(run_path);
   std::filesystem::create_directory(evidence_path);
   std::filesystem::create_directory(effect_path);
-  std::filesystem::create_directory(lock_path);
+  std::filesystem::create_directory(operation_lock_path);
 
   bool overlap_refused = false;
   try
   {
     (void)pkgctl::native_posix_transaction_run_runtime::open(
-        {run_path, run_path, effect_path, lock_path}, configuration,
+        {run_path, run_path, effect_path, operation_lock_path},
+        operation_runtime_configuration,
         {installed_packages, operation_specifications, effect_restart_bodies},
         {&execution_backend, &execution_backend, application_backend,
          &execution_backend, state_store, archive_backend});
@@ -3132,14 +3161,11 @@ void check_native_posix_transaction_run_runtime()
   bool descriptor_alias_refused = false;
   const int run_fd = open_runtime_directory(run_path);
   const int effect_fd = open_runtime_directory(effect_path);
-  const int lock_fd = open_runtime_directory(lock_path);
   try
   {
     (void)pkgctl::native_posix_transaction_run_runtime::from_directory_fds(
-        run_fd, run_fd, effect_fd, lock_fd, configuration,
-        {installed_packages, operation_specifications, effect_restart_bodies},
-        {&execution_backend, &execution_backend, application_backend,
-         &execution_backend, state_store, archive_backend});
+        run_fd, run_fd, effect_fd, configuration, {installed_packages},
+        {&execution_backend, &execution_backend, archive_backend});
   }
   catch (const pkgctl::native_transaction_run_runtime_error& problem)
   {
@@ -3148,15 +3174,28 @@ void check_native_posix_transaction_run_runtime()
   }
   CHECK(::close(run_fd) == 0);
   CHECK(::close(effect_fd) == 0);
-  CHECK(::close(lock_fd) == 0);
   CHECK(descriptor_alias_refused);
 
+  bool surplus_target_lock_refused = false;
+  try
+  {
+    (void)pkgctl::native_posix_transaction_run_runtime::open(
+        {run_path, evidence_path, effect_path, operation_lock_path},
+        configuration, {installed_packages},
+        {&execution_backend, &execution_backend, archive_backend});
+  }
+  catch (const pkgctl::native_transaction_run_runtime_error& problem)
+  {
+    surplus_target_lock_refused = problem.code() ==
+        pkgctl::native_transaction_run_runtime_error_code::
+            invalid_configuration;
+  }
+  CHECK(surplus_target_lock_refused);
+
   auto runtime = pkgctl::native_posix_transaction_run_runtime::open(
-      {run_path, evidence_path, effect_path, lock_path},
-      std::move(configuration),
-      {installed_packages, operation_specifications, effect_restart_bodies},
-      {&execution_backend, &execution_backend, application_backend,
-       &execution_backend, state_store, archive_backend});
+      {run_path, evidence_path, effect_path}, std::move(configuration),
+      {installed_packages},
+      {&execution_backend, &execution_backend, archive_backend});
 
   std::filesystem::rename(run_path, selected_run_path);
   std::filesystem::create_directory(run_path);
@@ -3184,7 +3223,8 @@ void check_native_posix_transaction_run_runtime()
   CHECK(directory_entry_count(selected_evidence_path) >= 3U);
   CHECK(directory_entry_count(evidence_path) == 0U);
   CHECK(directory_entry_count(effect_path) == 0U);
-  CHECK(directory_entry_count(lock_path) == 0U);
+  CHECK(directory_entry_count(operation_lock_path) == 0U);
+  CHECK(!std::filesystem::exists(construction_lock_path));
 
   std::size_t artifacts = 0U;
   for (const auto& entry : std::filesystem::recursive_directory_iterator(

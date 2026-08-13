@@ -10,6 +10,31 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+# CONSTRUCTION-ONLY NATIVE AUTHORITY
+
+Version 0.36.0 distinguishes a construction/check-only native runtime from an
+operation-capable one. A sealed transaction containing no install, upgrade,
+remove, or lifecycle node carries the run, evidence, and effect namespaces,
+construction/check session authority, retained installed-package input,
+construction/check execution mechanisms, and package archive backend. It does
+not carry a target-lock namespace, live operation specification or restart-body
+source, retained operation-session store, application or lifecycle backend,
+canonical-state publication backend, or operation effect-body sink.
+
+The reduced runtime refuses surplus target-operation authority. Conversely, a
+transaction containing target operations requires the operation-capable
+configuration and complete target-operation mechanisms. The shared dispatch and
+recovery composers represent an absent operation source directly; they do not
+manufacture placeholder authority. If an operation dispatch were to reach the
+reduced composition despite the sealed transaction invariant, it fails closed.
+
+The bounded *run* command chooses this composition after recomposing the exact
+transaction. A construction/check-only invocation therefore does not open the
+lifecycle root, target root, target-lock store, application storage, effect-body
+store, or canonical-state publication backend. The canonical state snapshot may
+still be semantic input to resolution; read authority over that state is not
+publication authority over the managed target.
+
 # BOUNDED NATIVE TRANSACTION COMMAND
 
 Version 0.35.0 exposes *pkgctl run*, one narrow command over the existing native
@@ -65,8 +90,12 @@ admits only the invoking supervisor's credentials; a relevant mismatch is
 control-plane refusal before run admission. No fakeroot, logical ownership
 virtualization, or implicit credential transition is provided.
 
-All runtime namespaces, construction/check root, lifecycle root, and target root
-must already exist. One
+The runtime namespaces actually selected by the sealed transaction and the
+construction/check root must already exist. An operation-capable transaction
+additionally requires the lifecycle root, target root, target-lock namespace,
+and application/publication stores. A construction/check-only transaction may
+name lifecycle/target command coordinates for the current *run* option surface,
+but those paths are not opened as authority. One
 invocation performs at most the positive *--max-steps* drive policy. It starts
 no daemon, discovers no journal, performs no unbounded loop, timer retry,
 implicit replanning, rollback, repair, cleanup, compaction, or garbage
@@ -83,10 +112,15 @@ explicit archive mapping; exact progress rehydration; restart composition;
 construction, check, and effect drivers; and canonical dispatch nonce
 projection.
 
-The caller supplies four existing disjoint POSIX namespaces, fixed
-construction/check and lifecycle coordinates, retained installed-package tree
-authority, live per-dispatch operation specifications, subordinate effect
-restart bodies, selected physical backends, and canonical state. Path-based
+The caller always supplies three existing disjoint POSIX namespaces for run,
+construction/check evidence, and effects, plus fixed construction/check
+coordinates and retained installed-package tree authority. An operation-capable
+transaction additionally supplies the target-lock namespace, lifecycle
+coordinates, live per-dispatch operation specifications, subordinate effect
+restart bodies, application/lifecycle/state mechanisms, and archive mapping.
+Version 0.34.0 introduced the four-namespace operation-capable shape; Version
+0.36.0 makes the target-operation portion absent for a construction/check-only
+transaction. Path-based
 opening requires absolute normalized existing directories and uses final-component no-follow
 directory semantics. Descriptor-based opening rejects aliases by filesystem
 identity. No store or directory is initialized, discovered, scanned, or

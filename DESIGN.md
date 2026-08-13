@@ -13,6 +13,37 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Release 0.36.0 construction-only runtime authority
+
+A sealed transaction that contains only construction, check, and retain nodes
+does not acquire target-operation capability merely because the generic durable
+run kernel can also execute operations. Its native composition carries the run,
+construction/check evidence, and effect namespaces; the native construction/check
+session source; retained installed-package tree source; construction/check
+execution mechanisms; and package archive backend. The target-lock namespace,
+live operation specification source, operation restart bodies, retained operation
+sessions, application and lifecycle mechanisms, canonical-state publication
+backend, and operation effect-body sink are absent.
+
+The reduced shape is an invariant, not a convenience path. The two-argument
+native runtime configuration refuses a transaction containing install, upgrade,
+remove, or lifecycle authority. The operation-capable configuration refuses a
+construction/check-only transaction. Native runtime assembly then refuses either
+surplus target-operation authority on the reduced shape or an incomplete
+operation-capable shape. Generic execution and recovery composition represents
+the operation source with an optional pointer and fails closed only if an
+impossible operation dispatch reaches a construction-only composition; no dummy
+operation authority is fabricated.
+
+The bounded command selects the shape only after the exact transaction is
+composed or recomposed. For a construction/check-only graph it does not open the
+lifecycle root, target root, target-lock namespace, application journal/checkpoint
+or payload/capture stores, rejected/completed stores, effect-body store, or live
+canonical state publication backend. The canonical store remains semantic input
+to transaction resolution/recomposition; it is not thereby granted publication
+authority. This keeps `pkgctl run --goal build=...` on the same durable run kernel
+while removing the target mutation capability that the selected graph cannot use.
+
 ## Pre-frontend live-target qualification boundary
 
 The in-process package campaign shares live target-observation semantics with the
@@ -245,7 +276,8 @@ an outer caller to manually retain every intermediate adapter lifetime:
 
 ```text
 sealed transaction + fixed roots/lifecycle configuration
-        + four existing POSIX namespaces
+        + run/evidence/effect namespaces
+        + target-lock namespace when operations exist
         + live semantic owner sources
         + selected physical backends
                          |
@@ -279,11 +311,12 @@ completed construction/check evidence through the same locator and backend
 profile used by fresh and restarted work. Terminal operations are reopened by
 the same native operation authority and canonical checkpoint validator.
 
-Path-based construction opens four existing absolute, normalized directories
-with final-component no-follow directory semantics, then delegates to the descriptor-based
-factory. Normalized path overlap is refused before opening; aliased descriptors
-are refused by device/inode identity. No directory is created, initialized,
-scanned, inferred, or selected. Build/check writable roots must remain disjoint from lifecycle execution,
+Path-based construction opens three existing absolute, normalized journal
+directories and, for an operation-capable transaction, the fourth target-lock
+directory with final-component no-follow directory semantics, then delegates to
+the corresponding descriptor-based factory. Normalized path overlap is refused
+before opening; aliased descriptors are refused by device/inode identity. No
+directory is created, initialized, scanned, inferred, or selected. Build/check writable roots must remain disjoint from lifecycle execution,
 target, and lifecycle-session authority. Construction/check and lifecycle root
 views remain independent typed authorities; when they deliberately use the same
 host path, their identities must agree.

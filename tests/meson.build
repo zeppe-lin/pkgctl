@@ -388,6 +388,30 @@ if not get_option('tests').disabled()
     suite: 'integration-privileged',
   )
 
+  cli_run_construction_only_test = find_program(
+    'integration/cli_run_construction_only_test.sh',
+  )
+  test(
+    'cli-run-construction-only',
+    cli_run_construction_only_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_interpreter,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/simple-install',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: native_interpreter,
+    suite: 'integration-privileged',
+  )
+
   cli_run_lease_contention_test = find_program(
     'integration/cli_run_lease_contention_test.sh',
   )

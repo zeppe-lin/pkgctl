@@ -1,5 +1,25 @@
 # pkgctl testing
 
+## Release 0.36.0 construction-only authority qualification
+
+The native runtime unit campaign now seals a build-only transaction through the
+reduced configuration and proves that operation specifications and effect restart
+bodies are never consulted, the effect and operation-lock stores remain empty,
+and no construction target-lock namespace is created. It separately proves that
+supplying operation configuration or a target-lock namespace to that transaction
+is refused. Existing operation-capable root-identity and directory-alias tests use
+an install-bearing transaction so their target authority remains intentional.
+
+The privileged `cli-run-construction-only` campaign creates only the command,
+run, evidence, effect, content, construction-session, package-output, artifact,
+and check-temporary namespaces. The lifecycle root, target root, target locks,
+application journals/checkpoints, payload/capture, rejected/completed stores,
+effect-body store, and lifecycle sessions are deliberately absent. A
+`build=fixture` run must complete in one durable construction step, publish one
+package archive, and leave canonical target state unchanged. The collection is
+then removed and a terminal resume must complete with zero durable steps while
+the target-operation roots remain absent.
+
 ## Library-level package campaign qualification
 
 Before a user-facing construction command is extended, the non-CLI integration
@@ -157,9 +177,11 @@ The native runtime suite must prove:
 - one composition root owns the POSIX run, construction/check evidence, and
   effect stores plus the native session, operation, archive, progress,
   recovery, driver, and dispatch-nonce chain in dependency-safe lifetime order;
-- four path-selected namespaces are existing absolute directories, opened with
-  final-component no-follow directory authority, and refused when normalized paths overlap;
-  descriptor-selected aliases are refused by device/inode identity;
+- the run, evidence, and effect path-selected namespaces are existing absolute
+  directories opened with final-component no-follow authority; an
+  operation-capable transaction additionally requires the target-lock namespace.
+  Normalized overlaps and descriptor-selected aliases are refused by
+  path/device-inode authority respectively;
 - construction/check and lifecycle execution retain independent typed
   root-view authority; a deliberately shared path requires one identity, while
   build/check writable roots remain disjoint from lifecycle execution, target,

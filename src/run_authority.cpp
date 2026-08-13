@@ -209,9 +209,16 @@ void validate_operation_recovery(
 
 composed_transaction_dispatch_execution_authority_source::
 composed_transaction_dispatch_execution_authority_source(
+    transaction_dispatch_session_source& sessions)
+    : sessions_(sessions), operations_(nullptr)
+{
+}
+
+composed_transaction_dispatch_execution_authority_source::
+composed_transaction_dispatch_execution_authority_source(
     transaction_dispatch_session_source& sessions,
     transaction_operation_execution_authority_source& operations)
-    : sessions_(sessions), operations_(operations)
+    : sessions_(sessions), operations_(&operations)
 {
 }
 
@@ -239,7 +246,10 @@ composed_transaction_dispatch_execution_authority_source::operation(
     const transaction_run& run,
     const transaction_dispatch& dispatch)
 {
-  return operations_.operation(record, run, dispatch);
+  if (operations_ == nullptr)
+    invalid_authority(
+        "operation execution requested without operation authority");
+  return operations_->operation(record, run, dispatch);
 }
 
 transaction_dispatch_execution_handoff::

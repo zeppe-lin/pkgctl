@@ -1,5 +1,15 @@
 # pkgctl
 
+Release 0.36.0 removes target-operation authority from native
+construction/check-only runs. Such a sealed transaction enters the same durable
+run kernel without opening lifecycle or target roots, target-lock authority,
+application storage, operation restart bodies, or canonical-state publication
+authority. Supplying those mechanisms to the reduced native composition is a
+configuration error rather than harmless surplus capability. The bounded CLI
+selects this reduced composition after sealing the transaction; privileged
+qualification builds one real package archive while the target-operation
+namespaces remain absent and canonical target state remains unchanged.
+
 Release 0.35.1 hardens retained private journal and evidence reopening so
 corrupted special-file authority fails closed without blocking recovery.
 
@@ -59,11 +69,12 @@ The current Linux backend admits only the invoking supervisor's credentials;
 `pkgctl` refuses incompatible explicit credentials before run admission rather
 than pretending to provide fakeroot or ownership virtualization.
 
-All authority remains explicit: existing runtime, construction/check, lifecycle,
-and target roots; one exact interpreter authority when current execution is possible;
-numeric credentials; source-date
-epoch; retained installed-package trees; canonical state binding; and a caller-issued run
-nonce. The command creates no namespace, starts no daemon, waits on no timer,
+All authority remains explicit: existing runtime and construction/check roots;
+operation-capable transactions additionally require existing lifecycle and target
+roots and their target-operation stores. One exact interpreter authority is
+required when current execution is possible, alongside explicit numeric
+credentials, source-date epoch, retained installed-package trees, canonical state
+binding, and a caller-issued run nonce. The command creates no namespace, starts no daemon, waits on no timer,
 loops beyond the bound, retries implicitly, rolls back, repairs, cleans up, or
 collects history. Package management is now functionally closed; remaining work
 is one coordinated whole-zoo qualification and publication pass.

@@ -25,7 +25,8 @@ for required in \
   'class transaction_dispatch_recovery_context_source' \
   'class transaction_operation_recovery_authority_source' \
   'class native_transaction_dispatch_recovery_context_source final' \
-  'transaction_operation_recovery_authority_source& operations_' \
+  'transaction_operation_recovery_authority_source* operations_' \
+  'operation recovery requested without operation authority' \
   'class stored_transaction_dispatch_recovery_authority_source final' \
   'transaction_run_evidence_store& evidence_' \
   'transaction_dispatch_recovery_context_source& context_' \
@@ -76,6 +77,7 @@ for required_test in \
   'transaction_run_evidence_error_code::evidence_missing' \
   'recovery_context_mismatch' \
   'native_transaction_dispatch_recovery_context_source' \
+  'native_transaction_dispatch_recovery_context_source native_context;' \
   'check_durable_session_codec' \
   'encode_check_session(native_recovery.check()->session())'; do
   grep -F -- "$required_test" "$check" >/dev/null || {

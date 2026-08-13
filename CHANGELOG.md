@@ -1,5 +1,27 @@
 # pkgctl changelog
 
+## 0.36.0 - 2026-08-13
+
+- Separates construction/check-only native run composition from target-operation
+  authority. A sealed transaction with no install, upgrade, remove, or lifecycle
+  nodes uses only the run, evidence, and effect namespaces plus construction/check
+  session and archive mechanisms. It carries no operation specification/restart
+  source, target-lock namespace, application backend, lifecycle backend, canonical
+  state publication backend, operation session store, or operation effect body
+  authority. Supplying any of those authorities to the construction-only native
+  composition is refused rather than silently retained.
+- Makes the shared dispatch and recovery composers represent absent operation
+  authority as absence. Construction/check calls remain valid; an impossible
+  operation execution or recovery request fails closed instead of relying on a
+  fabricated placeholder authority.
+- Routes `pkgctl run` through that reduced composition whenever the sealed
+  transaction contains no target operation. The command does not open the
+  lifecycle root, target root, target-lock store, application stores, effect-body
+  store, or canonical-state publication backend for such a run. A privileged
+  construction-only CLI campaign proves one package archive is produced while
+  those namespaces remain absent, canonical target state remains unchanged, and
+  terminal resume needs no reconstructed collection semantics.
+
 ## 0.35.1 - 2026-08-12
 
 - Refuses corrupted transaction-run journal, effect-journal, and retained

@@ -10,6 +10,7 @@ main="$srcdir/cli/main.cpp"
 meson="$srcdir/cli/meson.build"
 tests_meson="$srcdir/tests/meson.build"
 integration="$srcdir/tests/integration/cli_run_test.sh"
+construction_only_integration="$srcdir/tests/integration/cli_run_construction_only_test.sh"
 readonly_integration="$srcdir/tests/integration/cli_readonly_test.sh"
 removal_integration="$srcdir/tests/integration/cli_run_removal_test.sh"
 restart_integration="$srcdir/tests/integration/cli_run_application_restart_test.sh"
@@ -24,6 +25,7 @@ lifecycle_interrupt_fixture="$srcdir/tests/fixtures/lifecycle_intent_interrupt_f
 interrupt_fixture="$srcdir/tests/fixtures/application_intent_interrupt_fixture.cpp"
 
 for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration" \
+            "$construction_only_integration" \
             "$readonly_integration" \
             "$removal_integration" "$restart_integration" "$publication_restart_integration" \
             "$publication_terminal_integration" "$publication_terminal_fixture" \
@@ -75,6 +77,8 @@ for required in \
   'read_optional(' \
   'result.application = std::move(body)' \
   'pkgstate::posix::canonical_generation_store::open_existing(' \
+  'native_transaction_requires_target_operation_authority(transaction)' \
+  'if (!operation_runtime)' \
   'native_posix_transaction_run_runtime::from_directory_fds(' \
   'require_native_execution_preflight(' \
   'transaction_run_drive_policy::make(command.maximum_steps)' \
@@ -158,6 +162,43 @@ grep -F "'cli-run'" "$tests_meson" >/dev/null || {
   echo 'bounded run command has no process-level integration test' >&2
   exit 1
 }
+grep -F "'cli-run-construction-only'" "$tests_meson" >/dev/null || {
+  echo 'construction-only run has no process-level authority-minimization test' >&2
+  exit 1
+}
+
+construction_branch_line=$(grep -n -F 'if (!operation_runtime)' "$command" \
+  | tail -1 | cut -d: -f1)
+lifecycle_open_line=$(grep -n -F 'open_directory(command.lifecycle_root)' "$command" \
+  | tail -1 | cut -d: -f1)
+target_open_line=$(grep -n -F 'open_directory(command.target_root)' "$command" \
+  | tail -1 | cut -d: -f1)
+[ -n "$construction_branch_line" ] && [ -n "$lifecycle_open_line" ] && \
+  [ -n "$target_open_line" ] && \
+  [ "$construction_branch_line" -lt "$lifecycle_open_line" ] && \
+  [ "$construction_branch_line" -lt "$target_open_line" ] || {
+  echo 'target/lifecycle roots are opened before construction-only authority is selected' >&2
+  exit 1
+}
+
+for construction_only_contract in \
+  "--goal 'build=fixture'" \
+  'lifecycle-must-remain-absent' \
+  'target-must-remain-absent' \
+  'target-locks' \
+  'application-journals' \
+  'effect-bodies' \
+  'require_absent "operation-runtime-$directory"' \
+  'construction-only run changed canonical target state' \
+  "find \"\$runtime/artifacts\" -type f -name '*.tar'" \
+  'rm -rf "$collection"' \
+  'durable-steps 0'; do
+  grep -F -- "$construction_only_contract" "$construction_only_integration" \
+      >/dev/null || {
+    echo "missing construction-only CLI qualification: $construction_only_contract" >&2
+    exit 1
+  }
+done
 
 for usage in \
   'pkgctl run OPTIONS --goal SCOPE=SUBJECT [--goal ...] --start SHA256 RUN-AUTHORITY' \
@@ -486,7 +527,9 @@ for documented in \
   'Release 0.35.0 closes the functional package-management chain' \
   'Release 0.35.0 bounded native command boundary' \
   'Release 0.35.0 bounded native command qualification' \
-  'Version 0.35.1 retains the native catalog' \
+  'Version 0.36.0 retains the native catalog' \
+  'Release 0.36.0 construction-only runtime authority' \
+  'Release 0.36.0 construction-only authority qualification' \
   'BOUNDED NATIVE TRANSACTION COMMAND' \
   'current private command-evidence format' \
   'retained transaction semantics'; do

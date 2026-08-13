@@ -41,7 +41,7 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.35.1' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.36.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_' \
   "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '# RUN OPTIONS' "$srcdir/man/pkgctl.1.scd" >/dev/null

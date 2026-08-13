@@ -433,9 +433,15 @@ check_dispatch_recovery_context detail::native_check_recovery_context(
 }
 
 native_transaction_dispatch_recovery_context_source::
+native_transaction_dispatch_recovery_context_source()
+    : operations_(nullptr)
+{
+}
+
+native_transaction_dispatch_recovery_context_source::
 native_transaction_dispatch_recovery_context_source(
     transaction_operation_recovery_authority_source& operations)
-    : operations_(operations)
+    : operations_(&operations)
 {
 }
 
@@ -476,7 +482,10 @@ native_transaction_dispatch_recovery_context_source::operation(
     const transaction_dispatch_restart_assessment& assessment,
     const transaction_dispatch& dispatch)
 {
-  return operations_.operation(checkpoint, assessment, dispatch);
+  if (operations_ == nullptr)
+    context_mismatch(
+        "operation recovery requested without operation authority");
+  return operations_->operation(checkpoint, assessment, dispatch);
 }
 
 stored_transaction_dispatch_recovery_authority_source::

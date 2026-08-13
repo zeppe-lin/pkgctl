@@ -2228,8 +2228,6 @@ int execute_transaction_run(transaction_run_command command)
 {
   (void)open_directory(command.runtime_root);
   (void)open_directory(command.build_root);
-  (void)open_directory(command.lifecycle_root);
-  auto target_root = open_directory(command.target_root);
 
   command_evidence_store command_evidence(
       runtime_path(command, "command-evidence"));
@@ -2262,15 +2260,8 @@ int execute_transaction_run(transaction_run_command command)
   auto run_store = open_directory(runtime_path(command, "run"));
   auto evidence_store = open_directory(runtime_path(command, "evidence"));
   auto effect_store = open_directory(runtime_path(command, "effects"));
-  auto target_locks = open_directory(runtime_path(command, "target-locks"));
-  auto application_journal_directory = open_directory(
-      runtime_path(command, "application-journals"));
-  auto application_checkpoint_directory = open_directory(
-      runtime_path(command, "application-checkpoints"));
-  auto payload_directory = open_directory(runtime_path(command, "payload"));
-  auto capture_directory = open_directory(runtime_path(command, "capture"));
-  auto rejected_directory = open_directory(runtime_path(command, "rejected"));
-  auto completed_directory = open_directory(runtime_path(command, "completed"));
+  const bool operation_runtime =
+      native_transaction_requires_target_operation_authority(transaction);
 
   const auto dispatch_policy = transaction_dispatch_policy::make(1U, 1U);
   const auto expected_admission = transaction_run_journal_record::admit(
@@ -2335,33 +2326,9 @@ int execute_transaction_run(transaction_run_command command)
             : nullptr);
   }
 
-  auto application_target = command_application_target(
-      command, transaction, binding, admitted_interpreter,
-      admitted_execution_profiles.lifecycle);
-  auto target_observer =
-      pkgapply::posix::application_target_observer::from_directory_fd(
-          target_root.get());
-
-  auto application_journals =
-      pkgapply::posix::application_journal_store::from_directory_fd(
-          application_journal_directory.get());
-  private_effect_body_store effect_bodies(
-      runtime_path(command, "effect-bodies"), application_journals);
-  auto application_backend =
-      pkgapply::posix::application_posix_backend::from_directory_fds(
-          application_target, target_root.get(),
-          application_journal_directory.get(),
-          application_checkpoint_directory.get(), payload_directory.get(),
-          capture_directory.get(), rejected_directory.get(),
-          completed_directory.get());
-  auto state_store = pkgstate::posix::canonical_generation_store::open_existing(
-      command.canonical_store, binding);
   pkgimage::libarchive_backend archive_backend;
   explicit_installed_package_source installed_packages(
       std::move(command.installed_trees));
-  live_operation_authority operation_authority(
-      transaction, target_observer, archive_backend, application_target,
-      runtime_path(command, "effect-bodies"));
 
   if (command.intent == transaction_run_command_intent::start)
   {
@@ -2370,35 +2337,89 @@ int execute_transaction_run(transaction_run_command command)
         admitted_execution_profiles);
   }
 
-  auto configuration = native_transaction_run_runtime_configuration::make(
-      transaction, command_sessions(command, binding, admitted_interpreter),
-      command_operations(command, transaction, binding, admitted_interpreter),
-      {});
-  auto runtime = native_posix_transaction_run_runtime::from_directory_fds(
-      run_store.get(), evidence_store.get(), effect_store.get(),
-      target_locks.get(), std::move(configuration),
-      {installed_packages, operation_authority, effect_bodies,
-       &operation_authority, &effect_bodies, &operation_authority},
-      {current_execution_backend.get(), current_execution_backend.get(),
-       *application_backend, current_execution_backend.get(), state_store,
-       archive_backend});
-
   const auto drive_policy =
       transaction_run_drive_policy::make(command.maximum_steps);
-  if (command.intent == transaction_run_command_intent::start)
-  {
-    const auto result = runtime->launch(
-        dispatch_policy, command.nonce, drive_policy);
-    render_run_result(transaction, result.drive(), true);
-    render_terminal_failure(result.drive());
-    return drive_status(result.drive().disposition());
-  }
+  const auto drive_runtime = [&](native_posix_transaction_run_runtime& runtime) {
+    if (command.intent == transaction_run_command_intent::start)
+    {
+      const auto result = runtime.launch(
+          dispatch_policy, command.nonce, drive_policy);
+      render_run_result(transaction, result.drive(), true);
+      render_terminal_failure(result.drive());
+      return drive_status(result.drive().disposition());
+    }
 
-  const auto result = runtime->drive(
-      expected_admission.journal(), drive_policy);
-  render_run_result(transaction, result, false);
-  render_terminal_failure(result);
-  return drive_status(result.disposition());
+    const auto result = runtime.drive(
+        expected_admission.journal(), drive_policy);
+    render_run_result(transaction, result, false);
+    render_terminal_failure(result);
+    return drive_status(result.disposition());
+  };
+
+  if (!operation_runtime)
+  {
+    auto configuration = native_transaction_run_runtime_configuration::make(
+        transaction, command_sessions(command, binding, admitted_interpreter));
+    auto runtime = native_posix_transaction_run_runtime::from_directory_fds(
+        run_store.get(), evidence_store.get(), effect_store.get(),
+        std::move(configuration), {installed_packages},
+        {current_execution_backend.get(), current_execution_backend.get(),
+         archive_backend});
+    return drive_runtime(*runtime);
+  }
+  else
+  {
+    (void)open_directory(command.lifecycle_root);
+    auto target_root = open_directory(command.target_root);
+    auto target_locks = open_directory(runtime_path(command, "target-locks"));
+    auto application_journal_directory = open_directory(
+        runtime_path(command, "application-journals"));
+    auto application_checkpoint_directory = open_directory(
+        runtime_path(command, "application-checkpoints"));
+    auto payload_directory = open_directory(runtime_path(command, "payload"));
+    auto capture_directory = open_directory(runtime_path(command, "capture"));
+    auto rejected_directory = open_directory(runtime_path(command, "rejected"));
+    auto completed_directory = open_directory(runtime_path(command, "completed"));
+
+    auto application_target = command_application_target(
+        command, transaction, binding, admitted_interpreter,
+        admitted_execution_profiles.lifecycle);
+    auto target_observer =
+        pkgapply::posix::application_target_observer::from_directory_fd(
+            target_root.get());
+    auto application_journals =
+        pkgapply::posix::application_journal_store::from_directory_fd(
+            application_journal_directory.get());
+    private_effect_body_store effect_bodies(
+        runtime_path(command, "effect-bodies"), application_journals);
+    auto application_backend =
+        pkgapply::posix::application_posix_backend::from_directory_fds(
+            application_target, target_root.get(),
+            application_journal_directory.get(),
+            application_checkpoint_directory.get(), payload_directory.get(),
+            capture_directory.get(), rejected_directory.get(),
+            completed_directory.get());
+    auto state_store =
+        pkgstate::posix::canonical_generation_store::open_existing(
+            command.canonical_store, binding);
+    live_operation_authority operation_authority(
+        transaction, target_observer, archive_backend, application_target,
+        runtime_path(command, "effect-bodies"));
+
+    auto configuration = native_transaction_run_runtime_configuration::make(
+        transaction, command_sessions(command, binding, admitted_interpreter),
+        command_operations(command, transaction, binding, admitted_interpreter),
+        {});
+    auto runtime = native_posix_transaction_run_runtime::from_directory_fds(
+        run_store.get(), evidence_store.get(), effect_store.get(),
+        target_locks.get(), std::move(configuration),
+        {installed_packages, operation_authority, effect_bodies,
+         &operation_authority, &effect_bodies, &operation_authority},
+        {current_execution_backend.get(), current_execution_backend.get(),
+         *application_backend, current_execution_backend.get(), state_store,
+         archive_backend});
+    return drive_runtime(*runtime);
+  }
 }
 
 } // namespace pkgctl::cli

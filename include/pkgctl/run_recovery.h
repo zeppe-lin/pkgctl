@@ -82,11 +82,15 @@ public:
  * projections, while exact historical backend capability profiles are decoded
  * from libpkgexec-owned bytes retained in the durable attempt. A live
  * execution backend is unnecessary merely to decode old evidence.
- * Operation recovery is delegated to its effect-journal owner.
+ * Operation recovery is delegated to its effect-journal owner when that
+ * authority is present. A construction/check-only composition carries no
+ * operation recovery authority.
  */
 class native_transaction_dispatch_recovery_context_source final
     : public transaction_dispatch_recovery_context_source {
 public:
+  native_transaction_dispatch_recovery_context_source();
+
   native_transaction_dispatch_recovery_context_source(
       transaction_operation_recovery_authority_source& operations);
 
@@ -108,7 +112,7 @@ public:
       const transaction_dispatch& dispatch) override;
 
 private:
-  transaction_operation_recovery_authority_source& operations_;
+  transaction_operation_recovery_authority_source* operations_;
 };
 
 /*! \brief Recover exact semantic authorities from durable typed evidence.

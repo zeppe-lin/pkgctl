@@ -103,10 +103,13 @@ public:
       const transaction_dispatch& dispatch) = 0;
 };
 
-/*! \brief Compose one shared construction/check source with operation input. */
+/*! \brief Compose construction/check authority with optional operation input. */
 class composed_transaction_dispatch_execution_authority_source final
     : public transaction_dispatch_execution_authority_source {
 public:
+  explicit composed_transaction_dispatch_execution_authority_source(
+      transaction_dispatch_session_source& sessions);
+
   composed_transaction_dispatch_execution_authority_source(
       transaction_dispatch_session_source& sessions,
       transaction_operation_execution_authority_source& operations);
@@ -128,7 +131,7 @@ public:
 
 private:
   transaction_dispatch_session_source& sessions_;
-  transaction_operation_execution_authority_source& operations_;
+  transaction_operation_execution_authority_source* operations_;
 };
 
 /*! \brief Caller-owned source of exact evidence for one active restart item. */

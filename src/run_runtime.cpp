@@ -123,16 +123,17 @@ void validate_runtime_paths(native_transaction_run_runtime_paths& paths)
       std::move(paths.evidence_store), "transaction evidence store");
   paths.effect_store = normalize_runtime_path(
       std::move(paths.effect_store), "effect journal store");
-  paths.target_lock_store = normalize_runtime_path(
-      std::move(paths.target_lock_store), "target lock store");
+  if (paths.target_lock_store)
+    paths.target_lock_store = normalize_runtime_path(
+        std::move(*paths.target_lock_store), "target lock store");
 
-  const std::array<std::pair<const std::filesystem::path*, const char*>, 4>
-      selected{{
-          {&paths.run_store, "transaction-run store"},
-          {&paths.evidence_store, "transaction evidence store"},
-          {&paths.effect_store, "effect journal store"},
-          {&paths.target_lock_store, "target lock store"},
-      }};
+  std::vector<std::pair<const std::filesystem::path*, const char*>> selected{
+      {&paths.run_store, "transaction-run store"},
+      {&paths.evidence_store, "transaction evidence store"},
+      {&paths.effect_store, "effect journal store"},
+  };
+  if (paths.target_lock_store)
+    selected.push_back({&*paths.target_lock_store, "target lock store"});
   for (std::size_t first = 0U; first < selected.size(); ++first)
     for (std::size_t second = first + 1U; second < selected.size(); ++second)
       if (paths_overlap(*selected[first].first, *selected[second].first))
@@ -186,9 +187,9 @@ void validate_distinct_runtime_directories(
     int run_store_directory_fd,
     int evidence_store_directory_fd,
     int effect_store_directory_fd,
-    int target_lock_directory_fd)
+    std::optional<int> target_lock_directory_fd)
 {
-  const std::array<std::pair<directory_authority, const char*>, 4> selected{{
+  std::vector<std::pair<directory_authority, const char*>> selected{
       {inspect_runtime_directory(
            run_store_directory_fd, "transaction-run store"),
        "transaction-run store"},
@@ -198,10 +199,11 @@ void validate_distinct_runtime_directories(
       {inspect_runtime_directory(
            effect_store_directory_fd, "effect journal store"),
        "effect journal store"},
-      {inspect_runtime_directory(
-           target_lock_directory_fd, "target lock store"),
-       "target lock store"},
-  }};
+  };
+  if (target_lock_directory_fd)
+    selected.push_back(
+        {inspect_runtime_directory(*target_lock_directory_fd, "target lock store"),
+         "target lock store"});
   for (std::size_t first = 0U; first < selected.size(); ++first)
     for (std::size_t second = first + 1U; second < selected.size(); ++second)
       if (selected[first].first.device == selected[second].first.device &&
@@ -267,8 +269,8 @@ void validate_native_configuration(
 class native_transaction_progress_rehydration_context_source final
     : public transaction_progress_rehydration_context_source {
 public:
-  native_transaction_progress_rehydration_context_source(
-      native_transaction_operation_authority_source& operations)
+  explicit native_transaction_progress_rehydration_context_source(
+      native_transaction_operation_authority_source* operations)
       : operations_(operations)
   {
   }
@@ -299,12 +301,17 @@ public:
       const transaction_dispatch& dispatch,
       const effect_attempt_record& evidence) override
   {
-    return operations_.rehydrate(
+    if (operations_ == nullptr)
+      runtime_failure(
+          native_transaction_run_runtime_error_code::invalid_configuration,
+          "operation progress recovery requested without target-operation "
+          "authority");
+    return operations_->rehydrate(
         record, partial_progress, dispatch, evidence);
   }
 
 private:
-  native_transaction_operation_authority_source& operations_;
+  native_transaction_operation_authority_source* operations_;
 };
 
 class transaction_run_runtime_engine final {
@@ -313,24 +320,48 @@ public:
       transaction_run_journal_store& runs,
       transaction_run_evidence_store& evidence,
       effect_journal_store& effects,
-      int target_lock_directory_fd,
+      std::optional<int> target_lock_directory_fd,
       transaction_progress_rehydration_source& progress,
       transaction_dispatch_session_source& sessions,
-      transaction_operation_execution_authority_source& operation_execution,
-      transaction_operation_recovery_authority_source& operation_recovery,
-      transaction_effect_archive_source& archives,
-      transaction_run_runtime_backends backends,
+      transaction_operation_execution_authority_source* operation_execution,
+      transaction_operation_recovery_authority_source* operation_recovery,
+      transaction_effect_archive_source* archives,
+      pkgexec::execution_backend& construction_backend,
+      pkgexec::execution_backend& check_backend,
+      pkgapply::application_backend* application_backend,
+      pkgexec::execution_backend* lifecycle_backend,
+      pkgstate::canonical_store* state_backend,
       transaction_effect_body_sink* effect_bodies)
       : runs_(runs), evidence_(evidence), effects_(effects), progress_(progress),
-        execution_(sessions, operation_execution),
-        recovery_context_(operation_recovery),
+        execution_(operation_execution != nullptr
+                ? composed_transaction_dispatch_execution_authority_source(
+                      sessions, *operation_execution)
+                : composed_transaction_dispatch_execution_authority_source(
+                      sessions)),
+        recovery_context_(operation_recovery != nullptr
+                ? native_transaction_dispatch_recovery_context_source(
+                      *operation_recovery)
+                : native_transaction_dispatch_recovery_context_source()),
         recovery_(evidence_, recovery_context_),
-        construction_(backends.construction), check_(backends.check),
-        operation_(
-            posix_transaction_effect_driver_source::from_lock_directory_fd(
-                target_lock_directory_fd, backends.application,
-                backends.lifecycle, backends.state, archives, effect_bodies))
+        construction_(construction_backend), check_(check_backend)
   {
+    const bool any_operation_mechanism =
+        target_lock_directory_fd.has_value() || archives != nullptr ||
+        application_backend != nullptr || lifecycle_backend != nullptr ||
+        state_backend != nullptr;
+    const bool complete_operation_mechanism =
+        target_lock_directory_fd.has_value() && archives != nullptr &&
+        application_backend != nullptr && lifecycle_backend != nullptr &&
+        state_backend != nullptr;
+    if (any_operation_mechanism != complete_operation_mechanism)
+      runtime_failure(
+          native_transaction_run_runtime_error_code::invalid_configuration,
+          "target-operation runtime mechanism is incomplete");
+    if (complete_operation_mechanism)
+      operation_ =
+          posix_transaction_effect_driver_source::from_lock_directory_fd(
+              *target_lock_directory_fd, *application_backend,
+              *lifecycle_backend, *state_backend, *archives, effect_bodies);
   }
 
   transaction_run_launch_result launch(
@@ -388,6 +419,49 @@ private:
 
 } // namespace
 
+bool native_transaction_requires_target_operation_authority(
+    const transaction_session& transaction) noexcept
+{
+  for (const auto& node : transaction.program().nodes())
+  {
+    switch (node.action())
+    {
+      case pkgtransaction::transaction_action_kind::install:
+      case pkgtransaction::transaction_action_kind::upgrade:
+      case pkgtransaction::transaction_action_kind::remove:
+      case pkgtransaction::transaction_action_kind::lifecycle:
+        return true;
+      case pkgtransaction::transaction_action_kind::build:
+      case pkgtransaction::transaction_action_kind::check:
+      case pkgtransaction::transaction_action_kind::retain:
+        break;
+    }
+  }
+  return false;
+}
+
+native_transaction_run_runtime_paths::native_transaction_run_runtime_paths(
+    std::filesystem::path run_store_value,
+    std::filesystem::path evidence_store_value,
+    std::filesystem::path effect_store_value)
+    : run_store(std::move(run_store_value)),
+      evidence_store(std::move(evidence_store_value)),
+      effect_store(std::move(effect_store_value)), target_lock_store(std::nullopt)
+{
+}
+
+native_transaction_run_runtime_paths::native_transaction_run_runtime_paths(
+    std::filesystem::path run_store_value,
+    std::filesystem::path evidence_store_value,
+    std::filesystem::path effect_store_value,
+    std::filesystem::path target_lock_store_value)
+    : run_store(std::move(run_store_value)),
+      evidence_store(std::move(evidence_store_value)),
+      effect_store(std::move(effect_store_value)),
+      target_lock_store(std::move(target_lock_store_value))
+{
+}
+
 native_transaction_run_runtime_error::native_transaction_run_runtime_error(
     native_transaction_run_runtime_error_code code,
     int system_error,
@@ -412,7 +486,7 @@ native_transaction_run_runtime_configuration::
 native_transaction_run_runtime_configuration(
     transaction_session transaction,
     native_transaction_session_configuration sessions,
-    native_transaction_operation_configuration operations,
+    std::optional<native_transaction_operation_configuration> operations,
     std::vector<retained_transaction_effect_archive> archives)
     : transaction_(std::move(transaction)), sessions_(std::move(sessions)),
       operations_(std::move(operations)), archives_(std::move(archives))
@@ -422,10 +496,28 @@ native_transaction_run_runtime_configuration(
 native_transaction_run_runtime_configuration
 native_transaction_run_runtime_configuration::make(
     transaction_session transaction,
+    native_transaction_session_configuration sessions)
+{
+  if (native_transaction_requires_target_operation_authority(transaction))
+    runtime_failure(
+        native_transaction_run_runtime_error_code::invalid_configuration,
+        "target-operation transaction requires explicit operation authority");
+  return native_transaction_run_runtime_configuration(
+      std::move(transaction), std::move(sessions), std::nullopt, {});
+}
+
+native_transaction_run_runtime_configuration
+native_transaction_run_runtime_configuration::make(
+    transaction_session transaction,
     native_transaction_session_configuration sessions,
     native_transaction_operation_configuration operations,
     std::vector<retained_transaction_effect_archive> archives)
 {
+  if (!native_transaction_requires_target_operation_authority(transaction))
+    runtime_failure(
+        native_transaction_run_runtime_error_code::invalid_configuration,
+        "construction/check-only transaction refuses target-operation "
+        "authority");
   validate_native_configuration(transaction, sessions, operations);
   return native_transaction_run_runtime_configuration(
       std::move(transaction), std::move(sessions), std::move(operations),
@@ -444,16 +536,63 @@ native_transaction_run_runtime_configuration::sessions() const noexcept
   return sessions_;
 }
 
-const native_transaction_operation_configuration&
+const native_transaction_operation_configuration*
 native_transaction_run_runtime_configuration::operations() const noexcept
 {
-  return operations_;
+  return operations_ ? &*operations_ : nullptr;
 }
 
 const std::vector<retained_transaction_effect_archive>&
 native_transaction_run_runtime_configuration::archives() const noexcept
 {
   return archives_;
+}
+
+native_transaction_run_runtime_authorities::
+native_transaction_run_runtime_authorities(
+    retained_installed_package_tree_source& installed_packages_value)
+    : installed_packages(installed_packages_value),
+      operation_specifications(nullptr), effect_restart_bodies(nullptr),
+      archives(nullptr), effect_bodies(nullptr), operation_sessions(nullptr)
+{
+}
+
+native_transaction_run_runtime_authorities::
+native_transaction_run_runtime_authorities(
+    retained_installed_package_tree_source& installed_packages_value,
+    transaction_operation_specification_source& operation_specifications_value,
+    transaction_effect_restart_body_source& effect_restart_bodies_value,
+    transaction_effect_archive_source* archives_value,
+    transaction_effect_body_sink* effect_bodies_value,
+    transaction_operation_session_store* operation_sessions_value)
+    : installed_packages(installed_packages_value),
+      operation_specifications(&operation_specifications_value),
+      effect_restart_bodies(&effect_restart_bodies_value),
+      archives(archives_value), effect_bodies(effect_bodies_value),
+      operation_sessions(operation_sessions_value)
+{
+}
+
+native_transaction_run_runtime_backends::native_transaction_run_runtime_backends(
+    pkgexec::execution_backend* construction_value,
+    pkgexec::execution_backend* check_value,
+    pkgimage::archive_backend& archive_value)
+    : construction(construction_value), check(check_value), application(nullptr),
+      lifecycle(nullptr), state(nullptr), archive(archive_value)
+{
+}
+
+native_transaction_run_runtime_backends::native_transaction_run_runtime_backends(
+    pkgexec::execution_backend* construction_value,
+    pkgexec::execution_backend* check_value,
+    pkgapply::application_backend& application_value,
+    pkgexec::execution_backend* lifecycle_value,
+    pkgstate::canonical_store& state_value,
+    pkgimage::archive_backend& archive_value)
+    : construction(construction_value), check(check_value),
+      application(&application_value), lifecycle(lifecycle_value),
+      state(&state_value), archive(archive_value)
+{
 }
 
 class posix_transaction_run_runtime::implementation final {
@@ -475,8 +614,9 @@ public:
         engine_(
             runs_, evidence_, effects_, target_lock_directory_fd,
             authorities_.progress, authorities_.sessions,
-            authorities_.operation_execution, authorities_.operation_recovery,
-            authorities_.archives, backends, nullptr)
+            &authorities_.operation_execution, &authorities_.operation_recovery,
+            &authorities_.archives, backends.construction, backends.check,
+            &backends.application, &backends.lifecycle, &backends.state, nullptr)
   {
   }
 
@@ -549,13 +689,72 @@ transaction_run_drive_result posix_transaction_run_runtime::drive(
   return state_->drive(std::move(journal), std::move(drive_policy));
 }
 
+void validate_native_runtime_composition(
+    const native_transaction_run_runtime_configuration& configuration,
+    const native_transaction_run_runtime_authorities& authorities,
+    const native_transaction_run_runtime_backends& backends,
+    bool has_target_lock_authority)
+{
+  const bool operation_capable = configuration.operations() != nullptr;
+  if (operation_capable)
+  {
+    if (!has_target_lock_authority ||
+        authorities.operation_specifications == nullptr ||
+        authorities.effect_restart_bodies == nullptr ||
+        backends.application == nullptr || backends.state == nullptr)
+      runtime_failure(
+          native_transaction_run_runtime_error_code::invalid_configuration,
+          "target-operation transaction lacks complete runtime authority");
+    return;
+  }
+
+  if (has_target_lock_authority ||
+      authorities.operation_specifications != nullptr ||
+      authorities.effect_restart_bodies != nullptr ||
+      authorities.archives != nullptr || authorities.effect_bodies != nullptr ||
+      authorities.operation_sessions != nullptr ||
+      backends.application != nullptr || backends.lifecycle != nullptr ||
+      backends.state != nullptr || !configuration.archives().empty())
+    runtime_failure(
+        native_transaction_run_runtime_error_code::invalid_configuration,
+        "construction/check-only transaction refuses target-operation "
+        "runtime authority");
+}
+
 class native_posix_transaction_run_runtime::implementation final {
+private:
+  class unavailable_execution_backend final : public pkgexec::execution_backend {
+  public:
+    unavailable_execution_backend()
+        : capabilities_(pkgexec::backend_capability_profile::seal(
+              pkgexec::backend_identity::from_sha256(std::string(64U, '0')),
+              {}))
+    {
+    }
+
+    [[nodiscard]] pkgexec::backend_capability_profile capabilities() const override
+    {
+      return capabilities_;
+    }
+
+    [[nodiscard]] pkgexec::execution_result execute(
+        const pkgexec::execution_request&,
+        const pkgexec::execution_resources&) override
+    {
+      throw std::runtime_error(
+          "current execution backend is unavailable for durable recovery");
+    }
+
+  private:
+    pkgexec::backend_capability_profile capabilities_;
+  };
+
 public:
   implementation(
       int run_store_directory_fd,
       int evidence_store_directory_fd,
       int effect_store_directory_fd,
-      int target_lock_directory_fd,
+      std::optional<int> target_lock_directory_fd,
       native_transaction_run_runtime_configuration configuration,
       native_transaction_run_runtime_authorities authorities,
       native_transaction_run_runtime_backends backends)
@@ -567,41 +766,48 @@ public:
         effects_(posix_effect_journal_store::from_directory_fd(
             effect_store_directory_fd)),
         sessions_(configuration_.sessions(), authorities.installed_packages),
-        operations_(
-            configuration_.operations(), authorities.operation_specifications,
-            effects_, authorities.effect_restart_bodies,
-            authorities.operation_sessions),
-        owned_archives_(authorities.archives == nullptr
+        operations_(configuration_.operations() != nullptr
+                ? std::make_unique<native_transaction_operation_authority_source>(
+                      *configuration_.operations(),
+                      *authorities.operation_specifications, effects_,
+                      *authorities.effect_restart_bodies,
+                      authorities.operation_sessions)
+                : nullptr),
+        owned_archives_(configuration_.operations() != nullptr &&
+                authorities.archives == nullptr
                 ? std::make_unique<explicit_transaction_effect_archive_source>(
                       explicit_transaction_effect_archive_source::make(
                           backends.archive, configuration_.archives()))
                 : nullptr),
-        archives_(authorities.archives != nullptr
-                ? authorities.archives
-                : owned_archives_.get()),
-        progress_context_(operations_),
+        archives_(configuration_.operations() != nullptr
+                ? (authorities.archives != nullptr
+                          ? authorities.archives
+                          : owned_archives_.get())
+                : nullptr),
+        progress_context_(operations_.get()),
         progress_(
             configuration_.transaction(), evidence_, effects_,
             progress_context_),
         unavailable_execution_backend_(),
         engine_(
             runs_, evidence_, effects_, target_lock_directory_fd, progress_,
-            sessions_, operations_, operations_, *archives_,
-            {backends.construction != nullptr
-                    ? *backends.construction
-                    : static_cast<pkgexec::execution_backend&>(
-                          unavailable_execution_backend_),
-             backends.check != nullptr
-                    ? *backends.check
-                    : static_cast<pkgexec::execution_backend&>(
-                          unavailable_execution_backend_),
-             backends.application,
-             backends.lifecycle != nullptr
-                    ? *backends.lifecycle
-                    : static_cast<pkgexec::execution_backend&>(
-                          unavailable_execution_backend_),
-             backends.state},
-            authorities.effect_bodies)
+            sessions_, operations_.get(), operations_.get(), archives_,
+            backends.construction != nullptr
+                ? *backends.construction
+                : static_cast<pkgexec::execution_backend&>(
+                      unavailable_execution_backend_),
+            backends.check != nullptr
+                ? *backends.check
+                : static_cast<pkgexec::execution_backend&>(
+                      unavailable_execution_backend_),
+            backends.application,
+            configuration_.operations() != nullptr
+                ? (backends.lifecycle != nullptr
+                          ? backends.lifecycle
+                          : static_cast<pkgexec::execution_backend*>(
+                                &unavailable_execution_backend_))
+                : nullptr,
+            backends.state, authorities.effect_bodies)
   {
   }
 
@@ -629,36 +835,12 @@ private:
   posix_transaction_run_evidence_store evidence_;
   posix_effect_journal_store effects_;
   native_transaction_dispatch_session_source sessions_;
-  native_transaction_operation_authority_source operations_;
+  std::unique_ptr<native_transaction_operation_authority_source> operations_;
   std::unique_ptr<explicit_transaction_effect_archive_source> owned_archives_;
   transaction_effect_archive_source* archives_;
   native_transaction_progress_rehydration_context_source progress_context_;
   stored_transaction_progress_rehydration_source progress_;
-  class unavailable_execution_backend final : public pkgexec::execution_backend {
-  public:
-    unavailable_execution_backend()
-        : capabilities_(pkgexec::backend_capability_profile::seal(
-              pkgexec::backend_identity::from_sha256(std::string(64U, '0')),
-              {}))
-    {
-    }
-
-    [[nodiscard]] pkgexec::backend_capability_profile capabilities() const override
-    {
-      return capabilities_;
-    }
-
-    [[nodiscard]] pkgexec::execution_result execute(
-        const pkgexec::execution_request&,
-        const pkgexec::execution_resources&) override
-    {
-      throw std::runtime_error(
-          "current execution backend is unavailable for durable recovery");
-    }
-
-  private:
-    pkgexec::backend_capability_profile capabilities_;
-  } unavailable_execution_backend_;
+  unavailable_execution_backend unavailable_execution_backend_;
   transaction_run_runtime_engine engine_;
 };
 
@@ -670,16 +852,44 @@ native_posix_transaction_run_runtime::open(
     native_transaction_run_runtime_backends backends)
 {
   validate_runtime_paths(paths);
+  validate_native_runtime_composition(
+      configuration, authorities, backends, paths.target_lock_store.has_value());
   auto runs = open_runtime_directory(paths.run_store, "transaction-run store");
   auto evidence = open_runtime_directory(
       paths.evidence_store, "transaction evidence store");
   auto effects = open_runtime_directory(
       paths.effect_store, "effect journal store");
-  auto locks = open_runtime_directory(
-      paths.target_lock_store, "target lock store");
+  if (!paths.target_lock_store)
+    return from_directory_fds(
+        runs.get(), evidence.get(), effects.get(), std::move(configuration),
+        authorities, backends);
+
+  auto locks = open_runtime_directory(*paths.target_lock_store, "target lock store");
   return from_directory_fds(
       runs.get(), evidence.get(), effects.get(), locks.get(),
       std::move(configuration), authorities, backends);
+}
+
+std::unique_ptr<native_posix_transaction_run_runtime>
+native_posix_transaction_run_runtime::from_directory_fds(
+    int run_store_directory_fd,
+    int evidence_store_directory_fd,
+    int effect_store_directory_fd,
+    native_transaction_run_runtime_configuration configuration,
+    native_transaction_run_runtime_authorities authorities,
+    native_transaction_run_runtime_backends backends)
+{
+  validate_native_runtime_composition(
+      configuration, authorities, backends, false);
+  validate_distinct_runtime_directories(
+      run_store_directory_fd, evidence_store_directory_fd,
+      effect_store_directory_fd, std::nullopt);
+  auto state = std::make_unique<implementation>(
+      run_store_directory_fd, evidence_store_directory_fd,
+      effect_store_directory_fd, std::nullopt,
+      std::move(configuration), authorities, backends);
+  return std::unique_ptr<native_posix_transaction_run_runtime>(
+      new native_posix_transaction_run_runtime(std::move(state)));
 }
 
 std::unique_ptr<native_posix_transaction_run_runtime>
@@ -692,6 +902,8 @@ native_posix_transaction_run_runtime::from_directory_fds(
     native_transaction_run_runtime_authorities authorities,
     native_transaction_run_runtime_backends backends)
 {
+  validate_native_runtime_composition(
+      configuration, authorities, backends, true);
   validate_distinct_runtime_directories(
       run_store_directory_fd, evidence_store_directory_fd,
       effect_store_directory_fd, target_lock_directory_fd);

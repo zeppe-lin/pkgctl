@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -105,12 +106,28 @@ private:
   std::unique_ptr<implementation> state_;
 };
 
-/*! \brief Four existing POSIX namespaces selected for native run control. */
+/*! \brief Existing POSIX namespaces selected for native run control.
+ *
+ * Construction/check-only transactions use the run, evidence, and effect
+ * stores. A target-operation transaction additionally requires one target-lock
+ * namespace.
+ */
 struct native_transaction_run_runtime_paths final {
+  native_transaction_run_runtime_paths(
+      std::filesystem::path run_store,
+      std::filesystem::path evidence_store,
+      std::filesystem::path effect_store);
+
+  native_transaction_run_runtime_paths(
+      std::filesystem::path run_store,
+      std::filesystem::path evidence_store,
+      std::filesystem::path effect_store,
+      std::filesystem::path target_lock_store);
+
   std::filesystem::path run_store;
   std::filesystem::path evidence_store;
   std::filesystem::path effect_store;
-  std::filesystem::path target_lock_store;
+  std::optional<std::filesystem::path> target_lock_store;
 };
 
 /*! \brief Stable failure classes for native runtime composition. */
@@ -137,9 +154,26 @@ private:
   int system_error_;
 };
 
+/*! \brief Whether one sealed transaction requires target-operation runtime
+ * authority.
+ */
+[[nodiscard]] bool native_transaction_requires_target_operation_authority(
+    const transaction_session& transaction) noexcept;
+
 /*! \brief Complete fixed semantic/mechanical configuration for one transaction. */
 class native_transaction_run_runtime_configuration final {
 public:
+  /*! \brief Seal a transaction with no target-operation authority.
+   *
+   * The transaction must contain no install, upgrade, remove, or lifecycle
+   * nodes. Construction/check execution then has no target-mutation authority
+   * in this composition root.
+   */
+  [[nodiscard]] static native_transaction_run_runtime_configuration make(
+      transaction_session transaction,
+      native_transaction_session_configuration sessions);
+
+  /*! \brief Seal a transaction that can dispatch target operations. */
   [[nodiscard]] static native_transaction_run_runtime_configuration make(
       transaction_session transaction,
       native_transaction_session_configuration sessions,
@@ -149,7 +183,7 @@ public:
   [[nodiscard]] const transaction_session& transaction() const noexcept;
   [[nodiscard]] const native_transaction_session_configuration&
   sessions() const noexcept;
-  [[nodiscard]] const native_transaction_operation_configuration&
+  [[nodiscard]] const native_transaction_operation_configuration*
   operations() const noexcept;
   [[nodiscard]] const std::vector<retained_transaction_effect_archive>&
   archives() const noexcept;
@@ -158,12 +192,12 @@ private:
   native_transaction_run_runtime_configuration(
       transaction_session transaction,
       native_transaction_session_configuration sessions,
-      native_transaction_operation_configuration operations,
+      std::optional<native_transaction_operation_configuration> operations,
       std::vector<retained_transaction_effect_archive> archives);
 
   transaction_session transaction_;
   native_transaction_session_configuration sessions_;
-  native_transaction_operation_configuration operations_;
+  std::optional<native_transaction_operation_configuration> operations_;
   std::vector<retained_transaction_effect_archive> archives_;
 };
 
@@ -177,12 +211,23 @@ private:
  * fresh-dispatch only.
  */
 struct native_transaction_run_runtime_authorities final {
+  native_transaction_run_runtime_authorities(
+      retained_installed_package_tree_source& installed_packages);
+
+  native_transaction_run_runtime_authorities(
+      retained_installed_package_tree_source& installed_packages,
+      transaction_operation_specification_source& operation_specifications,
+      transaction_effect_restart_body_source& effect_restart_bodies,
+      transaction_effect_archive_source* archives = nullptr,
+      transaction_effect_body_sink* effect_bodies = nullptr,
+      transaction_operation_session_store* operation_sessions = nullptr);
+
   retained_installed_package_tree_source& installed_packages;
-  transaction_operation_specification_source& operation_specifications;
-  transaction_effect_restart_body_source& effect_restart_bodies;
-  transaction_effect_archive_source* archives = nullptr;
-  transaction_effect_body_sink* effect_bodies = nullptr;
-  transaction_operation_session_store* operation_sessions = nullptr;
+  transaction_operation_specification_source* operation_specifications;
+  transaction_effect_restart_body_source* effect_restart_bodies;
+  transaction_effect_archive_source* archives;
+  transaction_effect_body_sink* effect_bodies;
+  transaction_operation_session_store* operation_sessions;
 };
 
 /*! \brief Explicit selected physical mechanisms for one native runtime.
@@ -193,22 +238,39 @@ struct native_transaction_run_runtime_authorities final {
  * evidence remains independently decodable without one.
  */
 struct native_transaction_run_runtime_backends final {
+  native_transaction_run_runtime_backends(
+      pkgexec::execution_backend* construction,
+      pkgexec::execution_backend* check,
+      pkgimage::archive_backend& archive);
+
+  native_transaction_run_runtime_backends(
+      pkgexec::execution_backend* construction,
+      pkgexec::execution_backend* check,
+      pkgapply::application_backend& application,
+      pkgexec::execution_backend* lifecycle,
+      pkgstate::canonical_store& state,
+      pkgimage::archive_backend& archive);
+
   pkgexec::execution_backend* construction;
   pkgexec::execution_backend* check;
-  pkgapply::application_backend& application;
+  pkgapply::application_backend* application;
   pkgexec::execution_backend* lifecycle;
-  pkgstate::canonical_store& state;
+  pkgstate::canonical_store* state;
   pkgimage::archive_backend& archive;
 };
 
 /*! \brief Stable native composition root for one sealed transaction.
  *
- * The root opens or duplicates four existing POSIX namespaces and owns the
- * concrete native session locator, operation authority, archive map, semantic
- * progress rehydrator, restart chain, and effect drivers over explicitly
- * selected backends. Live operation sensing is fresh-dispatch authority; the
- * operation-session store and subordinate restart bodies remain borrowed from
- * their semantic owners and must outlive the runtime.
+ * The root always opens or duplicates the run, evidence, and effect
+ * namespaces and owns the concrete native session locator, semantic progress
+ * rehydrator, restart chain, and construction/check drivers. A transaction
+ * containing target operations additionally requires the target-lock
+ * namespace, operation authority, archive map, application/state mechanisms,
+ * and effect driver. Construction/check-only composition refuses those
+ * authorities rather than retaining unused target mutation capability. Live
+ * operation sensing is fresh-dispatch authority; the operation-session store
+ * and subordinate restart bodies remain borrowed from their semantic owners
+ * and must outlive an operation-capable runtime.
  *
  * No directory is initialized, no backend is selected implicitly, and no
  * transaction is launched until launch() receives an explicit durable user
@@ -219,6 +281,15 @@ public:
   [[nodiscard]] static std::unique_ptr<native_posix_transaction_run_runtime>
   open(
       native_transaction_run_runtime_paths paths,
+      native_transaction_run_runtime_configuration configuration,
+      native_transaction_run_runtime_authorities authorities,
+      native_transaction_run_runtime_backends backends);
+
+  [[nodiscard]] static std::unique_ptr<native_posix_transaction_run_runtime>
+  from_directory_fds(
+      int run_store_directory_fd,
+      int evidence_store_directory_fd,
+      int effect_store_directory_fd,
       native_transaction_run_runtime_configuration configuration,
       native_transaction_run_runtime_authorities authorities,
       native_transaction_run_runtime_backends backends);
