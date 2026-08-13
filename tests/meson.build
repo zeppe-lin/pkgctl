@@ -187,6 +187,18 @@ if not get_option('tests').disabled()
     dependencies: pkgctl_core_dep,
   )
 
+  libpkgaudit_test_dep = dependency(
+    'libpkgaudit',
+    version: ['>=0.1.0', '<1.0.0'],
+    required: true,
+    static: want_static,
+  )
+  rootfs_audit_fixture = executable(
+    'rootfs-audit-fixture',
+    'fixtures/rootfs_audit_fixture.cpp',
+    dependencies: [pkgctl_core_dep, libpkgaudit_test_dep],
+  )
+
   native_target_lock_holder = executable(
     'native-target-lock-holder',
     'fixtures/native_target_lock_holder.cpp',
@@ -476,6 +488,7 @@ if not get_option('tests').disabled()
       state_fixture,
       state_inspect_fixture,
       native_runtime_root_fixture,
+      rootfs_audit_fixture,
       join_paths(
         meson.project_source_root(),
         'tests/fixtures/collections/rootfs-campaign',
@@ -485,7 +498,7 @@ if not get_option('tests').disabled()
         'tests/fixtures/native_root_view_fixture.sh',
       ),
     ],
-    depends: native_runtime_root_fixture,
+    depends: [native_runtime_root_fixture, rootfs_audit_fixture],
     suite: 'integration-privileged',
   )
 

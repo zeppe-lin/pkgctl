@@ -11,6 +11,7 @@ trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
 cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
 pipeline_modules='libpkgreconcile libpkgreconcile-apply libpkgreconcile-posix libpkgreconcile-apply-posix'
+audit_modules='libpkgaudit'
 pkg-config --exists \
   'libpkgfetch >= 2.1.0' 'libpkgfetch < 3.0.0' \
   'libpkgbuild-exec >= 2.2.0' 'libpkgbuild-exec < 3.0.0' \
@@ -23,13 +24,16 @@ pkg-config --exists \
   'libpkgreconcile >= 0.3.0' 'libpkgreconcile < 1.0.0' \
   'libpkgreconcile-apply >= 0.1.0' 'libpkgreconcile-apply < 1.0.0' \
   'libpkgreconcile-posix >= 0.1.0' 'libpkgreconcile-posix < 1.0.0' \
-  'libpkgreconcile-apply-posix >= 0.1.0' 'libpkgreconcile-apply-posix < 1.0.0'
+  'libpkgreconcile-apply-posix >= 0.1.0' 'libpkgreconcile-apply-posix < 1.0.0' \
+  'libpkgaudit >= 0.1.0' 'libpkgaudit < 1.0.0'
 core_cflags=$(pkg-config --cflags $core_modules)
 core_libs=$(pkg-config --libs $core_modules)
 cli_cflags=$(pkg-config --cflags $cli_modules)
 cli_libs=$(pkg-config --libs $cli_modules)
 pipeline_cflags=$(pkg-config --cflags $pipeline_modules)
 pipeline_libs=$(pkg-config --libs $pipeline_modules)
+audit_cflags=$(pkg-config --cflags $audit_modules)
+audit_libs=$(pkg-config --libs $audit_modules)
 flags="-std=c++17 -Wall -Wextra -Wpedantic -Werror -I$srcdir/include -I$srcdir/tests $core_cflags"
 objects=
 for source in "$srcdir"/src/*.cpp; do
@@ -64,6 +68,12 @@ for fixture in state_fixture state_inspect_fixture run_store_fixture effect_stor
   "$cxx" $flags "$srcdir/tests/fixtures/$fixture.cpp" $objects $core_libs \
     -o "$tmp/$name-fixture"
 done
+
+# The rootfs feedback oracle is test-only and remains outside pkgctl production.
+# shellcheck disable=SC2086
+"$cxx" $flags $audit_cflags \
+  "$srcdir/tests/fixtures/rootfs_audit_fixture.cpp" \
+  $objects $core_libs $audit_libs -o "$tmp/rootfs-audit-fixture"
 
 # shellcheck disable=SC2086
 "$cxx" $flags "$srcdir/tests/fixtures/native_target_lock_holder.cpp" \
@@ -173,7 +183,7 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
 
 "$srcdir/tests/integration/cli_run_rootfs_campaign_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
-  "$tmp/native-runtime-root-fixture" \
+  "$tmp/native-runtime-root-fixture" "$tmp/rootfs-audit-fixture" \
   "$srcdir/tests/fixtures/collections/rootfs-campaign" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 

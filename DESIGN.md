@@ -13,6 +13,22 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Empty-target feedback qualification
+
+The synthetic rootfs campaign is not a new controller verb. It treats an empty
+managed target as an ordinary desired-state convergence problem, then hands the
+terminal canonical state and target root to `libpkgaudit` as an independent
+test-only observer. The controller does not call the auditor in production and
+does not reinterpret audit findings as transaction evidence. A clean audit
+closes the qualification loop; deliberate post-terminal deletion of one owned
+object must be observed as drift without changing the retained transaction or
+canonical state.
+
+This boundary keeps deployment composition outside `pkgctl`: a future rootfs
+client may select policy and invoke convergence plus audit, but package source,
+resolution, transaction, state, and observation authority remain with their
+owners.
+
 ## Release 0.37.0 build frontend authority
 
 `pkgctl build PACKAGE` is not a second construction orchestrator. It constructs

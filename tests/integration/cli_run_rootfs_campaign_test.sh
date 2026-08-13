@@ -7,8 +7,9 @@ pkgctl=$1
 state_fixture=$2
 state_inspect_fixture=$3
 runtime_root_fixture=$4
-fixture_collection=$5
-root_view_fixture=$6
+rootfs_audit_fixture=$5
+fixture_collection=$6
+root_view_fixture=$7
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-run-rootfs-campaign.XXXXXX")
 cleanup()
 {
@@ -269,3 +270,33 @@ check_marker=$(find "$runtime/check-temporary" -type f -name rootfs-check-ran)
 require_equal rootfs-check \
   checked:rootfs-probe-source+build-tool-source \
   "$(cat "$check_marker")"
+
+set +e
+"$rootfs_audit_fixture" "$state" "$target" >"$root/audit-clean.out" 2>"$root/audit-clean.err"
+audit_status=$?
+set -e
+if [ "$audit_status" -ne 0 ]; then
+  dump_file 'clean audit stdout' "$root/audit-clean.out"
+  dump_file 'clean audit stderr' "$root/audit-clean.err"
+  fail "clean rootfs audit: expected status 0, got $audit_status"
+fi
+require_contains clean-audit "$root/audit-clean.out" 'complete yes'
+require_contains clean-audit "$root/audit-clean.out" 'packages 3'
+require_contains clean-audit "$root/audit-clean.out" 'findings 0'
+require_contains clean-audit "$root/audit-clean.out" 'failures 0'
+
+rm "$target/runtime-lib-marker"
+set +e
+"$rootfs_audit_fixture" "$state" "$target" >"$root/audit-drift.out" 2>"$root/audit-drift.err"
+audit_status=$?
+set -e
+[ "$audit_status" -eq 1 ] || {
+  dump_file 'drift audit stdout' "$root/audit-drift.out"
+  dump_file 'drift audit stderr' "$root/audit-drift.err"
+  fail "drift rootfs audit: expected status 1, got $audit_status"
+}
+require_contains drift-audit "$root/audit-drift.out" 'complete yes'
+require_contains drift-audit "$root/audit-drift.out" 'findings 1'
+require_contains drift-audit "$root/audit-drift.out" \
+  'finding missing-object runtime-lib runtime-lib-marker'
+require_contains drift-audit "$root/audit-drift.out" 'failures 0'

@@ -23,9 +23,22 @@ exactly three installed packages and three target payloads: `base-files`,
 therefore enter target/state even though it is not a profile member, while the
 constructed build-only dependency must remain absent from both. The probe build
 must consume the exact `build-tool` package input and its real check must consume
-the constructed probe package. This campaign is the release gate before a
-rootfs-specific CLI frontend: it proves the existing transaction/run kernel can
-materialize an empty target without collapsing build and target authority.
+the constructed probe package.
+
+The terminal target is then handed to a test-only `libpkgaudit` oracle. The
+oracle independently adapts the immutable canonical state snapshot into audit
+facts, observes the separately selected target with the real root-bound POSIX
+backend, and requests object-state plus symlink resolution/ownership checks. A
+clean rootfs must produce a complete report with zero findings and zero failures.
+The campaign then deletes the runtime dependency's owned marker and requires the
+same auditor to report exactly one `missing-object` finding for `runtime-lib`.
+This proves the feedback path is observing the managed object rather than merely
+repeating controller success. `libpkgaudit` remains a test-only pkgctl dependency.
+
+This campaign is the release gate before any distribution rootfs composition
+client: it proves the existing transaction/run kernel can materialize an empty
+target without collapsing build and target authority, and that an independent
+observer can detect subsequent drift from the admitted state.
 
 ## Release 0.37.0 build frontend qualification
 

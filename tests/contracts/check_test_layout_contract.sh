@@ -42,6 +42,7 @@ for path in \
   'fixtures/state_fixture.cpp' \
   'fixtures/native_root_view_fixture.sh' \
   'fixtures/native_runtime_root_fixture.cpp' \
+  'fixtures/rootfs_audit_fixture.cpp' \
   'fixtures/native_target_lock_holder.cpp' \
   'fixtures/native_credential_context_runner.cpp' \
   'fixtures/native_credential_context_preload.cpp' \
