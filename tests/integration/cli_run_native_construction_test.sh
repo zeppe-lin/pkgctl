@@ -109,6 +109,7 @@ set -- run --canonical-store "$state" \
   --collection "core=$collection" \
   --build-architecture x86_64 \
   --target-architecture x86_64 \
+  --goal 'build=tool' \
   --goal 'check=tool' \
   --start "$(printf '%064d' 7)" \
   --runtime-root "$runtime" \

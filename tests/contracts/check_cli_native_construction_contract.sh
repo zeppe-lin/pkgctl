@@ -39,6 +39,7 @@ if grep -F -- 'native-test-interpreter' "$test_source" >/dev/null; then
 fi
 
 for required in \
+  "--goal 'build=tool'" \
   "--goal 'check=tool'" \
   "'durable-steps 3'" \
   "package archives, expected 2" \

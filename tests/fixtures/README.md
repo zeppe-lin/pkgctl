@@ -9,7 +9,9 @@ programs. Its payload is `/usr/bin/pkgctl-fixture` with fixed bytes.
 
 `collections/native-construction` is the process-reality construction fixture.
 `dep` and `tool` each carry one digest-pinned local source; `tool` has a build
-requirement on `dep` and a check program. The recipes use only shell builtins so
+requirement on `dep` and a check program. The campaign requests both build and
+check resolver scopes explicitly, so each durable input/action is backed by its
+own admitted resolver authority. The recipes use only shell builtins so
 the root view needs no ambient utility set. Successful output can exist only if
 the production adapters mounted the fetched source, predecessor package tree,
 constructed package tree, and check source at their declared logical paths.

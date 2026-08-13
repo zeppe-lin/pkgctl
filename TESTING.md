@@ -10,8 +10,11 @@ shared-library closure reported for that executable. No compiler, package tool,
 or general host `/usr` tree is made visible. The fixture recipes therefore use
 only POSIX-shell builtins.
 
-The transaction is `check=tool`. `dep` declares one local source with a pinned
-SHA-256, reads it through `PKG_SOURCE_ROOT`, and emits `dep-token`. `tool` declares
+The transaction requests both `build=tool` and `check=tool`. Resolver scopes are
+independent: the build goal admits `tool`'s declared build-input closure, while
+the check goal admits the check action and any declared check-input closure.
+`dep` declares one local source with a pinned SHA-256, reads it through
+`PKG_SOURCE_ROOT`, and emits `dep-token`. `tool` declares
 its own pinned local source plus a build dependency on `dep`; its recipe must read
 the predecessor package through `PKG_BUILD_INPUT_ROOT/dep`, combine those exact
 bytes with its materialized source, and emit `tool-token`. The real check then
