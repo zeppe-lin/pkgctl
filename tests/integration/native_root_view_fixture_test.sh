@@ -25,7 +25,6 @@ for path in \
   build/inputs/build \
   build/inputs/check \
   check/source \
-  check/package \
   check/inputs \
   target \
   tmp; do
@@ -37,4 +36,8 @@ done
 [ -z "$(find "$view/build/inputs/build" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
   fail 'fixture invented a scenario-specific build input'
 [ -z "$(find "$view/build/inputs/check" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
-  fail 'fixture invented a scenario-specific check input'
+  fail 'fixture invented a scenario-specific build-time check input'
+[ -z "$(find "$view/check/inputs" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
+  fail 'fixture populated backend-owned check input namespace'
+[ ! -e "$view/check/package" ] ||
+  fail 'fixture invented backend-owned checked-package leaf'

@@ -22,9 +22,9 @@ esac
 # production Linux backend deliberately refuses to create these destinations:
 # the supplied root view is caller-owned authority.  /dev is only a structural
 # mountpoint: the Linux backend replaces it with its private execution-only
-# device namespace.  Package-input leaves are backend-owned children of the
-# empty build/check namespaces and are therefore never part of caller root-view
-# authority.
+# device namespace.  Package-input leaves, including the checked package used
+# by check execution, are backend-owned children of the empty build/check input
+# namespaces and are therefore never part of caller root-view authority.
 mkdir -p \
   "$root/dev" \
   "$root/build/source" \
@@ -33,7 +33,6 @@ mkdir -p \
   "$root/build/inputs/build" \
   "$root/build/inputs/check" \
   "$root/check/source" \
-  "$root/check/package" \
   "$root/check/inputs" \
   "$root/target" \
   "$root/tmp"
