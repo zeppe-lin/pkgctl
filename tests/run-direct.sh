@@ -13,8 +13,10 @@ cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
 pipeline_modules='libpkgreconcile libpkgreconcile-apply libpkgreconcile-posix libpkgreconcile-apply-posix'
 audit_modules='libpkgaudit'
 pkg-config --exists \
+  'libpkgsource >= 4.0.0' 'libpkgsource < 5.0.0' \
+  'libpkgsource-yaml >= 1.1.0' 'libpkgsource-yaml < 2.0.0' \
   'libpkgfetch >= 2.1.0' 'libpkgfetch < 3.0.0' \
-  'libpkgbuild-exec >= 2.2.0' 'libpkgbuild-exec < 3.0.0' \
+  'libpkgbuild-exec >= 2.3.0' 'libpkgbuild-exec < 3.0.0' \
   'libpkgstate-apply >= 3.1.0' 'libpkgstate-apply < 4.0.0' \
   'libpkgexec >= 2.0.0' 'libpkgexec < 3.0.0' \
   'libpkgexec-linux >= 0.6.0' 'libpkgexec-linux < 1.0.0' \

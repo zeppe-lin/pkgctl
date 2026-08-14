@@ -20,13 +20,13 @@ pkgctl_inc = include_directories('include')
 libcrypto_dep = dependency('libcrypto', required: true, static: want_static)
 libpkgsource_dep = dependency(
   'libpkgsource',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=4.0.0', '<5.0.0'],
   required: true,
   static: want_static,
 )
 libpkgsource_yaml_dep = dependency(
   'libpkgsource-yaml',
-  version: ['>=1.0.0', '<2.0.0'],
+  version: ['>=1.1.0', '<2.0.0'],
   required: true,
   static: want_static,
 )
@@ -86,7 +86,7 @@ libpkgbuild_dep = dependency(
 )
 libpkgbuild_exec_dep = dependency(
   'libpkgbuild-exec',
-  version: ['>=2.2.0', '<3.0.0'],
+  version: ['>=2.3.0', '<3.0.0'],
   required: true,
   static: want_static,
 )

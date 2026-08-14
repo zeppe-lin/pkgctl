@@ -10,6 +10,10 @@ satisfy a build request without construction. The frontend carries no lifecycle
 root, managed target root, lifecycle credentials,
 state-publication backend, target lock, or convergence policy.
 
+The frontend admits recipe syntax through `libpkgsource-yaml` 1.1.x and requires
+`libpkgsource` ABI 4 so explicit `unpack: archive` source realization reaches the
+sealed source/build authority rather than being reconstructed from filenames.
+
 The final immutable package archives are published beneath one explicit existing
 `--artifact-root`, separate from the private runtime hierarchy. Frontend kind and
 artifact-root coordinate are retained in command evidence; resume refuses either
