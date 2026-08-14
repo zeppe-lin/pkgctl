@@ -51,11 +51,27 @@ cli_modules=$(sed -n "s/^cli_modules='\(.*\)'$/\1/p" "$direct_build")
 reviewed_core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
 reviewed_cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
 for constraint in \
-  'libpkgsource >= 4.0.0' 'libpkgsource < 5.0.0' \
-  'libpkgsource-yaml >= 1.1.0' 'libpkgsource-yaml < 2.0.0' \
-  'libpkgfetch >= 2.1.0' 'libpkgfetch < 3.0.0' \
-  'libpkgbuild-exec >= 2.3.0' 'libpkgbuild-exec < 3.0.0' \
-  'libpkgcheck-exec >= 0.4.0' 'libpkgcheck-exec < 1.0.0'; do
+  'libpkgsource >= 4.1.0' 'libpkgsource < 5.0.0' \
+  'libpkgsource-yaml >= 2.0.0' 'libpkgsource-yaml < 3.0.0' \
+  'libpkgsource-plan >= 2.0.0' 'libpkgsource-plan < 3.0.0' \
+  'libpkgcatalog >= 4.0.0' 'libpkgcatalog < 5.0.0' \
+  'libpkgcatalog-codec >= 4.0.0' 'libpkgcatalog-codec < 5.0.0' \
+  'libpkgcatalog-acquire >= 4.0.0' 'libpkgcatalog-acquire < 5.0.0' \
+  'libpkgfetch >= 3.0.0' 'libpkgfetch < 4.0.0' \
+  'libpkgbuild >= 3.0.1' 'libpkgbuild < 4.0.0' \
+  'libpkgbuild-exec >= 3.0.0' 'libpkgbuild-exec < 4.0.0' \
+  'libpkgbuild-image >= 1.0.1' 'libpkgbuild-image < 2.0.0' \
+  'libpkgbuild-plan >= 1.1.0' 'libpkgbuild-plan < 2.0.0' \
+  'libpkgstate-apply >= 3.1.1' 'libpkgstate-apply < 4.0.0' \
+  'libpkgresolve >= 4.0.0' 'libpkgresolve < 5.0.0' \
+  'libpkgtransaction >= 4.0.0' 'libpkgtransaction < 5.0.0' \
+  'libpkgcheck >= 0.3.0' 'libpkgcheck < 1.0.0' \
+  'libpkgexec >= 2.1.1' 'libpkgexec < 3.0.0' \
+  'libpkgexec-linux >= 0.6.2' 'libpkgexec-linux < 1.0.0' \
+  'libpkgapply >= 3.0.1' 'libpkgapply < 4.0.0' \
+  'libpkgapply-posix >= 3.2.1' 'libpkgapply-posix < 4.0.0' \
+  'libpkgapply-exec >= 3.0.1' 'libpkgapply-exec < 4.0.0' \
+  'libpkgcheck-exec >= 0.5.0' 'libpkgcheck-exec < 1.0.0'; do
   grep -F "'$constraint'" "$direct_build" >/dev/null || {
     echo "direct qualification omits adapter API constraint: $constraint" >&2
     exit 1
@@ -68,6 +84,15 @@ done
   echo "actual:   $core_modules" >&2
   exit 1
 }
+
+for constraint in \
+  'libpkgreconcile-apply >= 0.1.1' 'libpkgreconcile-apply < 1.0.0' \
+  'libpkgreconcile-apply-posix >= 0.1.1' 'libpkgreconcile-apply-posix < 1.0.0'; do
+  grep -F "'$constraint'" "$direct_build" >/dev/null || {
+    echo "direct qualification omits source-4 reconciliation constraint: $constraint" >&2
+    exit 1
+  }
+done
 
 [ "$cli_modules" = "$reviewed_cli_modules" ] || {
   echo 'direct qualification CLI module closure differs from review' >&2

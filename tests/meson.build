@@ -74,7 +74,7 @@ if not get_option('tests').disabled()
     ),
     dependency(
       'libpkgreconcile-apply',
-      version: ['>=0.1.0', '<1.0.0'],
+      version: ['>=0.1.1', '<1.0.0'],
       required: true,
       static: want_static,
     ),
@@ -86,7 +86,7 @@ if not get_option('tests').disabled()
     ),
     dependency(
       'libpkgreconcile-apply-posix',
-      version: ['>=0.1.0', '<1.0.0'],
+      version: ['>=0.1.1', '<1.0.0'],
       required: true,
       static: want_static,
     ),

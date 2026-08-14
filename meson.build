@@ -20,31 +20,31 @@ pkgctl_inc = include_directories('include')
 libcrypto_dep = dependency('libcrypto', required: true, static: want_static)
 libpkgsource_dep = dependency(
   'libpkgsource',
-  version: ['>=4.0.0', '<5.0.0'],
+  version: ['>=4.1.0', '<5.0.0'],
   required: true,
   static: want_static,
 )
 libpkgsource_yaml_dep = dependency(
   'libpkgsource-yaml',
-  version: ['>=1.1.0', '<2.0.0'],
+  version: ['>=2.0.0', '<3.0.0'],
   required: true,
   static: want_static,
 )
 libpkgcatalog_dep = dependency(
   'libpkgcatalog',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=4.0.0', '<5.0.0'],
   required: true,
   static: want_static,
 )
 libpkgcatalog_codec_dep = dependency(
   'libpkgcatalog-codec',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=4.0.0', '<5.0.0'],
   required: true,
   static: want_static,
 )
 libpkgcatalog_acquire_dep = dependency(
   'libpkgcatalog-acquire',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=4.0.0', '<5.0.0'],
   required: true,
   static: want_static,
 )
@@ -68,43 +68,43 @@ libpkgstate_plan_dep = dependency(
 )
 libpkgresolve_dep = dependency(
   'libpkgresolve',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=4.0.0', '<5.0.0'],
   required: true,
   static: want_static,
 )
 libpkgfetch_dep = dependency(
   'libpkgfetch',
-  version: ['>=2.1.0', '<3.0.0'],
+  version: ['>=3.0.0', '<4.0.0'],
   required: true,
   static: want_static,
 )
 libpkgbuild_dep = dependency(
   'libpkgbuild',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=3.0.1', '<4.0.0'],
   required: true,
   static: want_static,
 )
 libpkgbuild_exec_dep = dependency(
   'libpkgbuild-exec',
-  version: ['>=2.3.0', '<3.0.0'],
+  version: ['>=3.0.0', '<4.0.0'],
   required: true,
   static: want_static,
 )
 libpkgbuild_image_dep = dependency(
   'libpkgbuild-image',
-  version: ['>=1.0.0', '<2.0.0'],
+  version: ['>=1.0.1', '<2.0.0'],
   required: true,
   static: want_static,
 )
 libpkgsource_plan_dep = dependency(
   'libpkgsource-plan',
-  version: ['>=1.0.0', '<2.0.0'],
+  version: ['>=2.0.0', '<3.0.0'],
   required: true,
   static: want_static,
 )
 libpkgbuild_plan_dep = dependency(
   'libpkgbuild-plan',
-  version: ['>=1.0.0', '<2.0.0'],
+  version: ['>=1.1.0', '<2.0.0'],
   required: true,
   static: want_static,
 )
@@ -122,55 +122,55 @@ libpkgplan_dep = dependency(
 )
 libpkgexec_dep = dependency(
   'libpkgexec',
-  version: ['>=2.1.0', '<3.0.0'],
+  version: ['>=2.1.1', '<3.0.0'],
   required: true,
   static: want_static,
 )
 libpkgexec_linux_dep = dependency(
   'libpkgexec-linux',
-  version: ['>=0.6.0', '<1.0.0'],
+  version: ['>=0.6.2', '<1.0.0'],
   required: true,
   static: want_static,
 )
 libpkgapply_dep = dependency(
   'libpkgapply',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=3.0.1', '<4.0.0'],
   required: true,
   static: want_static,
 )
 libpkgapply_posix_dep = dependency(
   'libpkgapply-posix',
-  version: ['>=3.1.0', '<4.0.0'],
+  version: ['>=3.2.1', '<4.0.0'],
   required: true,
   static: want_static,
 )
 libpkgapply_exec_dep = dependency(
   'libpkgapply-exec',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=3.0.1', '<4.0.0'],
   required: true,
   static: want_static,
 )
 libpkgstate_apply_dep = dependency(
   'libpkgstate-apply',
-  version: ['>=3.1.0', '<4.0.0'],
+  version: ['>=3.1.1', '<4.0.0'],
   required: true,
   static: want_static,
 )
 libpkgtransaction_dep = dependency(
   'libpkgtransaction',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=4.0.0', '<5.0.0'],
   required: true,
   static: want_static,
 )
 libpkgcheck_dep = dependency(
   'libpkgcheck',
-  version: ['>=0.2.0', '<1.0.0'],
+  version: ['>=0.3.0', '<1.0.0'],
   required: true,
   static: want_static,
 )
 libpkgcheck_exec_dep = dependency(
   'libpkgcheck-exec',
-  version: ['>=0.4.0', '<1.0.0'],
+  version: ['>=0.5.0', '<1.0.0'],
   required: true,
   static: want_static,
 )

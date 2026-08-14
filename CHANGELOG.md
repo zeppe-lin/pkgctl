@@ -2,6 +2,17 @@
 
 ## 0.37.0 - 2026-08-13
 
+- Closes the native source-4 ABI generation across source codec/YAML, catalog
+  owner/codec/acquisition, resolver, fetch, build execution, transaction, check,
+  source-plan, build-image, state-source-backed application, and their execution
+  adapters. The 0.37 runtime no longer admits a source-3 retaining carrier beside
+  `libpkgsource.so.4`; retained source snapshots therefore cross one coherent
+  binary generation instead of relying on mixed C++ layouts. Historical
+  dependency ledgers remain unchanged. The closure is version-addressable:
+  source begins at 4.1.0, source-yaml at 2.0.0, fetch and build-exec at 3.0.0,
+  exec at 2.1.1, the Linux backend at 0.6.2, application core/execution at
+  3.0.1, and the POSIX application provider at 3.2.1, so a clean resolver cannot
+  select their source-3-linked predecessor releases.
 - Adds `pkgctl build PACKAGE`, a constrained construction/check frontend over
   the same sealed transaction and durable native run kernel as `pkgctl run`.
   The command owns the exact package build goal, optionally adds its check goal,

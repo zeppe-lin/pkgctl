@@ -1654,7 +1654,7 @@ Starting a construction dispatch validates every exact package-input edge. A
 built input must reproduce the selected package release, source snapshot, build
 result, artifact, and retained predecessor construction evidence. A retained
 installed input must still name the same installed package in the current state
-and reproduce its source and build provenance. `libpkgtransaction >= 3.0.0`
+and reproduce its source and build provenance. `libpkgtransaction >= 4.0.0`
 orders both build- and check-scoped package inputs before the construction that
 seals them.
 
