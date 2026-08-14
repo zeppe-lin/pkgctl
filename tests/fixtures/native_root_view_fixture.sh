@@ -22,8 +22,9 @@ esac
 # production Linux backend deliberately refuses to create these destinations:
 # the supplied root view is caller-owned authority.  /dev is only a structural
 # mountpoint: the Linux backend replaces it with its private execution-only
-# device namespace.  Dynamic dependency input leaves are scenario-specific and
-# are therefore not invented here.
+# device namespace.  Package-input leaves are backend-owned children of the
+# empty build/check namespaces and are therefore never part of caller root-view
+# authority.
 mkdir -p \
   "$root/dev" \
   "$root/build/source" \

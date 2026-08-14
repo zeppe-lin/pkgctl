@@ -126,7 +126,6 @@ done
 
 "$root_view_fixture" "$build"
 "$root_view_fixture" "$lifecycle"
-mkdir "$build/build/inputs/build/build-tool"
 build_interpreter=$("$runtime_root_fixture" "$build" /bin/sh)
 lifecycle_interpreter=$("$runtime_root_fixture" "$lifecycle" /bin/sh)
 require_equal interpreter-authority "$build_interpreter" "$lifecycle_interpreter"

@@ -91,7 +91,6 @@ for directory in \
   mkdir "$runtime/$directory"
 done
 "$root_view_fixture" "$build"
-mkdir "$build/build/inputs/build/dep"
 chmod_program=$(command -v chmod) || fail 'host chmod is unavailable for runtime fixture'
 case $chmod_program in
   /*)
