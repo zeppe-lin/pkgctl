@@ -58,6 +58,7 @@ for path in \
   'fixtures/collections/native-construction' \
   'fixtures/collections/rootfs-campaign' \
   'fixtures/collections/lifecycle-post-install' \
+  'integration/native_root_view_fixture_test.sh' \
   'integration/application_intent_interrupt_fixture_test.sh' \
   'integration/publication_intent_interrupt_fixture_test.sh' \
   'integration/publication_terminal_interrupt_fixture_test.sh' \

@@ -145,6 +145,9 @@ done
   "$tmp/lifecycle-intent-interrupt-fixture" \
   "$tmp/lifecycle-intent-interrupt-probe"
 
+"$srcdir/tests/integration/native_root_view_fixture_test.sh" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
 # shellcheck disable=SC2086
 "$cxx" $flags $cli_cflags \
   "$srcdir/cli/main.cpp" "$srcdir/cli/options.cpp" \

@@ -43,10 +43,13 @@ mutation lease. It does not emulate `flock(2)`, inject errno, or call the contro
 The held lease is released only when the test explicitly terminates the fixture.
 
 `native_root_view_fixture.sh` creates only the stable logical mount
-destinations required by the native build, check, and lifecycle adapters. The
-root view itself remains caller-owned fiction: the production Linux backend is
-expected to reject missing destinations rather than silently populate them.
-Scenario-specific dependency input leaves are not invented by this fixture.
+destinations required by the native build, check, lifecycle, and Linux execution
+adapters. This includes an empty `/dev` mountpoint; its contents are not root-view
+authority because the Linux backend replaces that directory with its private
+execution-only device namespace. The root view itself remains caller-owned
+fiction: the production Linux backend is expected to reject missing destinations
+rather than silently populate them. Scenario-specific dependency input leaves are
+not invented by this fixture.
 
 
 `native_runtime_root_fixture.cpp` adds explicitly selected real executables

@@ -367,6 +367,19 @@ if not get_option('tests').disabled()
     suite: 'integration',
   )
 
+  native_root_view_fixture_test = find_program(
+    'integration/native_root_view_fixture_test.sh',
+  )
+  test(
+    'native-root-view-fixture',
+    native_root_view_fixture_test,
+    args: join_paths(
+      meson.project_source_root(),
+      'tests/fixtures/native_root_view_fixture.sh',
+    ),
+    suite: 'integration',
+  )
+
   cli_readonly_test = find_program('integration/cli_readonly_test.sh')
   test(
     'cli-readonly',
