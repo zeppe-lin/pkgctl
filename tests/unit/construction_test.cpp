@@ -2825,7 +2825,8 @@ void check_single_step_transaction_advancement()
     CHECK(run_store.latest().dispatches().size() == 1U);
     CHECK(run_store.latest().dispatches().front().state() ==
           pkgctl::transaction_dispatch_state::started);
-    CHECK(trace == std::vector<std::string>({"run-1", "run-2"}));
+    CHECK(trace == std::vector<std::string>({
+        "run-1", "attempt-construction", "run-2"}));
   }
 }
 
