@@ -1,0 +1,44 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: archive-probe
+  version: 1.0
+  release: 1
+  summary: archive source realization check fixture
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  {}
+
+sources:
+  - path: files/archive-probe.tar
+    name: archive-probe.tar
+    unpack: archive
+    sha256: fe950834e818090a0ad63e431bd0157215bc33a2e9e44ef8f8517292abf84ce9
+
+build:
+  language: posix-shell
+  script: |
+    set -eu
+    [ -f "$PKG_SOURCE_ROOT/archive-probe.tar" ]
+    [ ! -e "$PKG_SOURCE_ROOT/tree/source.txt" ]
+    IFS= read -r source <tree/source.txt
+    [ "$source" = archive-source ]
+    printf '%s\n' "$source" >"$PKG_DESTDIR/archive-result"
+
+check:
+  language: posix-shell
+  script: |
+    set -eu
+    [ -f "$PKG_SOURCE_ROOT/archive-probe.tar" ]
+    [ ! -e "$PKG_SOURCE_ROOT/tree/source.txt" ]
+    IFS= read -r payload <"$PKG_PACKAGE_ROOT/archive-result"
+    [ "$payload" = archive-source ]
+    printf 'checked:%s\n' "$payload" >/tmp/archive-check-ran
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64

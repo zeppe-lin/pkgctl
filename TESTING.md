@@ -125,6 +125,17 @@ application, publication, rejected/completed, effect-body, or lifecycle-session
 authority. Native isolation unavailability may skip an ordinary development run;
 `PKGCTL_REQUIRE_NATIVE_INTEGRATION=1` turns that absence into a release failure.
 
+A separate privileged `cli-build-archive-source` campaign closes the archive
+realization cross-product without using a heavyweight toolchain package. Its
+single source is a deterministic tar archive retained at
+`PKG_SOURCE_ROOT/archive-probe.tar`. Construction must also observe the unpacked
+`tree/source.txt` through its realized working directory while proving that the
+source-object root itself does not contain that unpacked path. The independent
+check receives the same retained archive object plus the sealed package through
+`PKG_PACKAGE_ROOT`; it must likewise refuse any fiction that the source-object
+root is the construction workspace. One construction plus one check must finish
+in two durable dispatches and retain one archive plus one check marker.
+
 ## Release 0.36.0 construction-only authority qualification
 
 The native runtime unit campaign now seals a build-only transaction through the

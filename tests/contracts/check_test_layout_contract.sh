@@ -58,6 +58,7 @@ for path in \
   'fixtures/artifact_publication_interrupt_fixture.cpp' \
   'fixtures/collections/lifecycle-pre-install' \
   'fixtures/collections/native-construction' \
+  'fixtures/collections/archive-source-check' \
   'fixtures/collections/rootfs-campaign' \
   'fixtures/collections/lifecycle-post-install' \
   'integration/native_root_view_fixture_test.sh' \
@@ -70,6 +71,7 @@ for path in \
   'integration/cli_run_construction_only_test.sh' \
   'integration/cli_run_native_construction_test.sh' \
   'integration/cli_build_test.sh' \
+  'integration/cli_build_archive_source_test.sh' \
   'integration/cli_build_process_death_test.sh' \
   'integration/cli_run_rootfs_campaign_test.sh' \
   'integration/cli_run_lease_contention_test.sh' \
@@ -83,6 +85,7 @@ for path in \
   'contracts/check_cli_lease_contention_contract.sh' \
   'contracts/check_cli_native_construction_contract.sh' \
   'contracts/check_cli_build_contract.sh' \
+  'contracts/check_cli_archive_source_contract.sh' \
   'contracts/check_cli_process_death_contract.sh' \
   'contracts/check_cli_run_rootfs_campaign_contract.sh' \
   'contracts/check_target_observation_contract.sh' \
