@@ -636,14 +636,61 @@ const pkgbuild_exec::package_input_resource& concrete_input_resource(
   return *found;
 }
 
-void remove_retained_package_input(const fs::path& path)
+void make_retained_resource_tree_removable(const fs::path& path)
 {
+  std::error_code ec;
+  const auto root_status = fs::symlink_status(path, ec);
+  if (ec)
+    throw std::runtime_error(
+        "cannot inspect retained check resource fixture: " + ec.message());
+  if (!fs::is_directory(root_status))
+    throw std::runtime_error(
+        "retained check resource fixture is not a directory");
+
   fs::permissions(
-      path, fs::perms::owner_write, fs::perm_options::add);
+      path, fs::perms::owner_all, fs::perm_options::add, ec);
+  if (ec)
+    throw std::runtime_error(
+        "cannot make retained check resource fixture removable: " +
+        ec.message());
+
+  fs::recursive_directory_iterator iterator(
+      path, fs::directory_options::none, ec);
+  const fs::recursive_directory_iterator end;
+  if (ec)
+    throw std::runtime_error(
+        "cannot enumerate retained check resource fixture: " +
+        ec.message());
+
+  while (iterator != end) {
+    const auto status = iterator->symlink_status(ec);
+    if (ec)
+      throw std::runtime_error(
+          "cannot inspect retained check resource fixture entry: " +
+          ec.message());
+    if (fs::is_directory(status)) {
+      fs::permissions(
+          iterator->path(), fs::perms::owner_all, fs::perm_options::add, ec);
+      if (ec)
+        throw std::runtime_error(
+            "cannot make retained check resource fixture directory removable: " +
+            ec.message());
+    }
+    iterator.increment(ec);
+    if (ec)
+      throw std::runtime_error(
+          "cannot enumerate retained check resource fixture: " +
+          ec.message());
+  }
+}
+
+void remove_retained_resource_tree(const fs::path& path)
+{
+  make_retained_resource_tree_removable(path);
   const auto removed = fs::remove_all(path);
   if (removed == 0U)
     throw std::runtime_error(
-        "retained package input fixture was not removed");
+        "retained check resource fixture was not removed");
 }
 
 std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
@@ -788,9 +835,15 @@ void check_durable_session_codec()
   for (const auto& input : session.execution_session().inputs())
     retained_inputs.push_back(input.path);
 
+  remove_retained_resource_tree(retained_source);
+  remove_retained_resource_tree(retained_package);
+  // Session admission can retain a private candidate-input coordinate before
+  // native execution has realized it. Remove only concrete inputs that exist.
+  for (const auto& input : retained_inputs) {
+    if (fs::exists(input))
+      remove_retained_resource_tree(input);
+  }
   fs::remove_all(check_root);
-  for (const auto& input : retained_inputs)
-    remove_retained_package_input(input);
   CHECK(!fs::exists(retained_source));
   CHECK(!fs::exists(retained_package));
   CHECK(!fs::exists(retained_root_view));
@@ -1992,9 +2045,17 @@ void check_stored_check_recovery()
   for (const auto& input : session.execution_session().inputs())
     retained_inputs.push_back(input.path);
 
-  fs::remove_all(check_root);
+  // Executed native check must have realized every private check resource.
+  CHECK(fs::exists(retained_source));
+  CHECK(fs::exists(retained_package));
   for (const auto& input : retained_inputs)
-    remove_retained_package_input(input);
+    CHECK(fs::exists(input));
+
+  remove_retained_resource_tree(retained_source);
+  remove_retained_resource_tree(retained_package);
+  for (const auto& input : retained_inputs)
+    remove_retained_resource_tree(input);
+  fs::remove_all(check_root);
   CHECK(!fs::exists(retained_source));
   CHECK(!fs::exists(retained_package));
   CHECK(!fs::exists(retained_root_view));
