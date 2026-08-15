@@ -274,6 +274,13 @@ void check_native_locator()
   pkgctl::native_construction_driver build_driver(build_backend);
   auto construction = pkgctl::execute_construction(session, build_driver);
   CHECK(construction.succeeded());
+  CHECK(dependency_result.build().image_authority());
+  CHECK(construction.build().image_authority());
+  if (dependency_result.build().image_authority() &&
+      construction.build().image_authority()) {
+    CHECK(dependency_result.build().image_authority()->image().image().identity() ==
+          construction.build().image_authority()->image().image().identity());
+  }
   progress = pkgctl::advance_construction(
       std::move(progress), construction);
 
@@ -298,30 +305,34 @@ void check_native_locator()
   CHECK(!fs::exists(
       check_session.execution_session().paths().temporary_root));
 
-  auto admitted_build = pkgbuild_exec::admitted_build_session::admit(
-      construction.session().request().build(), construction.materialization(),
-      construction.session().package_inputs(),
-      construction.session().paths().build,
-      construction.session().execution_identity(),
-      construction.session().compression());
-  const auto prepared_paths =
-      pkgbuild_exec::project_prepared_paths(admitted_build);
-  const auto source_slot = pkgexec::resource_slot::named(
-      pkgexec::resource_role::source_tree, "sources");
-  const auto& build_execution = construction.build().execution().request();
+  const auto check_scope =
+      fs::path(reserved_check_record.journal().hex()) /
+      check_dispatch.identity().hex();
+  const auto check_resource_root = runtime_root / "check-resources" / check_scope;
   CHECK(check_session.execution_session().source().path ==
-        prepared_paths.source_tree);
-  CHECK(check_session.execution_session().source().tree ==
-        build_execution.resources().binding(source_slot).resource());
+        check_resource_root / "source");
   CHECK(check_session.execution_session().package().path ==
-        construction.session().paths().build.package_output_root);
-  CHECK(check_session.execution_session().package().tree ==
-        build_execution.resources().binding(output_slot).resource());
+        check_resource_root / "package");
+  CHECK(check_session.execution_session().source().tree !=
+        check_session.execution_session().package().tree);
   CHECK(check_session.execution_session().inputs().size() == 1U);
-  CHECK(check_session.execution_session().inputs().front().resource ==
-        construction.session().package_inputs().front().resource);
   CHECK(check_session.execution_session().inputs().front().path ==
-        construction.session().package_inputs().front().path);
+        check_resource_root / "inputs" /
+            check_session.execution_session().inputs().front().input.hex());
+  CHECK(check_session.execution_session().inputs().front().resource !=
+        check_session.execution_session().source().tree);
+  CHECK(check_session.execution_session().inputs().front().resource !=
+        check_session.execution_session().package().tree);
+  CHECK(repeated_check.execution_session().source().tree ==
+        check_session.execution_session().source().tree);
+  CHECK(repeated_check.execution_session().package().tree ==
+        check_session.execution_session().package().tree);
+  CHECK(repeated_check.execution_session().inputs().front().resource ==
+        check_session.execution_session().inputs().front().resource);
+  CHECK(check_session.execution_session().source().path !=
+        construction.session().paths().build.session_root / "source");
+  CHECK(check_session.execution_session().package().path !=
+        construction.session().paths().build.package_output_root);
 
   auto started_check_run = pkgctl::start_check_dispatch(
       check_reservation.run, check_dispatch, check_session);

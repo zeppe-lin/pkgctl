@@ -6,8 +6,6 @@
 
 #include <pkgctl/check.h>
 
-#include <libpkgimage-exec/libpkgimage-exec.h>
-#include <libpkgsource-exec/libpkgsource-exec.h>
 #include <pkgctl/check_codec.h>
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
@@ -678,8 +676,8 @@ std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
             "check fixture lacks candidate input image authority");
       result.push_back({
           input.identity(),
-          pkgimage_exec::package_tree_identity(
-              authority->build().image_authority()->image().image().identity()),
+          pkgexec::resource_identity::from_sha256(
+              std::string(64U, hexadecimal_offset(seed, 4 + index))),
           root / "inputs" / input.identity().hex(),
       });
       continue;
@@ -714,14 +712,14 @@ check_resources resources_for(
   return {
       {
           construction.session().request().source().identity(),
-          pkgsource_exec::source_object_tree_identity(
-              construction.materialization()),
+          pkgexec::resource_identity::from_sha256(
+              std::string(64U, hexadecimal_offset(seed, 0))),
           root / "source-tree",
       },
       {
           artifact->identity(),
-          pkgimage_exec::package_tree_identity(
-              construction.build().image_authority()->image().image().identity()),
+          pkgexec::resource_identity::from_sha256(
+              std::string(64U, hexadecimal_offset(seed, 1))),
           root / "package-tree",
       },
       check_input_resources(construction, root, seed, progress),

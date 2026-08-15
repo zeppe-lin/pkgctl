@@ -34,7 +34,8 @@ forbid()
 }
 
 require "$locator" 'source_object_resource_identity('
-require "$locator" 'package_tree_resource_identity('
+require "$locator" 'checked_package_resource_identity('
+require "$locator" 'constructed_input_resource_identity('
 require "$locator" 'roots.check_resource_root / scope / "source"'
 require "$locator" 'roots.check_resource_root / scope / "package"'
 require "$locator" 'roots.check_resource_root / scope / "inputs" /'
@@ -63,3 +64,10 @@ require "$archive_test" 'rm -rf "$runtime/construction-sessions" "$runtime/packa
 require "$archive_test" 'independent check source-object tree is absent'
 require "$archive_test" 'independent checked-package tree is absent'
 require "$archive_test" 'independent constructed check input is absent'
+
+# Execution resource identities are controller-owned per-instance bindings.
+grep -F 'pkgctl/native-check-source-resource/1' "$locator" >/dev/null || { echo 'check-resource contract: source instance identity is not controller-owned' >&2; exit 1; }
+grep -F 'pkgctl/native-check-package-resource/1' "$locator" >/dev/null || { echo 'check-resource contract: checked-package instance identity is not controller-owned' >&2; exit 1; }
+grep -F 'pkgctl/native-check-input-resource/1' "$locator" >/dev/null || { echo 'check-resource contract: constructed-input instance identity is not controller-owned' >&2; exit 1; }
+! grep -F 'pkgsource_exec::source_object_tree_identity' "$locator" "$check" >/dev/null || { echo 'check-resource contract: source realizer leaked execution-resource identity ownership' >&2; exit 1; }
+! grep -F 'pkgimage_exec::package_tree_identity' "$locator" "$check" >/dev/null || { echo 'check-resource contract: image realizer leaked execution-resource identity ownership' >&2; exit 1; }

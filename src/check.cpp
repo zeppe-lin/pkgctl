@@ -246,7 +246,6 @@ const pkgcheck_exec::package_input_resource& require_check_input_resource(
 
 void realize_construction_package(
     const construction_result& construction,
-    const pkgexec::resource_identity& expected_resource,
     const std::filesystem::path& destination,
     std::string_view description)
 {
@@ -267,7 +266,7 @@ void realize_construction_package(
   if (realized.image != image_authority->image().image().identity() ||
       realized.archive_digest !=
           image_authority->image().receipt().archive_digest() ||
-      realized.resource != expected_resource)
+      realized.path != destination)
     throw error(
         error_code::check_driver_contract_violation,
         std::string(description) +
@@ -538,7 +537,8 @@ native_transaction_check_driver::execute_check(
     const auto source = pkgsource_exec::realize_source_object_tree(
         construction.materialization(), execution_session.source().path);
     if (source.source != execution_session.source().source ||
-        source.resource != execution_session.source().tree)
+        source.materialization != construction.materialization().identity() ||
+        source.path != execution_session.source().path)
       throw error(
           error_code::check_driver_contract_violation,
           "native check source realization differs from admitted authority");
@@ -548,14 +548,14 @@ native_transaction_check_driver::execute_check(
           error_code::check_driver_contract_violation,
           "native check package artifact differs from retained construction");
     realize_construction_package(
-        construction, execution_session.package().tree,
-        execution_session.package().path, "native checked package");
+        construction, execution_session.package().path,
+        "native checked package");
 
     for (const auto& authority : session.request().constructed_inputs()) {
       const auto& input =
           require_check_input_resource(execution_session, authority.input);
       realize_construction_package(
-          authority.construction, input.resource, input.path,
+          authority.construction, input.path,
           "native constructed check input");
     }
 

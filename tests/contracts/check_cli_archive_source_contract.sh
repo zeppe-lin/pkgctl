@@ -47,9 +47,13 @@ for required in \
   'build archive-probe --check' \
   '--max-steps 2' \
   'durable-steps 2' \
-  'artifact.0.package archive-probe' \
-  'archive-payload archive-source' \
-  'check-payload checked:archive-source'; do
+  'artifacts 2' \
+  '.package archive-dep' \
+  '.package archive-probe' \
+  'rm -rf "$runtime/construction-sessions" "$runtime/package-outputs"' \
+  'dep-token' \
+  'archive-payload archive-source+archive-dependency' \
+  'check-payload checked:archive-source+archive-dependency'; do
   grep -F -- "$required" "$test_source" >/dev/null || {
     echo "archive-source process proof omits: $required" >&2
     exit 1

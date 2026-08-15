@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <pkgctl/error.h>
+#include <pkgctl/identity.h>
 
 namespace pkgctl {
 namespace fs = std::filesystem;
@@ -27,31 +28,46 @@ namespace {
   throw native_session_locator_error(code, std::move(message));
 }
 
-pkgexec::resource_identity source_object_resource_identity(
-    const pkgfetch::source_materialization& materialization)
+pkgexec::resource_identity check_resource_identity(
+    std::string_view domain,
+    const std::vector<std::string>& fields)
 {
-  try {
-    return pkgsource_exec::source_object_tree_identity(materialization);
-  } catch (const pkgsource_exec::error& problem) {
-    locator_failure(
-        native_session_locator_error_code::check_session_invalid,
-        "cannot derive check source-object resource identity: " +
-            std::string(problem.what()));
-  }
+  return pkgexec::resource_identity::from_sha256(
+      make_session_identity(domain, fields).hex());
 }
 
-pkgexec::resource_identity package_tree_resource_identity(
+pkgexec::resource_identity source_object_resource_identity(
+    const construction_result& construction)
+{
+  return check_resource_identity(
+      "pkgctl/native-check-source-resource/1",
+      {construction.identity().hex(),
+       construction.materialization().source().identity().hex(),
+       construction.materialization().identity().hex()});
+}
+
+pkgexec::resource_identity checked_package_resource_identity(
+    const construction_result& construction,
+    const pkgbuild::artifact_identity& artifact,
     const pkgimage::package_image_identity& image)
 {
-  try {
-    return pkgimage_exec::package_tree_identity(image);
-  } catch (const pkgimage_exec::error& problem) {
-    locator_failure(
-        native_session_locator_error_code::check_session_invalid,
-        "cannot derive check package-tree resource identity: " +
-            std::string(problem.what()));
-  }
+  return check_resource_identity(
+      "pkgctl/native-check-package-resource/1",
+      {construction.identity().hex(), artifact.hex(), image.string()});
 }
+
+pkgexec::resource_identity constructed_input_resource_identity(
+    const pkgbuild::build_input_identity& input,
+    const construction_result& construction,
+    const pkgbuild::artifact_identity& artifact,
+    const pkgimage::package_image_identity& image)
+{
+  return check_resource_identity(
+      "pkgctl/native-check-input-resource/1",
+      {input.hex(), construction.identity().hex(), artifact.hex(),
+       image.string()});
+}
+
 
 fs::path normalize_absolute_path(
     fs::path path,
@@ -316,7 +332,8 @@ std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
             "candidate check input lacks sealed image authority");
       result.push_back({
           input.identity(),
-          package_tree_resource_identity(
+          constructed_input_resource_identity(
+              input.identity(), authority.construction, artifact->identity(),
               image_authority->image().image().identity()),
           roots.check_resource_root / scope / "inputs" /
               input.identity().hex(),
@@ -479,13 +496,13 @@ native_transaction_dispatch_session_source::check(
     transaction_check_resources resources{
         {
             construction.session().request().source().identity(),
-            source_object_resource_identity(
-                construction.materialization()),
+            source_object_resource_identity(construction),
             roots.check_resource_root / scope / "source",
         },
         {
             artifact->identity(),
-            package_tree_resource_identity(
+            checked_package_resource_identity(
+                construction, artifact->identity(),
                 image_authority->image().image().identity()),
             roots.check_resource_root / scope / "package",
         },

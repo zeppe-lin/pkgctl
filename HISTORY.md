@@ -17,6 +17,9 @@
   are reconstructed from their own predecessor artifacts as well. The
   archive-source qualification now deletes those construction-private trees
   before check resume and requires successful independent resource realization.
+  Concrete `pkgexec::resource_identity` values are minted by pkgctl per semantic
+  check resource instance rather than borrowed from source/image realizers, so
+  distinct package inputs remain distinct even when their image bytes are equal.
 
 ## 0.38.0 - 2026-08-15
 

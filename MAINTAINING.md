@@ -583,3 +583,8 @@ Historical evidence rule:
   the durable libpkgapply journal; a current canonical-state observation may
   validate present pre-state but must never regenerate historical projection
   evidence from an old lease identity.
+
+Check-resource filesystem realizers prove content authority; they do not own
+`pkgexec::resource_identity`. Keep concrete check resource-instance identities in
+pkgctl composition, bound to semantic role plus retained construction authority.
+Never derive two disjoint check resources solely from package-image content.

@@ -142,6 +142,10 @@ artifact/image authority, and its candidate check input from the dependency's
 sealed artifact rather than construction residue. Two constructions plus one
 resumed check must finish in three durable dispatches and retain two archives
 plus one check marker.
+The locator qualification also requires distinct controller-owned execution
+resource identities for source, checked package, and candidate inputs; equal
+package-image content must never collapse two disjoint check resources into one
+`pkgexec` materialization handle.
 
 ## Release 0.36.0 construction-only authority qualification
 

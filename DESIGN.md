@@ -400,8 +400,13 @@ profile used by fresh and restarted work. Terminal operations are reopened by
 the same native operation authority and canonical checkpoint validator.
 
 Check resource location is now separated from check resource realization. The
-locator derives only deterministic private paths and resource identities from
-retained construction authority. Immediately before native check execution,
+locator derives only deterministic private paths and controller-owned execution
+resource-instance identities from retained construction authority. Those
+identities bind semantic role plus retained authority; they are deliberately not
+content identities exported by the filesystem realizers. Two logical package
+resources may therefore carry identical normalized image bytes while remaining
+distinct concrete execution resources at disjoint host paths. Immediately before
+native check execution,
 `libpkgsource-exec` recreates `/check/source` from the retained exact
 `pkgfetch::source_materialization`, and `libpkgimage-exec` recreates the checked
 package tree from the exact published artifact digest plus normalized package
