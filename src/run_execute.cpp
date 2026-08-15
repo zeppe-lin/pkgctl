@@ -58,10 +58,11 @@ reexecute_started_construction_dispatch_durable(
   validate_started_replay(
       started_record, run, dispatch, session.identity(),
       transaction_unit_kind::construction);
-  auto result = execute_construction(std::move(session), driver);
+  auto result = execute_construction_unpublished(std::move(session), driver);
   auto admitted_evidence = construction_dispatch_evidence_record::admit(
       started_record, dispatch, result);
   auto evidence = evidence_store.publish(admitted_evidence);
+  publish_construction(result, driver);
   auto completed = complete_construction_dispatch(
       std::move(run), dispatch, result);
   auto completed_checkpoint = commit_transaction_run_successor(
@@ -117,10 +118,11 @@ execute_construction_dispatch_durable(
   auto started_checkpoint = commit_transaction_run_successor(
       current_record, std::move(started), run_store);
 
-  auto result = execute_construction(std::move(session), driver);
+  auto result = execute_construction_unpublished(std::move(session), driver);
   auto admitted_evidence = construction_dispatch_evidence_record::admit(
       started_checkpoint.record, dispatch, result);
   auto evidence = evidence_store.publish(admitted_evidence);
+  publish_construction(result, driver);
   auto completed = complete_construction_dispatch(
       std::move(started_checkpoint.run), dispatch, result);
   auto completed_checkpoint = commit_transaction_run_successor(

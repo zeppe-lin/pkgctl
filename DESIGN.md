@@ -33,10 +33,14 @@ lookup. An attempt record published before a failed started-run commit is merely
 unreferenced private evidence; reserved ownership is still released by the run
 journal rules.
 
-This closes process death before controller result evidence. Public construction
-artifact publication remains a separate crash boundary: no file discovered in
-an artifact directory is allowed to become historical success without retained
-controller result authority.
+This closes process death before controller result evidence. Successful native
+construction also separates private sealing from public artifact projection:
+the exact verified archive remains beneath the admitted construction session,
+terminal construction evidence becomes durable, and only then may the public
+artifact name be projected. Recovery with terminal evidence publishes or
+verifies that exact retained artifact without rerunning construction. A file
+discovered in an artifact directory is therefore never allowed to become
+historical success without retained controller result authority.
 
 ## Empty-target feedback qualification
 

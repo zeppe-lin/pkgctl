@@ -31,7 +31,10 @@ for required in \
   'validate_input_resources' \
   'transaction.resolution().resolution()' \
   'pkgbuild_exec::admitted_build_session::admit' \
-  'pkgbuild_exec::execute' \
+  'pkgbuild_exec::execute_sealed' \
+  'pkgbuild_exec::publish_sealed_artifact' \
+  'execute_construction_unpublished' \
+  'publish_construction' \
   'construction_driver_contract_violation' \
   'image_authority'; do
   grep -F -- "$required" "$header" "$source" "$codec" \
@@ -46,6 +49,13 @@ build_line=$(grep -n 'driver.execute_build' "$source" | head -n1 | cut -d: -f1)
 [ -n "$materialize_line" ] && [ -n "$build_line" ] && \
     [ "$materialize_line" -lt "$build_line" ] || {
   echo 'construction does not materialize before build execution' >&2
+  exit 1
+}
+
+publish_line=$(grep -n 'driver.publish_build' "$source" | head -n1 | cut -d: -f1)
+[ -n "$build_line" ] && [ -n "$publish_line" ] && \
+    [ "$build_line" -lt "$publish_line" ] || {
+  echo 'construction publication does not follow build sealing' >&2
   exit 1
 }
 

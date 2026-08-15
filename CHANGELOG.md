@@ -6,8 +6,11 @@
   construction/check dispatches. A retained terminal result still rehydrates
   without selecting a current execution backend; an attempt-only started
   dispatch selects the matching live construction/check backend for exact replay.
-  Requires `libpkgbuild-exec >= 3.0.1` so an authorized replay can converge on an
-  already-published artifact only when freshly sealed size and SHA-256 match.
+  Construction now retains terminal build evidence before caller-visible
+  artifact publication. Requires `libpkgbuild-exec >= 3.1.0` for private
+  artifact sealing plus evidence-backed exact-byte publication, so recovery
+  never has to reproduce nondeterministic build bytes merely to discover what
+  an already-published pathname might mean.
 - Closes the native source-4 ABI generation across source codec/YAML, catalog
   owner/codec/acquisition, resolver, fetch, build execution, transaction, check,
   source-plan, build-image, state-source-backed application, and their execution

@@ -429,7 +429,14 @@ pkgbuild_exec::build_execution_result
 native_construction_driver::execute_build(
     const pkgbuild_exec::admitted_build_session& session)
 {
-  return pkgbuild_exec::execute(session, backend_);
+  return pkgbuild_exec::execute_sealed(session, backend_);
+}
+
+void native_construction_driver::publish_build(
+    const pkgbuild_exec::admitted_build_session& session,
+    const pkgbuild_exec::build_execution_result& result)
+{
+  pkgbuild_exec::publish_sealed_artifact(session, result);
 }
 
 construction_result::construction_result(
@@ -457,7 +464,21 @@ construction_result::build() const noexcept { return build_; }
 const session_identity& construction_result::identity() const noexcept
 { return identity_; }
 
-construction_result execute_construction(
+namespace {
+
+pkgbuild_exec::admitted_build_session admit_build_session(
+    const construction_session& session,
+    const pkgfetch::source_materialization& materialization)
+{
+  return pkgbuild_exec::admitted_build_session::admit(
+      session.request().build(), materialization, session.package_inputs(),
+      session.paths().build, session.execution_identity(),
+      session.compression());
+}
+
+} // namespace
+
+construction_result execute_construction_unpublished(
     construction_session session,
     construction_driver& driver)
 {
@@ -469,10 +490,7 @@ construction_result execute_construction(
   validate_materialization(session.request(), materialization);
 
   const auto& build_request = session.request().build();
-  auto admitted = pkgbuild_exec::admitted_build_session::admit(
-      build_request, materialization, session.package_inputs(),
-      session.paths().build, session.execution_identity(),
-      session.compression());
+  auto admitted = admit_build_session(session, materialization);
   auto build = driver.execute_build(admitted);
   validate_build_result(build_request, build);
 
@@ -488,6 +506,26 @@ construction_result execute_construction(
   return construction_result(
       std::move(session), std::move(materialization), std::move(build),
       outcome, std::move(identity));
+}
+
+void publish_construction(
+    const construction_result& result,
+    construction_driver& driver)
+{
+  if (!result.succeeded()) {
+    return;
+  }
+  auto admitted = admit_build_session(result.session(), result.materialization());
+  driver.publish_build(admitted, result.build());
+}
+
+construction_result execute_construction(
+    construction_session session,
+    construction_driver& driver)
+{
+  auto result = execute_construction_unpublished(std::move(session), driver);
+  publish_construction(result, driver);
+  return result;
 }
 
 } // namespace pkgctl

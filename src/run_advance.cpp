@@ -277,6 +277,7 @@ transaction_run_advance_result reconcile_active(
       if (result == nullptr)
         invalid_advancement(
             "construction recovery handoff carries no replay or result authority");
+      publish_construction(*result, require_construction_driver(drivers));
       auto value = reconcile_construction_dispatch_durable(
           handoff.checkpoint(), handoff.dispatch(), *result, stores.runs);
       auto evidence = value.result;

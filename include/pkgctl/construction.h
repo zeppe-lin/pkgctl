@@ -111,6 +111,10 @@ public:
 
   [[nodiscard]] virtual pkgbuild_exec::build_execution_result execute_build(
       const pkgbuild_exec::admitted_build_session& session) = 0;
+
+  virtual void publish_build(
+      const pkgbuild_exec::admitted_build_session& session,
+      const pkgbuild_exec::build_execution_result& result) = 0;
 };
 
 /*! \brief Native composition of libpkgfetch and libpkgbuild-exec. */
@@ -123,6 +127,10 @@ public:
 
   [[nodiscard]] pkgbuild_exec::build_execution_result execute_build(
       const pkgbuild_exec::admitted_build_session& session) override;
+
+  void publish_build(
+      const pkgbuild_exec::admitted_build_session& session,
+      const pkgbuild_exec::build_execution_result& result) override;
 
 private:
   pkgexec::execution_backend& backend_;
@@ -147,6 +155,8 @@ public:
 
 private:
   friend struct detail_run_recovery_access;
+  friend construction_result execute_construction_unpublished(
+      construction_session, construction_driver&);
   friend construction_result execute_construction(
       construction_session, construction_driver&);
 
@@ -163,6 +173,16 @@ private:
   construction_outcome outcome_;
   session_identity identity_;
 };
+
+/*! \brief Materialize and seal one construction without public publication. */
+[[nodiscard]] construction_result execute_construction_unpublished(
+    construction_session session,
+    construction_driver& driver);
+
+/*! \brief Publish the exact artifact retained by terminal construction evidence. */
+void publish_construction(
+    const construction_result& result,
+    construction_driver& driver);
 
 /*! \brief Materialize and build one exact transaction construction node. */
 [[nodiscard]] construction_result execute_construction(

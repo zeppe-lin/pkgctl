@@ -34,6 +34,7 @@ for required in \
   'assessment().active().front()' \
   'acquire_transaction_dispatch_recovery_authority' \
   'reconcile_reserved_dispatch_durable' \
+  'publish_construction' \
   'reconcile_construction_dispatch_durable' \
   'reconcile_check_dispatch_durable' \
   'reconcile_operation_dispatch_durable' \
@@ -98,6 +99,7 @@ reconcile_body=$(sed -n \
 ordered_tokens "$reconcile_body" \
   'acquire_transaction_dispatch_recovery_authority' \
   'reconcile_reserved_dispatch_durable' \
+  'publish_construction' \
   'reconcile_construction_dispatch_durable' \
   'reconcile_check_dispatch_durable' \
   'reconcile_operation_dispatch_durable' \

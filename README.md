@@ -81,7 +81,12 @@ immutable evidence before the `started` run successor can become durable.
 Terminal fetch/build or check evidence remains a separate later record. Restart
 prefers that terminal evidence; when process death leaves only durable started
 ownership, it decodes and replays the exact retained attempt session instead of
-reconsulting current construction/check configuration. Construction/check
+reconsulting current construction/check configuration. Successful construction
+seals its verified archive beneath the private attempt session; terminal build
+evidence is persisted before the caller-visible artifact name is projected.
+Evidence-backed restart can therefore finish or verify publication without
+re-executing a nondeterministic build or treating an artifact pathname as
+historical truth. Construction/check
 restart validates those retained sessions under the exact retained
 transaction/progress/node authority; it does not reconsult current
 construction/check configuration, the fresh session locator, or retained-installed-package lookup. A started operation likewise retains the complete admitted

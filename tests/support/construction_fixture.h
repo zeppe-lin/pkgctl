@@ -603,6 +603,13 @@ public:
     throw std::runtime_error("mismatched materialization reached build execution");
   }
 
+  void publish_build(
+      const pkgbuild_exec::admitted_build_session&,
+      const pkgbuild_exec::build_execution_result&) override
+  {
+    throw std::runtime_error("mismatched materialization reached publication");
+  }
+
 private:
   pkgsource::source_snapshot source_;
 };
@@ -624,7 +631,14 @@ public:
     auto admitted = pkgbuild_exec::admitted_build_session::admit(
         alternate_, session.sources(), session.package_inputs(),
         session.paths(), session.identity(), session.compression());
-    return pkgbuild_exec::execute(admitted, backend_);
+    return pkgbuild_exec::execute_sealed(admitted, backend_);
+  }
+
+  void publish_build(
+      const pkgbuild_exec::admitted_build_session& session,
+      const pkgbuild_exec::build_execution_result& result) override
+  {
+    pkgbuild_exec::publish_sealed_artifact(session, result);
   }
 
 private:

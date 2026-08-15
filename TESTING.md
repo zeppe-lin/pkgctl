@@ -6,9 +6,10 @@ The privileged build process-death gate kills `pkgctl` at durable construction
 `started`, durable public artifact publication, and durable check `started`. A
 construction/check `started` case is recoverable only from the exact immutable
 attempt session published before started ownership; current collection or
-session-locator authority must not participate in replay. The artifact case
-remains red until public publication is ordered behind durable terminal result
-authority and made idempotent from that authority.
+session-locator authority must not participate in replay. Public artifact
+publication is ordered after durable terminal construction evidence. The
+artifact-published case therefore resumes from retained result authority and
+must verify/project the exact sealed bytes without rerunning construction.
 
 The ordinary test pass must preflight native isolation without ptrace and skip
 these cases with status 77 when the required Linux namespace guarantees are not

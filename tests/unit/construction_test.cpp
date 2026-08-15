@@ -917,6 +917,13 @@ public:
   {
     throw std::runtime_error("unreachable build execution");
   }
+
+  void publish_build(
+      const pkgbuild_exec::admitted_build_session&,
+      const pkgbuild_exec::build_execution_result&) override
+  {
+    throw std::runtime_error("unreachable artifact publication");
+  }
 };
 
 class tracing_construction_driver final : public pkgctl::construction_driver {
@@ -939,6 +946,14 @@ public:
   {
     trace_.push_back("build");
     return driver_.execute_build(session);
+  }
+
+  void publish_build(
+      const pkgbuild_exec::admitted_build_session& session,
+      const pkgbuild_exec::build_execution_result& result) override
+  {
+    trace_.push_back("publish");
+    driver_.publish_build(session, result);
   }
 
 private:
@@ -1417,7 +1432,7 @@ void check_durable_dispatch_execution()
 
     CHECK(trace == std::vector<std::string>(
         {"attempt-construction", "run-1", "materialize", "build",
-         "evidence-construction", "run-2"}));
+         "evidence-construction", "publish", "run-2"}));
     CHECK(completed.result.succeeded());
     CHECK(completed.evidence.result() == completed.result.identity());
     CHECK(completed.record.sequence() == reserved.sequence() + 2U);
@@ -1519,7 +1534,8 @@ void check_durable_dispatch_execution()
     CHECK(failed);
     CHECK(trace == std::vector<std::string>(
         {"attempt-construction", "run-1", "materialize", "build",
-         "evidence-construction", "run-2"}));
+         "evidence-construction", "publish", "run-2"}));
+    CHECK(fs::is_regular_file(fixture.second.paths().build.artifact_path));
     CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
     const auto reopened = run_store.latest().reopen(reservation.run.progress());
     CHECK(reopened.records().size() == 1U);
@@ -1577,6 +1593,7 @@ void check_durable_dispatch_execution()
     CHECK(trace == std::vector<std::string>(
         {"attempt-construction", "run-1", "materialize", "build",
          "evidence-construction"}));
+    CHECK(!fs::exists(fixture.second.paths().build.artifact_path));
     CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
     const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
         reservation.run.progress(), run_store.latest()).assessment();
@@ -2563,7 +2580,7 @@ void check_single_step_transaction_advancement()
     CHECK(execution_source.calls() == 1U);
     CHECK(trace == std::vector<std::string>({
         "run-1", "attempt-construction", "run-2", "materialize", "build",
-        "evidence-construction", "run-3"}));
+        "evidence-construction", "publish", "run-3"}));
   }
 
   {
@@ -2604,7 +2621,9 @@ void check_single_step_transaction_advancement()
     auto started_run = pkgctl::start_construction_dispatch(
         reservation.run, *reservation.dispatch, session);
     auto started = reserved.successor(started_run);
-    auto recovered_result = pkgctl::execute_construction(session, native_driver);
+    auto recovered_result =
+        pkgctl::execute_construction_unpublished(session, native_driver);
+    CHECK(!fs::exists(session.paths().build.artifact_path));
 
     fixed_progress_source progress_source(started_run.progress());
     construction_execution_authority_source execution_source(session);
@@ -2612,11 +2631,12 @@ void check_single_step_transaction_advancement()
     std::vector<std::string> trace;
     run_execute_support::sequenced_run_store run_store(started, trace);
     run_execute_support::sequenced_evidence_store evidence_store(trace);
+    tracing_construction_driver driver(native_driver, trace);
 
     const auto reconciled = pkgctl::advance_transaction_run_once(
         started.journal(), dispatch_nonce(75U),
         {progress_source, execution_source, recovery_source},
-        {nullptr, nullptr, nullptr}, {run_store, evidence_store, nullptr});
+        {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
 
     CHECK(reconciled.disposition() ==
           pkgctl::transaction_run_advance_disposition::
@@ -2626,7 +2646,8 @@ void check_single_step_transaction_advancement()
           reconciled.construction()->identity() == recovered_result.identity());
     CHECK(recovery_source.calls() == 1U);
     CHECK(execution_source.calls() == 0U);
-    CHECK(trace == std::vector<std::string>({"run-1"}));
+    CHECK(trace == std::vector<std::string>({"publish", "run-1"}));
+    CHECK(fs::is_regular_file(session.paths().build.artifact_path));
   }
 
   {
@@ -2661,7 +2682,8 @@ void check_single_step_transaction_advancement()
     CHECK(execution_source.calls() == 0U);
     CHECK(replayed.record().sequence() == started.sequence() + 1U);
     CHECK(trace == std::vector<std::string>({
-        "materialize", "build", "evidence-construction", "run-1"}));
+        "materialize", "build", "evidence-construction", "publish",
+        "run-1"}));
   }
 
   {

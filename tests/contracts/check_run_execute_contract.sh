@@ -33,7 +33,8 @@ for required in \
   'start_construction_dispatch' \
   'start_check_dispatch' \
   'commit_operation_dispatch_start' \
-  'execute_construction' \
+  'execute_construction_unpublished' \
+  'publish_construction' \
   'execute_transaction_check' \
   'execute_effectful_operation_durable' \
   'complete_construction_dispatch' \
@@ -70,9 +71,10 @@ construction_body=$(sed -n \
 ordered_tokens "$construction_body" \
   'start_construction_dispatch' \
   'commit_transaction_run_successor' \
-  'execute_construction' \
+  'execute_construction_unpublished' \
   'construction_dispatch_evidence_record::admit' \
   'evidence_store.publish' \
+  'publish_construction' \
   'complete_construction_dispatch' \
   'commit_transaction_run_successor'
 
