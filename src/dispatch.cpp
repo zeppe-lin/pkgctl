@@ -793,7 +793,8 @@ void validate_construction_inputs(
     const construction_session& session)
 {
   std::set<pkgtransaction::transaction_edge_identity> matched_edges;
-  for (const auto& input : session.request().inputs())
+  for (const auto& input : session.request().build().inputs().for_scope(
+           pkgbuild::input_scope::build))
   {
     const auto& edge = require_input_edge(run.progress(), dispatch, input);
     if (!matched_edges.insert(edge.identity()).second)
@@ -825,13 +826,11 @@ void validate_construction_inputs(
     if (edge.kind() != pkgtransaction::transaction_edge_kind::requirement ||
         edge.after() != dispatch.unit().primary_node() || !edge.scope())
       continue;
-    const auto kind = edge.scope()->kind();
-    if (kind != pkgsource::requirement_scope_kind::build &&
-        kind != pkgsource::requirement_scope_kind::check)
+    if (edge.scope()->kind() != pkgsource::requirement_scope_kind::build)
       continue;
     if (matched_edges.find(edge.identity()) == matched_edges.end())
       throw error(error_code::invalid_dispatch,
-                  "construction session omits a transaction package input");
+                  "construction session omits a transaction build input");
   }
 }
 

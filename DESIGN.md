@@ -13,6 +13,21 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Current construction/check input-scope boundary
+
+A sealed `pkgbuild::build_request` retains both build- and check-scoped logical
+requirements because both are part of package-build authority. Concrete
+execution resources are phase-specific: construction admits and mounts only
+`pkgbuild::input_scope::build`; check-scoped inputs are absent from the
+construction session and build environment. The independent check session later
+realizes candidate check inputs from their retained predecessor artifacts and
+locates installed check inputs from state-owned retained package resources.
+
+The same selected package may therefore satisfy both a build and a check
+requirement without aliasing one concrete construction resource under two
+logical identities. Scope does not duplicate filesystem authority; it selects
+which execution phase may receive that authority.
+
 ## Current construction/check process-death boundary
 
 Construction and check attempts use write-ahead admission. Before a started run

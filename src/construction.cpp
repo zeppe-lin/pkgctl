@@ -385,7 +385,9 @@ construction_session construction_session::admit(
     pkgbuild_exec::execution_identity execution_identity,
     pkgbuild::artifact_compression compression)
 {
-  validate_input_resources(request.inputs(), package_inputs);
+  validate_input_resources(
+      request.build().inputs().for_scope(pkgbuild::input_scope::build),
+      package_inputs);
   normalize_session_coordinates(paths, package_inputs,
                                 execution_identity, compression, request);
   auto identity = make_session_identity(

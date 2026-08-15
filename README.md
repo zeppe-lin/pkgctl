@@ -1,5 +1,12 @@
 # pkgctl
 
+Current construction/check input scope is phase-separated. The sealed
+`libpkgbuild` request still retains both build- and check-scoped logical
+requirements, but native construction concretizes only build-scoped package
+inputs. Check-scoped candidate inputs are realized later by the independent
+check boundary, and installed check inputs are located from their state-owned
+retained resources rather than borrowed from construction sessions.
+
 Current development makes native check resources independently reconstructible.
 The session locator projects private check coordinates and phase-neutral resource
 identities only; immediately before check execution, retained source

@@ -20,6 +20,12 @@
   Concrete `pkgexec::resource_identity` values are minted by pkgctl per semantic
   check resource instance rather than borrowed from source/image realizers, so
   distinct package inputs remain distinct even when their image bytes are equal.
+- Phase-separates concrete package inputs: construction receives only
+  build-scoped resources even though the sealed build request retains both
+  build/check requirements. Candidate check inputs are realized only for the
+  check phase and installed check inputs are located from state-owned retained
+  resources, so one package selected in both scopes cannot alias a construction
+  resource.
 
 ## 0.38.0 - 2026-08-15
 

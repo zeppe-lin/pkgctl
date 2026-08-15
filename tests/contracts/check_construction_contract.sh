@@ -44,6 +44,18 @@ for required in \
   }
 done
 
+
+# Concrete construction resources are build-scope only.
+grep -F 'request.build().inputs().for_scope(pkgbuild::input_scope::build)' \
+    "$source" >/dev/null || {
+  echo 'construction admission does not isolate build-scoped inputs' >&2
+  exit 1
+}
+if grep -F 'PKG_CHECK_INPUT' "$source" >/dev/null 2>&1; then
+  echo 'construction source leaked check execution resources' >&2
+  exit 1
+fi
+
 materialize_line=$(grep -n 'driver.materialize_source' "$source" | head -n1 | cut -d: -f1)
 build_line=$(grep -n 'driver.execute_build' "$source" | head -n1 | cut -d: -f1)
 [ -n "$materialize_line" ] && [ -n "$build_line" ] && \

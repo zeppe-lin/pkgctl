@@ -117,8 +117,10 @@ pkgctl::construction_session construction_session_for(
   if (supplied_inputs) {
     inputs = std::move(*supplied_inputs);
   } else {
-    inputs.reserve(request.inputs().size());
-    for (const auto& input : request.inputs()) {
+    const auto build_inputs = request.build().inputs().for_scope(
+        pkgbuild::input_scope::build);
+    inputs.reserve(build_inputs.size());
+    for (const auto& input : build_inputs) {
       const auto path = root / "inputs" / input.package().name();
       fs::create_directories(path);
       inputs.push_back({
@@ -322,21 +324,13 @@ pkgctl::transaction_check_resources check_resources(
   for (std::size_t index = 0; index < check_inputs.size(); ++index)
   {
     const auto& logical = check_inputs[index];
-    const pkgbuild_exec::package_input_resource* concrete = nullptr;
-    for (const auto& candidate : construction.session().package_inputs()) {
-      if (candidate.input == logical.identity()) {
-        concrete = &candidate;
-        break;
-      }
-    }
-    if (concrete == nullptr)
-      throw std::runtime_error(
-          "dispatch check fixture lacks concrete input resource");
+    const auto path = root / "inputs" / logical.identity().hex();
+    fs::create_directories(path);
     inputs.push_back({
         logical.identity(),
         external_identity<pkgexec::resource_identity>(
             static_cast<std::uint8_t>(marker + 4U + index)),
-        concrete->path,
+        path,
     });
   }
 
@@ -683,6 +677,9 @@ void check_check_inputs_are_constructed_before_checked_package()
       fixture.transaction, fixture.temporary.path() / "checked-build",
       "tool");
   CHECK(tool_session.request().inputs().size() == 1U);
+  CHECK(tool_session.request().inputs().front().scope() ==
+        pkgbuild::input_scope::check);
+  CHECK(tool_session.package_inputs().empty());
   const auto check_input = tool_session.request().inputs().front();
 
   auto run = pkgctl::transaction_run::begin(

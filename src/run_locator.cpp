@@ -223,6 +223,26 @@ fs::path normalize_retained_resource_path(fs::path path)
   return path;
 }
 
+pkgbuild_exec::package_input_resource retained_installed_input_resource(
+    const pkgbuild::build_input& input,
+    retained_installed_package_tree_source& installed_packages)
+{
+  const auto* installed = input.selection().installed();
+  if (installed == nullptr)
+    locator_failure(
+        native_session_locator_error_code::installed_resource_mismatch,
+        "selected package input has no installed authority");
+
+  auto retained = installed_packages.locate(*installed);
+  if (retained.package != installed->identity())
+    locator_failure(
+        native_session_locator_error_code::installed_resource_mismatch,
+        "retained installed package resource names another package");
+  retained.path = normalize_retained_resource_path(std::move(retained.path));
+  return {input.identity(), std::move(retained.resource),
+          std::move(retained.path)};
+}
+
 pkgbuild_exec::package_input_resource construction_input_resource(
     const pkgbuild::build_input& input,
     const transaction_progress& progress,
@@ -238,20 +258,7 @@ pkgbuild_exec::package_input_resource construction_input_resource(
     };
   }
 
-  const auto* installed = selection.installed();
-  if (installed == nullptr)
-    locator_failure(
-        native_session_locator_error_code::installed_resource_mismatch,
-        "selected package input has no catalog or installed authority");
-
-  auto retained = installed_packages.locate(*installed);
-  if (retained.package != installed->identity())
-    locator_failure(
-        native_session_locator_error_code::installed_resource_mismatch,
-        "retained installed package resource names another package");
-  retained.path = normalize_retained_resource_path(std::move(retained.path));
-  return {input.identity(), std::move(retained.resource),
-          std::move(retained.path)};
+  return retained_installed_input_resource(input, installed_packages);
 }
 
 std::vector<pkgbuild_exec::package_input_resource>
@@ -260,34 +267,14 @@ construction_input_resources(
     const transaction_progress& progress,
     retained_installed_package_tree_source& installed_packages)
 {
+  const auto inputs = request.build().inputs().for_scope(
+      pkgbuild::input_scope::build);
   std::vector<pkgbuild_exec::package_input_resource> result;
-  result.reserve(request.inputs().size());
-  for (const auto& input : request.inputs())
+  result.reserve(inputs.size());
+  for (const auto& input : inputs)
     result.push_back(construction_input_resource(
         input, progress, installed_packages));
   return result;
-}
-
-const pkgbuild_exec::package_input_resource&
-require_construction_input_resource(
-    const construction_result& construction,
-    const pkgbuild::build_input_identity& input)
-{
-  const pkgbuild_exec::package_input_resource* found = nullptr;
-  for (const auto& resource : construction.session().package_inputs()) {
-    if (resource.input != input)
-      continue;
-    if (found != nullptr)
-      locator_failure(
-          native_session_locator_error_code::check_session_invalid,
-          "retained construction contains duplicate package-input resources");
-    found = &resource;
-  }
-  if (found == nullptr)
-    locator_failure(
-        native_session_locator_error_code::check_session_invalid,
-        "retained construction lacks a check input resource");
-  return *found;
 }
 
 const transaction_check_constructed_input& require_constructed_check_input(
@@ -314,10 +301,10 @@ const transaction_check_constructed_input& require_constructed_check_input(
 std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
     const transaction_check_request& request,
     const native_transaction_session_roots& roots,
-    const fs::path& scope)
+    const fs::path& scope,
+    retained_installed_package_tree_source& installed_packages)
 {
   std::vector<pkgcheck_exec::package_input_resource> result;
-  const auto& construction = request.construction();
   result.reserve(request.check().inputs().inputs().size());
   for (const auto& input : request.check().inputs().inputs()) {
     if (input.selection().candidate() != nullptr) {
@@ -341,8 +328,8 @@ std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
       continue;
     }
 
-    const auto& retained =
-        require_construction_input_resource(construction, input.identity());
+    const auto retained =
+        retained_installed_input_resource(input, installed_packages);
     result.push_back({input.identity(), retained.resource, retained.path});
   }
   return result;
@@ -506,7 +493,7 @@ native_transaction_dispatch_session_source::check(
                 image_authority->image().image().identity()),
             roots.check_resource_root / scope / "package",
         },
-        check_input_resources(request, roots, scope),
+        check_input_resources(request, roots, scope, installed_packages_),
         {
             roots.root_view,
             roots.root_view_path,

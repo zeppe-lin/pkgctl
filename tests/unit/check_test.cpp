@@ -616,26 +616,6 @@ ready_check_fixture make_ready_check(
 
 using check_resources = pkgctl::transaction_check_resources;
 
-const pkgbuild_exec::package_input_resource& concrete_input_resource(
-    const pkgctl::construction_result& construction,
-    const pkgbuild::build_input& expected)
-{
-  const pkgbuild_exec::package_input_resource* found = nullptr;
-  for (const auto& resource : construction.session().package_inputs()) {
-    if (resource.input != expected.identity())
-      continue;
-    if (found != nullptr)
-      throw std::runtime_error(
-          "construction fixture contains duplicate package input resources");
-    found = &resource;
-  }
-
-  if (found == nullptr)
-    throw std::runtime_error(
-        "construction fixture lacks a package input resource");
-  return *found;
-}
-
 void make_retained_resource_tree_removable(const fs::path& path)
 {
   std::error_code ec;
@@ -706,7 +686,6 @@ std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
 
   for (std::size_t index = 0; index < inputs.size(); ++index) {
     const auto& input = inputs[index];
-    const auto& concrete = concrete_input_resource(construction, input);
     if (progress != nullptr && input.selection().candidate() != nullptr) {
       const pkgctl::construction_result* authority = nullptr;
       for (const auto& candidate : progress->constructions()) {
@@ -729,11 +708,13 @@ std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
       });
       continue;
     }
+    const auto path = root / "inputs" / input.identity().hex();
+    fs::create_directories(path);
     result.push_back({
         input.identity(),
         pkgexec::resource_identity::from_sha256(
             std::string(64U, hexadecimal_offset(seed, 4 + index))),
-        concrete.path,
+        path,
     });
   }
   return result;

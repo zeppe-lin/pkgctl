@@ -134,9 +134,11 @@ source-object root itself does not contain that unpacked path. The independent
 check receives the same retained archive object plus the sealed package through
 `PKG_PACKAGE_ROOT`; it must likewise refuse any fiction that the source-object
 root is the construction workspace. The probe declares the same candidate dependency in both build and
-check scopes. The build-scoped authority makes construction consume `archive-dep`;
-the check-scoped authority makes that selected candidate an exact logical check
-input. Qualification first completes the dependency and archive-probe
+check scopes. The sealed build request retains both authorities, but construction
+must concretize only the build-scoped `archive-dep` input; the check-scoped
+binding must remain absent from the construction session and build environment.
+The independent check later realizes the same selected candidate as its exact
+logical check input. Qualification first completes the dependency and archive-probe
 constructions, then deletes the complete construction-session and package-output
 trees before resuming the check. The check must independently recreate its
 source-object tree from retained materialization authority, its package tree

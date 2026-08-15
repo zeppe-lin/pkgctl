@@ -40,12 +40,14 @@ require "$locator" 'roots.check_resource_root / scope / "source"'
 require "$locator" 'roots.check_resource_root / scope / "package"'
 require "$locator" 'roots.check_resource_root / scope / "inputs" /'
 require "$locator" 'request.constructed_inputs()'
+require "$locator" 'retained_installed_input_resource('
+forbid "$locator" 'require_construction_input_resource('
 forbid "$locator" 'pkgbuild_exec::project_prepared_paths'
 forbid "$locator" 'prepared_paths.source_tree'
 
 check_block=$(sed -n \
   '/native_transaction_dispatch_session_source::check(/,/^}/p' "$locator")
-printf '%s\n' "$check_block" | grep -F 'check_input_resources(request, roots, scope)' >/dev/null ||
+printf '%s\n' "$check_block" | grep -F 'check_input_resources(request, roots, scope, installed_packages_)' >/dev/null ||
   fail 'native check locator does not allocate independent check inputs'
 printf '%s\n' "$check_block" | grep -F 'package_output_root' >/dev/null &&
   fail 'native check locator borrows construction package-output residue'
