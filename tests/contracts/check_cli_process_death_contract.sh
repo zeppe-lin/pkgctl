@@ -58,6 +58,10 @@ done
 
 for required in \
   'build tool --check' \
+  'native execution preflight is unavailable;' \
+  'privileged native execution is required for this case' \
+  'PKGCTL_REQUIRE_NATIVE_INTEGRATION' \
+  'exit 77' \
   '"$runtime/run" 2 --' \
   '"$runtime/run" 8 --' \
   '"$artifact_interrupt_fixture" "$artifacts" --' \

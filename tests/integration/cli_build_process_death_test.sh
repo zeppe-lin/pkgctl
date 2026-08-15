@@ -122,6 +122,89 @@ case $interpreter in
     ;;
 esac
 
+# Do not put a sanitizer-instrumented pkgctl under ptrace merely to discover
+# that this process context cannot provide native isolation. LeakSanitizer
+# deliberately refuses traced normal process exit, which would turn the
+# ordinary unprivileged SKIP into a fixture failure before the selected crash
+# boundary exists. Probe the exact native build/check authority first in a
+# disposable command/run namespace. Native preflight refusal occurs before
+# command evidence retention, while a successful probe is discarded whole.
+probe=$root/native-preflight
+probe_collection=$probe/collection
+probe_state=$probe/state
+probe_runtime=$probe/runtime
+probe_build=$probe/build
+probe_artifacts=$probe/artifacts
+mkdir -p "$probe"
+cp -R "$fixture_collection" "$probe_collection"
+probe_binding=$("$state_fixture" "$probe_state")
+mkdir "$probe_runtime" "$probe_build" "$probe_artifacts"
+for directory in \
+  command-evidence \
+  run \
+  evidence \
+  effects \
+  content \
+  construction-sessions \
+  package-outputs \
+  check-temporary; do
+  mkdir "$probe_runtime/$directory"
+done
+"$root_view_fixture" "$probe_build"
+probe_interpreter=$(
+  "$runtime_root_fixture" "$probe_build" /bin/sh "$chmod_program"
+)
+case $probe_interpreter in
+  /*)
+    ;;
+  *)
+    fail "native preflight returned non-absolute interpreter: $probe_interpreter"
+    ;;
+esac
+probe_nonce=$(printf '%064d' 6)
+set -- build tool --check \
+  --canonical-store "$probe_state" \
+  --collection "core=$probe_collection" \
+  --build-architecture x86_64 \
+  --target-architecture x86_64 \
+  --start "$probe_nonce" \
+  --runtime-root "$probe_runtime" \
+  --build-root "$probe_build" \
+  --artifact-root "$probe_artifacts" \
+  --interpreter "$probe_interpreter" \
+  --build-user-id "$uid" \
+  --build-group-id "$gid" \
+  --source-date-epoch 0 \
+  --max-steps 1
+for group in $groups; do
+  if [ "$group" != "$gid" ]; then
+    set -- "$@" --build-supplementary-group "$group"
+  fi
+done
+set +e
+# shellcheck disable=SC2086
+"$pkgctl" "$@" $probe_binding >"$probe/preflight.out" 2>"$probe/preflight.err"
+probe_status=$?
+set -e
+if [ "$probe_status" -ne 0 ]; then
+  if grep -F 'native execution unavailable before transaction execution;' \
+      "$probe/preflight.err" >/dev/null; then
+    printf '%s\n' \
+      "pkgctl:cli-build-process-death($mode): native execution preflight is unavailable;" \
+      'privileged native execution is required for this case' >&2
+    dump_file 'native execution preflight' "$probe/preflight.err"
+    if [ "${PKGCTL_REQUIRE_NATIVE_INTEGRATION:-0}" = 1 ]; then
+      fail 'release qualification requires the process-death native CLI path'
+    fi
+    exit 77
+  fi
+  dump_file 'native preflight stdout' "$probe/preflight.out"
+  dump_file 'native preflight stderr' "$probe/preflight.err"
+  fail "native preflight returned status $probe_status, expected 0"
+fi
+find "$probe" -type d -exec chmod u+w {} + 2>/dev/null || :
+rm -rf "$probe"
+
 initial_state=$("$state_inspect_fixture" "$state")
 printf '%s\n' "$initial_state" >"$root/initial-state.out"
 require_contains initial-state "$root/initial-state.out" 'packages 0'
