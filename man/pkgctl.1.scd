@@ -34,6 +34,17 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
+Version 0.38.0 makes durable construction and check ownership recoverable
+after process death. Before either dispatch becomes durably *started*, the
+controller retains its exact admitted attempt session. If terminal result evidence
+is absent on resume, only that retained session may authorize replay; current
+collection, session-locator, configuration, or installed-package authority does
+not reconstruct the attempt. Successful construction seals and verifies its
+archive below the private attempt root, retains terminal construction evidence,
+and only then projects the exact retained bytes beneath *--artifact-root*. Resume
+with terminal evidence completes or verifies that public projection without
+rerunning construction.
+
 Version 0.37.0 retains the native catalog, resolution, transaction, exact
 durable run/effect inspection, and bounded *run* command, and adds the
 construction-only *build* frontend. *build package* owns the exact package build

@@ -527,6 +527,7 @@ for documented in \
   'Release 0.35.0 closes the functional package-management chain' \
   'Release 0.35.0 bounded native command boundary' \
   'Release 0.35.0 bounded native command qualification' \
+  'Version 0.38.0 makes durable construction and check ownership recoverable' \
   'Version 0.37.0 retains the native catalog' \
   'Release 0.36.0 construction-only runtime authority' \
   'Release 0.36.0 construction-only authority qualification' \

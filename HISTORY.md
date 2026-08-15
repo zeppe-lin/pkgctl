@@ -1,5 +1,34 @@
 # pkgctl history
 
+## 0.38.0 - 2026-08-15
+
+- Makes durably started construction and check dispatches restartable after
+  process death by retaining the exact admitted attempt session before the
+  `started` run record becomes durable. Recovery reopens that immutable attempt
+  authority when terminal result evidence is absent; it does not reconsult the
+  live collection, session locator, current configuration, or installed-package
+  lookup.
+- Orders construction artifact publication after durable terminal construction
+  evidence. Native build execution first seals and independently verifies the
+  archive beneath the private attempt session; `pkgctl` then retains the exact
+  construction result before projecting those retained bytes into the caller's
+  public artifact root. Evidence-backed restart completes or verifies that
+  projection without rerunning construction or treating filesystem residue as
+  historical truth.
+- Qualifies live construction/check execution requirements from retained runtime
+  evidence below the command frontend. A started attempt with no terminal result
+  requires the matching native backend for exact replay, while terminal evidence
+  can retire the run without reacquiring execution authority. Transaction-run
+  evidence storage remains outside the CLI/frontend boundary.
+- Adds deterministic privileged process-death qualification at durable
+  construction `started`, durable check `started`, and construction artifact
+  publication. The ordinary unprivileged pass preflights native isolation before
+  ptrace and skips these cases when the required Linux namespace guarantees are
+  unavailable.
+- Renames the historical release ledger to `HISTORY.md`. Tagged release entries
+  are immutable release facts; unreleased implementation work is not backfilled
+  into the latest tag.
+
 ## 0.37.0 - 2026-08-13
 
 - Closes the native source-4 ABI generation across source codec/YAML, catalog

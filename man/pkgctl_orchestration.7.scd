@@ -10,6 +10,24 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+# CONSTRUCTION AND CHECK PROCESS-DEATH RECOVERY
+
+Version 0.38.0 gives durably started construction and check dispatches exact
+write-ahead attempt authority. The immutable attempt record is published before
+the `started` run record. Recovery prefers terminal result evidence when present;
+otherwise it decodes and replays the exact retained attempt session. Missing both
+records fails closed. Fresh collection, current session-locator, configuration,
+and retained-installed-package lookup are not historical recovery authority.
+
+Construction publication is a projection of already-retained terminal evidence.
+The build adapter seals and independently verifies an archive below its private
+attempt session first. The controller then retains that exact terminal result,
+after which the adapter may project the retained artifact beneath the public
+artifact root. Evidence-backed restart completes or verifies the projection from
+those exact retained bytes and does not rerun construction. A conflicting public
+path is refused rather than replaced or interpreted as proof that the dead build
+completed.
+
 # PACKAGE BUILD FRONTEND
 
 Version 0.37.0 exposes *pkgctl build package* as a constrained frontend over

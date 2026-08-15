@@ -1,5 +1,18 @@
 # pkgctl
 
+Release 0.38.0 makes native construction and check restartable across
+process death at their durable execution boundaries. Exact admitted attempt
+authority is retained before `started`; absent terminal evidence is replayed only
+from that authority, while retained terminal evidence can retire a run without
+reacquiring execution capability. Construction artifacts are sealed and verified
+privately first, terminal construction evidence becomes durable second, and the
+exact retained bytes are projected into the caller's public artifact root last.
+Recovery therefore neither reconstructs historical success from filesystem
+residue nor requires a second build to reproduce identical archive bytes.
+Privileged qualification kills the real `pkgctl build` process at construction
+`started`, check `started`, and artifact publication boundaries and requires exact
+resume to complete.
+
 Release 0.37.0 adds `pkgctl build PACKAGE`, the first package-artifact
 frontend. It is a constrained caller of the same sealed transaction and durable
 native run kernel as `pkgctl run`: the exact package becomes a build goal,
