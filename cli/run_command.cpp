@@ -1816,6 +1816,7 @@ void include_unit_nodes(
 [[nodiscard]] native_execution_scope resume_native_execution_scopes(
     const pkgtransaction::transaction_program& program,
     const transaction_run_journal_record& record,
+    const transaction_run_evidence_store& evidence,
     const effect_journal_store& effects)
 {
   if (record.complete() || record.failed() || record.stopped())
@@ -1832,9 +1833,32 @@ void include_unit_nodes(
     }
 
     include_unit_nodes(owned, retained.dispatch().unit());
-    if (retained.state() != transaction_dispatch_state::started ||
-        retained.dispatch().unit().kind() != transaction_unit_kind::operation)
+    if (retained.state() != transaction_dispatch_state::started)
+      continue;
+
+    const auto& dispatch = retained.dispatch();
+    if (dispatch.unit().kind() == transaction_unit_kind::construction ||
+        dispatch.unit().kind() == transaction_unit_kind::check)
     {
+      if (!retained.attempt_session())
+        continue;
+      const auto& attempt = *retained.attempt_session();
+      if (dispatch.unit().kind() == transaction_unit_kind::construction)
+      {
+        if (!evidence.load_construction(
+                record.journal(), dispatch.identity(), attempt) &&
+            evidence.load_construction_attempt(
+                record.journal(), dispatch.identity(), attempt))
+          result.construction = true;
+      }
+      else
+      {
+        if (!evidence.load_check(
+                record.journal(), dispatch.identity(), attempt) &&
+            evidence.load_check_attempt(
+                record.journal(), dispatch.identity(), attempt))
+          result.check = true;
+      }
       continue;
     }
 
@@ -2564,12 +2588,16 @@ int execute_transaction_run(transaction_run_command command)
     throw std::runtime_error(
         "exact transaction run is not admitted; use --start");
 
+  auto evidence_inspection_store =
+      posix_transaction_run_evidence_store::from_directory_fd(
+          evidence_store.get());
   auto effect_inspection_store =
       posix_effect_journal_store::from_directory_fd(effect_store.get());
   const auto execution_scopes = command.intent == transaction_run_command_intent::start
       ? native_execution_scopes(transaction.program())
       : resume_native_execution_scopes(
-            transaction.program(), *existing, effect_inspection_store);
+            transaction.program(), *existing, evidence_inspection_store,
+            effect_inspection_store);
 
   require_native_execution_credentials(
       execution_scopes, command.build_credentials,

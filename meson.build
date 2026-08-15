@@ -86,7 +86,7 @@ libpkgbuild_dep = dependency(
 )
 libpkgbuild_exec_dep = dependency(
   'libpkgbuild-exec',
-  version: ['>=3.0.0', '<4.0.0'],
+  version: ['>=3.0.1', '<4.0.0'],
   required: true,
   static: want_static,
 )

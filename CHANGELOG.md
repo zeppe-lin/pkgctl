@@ -2,6 +2,12 @@
 
 ## 0.37.0 - 2026-08-13
 
+- Makes process-death resume capability selection evidence-aware for started
+  construction/check dispatches. A retained terminal result still rehydrates
+  without selecting a current execution backend; an attempt-only started
+  dispatch selects the matching live construction/check backend for exact replay.
+  Requires `libpkgbuild-exec >= 3.0.1` so an authorized replay can converge on an
+  already-published artifact only when freshly sealed size and SHA-256 match.
 - Closes the native source-4 ABI generation across source codec/YAML, catalog
   owner/codec/acquisition, resolver, fetch, build execution, transaction, check,
   source-plan, build-image, state-source-backed application, and their execution
