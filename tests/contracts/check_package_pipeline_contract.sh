@@ -62,9 +62,9 @@ grep -F 'pkgexec::resource_role::build_input_tree, "dep"' \
   exit 1
 }
 
-grep -F 'pkgexec::resource_role::build_input_tree, "checked-package"' \
+grep -F 'pkgexec::resource_role::package_tree' \
   "$test_source" >/dev/null || {
-  echo 'package-pipeline backend does not consume the constructed package during check' >&2
+  echo 'package-pipeline backend does not consume the checked package through package-tree authority' >&2
   exit 1
 }
 

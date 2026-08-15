@@ -60,13 +60,13 @@ require_dependency_range libpkgbuild-plan '>=1.1.0' '<2.0.0'
 require_dependency_range libpkgresolve '>=4.0.0' '<5.0.0'
 require_dependency_range libpkgtransaction '>=4.0.0' '<5.0.0'
 require_dependency_range libpkgcheck '>=0.3.0' '<1.0.0'
-require_dependency_range libpkgcheck-exec '>=0.7.0' '<1.0.0'
+require_dependency_range libpkgcheck-exec '>=0.8.0' '<1.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
-require_dependency_range libpkgexec '>=2.1.1' '<3.0.0'
+require_dependency_range libpkgexec '>=2.2.0' '<3.0.0'
 require_dependency_range libpkgapply '>=3.0.1' '<4.0.0'
 require_dependency_range libpkgapply-posix '>=3.2.1' '<4.0.0'
 require_dependency_range libpkgapply-exec '>=3.0.1' '<4.0.0'
-require_dependency_range libpkgexec-linux '>=0.6.2' '<1.0.0'
+require_dependency_range libpkgexec-linux '>=0.7.0' '<1.0.0'
 
 grep -F '## 0.38.0 - 2026-08-15' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.37.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
@@ -181,9 +181,9 @@ awk '
 
 grep -F 'Renders structured native construction and check execution failures' \
   "$temporary.unreleased" >/dev/null
-grep -F 'Requires libpkgcheck-exec 0.7.0 so check dependencies are recipe-addressable' \
+grep -F 'Requires libpkgexec 2.2.0, libpkgexec-linux 0.7.0, and libpkgcheck-exec' \
   "$temporary.unreleased" >/dev/null
-grep -F '`PKG_CHECK_INPUT_ROOT` / `PKG_CHECK_INPUTS`' \
+grep -F 'only check dependencies inhabit `/check/inputs/<canonical-package-name>`' \
   "$temporary.unreleased" >/dev/null
 grep -F 'archive-source build/check qualification' \
   "$temporary.unreleased" >/dev/null

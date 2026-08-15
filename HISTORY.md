@@ -10,10 +10,12 @@
 - Renders structured native construction and check execution failures in the CLI,
   including execution classification and termination status even when the invoked
   program writes no diagnostic output.
-- Requires libpkgcheck-exec 0.7.0 so check dependencies are recipe-addressable
-  by canonical package name through `PKG_CHECK_INPUT_ROOT` / `PKG_CHECK_INPUTS`;
-  exact logical authority remains the sealed `build_input_identity`, and the
-  retired branded check-variable dialect remains rejected.
+- Requires libpkgexec 2.2.0, libpkgexec-linux 0.7.0, and libpkgcheck-exec
+  0.8.0 so the checked package and check inputs have distinct execution roles.
+  The checked subject uses singleton `package_tree` authority at `/check/package`;
+  only check dependencies inhabit `/check/inputs/<canonical-package-name>`. Exact
+  logical dependency authority remains the sealed `build_input_identity`, and
+  the retired `_package` namespace workaround is not retained.
 - Adds privileged archive-source build/check qualification that distinguishes
   retained source objects from the archive-realized construction workspace and
   verifies the independent check view of the sealed package image.

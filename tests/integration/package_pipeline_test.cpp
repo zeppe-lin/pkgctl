@@ -508,8 +508,8 @@ public:
       if (request.program().material() != "tool-check\n" ||
           (source != "tool source v1\n" && source != "tool source v2\n"))
         throw std::runtime_error("pipeline check authority changed");
-      const auto package_slot = pkgexec::resource_slot::named(
-          pkgexec::resource_role::build_input_tree, "checked-package");
+      const auto package_slot = pkgexec::resource_slot::singleton(
+          pkgexec::resource_role::package_tree);
       const auto& package_binding = request.resources().binding(package_slot);
       const fs::path package =
           resources.materialization(package_binding.resource()).host_path();

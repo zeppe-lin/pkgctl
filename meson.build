@@ -122,13 +122,13 @@ libpkgplan_dep = dependency(
 )
 libpkgexec_dep = dependency(
   'libpkgexec',
-  version: ['>=2.1.1', '<3.0.0'],
+  version: ['>=2.2.0', '<3.0.0'],
   required: true,
   static: want_static,
 )
 libpkgexec_linux_dep = dependency(
   'libpkgexec-linux',
-  version: ['>=0.6.2', '<1.0.0'],
+  version: ['>=0.7.0', '<1.0.0'],
   required: true,
   static: want_static,
 )
@@ -170,7 +170,7 @@ libpkgcheck_dep = dependency(
 )
 libpkgcheck_exec_dep = dependency(
   'libpkgcheck-exec',
-  version: ['>=0.7.0', '<1.0.0'],
+  version: ['>=0.8.0', '<1.0.0'],
   required: true,
   static: want_static,
 )

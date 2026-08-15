@@ -24,6 +24,7 @@ for path in \
   build/package \
   build/inputs \
   check/source \
+  check/package \
   check/inputs \
   target \
   tmp; do
@@ -40,5 +41,7 @@ done
   fail 'fixture retained obsolete construction check-scope namespace child'
 [ -z "$(find "$view/check/inputs" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
   fail 'fixture populated backend-owned check input namespace'
-[ ! -e "$view/check/package" ] ||
-  fail 'fixture invented backend-owned checked-package leaf'
+[ -d "$view/check/package" ] ||
+  fail 'checked-package structural mountpoint is absent'
+[ -z "$(find "$view/check/package" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
+  fail 'fixture populated caller-owned checked-package mountpoint'
