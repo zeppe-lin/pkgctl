@@ -759,6 +759,7 @@ native_runtime_session_configuration(const std::filesystem::path& root)
           root / "construction-sessions",
           root / "package-outputs",
           root / "artifacts",
+          root / "check-resources",
           root / "check-temporary",
           pkgexec::root_view_identity::from_sha256(std::string(64U, '5')),
           root_view,

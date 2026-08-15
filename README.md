@@ -1,5 +1,16 @@
 # pkgctl
 
+Current development makes native check resources independently reconstructible.
+The session locator projects private check coordinates and phase-neutral resource
+identities only; immediately before check execution, retained source
+materialization is realized through `libpkgsource-exec` and the exact sealed
+package artifact/image is realized through `libpkgimage-exec`. Candidate package
+inputs are likewise recreated from their retained predecessor construction
+artifacts; only installed inputs remain borrowed from their state-owned retained
+resources. Checks therefore do not borrow construction-session source staging,
+workspaces, or package-output trees, and restart remains valid after those
+construction-private trees are gone.
+
 Release 0.38.0 makes native construction and check restartable across
 process death at their durable execution boundaries. Exact admitted attempt
 authority is retained before `started`; absent terminal evidence is replayed only

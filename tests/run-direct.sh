@@ -8,7 +8,7 @@ cxx=${CXX:-c++}
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-direct.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
-core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
+core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgsource-exec libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgimage-exec libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
 cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
 pipeline_modules='libpkgreconcile libpkgreconcile-apply libpkgreconcile-posix libpkgreconcile-apply-posix'
 audit_modules='libpkgaudit'
@@ -20,9 +20,11 @@ pkg-config --exists \
   'libpkgcatalog-codec >= 4.0.0' 'libpkgcatalog-codec < 5.0.0' \
   'libpkgcatalog-acquire >= 4.0.0' 'libpkgcatalog-acquire < 5.0.0' \
   'libpkgfetch >= 3.0.0' 'libpkgfetch < 4.0.0' \
+  'libpkgsource-exec >= 0.1.0' 'libpkgsource-exec < 1.0.0' \
   'libpkgbuild >= 3.0.1' 'libpkgbuild < 4.0.0' \
-  'libpkgbuild-exec >= 3.1.0' 'libpkgbuild-exec < 4.0.0' \
+  'libpkgbuild-exec >= 3.2.0' 'libpkgbuild-exec < 4.0.0' \
   'libpkgbuild-image >= 1.0.1' 'libpkgbuild-image < 2.0.0' \
+  'libpkgimage-exec >= 0.1.0' 'libpkgimage-exec < 1.0.0' \
   'libpkgbuild-plan >= 1.1.0' 'libpkgbuild-plan < 2.0.0' \
   'libpkgstate-apply >= 3.1.1' 'libpkgstate-apply < 4.0.0' \
   'libpkgexec >= 2.1.1' 'libpkgexec < 3.0.0' \

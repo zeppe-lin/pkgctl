@@ -1,0 +1,31 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: archive-dep
+  version: 1.0
+  release: 1
+  summary: archive source check dependency fixture
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  {}
+
+sources:
+  - path: files/source.txt
+    name: source.txt
+    sha256: 6eaf3b11bec901f5bfa8be28e121c404467e97ca1bb799a7fca8ea02897f136f
+
+build:
+  language: posix-shell
+  script: |
+    set -eu
+    IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
+    [ "$source" = archive-dependency ]
+    printf '%s\n' "$source" >"$PKG_DESTDIR/dep-token"
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64

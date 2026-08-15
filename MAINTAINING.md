@@ -28,6 +28,16 @@ through the native session locator from successful predecessor construction
 evidence. Do not manufacture a semantically equivalent directory or bypass the
 transaction graph in the fixture. A green CLI is evidence about the frontend; it
 must not be used as the primary proof that lower package authority composes.
+For checks, do not borrow the predecessor construction's private source staging,
+workspace, temporary tree, or package-output directory. The locator may project
+private check coordinates, but native check execution must recreate the exact
+source-object resource from retained source materialization and the exact checked
+package resource from sealed artifact/image authority. Candidate check inputs
+must be recreated from their own predecessor construction artifacts rather than
+from those predecessors' package-output directories; installed inputs remain
+owned by the retained installed-package source. Tests must be able to remove all
+construction-private trees before check and still complete from retained
+evidence.
 The same rule applies after construction: reopen the exact retained artifact,
 hold the real target mutation lease, publish the exact completed application
 through the canonical store, and retire the operation against the published

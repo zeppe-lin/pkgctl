@@ -3,6 +3,9 @@
 
 #include <pkgctl/run_locator.h>
 
+#include <libpkgimage-exec/libpkgimage-exec.h>
+#include <libpkgsource-exec/libpkgsource-exec.h>
+
 #include <algorithm>
 #include <array>
 #include <optional>
@@ -22,6 +25,32 @@ namespace {
     std::string message)
 {
   throw native_session_locator_error(code, std::move(message));
+}
+
+pkgexec::resource_identity source_object_resource_identity(
+    const pkgfetch::source_materialization& materialization)
+{
+  try {
+    return pkgsource_exec::source_object_tree_identity(materialization);
+  } catch (const pkgsource_exec::error& problem) {
+    locator_failure(
+        native_session_locator_error_code::check_session_invalid,
+        "cannot derive check source-object resource identity: " +
+            std::string(problem.what()));
+  }
+}
+
+pkgexec::resource_identity package_tree_resource_identity(
+    const pkgimage::package_image_identity& image)
+{
+  try {
+    return pkgimage_exec::package_tree_identity(image);
+  } catch (const pkgimage_exec::error& problem) {
+    locator_failure(
+        native_session_locator_error_code::check_session_invalid,
+        "cannot derive check package-tree resource identity: " +
+            std::string(problem.what()));
+  }
 }
 
 fs::path normalize_absolute_path(
@@ -58,11 +87,12 @@ bool paths_overlap(const fs::path& first, const fs::path& second)
 void require_disjoint_configuration_roots(
     const native_transaction_session_roots& roots)
 {
-  const std::array<std::pair<const fs::path*, const char*>, 6> values{{
+  const std::array<std::pair<const fs::path*, const char*>, 7> values{{
       {&roots.content_store_root, "content store root"},
       {&roots.construction_session_root, "construction session root"},
       {&roots.package_output_root, "package output root"},
       {&roots.artifact_root, "artifact root"},
+      {&roots.check_resource_root, "check resource root"},
       {&roots.check_temporary_root, "check temporary root"},
       {&roots.root_view_path, "root view"},
   }};
@@ -163,15 +193,6 @@ pkgexec::resource_identity construction_output_resource(
       .binding(slot).resource();
 }
 
-pkgexec::resource_identity construction_source_resource(
-    const construction_result& construction)
-{
-  const auto slot = pkgexec::resource_slot::named(
-      pkgexec::resource_role::source_tree, "sources");
-  return construction.build().execution().request().resources()
-      .binding(slot).resource();
-}
-
 fs::path normalize_retained_resource_path(fs::path path)
 {
   if (path.empty() || !path.is_absolute())
@@ -231,18 +252,6 @@ construction_input_resources(
   return result;
 }
 
-pkgbuild_exec::admitted_build_session rebuild_admitted_build_session(
-    const construction_result& construction)
-{
-  return pkgbuild_exec::admitted_build_session::admit(
-      construction.session().request().build(),
-      construction.materialization(),
-      construction.session().package_inputs(),
-      construction.session().paths().build,
-      construction.session().execution_identity(),
-      construction.session().compression());
-}
-
 const pkgbuild_exec::package_input_resource&
 require_construction_input_resource(
     const construction_result& construction,
@@ -265,19 +274,63 @@ require_construction_input_resource(
   return *found;
 }
 
+const transaction_check_constructed_input& require_constructed_check_input(
+    const transaction_check_request& request,
+    const pkgbuild::build_input_identity& input)
+{
+  const transaction_check_constructed_input* found = nullptr;
+  for (const auto& authority : request.constructed_inputs()) {
+    if (authority.input != input)
+      continue;
+    if (found != nullptr)
+      locator_failure(
+          native_session_locator_error_code::check_session_invalid,
+          "check request contains duplicate constructed-input authority");
+    found = &authority;
+  }
+  if (found == nullptr)
+    locator_failure(
+        native_session_locator_error_code::check_session_invalid,
+        "candidate check input lacks constructed-input authority");
+  return *found;
+}
+
 std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
-    const transaction_check_request& request)
+    const transaction_check_request& request,
+    const native_transaction_session_roots& roots,
+    const fs::path& scope)
 {
   std::vector<pkgcheck_exec::package_input_resource> result;
   const auto& construction = request.construction();
   result.reserve(request.check().inputs().inputs().size());
   for (const auto& input : request.check().inputs().inputs()) {
+    if (input.selection().candidate() != nullptr) {
+      const auto& authority =
+          require_constructed_check_input(request, input.identity());
+      const auto& execution = authority.construction.build();
+      const auto& artifact = execution.build().artifact();
+      const auto& image_authority = execution.image_authority();
+      if (!artifact || !image_authority)
+        locator_failure(
+            native_session_locator_error_code::check_session_invalid,
+            "candidate check input lacks sealed image authority");
+      result.push_back({
+          input.identity(),
+          package_tree_resource_identity(
+              image_authority->image().image().identity()),
+          roots.check_resource_root / scope / "inputs" /
+              input.identity().hex(),
+      });
+      continue;
+    }
+
     const auto& retained =
         require_construction_input_resource(construction, input.identity());
     result.push_back({input.identity(), retained.resource, retained.path});
   }
   return result;
 }
+
 
 } // namespace
 
@@ -303,6 +356,8 @@ native_transaction_session_configuration::make(
       std::move(roots.package_output_root), "package output root");
   roots.artifact_root = normalize_absolute_path(
       std::move(roots.artifact_root), "artifact root");
+  roots.check_resource_root = normalize_absolute_path(
+      std::move(roots.check_resource_root), "check resource root");
   roots.check_temporary_root = normalize_absolute_path(
       std::move(roots.check_temporary_root), "check temporary root");
   roots.root_view_path = normalize_absolute_path(
@@ -412,27 +467,29 @@ native_transaction_dispatch_session_source::check(
     auto request = transaction_check_request::make(
         progress, dispatch.unit().primary_node());
     const auto& construction = request.construction();
-    const auto admitted = rebuild_admitted_build_session(construction);
-    const auto prepared_paths =
-        pkgbuild_exec::project_prepared_paths(admitted);
-    const auto& artifact = construction.build().build().artifact();
-    if (!artifact)
+    const auto& build_execution = construction.build();
+    const auto& artifact = build_execution.build().artifact();
+    const auto& image_authority = build_execution.image_authority();
+    if (!artifact || !image_authority)
       locator_failure(
           native_session_locator_error_code::check_session_invalid,
-          "successful predecessor construction lacks an artifact");
+          "successful predecessor construction lacks sealed image authority");
 
+    const auto scope = dispatch_scope(record, dispatch);
     transaction_check_resources resources{
         {
             construction.session().request().source().identity(),
-            construction_source_resource(construction),
-            prepared_paths.source_tree,
+            source_object_resource_identity(
+                construction.materialization()),
+            roots.check_resource_root / scope / "source",
         },
         {
             artifact->identity(),
-            construction_output_resource(construction),
-            construction.session().paths().build.package_output_root,
+            package_tree_resource_identity(
+                image_authority->image().image().identity()),
+            roots.check_resource_root / scope / "package",
         },
-        check_input_resources(request),
+        check_input_resources(request, roots, scope),
         {
             roots.root_view,
             roots.root_view_path,

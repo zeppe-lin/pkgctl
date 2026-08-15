@@ -3,6 +3,9 @@
 
 #include <pkgctl/check.h>
 
+#include <libpkgimage-exec/libpkgimage-exec.h>
+#include <libpkgsource-exec/libpkgsource-exec.h>
+
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
 
@@ -89,19 +92,69 @@ const construction_result& require_construction(
   return *construction;
 }
 
+const construction_result& require_constructed_check_input(
+    const transaction_progress& progression,
+    const pkgbuild::build_input& input)
+{
+  const auto& selection = input.selection();
+  if (selection.candidate() == nullptr)
+    throw error(error_code::invalid_check_request,
+                "installed check input has no construction authority");
+
+  const construction_result* found = nullptr;
+  for (const auto& construction : progression.constructions()) {
+    if (construction.session().request().build().subject().identity() !=
+        selection.identity())
+      continue;
+    if (found != nullptr)
+      throw error(error_code::invalid_check_request,
+                  "candidate check input has ambiguous construction authority");
+    found = &construction;
+  }
+  if (found == nullptr || !found->succeeded())
+    throw error(error_code::invalid_check_request,
+                "candidate check input lacks successful construction authority");
+  if (found->session().request().transaction().identity() !=
+      progression.transaction().identity())
+    throw error(error_code::invalid_check_request,
+                "candidate check input construction belongs to another transaction");
+  return *found;
+}
+
+std::vector<transaction_check_constructed_input> constructed_check_inputs(
+    const transaction_progress& progression,
+    const pkgcheck::check_request& check)
+{
+  std::vector<transaction_check_constructed_input> result;
+  for (const auto& input : check.inputs().inputs()) {
+    if (input.selection().candidate() == nullptr)
+      continue;
+    result.push_back({
+        input.identity(), require_constructed_check_input(progression, input)});
+  }
+  return result;
+}
+
 std::vector<std::string> request_identity_fields(
     const transaction_progress& progression,
     const node_identity& check_node,
     const construction_result& construction,
-    const pkgcheck::check_request& check)
+    const pkgcheck::check_request& check,
+    const std::vector<transaction_check_constructed_input>& constructed_inputs)
 {
-  return {
+  std::vector<std::string> fields{
       progression.transaction().identity().hex(),
       progression.identity().hex(),
       check_node.hex(),
       construction.identity().hex(),
       check.identity().hex(),
+      std::to_string(constructed_inputs.size()),
   };
+  for (const auto& input : constructed_inputs) {
+    fields.push_back(input.input.hex());
+    fields.push_back(input.construction.identity().hex());
+  }
+  return fields;
 }
 
 std::string path_text(const std::filesystem::path& path)
@@ -170,6 +223,57 @@ void validate_driver_result(
                 "check driver returned non-check execution evidence");
 }
 
+const pkgcheck_exec::package_input_resource& require_check_input_resource(
+    const pkgcheck_exec::admitted_check_session& session,
+    const pkgbuild::build_input_identity& input)
+{
+  const pkgcheck_exec::package_input_resource* found = nullptr;
+  for (const auto& resource : session.inputs()) {
+    if (resource.input != input)
+      continue;
+    if (found != nullptr)
+      throw error(
+          error_code::check_driver_contract_violation,
+          "native check execution contains duplicate package-input resources");
+    found = &resource;
+  }
+  if (found == nullptr)
+    throw error(
+        error_code::check_driver_contract_violation,
+        "native check execution lacks a constructed package-input resource");
+  return *found;
+}
+
+void realize_construction_package(
+    const construction_result& construction,
+    const pkgexec::resource_identity& expected_resource,
+    const std::filesystem::path& destination,
+    std::string_view description)
+{
+  const auto& execution = construction.build();
+  const auto& artifact = execution.build().artifact();
+  const auto& image_authority = execution.image_authority();
+  if (!artifact || !image_authority)
+    throw error(
+        error_code::check_driver_contract_violation,
+        std::string(description) + " lacks sealed construction image authority");
+
+  const auto realized = pkgimage_exec::realize_package_tree({
+      construction.session().paths().build.artifact_path,
+      image_authority->image().receipt().archive_digest(),
+      image_authority->image().image().identity(),
+      destination,
+  });
+  if (realized.image != image_authority->image().image().identity() ||
+      realized.archive_digest !=
+          image_authority->image().receipt().archive_digest() ||
+      realized.resource != expected_resource)
+    throw error(
+        error_code::check_driver_contract_violation,
+        std::string(description) +
+            " realization differs from admitted authority");
+}
+
 void prepare_native_check_temporary(
     const pkgcheck_exec::admitted_check_session& session)
 {
@@ -232,7 +336,7 @@ void prepare_native_check_temporary(
 
 pkgcheck_exec::check_execution_result invoke_check_driver(
     transaction_check_driver& driver,
-    const pkgcheck_exec::admitted_check_session& session)
+    const transaction_check_session& session)
 {
   try {
     return driver.execute_check(session);
@@ -263,12 +367,14 @@ transaction_check_request::transaction_check_request(
     pkgtransaction::transaction_node_identity check_node,
     construction_result construction,
     pkgcheck::check_request check,
+    std::vector<transaction_check_constructed_input> constructed_inputs,
     session_identity identity)
     : transaction_(std::move(transaction)),
       prepared_from_progress_(std::move(prepared_from_progress)),
       check_node_(std::move(check_node)),
       construction_(std::move(construction)),
       check_(std::move(check)),
+      constructed_inputs_(std::move(constructed_inputs)),
       identity_(std::move(identity))
 {
 }
@@ -287,15 +393,16 @@ transaction_check_request transaction_check_request::make(
   auto check = pkgcheck::check_request::seal(
       progression.transaction().program(), check_node,
       construction.build().build());
+  auto constructed_inputs = constructed_check_inputs(progression, check);
   auto identity = make_session_identity(
       "pkgctl/transaction-check-request/1",
       request_identity_fields(
-          progression, check_node, construction, check));
+          progression, check_node, construction, check, constructed_inputs));
 
   return transaction_check_request(
       progression.transaction(), progression.identity(),
       std::move(check_node), std::move(construction),
-      std::move(check), std::move(identity));
+      std::move(check), std::move(constructed_inputs), std::move(identity));
 }
 
 const transaction_session&
@@ -326,6 +433,12 @@ const pkgcheck::check_request&
 transaction_check_request::check() const noexcept
 {
   return check_;
+}
+
+const std::vector<transaction_check_constructed_input>&
+transaction_check_request::constructed_inputs() const noexcept
+{
+  return constructed_inputs_;
 }
 
 const session_identity& transaction_check_request::identity() const noexcept
@@ -408,11 +521,56 @@ native_transaction_check_driver::native_transaction_check_driver(
 
 pkgcheck_exec::check_execution_result
 native_transaction_check_driver::execute_check(
-    const pkgcheck_exec::admitted_check_session& session)
+    const transaction_check_session& session)
 {
+  const auto& execution_session = session.execution_session();
+  const auto& construction = session.request().construction();
+  const auto& build_execution = construction.build();
+  const auto& build = build_execution.build();
+  const auto& artifact = build.artifact();
+  const auto& image_authority = build_execution.image_authority();
+  if (!artifact || !image_authority)
+    throw error(
+        error_code::check_driver_contract_violation,
+        "native check realization lacks sealed construction image authority");
+
   try {
-    prepare_native_check_temporary(session);
-    return pkgcheck_exec::execute(session, backend_);
+    const auto source = pkgsource_exec::realize_source_object_tree(
+        construction.materialization(), execution_session.source().path);
+    if (source.source != execution_session.source().source ||
+        source.resource != execution_session.source().tree)
+      throw error(
+          error_code::check_driver_contract_violation,
+          "native check source realization differs from admitted authority");
+
+    if (execution_session.package().artifact != artifact->identity())
+      throw error(
+          error_code::check_driver_contract_violation,
+          "native check package artifact differs from retained construction");
+    realize_construction_package(
+        construction, execution_session.package().tree,
+        execution_session.package().path, "native checked package");
+
+    for (const auto& authority : session.request().constructed_inputs()) {
+      const auto& input =
+          require_check_input_resource(execution_session, authority.input);
+      realize_construction_package(
+          authority.construction, input.resource, input.path,
+          "native constructed check input");
+    }
+
+    prepare_native_check_temporary(execution_session);
+    return pkgcheck_exec::execute(execution_session, backend_);
+  } catch (const pkgsource_exec::error& problem) {
+    throw error(
+        error_code::check_driver_contract_violation,
+        "native check source realization failed: " +
+            std::string(problem.what()));
+  } catch (const pkgimage_exec::error& problem) {
+    throw error(
+        error_code::check_driver_contract_violation,
+        "native check package realization failed: " +
+            std::string(problem.what()));
   } catch (const pkgcheck_exec::error& problem) {
     throw error(
         error_code::check_driver_contract_violation,
@@ -461,8 +619,7 @@ transaction_check_result execute_transaction_check(
     transaction_check_session session,
     transaction_check_driver& driver)
 {
-  auto execution = invoke_check_driver(
-      driver, session.execution_session());
+  auto execution = invoke_check_driver(driver, session);
   validate_driver_result(session, execution);
 
   auto identity = make_session_identity(

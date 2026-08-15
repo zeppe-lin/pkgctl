@@ -5,6 +5,9 @@
 #include "support/run_execute_support.h"
 
 #include <pkgctl/check.h>
+
+#include <libpkgimage-exec/libpkgimage-exec.h>
+#include <libpkgsource-exec/libpkgsource-exec.h>
 #include <pkgctl/check_codec.h>
 #include <pkgctl/error.h>
 #include <pkgctl/progression.h>
@@ -136,7 +139,7 @@ public:
   }
 
   pkgcheck_exec::check_execution_result execute_check(
-      const pkgcheck_exec::admitted_check_session& session) override
+      const pkgctl::transaction_check_session& session) override
   {
     trace_.push_back("check");
     return driver_.execute_check(session);
@@ -486,7 +489,7 @@ public:
 class throwing_driver final : public pkgctl::transaction_check_driver {
 public:
   pkgcheck_exec::check_execution_result execute_check(
-      const pkgcheck_exec::admitted_check_session&) override
+      const pkgctl::transaction_check_session&) override
   {
     throw std::runtime_error("driver escaped without check evidence");
   }
@@ -647,7 +650,9 @@ void remove_retained_package_input(const fs::path& path)
 
 std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
     const pkgctl::construction_result& construction,
-    char seed)
+    const fs::path& root,
+    char seed,
+    const pkgctl::transaction_progress* progress)
 {
   std::vector<pkgcheck_exec::package_input_resource> result;
   const auto inputs = construction.build().build().request().inputs().for_scope(
@@ -657,6 +662,28 @@ std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
   for (std::size_t index = 0; index < inputs.size(); ++index) {
     const auto& input = inputs[index];
     const auto& concrete = concrete_input_resource(construction, input);
+    if (progress != nullptr && input.selection().candidate() != nullptr) {
+      const pkgctl::construction_result* authority = nullptr;
+      for (const auto& candidate : progress->constructions()) {
+        if (candidate.session().request().build().subject().identity() !=
+            input.selection().identity())
+          continue;
+        if (authority != nullptr)
+          throw std::runtime_error(
+              "check fixture contains ambiguous candidate input construction");
+        authority = &candidate;
+      }
+      if (authority == nullptr || !authority->build().image_authority())
+        throw std::runtime_error(
+            "check fixture lacks candidate input image authority");
+      result.push_back({
+          input.identity(),
+          pkgimage_exec::package_tree_identity(
+              authority->build().image_authority()->image().image().identity()),
+          root / "inputs" / input.identity().hex(),
+      });
+      continue;
+    }
     result.push_back({
         input.identity(),
         pkgexec::resource_identity::from_sha256(
@@ -671,11 +698,13 @@ std::vector<pkgcheck_exec::package_input_resource> check_input_resources(
 check_resources resources_for(
     const pkgctl::construction_result& construction,
     const fs::path& root,
-    char seed = '1')
+    char seed = '1',
+    const pkgctl::transaction_progress* progress = nullptr)
 {
   const auto& artifact = construction.build().build().artifact();
-  if (!artifact)
-    throw std::runtime_error("check fixture construction lacks artifact");
+  if (!artifact || !construction.build().image_authority())
+    throw std::runtime_error(
+        "check fixture construction lacks sealed image authority");
 
   fs::create_directories(root / "root-view");
   fs::create_directories(root / "source-tree");
@@ -685,16 +714,17 @@ check_resources resources_for(
   return {
       {
           construction.session().request().source().identity(),
-          pkgexec::resource_identity::from_sha256(std::string(64U, seed)),
+          pkgsource_exec::source_object_tree_identity(
+              construction.materialization()),
           root / "source-tree",
       },
       {
           artifact->identity(),
-          pkgexec::resource_identity::from_sha256(
-              std::string(64U, hexadecimal_offset(seed, 1))),
+          pkgimage_exec::package_tree_identity(
+              construction.build().image_authority()->image().image().identity()),
           root / "package-tree",
       },
-      check_input_resources(construction, seed),
+      check_input_resources(construction, root, seed, progress),
       {
           pkgexec::root_view_identity::from_sha256(
               std::string(64U, hexadecimal_offset(seed, 2))),
@@ -736,7 +766,8 @@ void check_durable_session_codec()
   options.check_dependencies = {"dep"};
   auto fixture = make_ready_check(temporary.path() / "retained", options);
   const auto check_root = temporary.path() / "retained-check";
-  auto resources = resources_for(fixture.construction, check_root, '5');
+  auto resources = resources_for(
+      fixture.construction, check_root, '5', &fixture.progress);
   resources.execution_identity.supplementary_groups = {
       static_cast<std::uint64_t>(::getegid()) + 1000U,
       static_cast<std::uint64_t>(::getegid()) + 2000U,
@@ -745,6 +776,7 @@ void check_durable_session_codec()
       5000U, 64U * 1024U * 1024U, 32U * 1024U * 1024U, 64U, 16U);
   auto session = admit_check(
       fixture.progress, fixture.transaction, std::move(resources));
+  CHECK(session.request().constructed_inputs().size() == 1U);
   const auto encoding = pkgctl::encode_check_session(session);
 
   const auto retained_source = session.execution_session().source().path;
@@ -785,6 +817,16 @@ void check_durable_session_codec()
   }
   CHECK(decoded.execution_session().limits().identity() ==
         session.execution_session().limits().identity());
+  CHECK(decoded.request().constructed_inputs().size() ==
+        session.request().constructed_inputs().size());
+  if (decoded.request().constructed_inputs().size() == 1U &&
+      session.request().constructed_inputs().size() == 1U)
+  {
+    CHECK(decoded.request().constructed_inputs().front().input ==
+          session.request().constructed_inputs().front().input);
+    CHECK(decoded.request().constructed_inputs().front().construction.identity() ==
+          session.request().constructed_inputs().front().construction.identity());
+  }
   CHECK(pkgctl::encode_check_session(decoded) == encoding);
 
   {
@@ -877,7 +919,7 @@ public:
   }
 
   pkgcheck_exec::check_execution_result execute_check(
-      const pkgcheck_exec::admitted_check_session&) override
+      const pkgctl::transaction_check_session&) override
   {
     return pkgcheck_exec::execute(session_, backend_);
   }
@@ -1795,7 +1837,7 @@ void check_stored_check_recovery()
   const auto check_root = temporary.path() / "check";
   auto session = admit_check(
       fixture.progress, fixture.transaction,
-      resources_for(fixture.construction, check_root));
+      resources_for(fixture.construction, check_root, '1', &fixture.progress));
   check_backend backend(check_backend_mode::pass);
   pkgctl::native_transaction_check_driver driver(backend);
   auto result = pkgctl::execute_transaction_check(session, driver);
@@ -1853,6 +1895,29 @@ void check_stored_check_recovery()
   if (attempt_recovery.check_retry())
   {
     CHECK(attempt_recovery.check_retry()->identity() == session.identity());
+    CHECK(attempt_recovery.check_retry()->request().constructed_inputs().size() ==
+          session.request().constructed_inputs().size());
+    if (attempt_recovery.check_retry()->request().constructed_inputs().size() ==
+            1U &&
+        session.request().constructed_inputs().size() == 1U)
+    {
+      CHECK(attempt_recovery.check_retry()
+                ->request()
+                .constructed_inputs()
+                .front()
+                .input == session.request().constructed_inputs().front().input);
+      CHECK(attempt_recovery.check_retry()
+                ->request()
+                .constructed_inputs()
+                .front()
+                .construction
+                .identity() ==
+            session.request()
+                .constructed_inputs()
+                .front()
+                .construction
+                .identity());
+    }
     CHECK(pkgctl::encode_check_session(*attempt_recovery.check_retry()) ==
           pkgctl::encode_check_session(session));
   }

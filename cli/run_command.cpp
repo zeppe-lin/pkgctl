@@ -1966,6 +1966,7 @@ void require_operation_command_authority(
           runtime_path(command, "construction-sessions"),
           runtime_path(command, "package-outputs"),
           command.artifact_root,
+          runtime_path(command, "check-resources"),
           runtime_path(command, "check-temporary"),
           execution_root_identity(binding),
           command.build_root,

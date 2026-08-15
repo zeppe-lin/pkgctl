@@ -18,8 +18,12 @@ for file in "$header" "$source" "$codec" "$codec_source" "$progression"; do
 done
 
 for required in \
+  'struct transaction_check_constructed_input final' \
   'class transaction_check_request final' \
   'transaction_check_request make' \
+  'constructed_inputs() const noexcept' \
+  'constructed_check_inputs(' \
+  'require_constructed_check_input(' \
   'class transaction_check_session final' \
   'transaction_check_session admit' \
   'check_session_encoding_version = 1' \

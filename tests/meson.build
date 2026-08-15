@@ -908,6 +908,16 @@ if not get_option('tests').disabled()
   check_contract = find_program('contracts/check_check_contract.sh')
   test('check-contract', check_contract, args: [meson.project_source_root()], suite: 'contract')
 
+  check_resource_realization_contract = find_program(
+    'contracts/check_check_resource_realization_contract.sh',
+  )
+  test(
+    'check-resource-realization-contract',
+    check_resource_realization_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
   dispatch_contract = find_program('contracts/check_dispatch_contract.sh')
   test('dispatch-contract', dispatch_contract, args: [meson.project_source_root()], suite: 'contract')
 

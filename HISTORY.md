@@ -11,6 +11,12 @@
 - Adds privileged archive-source build/check qualification that distinguishes
   retained source objects from the archive-realized construction workspace and
   verifies the independent check view of the sealed package image.
+- Reconstructs native check source and package resources from retained source
+  materialization and sealed artifact/image authority instead of borrowing
+  construction-session staging or package-output residue. Candidate check inputs
+  are reconstructed from their own predecessor artifacts as well. The
+  archive-source qualification now deletes those construction-private trees
+  before check resume and requires successful independent resource realization.
 
 ## 0.38.0 - 2026-08-15
 

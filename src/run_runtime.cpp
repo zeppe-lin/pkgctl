@@ -248,11 +248,12 @@ void validate_native_configuration(
         "construction/check root-view authority overlaps target or lifecycle "
         "session authority");
 
-  const std::array<const std::filesystem::path*, 5> mutable_roots{{
+  const std::array<const std::filesystem::path*, 6> mutable_roots{{
       &session_roots.content_store_root,
       &session_roots.construction_session_root,
       &session_roots.package_output_root,
       &session_roots.artifact_root,
+      &session_roots.check_resource_root,
       &session_roots.check_temporary_root,
   }};
   for (const auto* root : mutable_roots)

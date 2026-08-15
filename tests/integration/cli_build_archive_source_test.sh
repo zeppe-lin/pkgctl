@@ -78,6 +78,7 @@ for directory in \
   content \
   construction-sessions \
   package-outputs \
+  check-resources \
   check-temporary; do
   mkdir "$runtime/$directory"
 done
@@ -137,26 +138,81 @@ if [ "$status" -ne 0 ]; then
 fi
 
 require_contains run "$root/run.out" 'origin admitted'
-require_contains run "$root/run.out" 'disposition completed'
+require_contains run "$root/run.out" 'disposition step-limit-reached'
 require_contains run "$root/run.out" 'durable-steps 2'
-require_contains run "$root/run.out" 'complete yes'
+require_contains run "$root/run.out" 'complete no'
 require_contains run "$root/run.out" 'failed no'
 require_contains run "$root/run.out" 'frontend build'
-require_contains run "$root/run.out" 'artifacts 1'
-require_contains run "$root/run.out" 'artifact.0.package archive-probe'
+require_contains run "$root/run.out" 'artifacts 2'
+require_contains run "$root/run.out" '.package archive-dep'
+require_contains run "$root/run.out" '.package archive-probe'
+
+# Construction-private resource trees are not check authority. Remove them
+# completely before resuming the check; recovery must recreate source/package
+# resources from retained materialization and sealed artifact evidence.
+find "$runtime/construction-sessions" "$runtime/package-outputs" \
+  -type d -exec chmod u+w {} + 2>/dev/null || :
+rm -rf "$runtime/construction-sessions" "$runtime/package-outputs"
+mkdir "$runtime/construction-sessions" "$runtime/package-outputs"
+
+set -- build \
+  --canonical-store "$state" \
+  --resume "$nonce" \
+  --runtime-root "$runtime" \
+  --build-root "$build" \
+  --artifact-root "$artifacts" \
+  --interpreter "$interpreter" \
+  --build-user-id "$uid" \
+  --build-group-id "$gid" \
+  --source-date-epoch 0 \
+  --max-steps 1
+for group in $groups; do
+  if [ "$group" != "$gid" ]; then
+    set -- "$@" --build-supplementary-group "$group"
+  fi
+done
+
+"$pkgctl" "$@" >"$root/resume.out" 2>"$root/resume.err" || {
+  dump_file 'resume stdout' "$root/resume.out"
+  dump_file 'resume stderr' "$root/resume.err"
+  fail 'check resume after construction-residue removal failed'
+}
+require_contains resume "$root/resume.out" 'origin resumed'
+require_contains resume "$root/resume.out" 'disposition completed'
+require_contains resume "$root/resume.out" 'durable-steps 1'
+require_contains resume "$root/resume.out" 'complete yes'
+require_contains resume "$root/resume.out" 'failed no'
+require_contains resume "$root/resume.out" 'artifacts 2'
+require_contains resume "$root/resume.out" '.package archive-dep'
+require_contains resume "$root/resume.out" '.package archive-probe'
+
+[ -d "$runtime/check-resources" ] || fail 'check resource root is absent'
+find "$runtime/check-resources" -type f -name archive-probe.tar -print -quit | \
+  grep . >/dev/null || fail 'independent check source-object tree is absent'
+find "$runtime/check-resources" -type f -name archive-result -print -quit | \
+  grep . >/dev/null || fail 'independent checked-package tree is absent'
+find "$runtime/check-resources" -type f -name dep-token -print -quit | \
+  grep . >/dev/null || fail 'independent constructed check input is absent'
 
 final_state=$("$state_inspect_fixture" "$state")
 require_equal canonical-state "$initial_state" "$final_state"
 
-artifact=$(find "$artifacts" -type f -name '*.tar' -print)
-[ -n "$artifact" ] || fail 'public archive is absent'
-[ "$(printf '%s\n' "$artifact" | wc -l | tr -d ' ')" -eq 1 ] || \
-  fail 'expected exactly one public archive'
-require_equal archive-payload archive-source \
+archive_count=$(find "$artifacts" -type f -name '*.tar' | wc -l | tr -d ' ')
+[ "$archive_count" -eq 2 ] || fail "expected two public archives, got $archive_count"
+probe_index=$(awk '
+  $1 ~ /^artifact\.[0-9]+\.package$/ && $2 == "archive-probe" {
+    split($1, fields, "."); print fields[2]; exit
+  }
+' "$root/resume.out")
+[ -n "$probe_index" ] || fail 'archive-probe artifact index is absent'
+artifact=$(awk -v key="artifact.$probe_index.path" '$1 == key { print $2; exit }' \
+  "$root/resume.out")
+[ -f "$artifact" ] || fail 'archive-probe public archive is absent'
+require_equal archive-payload archive-source+archive-dependency \
   "$(tar -xOf "$artifact" archive-result)"
 
 check_count=$(find "$runtime/check-temporary" -type f -name archive-check-ran | wc -l)
 [ "$check_count" -eq 1 ] || \
   fail "retained $check_count archive check markers, expected 1"
 check_marker=$(find "$runtime/check-temporary" -type f -name archive-check-ran)
-require_equal check-payload checked:archive-source "$(cat "$check_marker")"
+require_equal check-payload checked:archive-source+archive-dependency "$(cat "$check_marker")"

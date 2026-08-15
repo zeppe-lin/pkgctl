@@ -399,6 +399,20 @@ completed construction/check evidence through the same locator and backend
 profile used by fresh and restarted work. Terminal operations are reopened by
 the same native operation authority and canonical checkpoint validator.
 
+Check resource location is now separated from check resource realization. The
+locator derives only deterministic private paths and resource identities from
+retained construction authority. Immediately before native check execution,
+`libpkgsource-exec` recreates `/check/source` from the retained exact
+`pkgfetch::source_materialization`, and `libpkgimage-exec` recreates the checked
+package tree from the exact published artifact digest plus normalized package
+image identity. Candidate check inputs are also reconstructed from the sealed
+artifact/image authority of the exact predecessor constructions retained by the
+check request; installed inputs continue to use their state-owned retained
+resources. Construction `source`, `work`, `tmp`, and package-output trees are
+therefore disposable after construction dependencies are complete rather than
+check authority. A restarted check can recreate every construction-produced
+check resource after those construction-private trees have disappeared.
+
 Path-based construction opens three existing absolute, normalized journal
 directories and, for an operation-capable transaction, the fourth target-lock
 directory with final-component no-follow directory semantics, then delegates to

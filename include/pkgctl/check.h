@@ -18,6 +18,12 @@ struct detail_run_recovery_access;
 
 class transaction_progress;
 
+/*! \brief Sealed predecessor construction for one candidate check input. */
+struct transaction_check_constructed_input final {
+  pkgbuild::build_input_identity input;
+  construction_result construction;
+};
+
 /*! \brief Pure controller authority for one ready transaction check node. */
 class transaction_check_request final {
 public:
@@ -31,6 +37,8 @@ public:
   check_node() const noexcept;
   [[nodiscard]] const construction_result& construction() const noexcept;
   [[nodiscard]] const pkgcheck::check_request& check() const noexcept;
+  [[nodiscard]] const std::vector<transaction_check_constructed_input>&
+  constructed_inputs() const noexcept;
   [[nodiscard]] const session_identity& identity() const noexcept;
 
 private:
@@ -40,6 +48,7 @@ private:
       pkgtransaction::transaction_node_identity check_node,
       construction_result construction,
       pkgcheck::check_request check,
+      std::vector<transaction_check_constructed_input> constructed_inputs,
       session_identity identity);
 
   transaction_session transaction_;
@@ -47,6 +56,7 @@ private:
   pkgtransaction::transaction_node_identity check_node_;
   construction_result construction_;
   pkgcheck::check_request check_;
+  std::vector<transaction_check_constructed_input> constructed_inputs_;
   session_identity identity_;
 };
 
@@ -93,7 +103,7 @@ public:
   virtual ~transaction_check_driver() = default;
 
   [[nodiscard]] virtual pkgcheck_exec::check_execution_result execute_check(
-      const pkgcheck_exec::admitted_check_session& session) = 0;
+      const transaction_check_session& session) = 0;
 };
 
 /*! \brief Native composition of libpkgcheck-exec and libpkgexec.
@@ -107,7 +117,7 @@ public:
   explicit native_transaction_check_driver(pkgexec::execution_backend& backend);
 
   [[nodiscard]] pkgcheck_exec::check_execution_result execute_check(
-      const pkgcheck_exec::admitted_check_session& session) override;
+      const transaction_check_session& session) override;
 
 private:
   pkgexec::execution_backend& backend_;

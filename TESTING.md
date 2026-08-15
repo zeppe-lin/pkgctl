@@ -133,8 +133,15 @@ single source is a deterministic tar archive retained at
 source-object root itself does not contain that unpacked path. The independent
 check receives the same retained archive object plus the sealed package through
 `PKG_PACKAGE_ROOT`; it must likewise refuse any fiction that the source-object
-root is the construction workspace. One construction plus one check must finish
-in two durable dispatches and retain one archive plus one check marker.
+root is the construction workspace. The probe has one constructed dependency,
+so qualification first completes the dependency and archive-probe constructions,
+then deletes the complete construction-session and package-output trees before
+resuming the check. The check must independently recreate its source-object tree
+from retained materialization authority, its package tree from the exact sealed
+artifact/image authority, and its candidate check input from the dependency's
+sealed artifact rather than construction residue. Two constructions plus one
+resumed check must finish in three durable dispatches and retain two archives
+plus one check marker.
 
 ## Release 0.36.0 construction-only authority qualification
 

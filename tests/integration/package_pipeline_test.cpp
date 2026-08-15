@@ -400,6 +400,7 @@ pkgctl::native_transaction_session_configuration configuration(
           root / "construction-sessions",
           root / "package-outputs",
           root / "artifacts",
+          root / "check-resources",
           root / "check-temporary",
           pkgexec::root_view_identity::from_sha256(std::string(64U, '8')),
           root / "root-view",

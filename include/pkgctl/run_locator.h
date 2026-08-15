@@ -41,6 +41,7 @@ struct native_transaction_session_roots final {
   std::filesystem::path construction_session_root;
   std::filesystem::path package_output_root;
   std::filesystem::path artifact_root;
+  std::filesystem::path check_resource_root;
   std::filesystem::path check_temporary_root;
   pkgexec::root_view_identity root_view;
   std::filesystem::path root_view_path;
