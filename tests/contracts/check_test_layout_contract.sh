@@ -72,6 +72,7 @@ for path in \
   'integration/cli_run_native_construction_test.sh' \
   'integration/cli_build_test.sh' \
   'integration/cli_build_archive_source_test.sh' \
+  'integration/cli_build_check_authority_refusal_test.sh' \
   'integration/cli_build_process_death_test.sh' \
   'integration/cli_run_rootfs_campaign_test.sh' \
   'integration/cli_run_lease_contention_test.sh' \

@@ -9,6 +9,16 @@ state_inspect_fixture=$3
 runtime_root_fixture=$4
 fixture_collection=$5
 root_view_fixture=$6
+active_root=
+
+cleanup()
+{
+  [ -n "$active_root" ] || return 0
+  find "$active_root" -type d -exec chmod u+w {} + 2>/dev/null || :
+  rm -rf "$active_root"
+  active_root=
+}
+trap cleanup EXIT HUP INT TERM
 
 fail()
 {
@@ -28,6 +38,7 @@ run_scenario()
 {
   scenario=$1
   root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-check-authority-$scenario.XXXXXX")
+  active_root=$root
   collection=$root/collection
   state=$root/state
   runtime=$root/runtime
@@ -78,8 +89,10 @@ run_scenario()
     if grep -F 'native execution unavailable before transaction execution;' \
         "$root/run.err" >/dev/null; then
       dump_file 'native execution preflight' "$root/run.err"
-      rm -rf "$root"
-      return 77
+      if [ "${PKGCTL_REQUIRE_NATIVE_INTEGRATION:-0}" = 1 ]; then
+        fail 'release qualification requires native check authority refusal'
+      fi
+      exit 77
     fi
     dump_file 'initial stdout' "$root/run.out"
     dump_file 'initial stderr' "$root/run.err"
@@ -93,7 +106,8 @@ run_scenario()
   case $scenario in
     source)
       digest=4fd7f5659897a904b772628cf3de2f03104cf284c45d305138c809639120d2e9
-      authority=$runtime/content/sha256/fe/$digest
+      prefix=$(printf '%s\n' "$digest" | cut -c1-2)
+      authority=$runtime/content/sha256/$prefix/$digest
       [ -f "$authority" ] || fail 'retained archive source authority is absent'
       chmod u+w "$authority"
       printf 'mutated-after-construction\n' >>"$authority"
@@ -151,7 +165,7 @@ run_scenario()
     dump_file 'unexpected resume stderr' "$root/resume.err"
     fail "$scenario mutated retained authority was admitted"
   }
-  grep -F "$expected" "$root/resume.err" >/dev/null || {
+  grep -F -- "$expected" "$root/resume.err" >/dev/null || {
     dump_file 'resume stdout' "$root/resume.out"
     dump_file 'resume stderr' "$root/resume.err"
     fail "$scenario failed outside the expected realization boundary"
@@ -165,20 +179,8 @@ run_scenario()
   [ "$initial_state" = "$final_state" ] || \
     fail "$scenario check authority failure changed canonical package state"
 
-  find "$root" -type d -exec chmod u+w {} + 2>/dev/null || :
-  rm -rf "$root"
-  return 0
+  cleanup
 }
 
-set +e
 run_scenario source 31
-source_status=$?
-set -e
-if [ "$source_status" -eq 77 ]; then
-  if [ "${PKGCTL_REQUIRE_NATIVE_INTEGRATION:-0}" = 1 ]; then
-    fail 'release qualification requires native check authority refusal'
-  fi
-  exit 77
-fi
-[ "$source_status" -eq 0 ] || exit "$source_status"
 run_scenario package 32
