@@ -1310,14 +1310,18 @@ void check_exact_input_resource_projection()
   const auto prepared = pkgcheck_exec::prepare(
       canonical.execution_session());
   std::size_t observed_check_inputs = 0;
-  for (const auto& input : canonical.execution_session().inputs()) {
+  for (std::size_t index = 0;
+       index < canonical.execution_session().inputs().size(); ++index) {
+    const auto& input = canonical.execution_session().inputs()[index];
+    const auto& logical = expected_inputs[index];
+    CHECK(input.input == logical.identity());
+    const auto& name = logical.package().name();
     const auto slot = pkgexec::resource_slot::named(
-        pkgexec::resource_role::check_input_tree, input.input.hex());
+        pkgexec::resource_role::check_input_tree, name);
     const auto& binding = prepared.request.resources().binding(slot);
     CHECK(binding.resource() == input.resource);
     CHECK(binding.access() == pkgexec::resource_access::read_only);
-    CHECK(binding.mount_point().string() ==
-          "/check/inputs/" + input.input.hex());
+    CHECK(binding.mount_point().string() == "/check/inputs/" + name);
     CHECK(prepared.resources.materialization(input.resource).host_path() ==
           input.path);
     ++observed_check_inputs;
