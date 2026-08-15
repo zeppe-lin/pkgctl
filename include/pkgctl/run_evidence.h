@@ -57,6 +57,107 @@ private:
   int system_error_;
 };
 
+/*! \brief Durable admission authority for one construction attempt.
+ *
+ * This record is published before the started run successor becomes durable.
+ * It retains the exact controller construction-session bytes selected for the
+ * attempt, but makes no claim that execution began or completed.  A started
+ * dispatch may therefore be replayed from this authority when no terminal
+ * execution evidence exists.
+ */
+class construction_dispatch_attempt_record final {
+public:
+  [[nodiscard]] static construction_dispatch_attempt_record admit(
+      const transaction_run_journal_record& reserved_record,
+      const transaction_dispatch& dispatch,
+      const construction_session& session);
+
+  [[nodiscard]] std::uint16_t schema_version() const noexcept;
+  [[nodiscard]] const session_identity& identity() const noexcept;
+  [[nodiscard]] const session_identity& journal() const noexcept;
+  [[nodiscard]] const session_identity& transaction() const noexcept;
+  [[nodiscard]] const session_identity& dispatch() const noexcept;
+  [[nodiscard]] const pkgtransaction::transaction_node_identity&
+  node() const noexcept;
+  [[nodiscard]] const session_identity& attempt_session() const noexcept;
+  [[nodiscard]] const session_identity& controller_request() const noexcept;
+  [[nodiscard]] const construction_session_encoding&
+  session_encoding() const noexcept;
+
+private:
+  friend struct detail_run_evidence_codec_access;
+
+  construction_dispatch_attempt_record(
+      session_identity identity,
+      session_identity journal,
+      session_identity transaction,
+      session_identity dispatch,
+      pkgtransaction::transaction_node_identity node,
+      session_identity attempt_session,
+      session_identity controller_request,
+      construction_session_encoding session_encoding);
+
+  std::uint16_t schema_version_ = transaction_run_evidence_schema_version;
+  session_identity identity_;
+  session_identity journal_;
+  session_identity transaction_;
+  session_identity dispatch_;
+  pkgtransaction::transaction_node_identity node_;
+  session_identity attempt_session_;
+  session_identity controller_request_;
+  construction_session_encoding session_encoding_;
+};
+
+/*! \brief Durable admission authority for one check attempt. */
+class check_dispatch_attempt_record final {
+public:
+  [[nodiscard]] static check_dispatch_attempt_record admit(
+      const transaction_run_journal_record& reserved_record,
+      const transaction_dispatch& dispatch,
+      const transaction_check_session& session);
+
+  [[nodiscard]] std::uint16_t schema_version() const noexcept;
+  [[nodiscard]] const session_identity& identity() const noexcept;
+  [[nodiscard]] const session_identity& journal() const noexcept;
+  [[nodiscard]] const session_identity& transaction() const noexcept;
+  [[nodiscard]] const session_identity& dispatch() const noexcept;
+  [[nodiscard]] const pkgtransaction::transaction_node_identity&
+  node() const noexcept;
+  [[nodiscard]] const session_identity& attempt_session() const noexcept;
+  [[nodiscard]] const session_identity& controller_request() const noexcept;
+  [[nodiscard]] const session_identity& construction() const noexcept;
+  [[nodiscard]] const pkgcheck::check_request_identity&
+  check_request() const noexcept;
+  [[nodiscard]] const check_session_encoding& session_encoding() const noexcept;
+
+private:
+  friend struct detail_run_evidence_codec_access;
+
+  check_dispatch_attempt_record(
+      session_identity identity,
+      session_identity journal,
+      session_identity transaction,
+      session_identity dispatch,
+      pkgtransaction::transaction_node_identity node,
+      session_identity attempt_session,
+      session_identity controller_request,
+      session_identity construction,
+      pkgcheck::check_request_identity check_request,
+      check_session_encoding session_encoding);
+
+  std::uint16_t schema_version_ = transaction_run_evidence_schema_version;
+  session_identity identity_;
+  session_identity journal_;
+  session_identity transaction_;
+  session_identity dispatch_;
+  pkgtransaction::transaction_node_identity node_;
+  session_identity attempt_session_;
+  session_identity controller_request_;
+  session_identity construction_;
+  pkgcheck::check_request_identity check_request_;
+  check_session_encoding session_encoding_;
+};
+
 /*! \brief Durable owner evidence for one started construction dispatch.
  *
  * The record retains the exact controller-owned construction-session bytes,

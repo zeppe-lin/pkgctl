@@ -1,5 +1,19 @@
 # pkgctl testing
 
+## Current process-death qualification
+
+The privileged build process-death gate kills `pkgctl` at durable construction
+`started`, durable public artifact publication, and durable check `started`. A
+construction/check `started` case is recoverable only from the exact immutable
+attempt session published before started ownership; current collection or
+session-locator authority must not participate in replay. The artifact case
+remains red until public publication is ordered behind durable terminal result
+authority and made idempotent from that authority.
+
+The ordinary test pass must preflight native isolation without ptrace and skip
+these cases with status 77 when the required Linux namespace guarantees are not
+available. Sanitizer failure under ptrace is not a substitute for that preflight.
+
 ## Empty-target rootfs campaign qualification
 
 The privileged `cli-run-rootfs-campaign` vertical is the first whole-root
@@ -1082,16 +1096,18 @@ The run-journal suite must prove:
 
 The durable execution suite must prove:
 
-- construction and check drivers are invoked only after the started run
-  successor is accepted by the run store;
+- construction and check attempt authority is accepted by the evidence store
+  before the started run successor, and drivers are invoked only after that
+  started successor is accepted by the run store;
 - effect admission is accepted before operation started ownership, and both are
   accepted before the first lifecycle, application, or publication call;
 - a start-store failure invokes no driver and leaves the prior reserved record
   selected;
 - an effect-admission failure invokes no operation driver and appends no run
   successor;
-- driver escape after durable start leaves the exact started construction,
-  check, or operation dispatch restartable;
+- driver escape after durable start leaves exact admitted construction/check
+  attempt authority available for replay, while operation restart remains bound
+  to its exact effect attempt;
 - a failed terminal run append never fabricates completion and leaves the
   started record selected;
 - a terminal effect journal paired with a lost run completion is classified for

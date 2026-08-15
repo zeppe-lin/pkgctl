@@ -24,6 +24,8 @@ namespace {
 enum class evidence_kind : std::uint8_t {
   construction = 1,
   check = 2,
+  construction_attempt = 3,
+  check_attempt = 4,
 };
 
 class fd_guard final {
@@ -161,6 +163,10 @@ std::string kind_name(evidence_kind kind)
 {
   switch (kind)
   {
+    case evidence_kind::construction_attempt:
+      return "construction-attempt";
+    case evidence_kind::check_attempt:
+      return "check-attempt";
     case evidence_kind::construction:
       return "construction";
     case evidence_kind::check:
@@ -484,13 +490,35 @@ evidence_index decode_index(
   return index;
 }
 
+session_identity index_authority(
+    const construction_dispatch_attempt_record& record)
+{
+  return record.controller_request();
+}
+
+session_identity index_authority(const check_dispatch_attempt_record& record)
+{
+  return record.controller_request();
+}
+
+session_identity index_authority(
+    const construction_dispatch_evidence_record& record)
+{
+  return record.result();
+}
+
+session_identity index_authority(const check_dispatch_evidence_record& record)
+{
+  return record.result();
+}
+
 template<typename Record>
 evidence_index make_index(evidence_kind kind, const Record& record)
 {
   return evidence_index{
       kind, record.journal(), record.transaction(), record.dispatch(),
       record.node(), record.attempt_session(), record.identity(),
-      record.result()};
+      index_authority(record)};
 }
 
 template<typename Record>
@@ -502,10 +530,63 @@ void validate_loaded_record(
       record.transaction() != index.transaction ||
       record.dispatch() != index.dispatch || record.node() != index.node ||
       record.attempt_session() != index.attempt ||
-      record.identity() != index.record || record.result() != index.result)
+      record.identity() != index.record ||
+      index_authority(record) != index.result)
   {
     corrupt("transaction-run evidence object contradicts its index");
   }
+}
+
+std::optional<construction_dispatch_attempt_record>
+load_construction_attempt_unlocked(
+    int directory_fd,
+    const session_identity& journal,
+    const session_identity& dispatch,
+    const session_identity& attempt_session)
+{
+  const auto index_path = index_name(
+      evidence_kind::construction_attempt, journal, dispatch, attempt_session);
+  const auto index_bytes = read_file(
+      directory_fd, index_path, index_size, true);
+  if (!index_bytes)
+    return std::nullopt;
+  const auto index = decode_index(
+      *index_bytes, evidence_kind::construction_attempt, journal, dispatch,
+      attempt_session);
+  const auto object_bytes = read_file(
+      directory_fd,
+      object_name(evidence_kind::construction_attempt, index.record),
+      maximum_transaction_run_evidence_encoding_size, true);
+  if (!object_bytes)
+    corrupt("construction attempt index names an absent object");
+  auto record = decode_construction_dispatch_attempt(*object_bytes);
+  validate_loaded_record(index, record);
+  return record;
+}
+
+std::optional<check_dispatch_attempt_record> load_check_attempt_unlocked(
+    int directory_fd,
+    const session_identity& journal,
+    const session_identity& dispatch,
+    const session_identity& attempt_session)
+{
+  const auto index_path = index_name(
+      evidence_kind::check_attempt, journal, dispatch, attempt_session);
+  const auto index_bytes = read_file(
+      directory_fd, index_path, index_size, true);
+  if (!index_bytes)
+    return std::nullopt;
+  const auto index = decode_index(
+      *index_bytes, evidence_kind::check_attempt, journal, dispatch,
+      attempt_session);
+  const auto object_bytes = read_file(
+      directory_fd, object_name(evidence_kind::check_attempt, index.record),
+      maximum_transaction_run_evidence_encoding_size, true);
+  if (!object_bytes)
+    corrupt("check attempt index names an absent object");
+  auto record = decode_check_dispatch_attempt(*object_bytes);
+  validate_loaded_record(index, record);
+  return record;
 }
 
 std::optional<construction_dispatch_evidence_record>
@@ -617,6 +698,61 @@ posix_transaction_run_evidence_store::~posix_transaction_run_evidence_store()
     (void)::close(directory_fd_);
 }
 
+construction_dispatch_attempt_record
+posix_transaction_run_evidence_store::publish(
+    const construction_dispatch_attempt_record& record)
+{
+  auto lock = lock_store(directory_fd_);
+  const auto index_path = index_name(
+      evidence_kind::construction_attempt, record.journal(), record.dispatch(),
+      record.attempt_session());
+  if (const auto existing = load_construction_attempt_unlocked(
+          directory_fd_, record.journal(), record.dispatch(),
+          record.attempt_session()))
+  {
+    if (existing->identity() != record.identity())
+      conflict("construction attempt already indexes different authority");
+    return *existing;
+  }
+
+  const auto object = encode_construction_dispatch_attempt(record);
+  persist_immutable(
+      directory_fd_,
+      object_name(evidence_kind::construction_attempt, record.identity()),
+      object, "construction-attempt-object");
+  const auto index = encode_index(
+      make_index(evidence_kind::construction_attempt, record));
+  persist_immutable(
+      directory_fd_, index_path, index, "construction-attempt-index");
+  return record;
+}
+
+check_dispatch_attempt_record posix_transaction_run_evidence_store::publish(
+    const check_dispatch_attempt_record& record)
+{
+  auto lock = lock_store(directory_fd_);
+  const auto index_path = index_name(
+      evidence_kind::check_attempt, record.journal(), record.dispatch(),
+      record.attempt_session());
+  if (const auto existing = load_check_attempt_unlocked(
+          directory_fd_, record.journal(), record.dispatch(),
+          record.attempt_session()))
+  {
+    if (existing->identity() != record.identity())
+      conflict("check attempt already indexes different authority");
+    return *existing;
+  }
+
+  const auto object = encode_check_dispatch_attempt(record);
+  persist_immutable(
+      directory_fd_, object_name(evidence_kind::check_attempt, record.identity()),
+      object, "check-attempt-object");
+  const auto index = encode_index(
+      make_index(evidence_kind::check_attempt, record));
+  persist_immutable(directory_fd_, index_path, index, "check-attempt-index");
+  return record;
+}
+
 construction_dispatch_evidence_record
 posix_transaction_run_evidence_store::publish(
     const construction_dispatch_evidence_record& record)
@@ -666,6 +802,74 @@ check_dispatch_evidence_record posix_transaction_run_evidence_store::publish(
   const auto index = encode_index(make_index(evidence_kind::check, record));
   persist_immutable(directory_fd_, index_path, index, "check-index");
   return record;
+}
+
+std::optional<construction_dispatch_attempt_record>
+posix_transaction_run_evidence_store::load_construction_attempt(
+    const session_identity& journal,
+    const session_identity& dispatch,
+    const session_identity& attempt_session) const
+{
+  if (auto lock = lock_store_read_only(directory_fd_))
+  {
+    return load_construction_attempt_unlocked(
+        directory_fd_, journal, dispatch, attempt_session);
+  }
+
+  try
+  {
+    auto record = load_construction_attempt_unlocked(
+        directory_fd_, journal, dispatch, attempt_session);
+    if (auto lock = lock_store_read_only(directory_fd_))
+    {
+      return load_construction_attempt_unlocked(
+          directory_fd_, journal, dispatch, attempt_session);
+    }
+    return record;
+  }
+  catch (...)
+  {
+    if (auto lock = lock_store_read_only(directory_fd_))
+    {
+      return load_construction_attempt_unlocked(
+          directory_fd_, journal, dispatch, attempt_session);
+    }
+    throw;
+  }
+}
+
+std::optional<check_dispatch_attempt_record>
+posix_transaction_run_evidence_store::load_check_attempt(
+    const session_identity& journal,
+    const session_identity& dispatch,
+    const session_identity& attempt_session) const
+{
+  if (auto lock = lock_store_read_only(directory_fd_))
+  {
+    return load_check_attempt_unlocked(
+        directory_fd_, journal, dispatch, attempt_session);
+  }
+
+  try
+  {
+    auto record = load_check_attempt_unlocked(
+        directory_fd_, journal, dispatch, attempt_session);
+    if (auto lock = lock_store_read_only(directory_fd_))
+    {
+      return load_check_attempt_unlocked(
+          directory_fd_, journal, dispatch, attempt_session);
+    }
+    return record;
+  }
+  catch (...)
+  {
+    if (auto lock = lock_store_read_only(directory_fd_))
+    {
+      return load_check_attempt_unlocked(
+          directory_fd_, journal, dispatch, attempt_session);
+    }
+    throw;
+  }
 }
 
 std::optional<construction_dispatch_evidence_record>

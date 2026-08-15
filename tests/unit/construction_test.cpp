@@ -483,11 +483,17 @@ class construction_recovery_authority_source final
 public:
   explicit construction_recovery_authority_source(
       pkgctl::construction_result result)
-      : result_(std::move(result))
+      : authority_(std::move(result))
   {
   }
 
-  pkgctl::construction_result construction(
+  explicit construction_recovery_authority_source(
+      pkgctl::construction_session session)
+      : authority_(std::move(session))
+  {
+  }
+
+  pkgctl::construction_dispatch_recovery_authority construction(
       const pkgctl::transaction_run_restart_checkpoint& checkpoint,
       const pkgctl::transaction_dispatch_restart_assessment& assessment,
       const pkgctl::transaction_dispatch& dispatch) override
@@ -496,10 +502,10 @@ public:
     record_ = checkpoint.record().identity();
     assessment_ = assessment.dispatch();
     dispatch_ = dispatch.identity();
-    return result_;
+    return authority_;
   }
 
-  pkgctl::transaction_check_result check(
+  pkgctl::check_dispatch_recovery_authority check(
       const pkgctl::transaction_run_restart_checkpoint&,
       const pkgctl::transaction_dispatch_restart_assessment&,
       const pkgctl::transaction_dispatch&) override
@@ -524,7 +530,7 @@ public:
   { return dispatch_; }
 
 private:
-  pkgctl::construction_result result_;
+  pkgctl::construction_dispatch_recovery_authority authority_;
   std::size_t calls_ = 0U;
   std::optional<pkgctl::session_identity> record_;
   std::optional<pkgctl::session_identity> assessment_;
@@ -612,7 +618,7 @@ public:
 class unreachable_recovery_authority_source final
     : public pkgctl::transaction_dispatch_recovery_authority_source {
 public:
-  pkgctl::construction_result construction(
+  pkgctl::construction_dispatch_recovery_authority construction(
       const pkgctl::transaction_run_restart_checkpoint&,
       const pkgctl::transaction_dispatch_restart_assessment&,
       const pkgctl::transaction_dispatch&) override
@@ -620,7 +626,7 @@ public:
     throw std::runtime_error("reserved recovery requested construction evidence");
   }
 
-  pkgctl::transaction_check_result check(
+  pkgctl::check_dispatch_recovery_authority check(
       const pkgctl::transaction_run_restart_checkpoint&,
       const pkgctl::transaction_dispatch_restart_assessment&,
       const pkgctl::transaction_dispatch&) override
@@ -1410,7 +1416,8 @@ void check_durable_dispatch_execution()
         fixture.second, driver, evidence_store, run_store);
 
     CHECK(trace == std::vector<std::string>(
-        {"run-1", "materialize", "build", "evidence-construction", "run-2"}));
+        {"attempt-construction", "run-1", "materialize", "build",
+         "evidence-construction", "run-2"}));
     CHECK(completed.result.succeeded());
     CHECK(completed.evidence.result() == completed.result.identity());
     CHECK(completed.record.sequence() == reserved.sequence() + 2U);
@@ -1423,6 +1430,36 @@ void check_durable_dispatch_execution()
             std::optional<pkgctl::session_identity>(
                 completed.result.identity()));
     }
+  }
+
+  {
+    test_support::temporary_directory temporary;
+    auto fixture = make_fixture(temporary.path());
+    auto [reservation, reserved] =
+        reserve_construction(fixture.first, 40U);
+
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(reserved, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(
+        trace, false, false, true, false);
+    fixture_backend backend(backend_mode::succeed);
+    pkgctl::native_construction_driver native_driver(backend);
+    tracing_construction_driver driver(native_driver, trace);
+    bool failed = false;
+    try
+    {
+      (void)pkgctl::execute_construction_dispatch_durable(
+          reserved, reservation.run, *reservation.dispatch,
+          fixture.second, driver, evidence_store, run_store);
+    }
+    catch (const pkgctl::transaction_run_evidence_error& problem)
+    {
+      failed = problem.code() ==
+          pkgctl::transaction_run_evidence_error_code::store_write_failed;
+    }
+    CHECK(failed);
+    CHECK(trace == std::vector<std::string>({"attempt-construction"}));
+    CHECK(run_store.latest().identity() == reserved.identity());
   }
 
   {
@@ -1450,7 +1487,8 @@ void check_durable_dispatch_execution()
           pkgctl::transaction_run_journal_error_code::store_write_failed;
     }
     CHECK(failed);
-    CHECK(trace == std::vector<std::string>({"run-1"}));
+    CHECK(trace == std::vector<std::string>(
+        {"attempt-construction", "run-1"}));
     CHECK(run_store.latest().identity() == reserved.identity());
   }
 
@@ -1480,7 +1518,8 @@ void check_durable_dispatch_execution()
     }
     CHECK(failed);
     CHECK(trace == std::vector<std::string>(
-        {"run-1", "materialize", "build", "evidence-construction", "run-2"}));
+        {"attempt-construction", "run-1", "materialize", "build",
+         "evidence-construction", "run-2"}));
     CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
     const auto reopened = run_store.latest().reopen(reservation.run.progress());
     CHECK(reopened.records().size() == 1U);
@@ -1536,7 +1575,8 @@ void check_durable_dispatch_execution()
     }
     CHECK(failed);
     CHECK(trace == std::vector<std::string>(
-        {"run-1", "materialize", "build", "evidence-construction"}));
+        {"attempt-construction", "run-1", "materialize", "build",
+         "evidence-construction"}));
     CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
     const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
         reservation.run.progress(), run_store.latest()).assessment();
@@ -1572,7 +1612,8 @@ void check_durable_dispatch_execution()
       failed = true;
     }
     CHECK(failed);
-    CHECK(trace == std::vector<std::string>({"run-1", "materialize"}));
+    CHECK(trace == std::vector<std::string>(
+        {"attempt-construction", "run-1", "materialize"}));
     CHECK(run_store.latest().sequence() == reserved.sequence() + 1U);
     const auto assessment = pkgctl::transaction_run_restart_checkpoint::make(
         reservation.run.progress(), run_store.latest()).assessment();
@@ -2334,6 +2375,37 @@ void check_stored_construction_recovery()
 
   auto checkpoint = pkgctl::transaction_run_restart_checkpoint::make(
       started_run.progress(), started);
+
+  const auto attempt_path = temporary.path() / "attempt-evidence";
+  std::filesystem::create_directory(attempt_path);
+  auto attempt_store = pkgctl::posix_transaction_run_evidence_store::open(
+      attempt_path.string());
+  const auto attempt = pkgctl::construction_dispatch_attempt_record::admit(
+      reserved, *reservation.dispatch, session);
+  const auto attempt_encoding =
+      pkgctl::encode_construction_dispatch_attempt(attempt);
+  const auto decoded_attempt =
+      pkgctl::decode_construction_dispatch_attempt(attempt_encoding);
+  CHECK(decoded_attempt.identity() == attempt.identity());
+  CHECK(decoded_attempt.session_encoding() == attempt.session_encoding());
+  CHECK(pkgctl::encode_construction_dispatch_attempt(decoded_attempt) ==
+        attempt_encoding);
+  CHECK(attempt_store.publish(attempt).identity() == attempt.identity());
+  pkgctl::native_transaction_dispatch_recovery_context_source attempt_context;
+  pkgctl::stored_transaction_dispatch_recovery_authority_source attempt_source(
+      attempt_store, attempt_context);
+  auto attempt_recovery = pkgctl::acquire_transaction_dispatch_recovery_authority(
+      checkpoint, *reservation.dispatch, attempt_source);
+  CHECK(attempt_recovery.construction_retry() != nullptr);
+  CHECK(attempt_recovery.construction() == nullptr);
+  if (attempt_recovery.construction_retry())
+  {
+    CHECK(attempt_recovery.construction_retry()->identity() == session.identity());
+    CHECK(pkgctl::encode_construction_session(
+              *attempt_recovery.construction_retry()) ==
+          pkgctl::encode_construction_session(session));
+  }
+
   construction_recovery_context_source context(result);
   pkgctl::stored_transaction_dispatch_recovery_authority_source recovery_source(
       evidence_store, context);
@@ -2490,7 +2562,7 @@ void check_single_step_transaction_advancement()
     CHECK(progress_source.calls() == 1U);
     CHECK(execution_source.calls() == 1U);
     CHECK(trace == std::vector<std::string>({
-        "run-1", "run-2", "materialize", "build",
+        "run-1", "attempt-construction", "run-2", "materialize", "build",
         "evidence-construction", "run-3"}));
   }
 
@@ -2560,6 +2632,41 @@ void check_single_step_transaction_advancement()
   {
     auto [run, admitted] = make_admitted(76U);
     auto reservation = pkgctl::reserve_next(run, dispatch_nonce(76U));
+    CHECK(reservation.dispatch.has_value());
+    if (!reservation.dispatch)
+      throw std::runtime_error("construction replay fixture did not reserve");
+    auto reserved = admitted.successor(reservation.run);
+    auto started_run = pkgctl::start_construction_dispatch(
+        reservation.run, *reservation.dispatch, session);
+    auto started = reserved.successor(started_run);
+
+    fixed_progress_source progress_source(started_run.progress());
+    construction_execution_authority_source execution_source(session);
+    construction_recovery_authority_source recovery_source(session);
+    std::vector<std::string> trace;
+    run_execute_support::sequenced_run_store run_store(started, trace);
+    run_execute_support::sequenced_evidence_store evidence_store(trace);
+    tracing_construction_driver driver(native_driver, trace);
+
+    const auto replayed = pkgctl::advance_transaction_run_once(
+        started.journal(), dispatch_nonce(77U),
+        {progress_source, execution_source, recovery_source},
+        {&driver, nullptr, nullptr}, {run_store, evidence_store, nullptr});
+
+    CHECK(replayed.disposition() ==
+          pkgctl::transaction_run_advance_disposition::
+              reconciled_construction);
+    CHECK(replayed.construction() != nullptr);
+    CHECK(recovery_source.calls() == 1U);
+    CHECK(execution_source.calls() == 0U);
+    CHECK(replayed.record().sequence() == started.sequence() + 1U);
+    CHECK(trace == std::vector<std::string>({
+        "materialize", "build", "evidence-construction", "run-1"}));
+  }
+
+  {
+    auto [run, admitted] = make_admitted(78U);
+    auto reservation = pkgctl::reserve_next(run, dispatch_nonce(78U));
     CHECK(reservation.dispatch.has_value());
     if (!reservation.dispatch)
       throw std::runtime_error("stale-head fixture did not reserve");

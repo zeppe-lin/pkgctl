@@ -13,6 +13,31 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Current construction/check process-death boundary
+
+Construction and check attempts use write-ahead admission. Before a started run
+record may become durable, the controller publishes an immutable attempt record
+containing the exact admitted session encoding and its transaction, node,
+dispatch, and request bindings. Terminal result evidence remains distinct.
+
+Restart therefore has two closed authorities for a durably started dispatch:
+
+```text
+terminal result evidence present  -> decode exact retained result
+terminal result evidence absent   -> decode exact retained attempt and replay
+```
+
+Missing both records fails closed. Replay does not consult the live session
+locator, collection, current configuration, or retained-installed-package
+lookup. An attempt record published before a failed started-run commit is merely
+unreferenced private evidence; reserved ownership is still released by the run
+journal rules.
+
+This closes process death before controller result evidence. Public construction
+artifact publication remains a separate crash boundary: no file discovered in
+an artifact directory is allowed to become historical success without retained
+controller result authority.
+
 ## Empty-target feedback qualification
 
 The synthetic rootfs campaign is not a new controller verb. It treats an empty

@@ -18,11 +18,29 @@ class transaction_run_evidence_store {
 public:
   virtual ~transaction_run_evidence_store() = default;
 
+  [[nodiscard]] virtual construction_dispatch_attempt_record
+  publish(const construction_dispatch_attempt_record& record) = 0;
+
+  [[nodiscard]] virtual check_dispatch_attempt_record
+  publish(const check_dispatch_attempt_record& record) = 0;
+
   [[nodiscard]] virtual construction_dispatch_evidence_record
   publish(const construction_dispatch_evidence_record& record) = 0;
 
   [[nodiscard]] virtual check_dispatch_evidence_record
   publish(const check_dispatch_evidence_record& record) = 0;
+
+  [[nodiscard]] virtual std::optional<construction_dispatch_attempt_record>
+  load_construction_attempt(
+      const session_identity& journal,
+      const session_identity& dispatch,
+      const session_identity& attempt_session) const = 0;
+
+  [[nodiscard]] virtual std::optional<check_dispatch_attempt_record>
+  load_check_attempt(
+      const session_identity& journal,
+      const session_identity& dispatch,
+      const session_identity& attempt_session) const = 0;
 
   [[nodiscard]] virtual std::optional<construction_dispatch_evidence_record>
   load_construction(
@@ -61,10 +79,24 @@ public:
       posix_transaction_run_evidence_store&& other) noexcept;
   ~posix_transaction_run_evidence_store() override;
 
+  [[nodiscard]] construction_dispatch_attempt_record publish(
+      const construction_dispatch_attempt_record& record) override;
+  [[nodiscard]] check_dispatch_attempt_record publish(
+      const check_dispatch_attempt_record& record) override;
   [[nodiscard]] construction_dispatch_evidence_record publish(
       const construction_dispatch_evidence_record& record) override;
   [[nodiscard]] check_dispatch_evidence_record publish(
       const check_dispatch_evidence_record& record) override;
+
+  [[nodiscard]] std::optional<construction_dispatch_attempt_record>
+  load_construction_attempt(
+      const session_identity& journal,
+      const session_identity& dispatch,
+      const session_identity& attempt_session) const override;
+  [[nodiscard]] std::optional<check_dispatch_attempt_record> load_check_attempt(
+      const session_identity& journal,
+      const session_identity& dispatch,
+      const session_identity& attempt_session) const override;
 
   [[nodiscard]] std::optional<construction_dispatch_evidence_record>
   load_construction(

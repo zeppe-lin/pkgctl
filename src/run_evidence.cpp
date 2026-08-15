@@ -51,10 +51,11 @@ std::string encoding_digest(const std::vector<std::uint8_t>& encoding)
   return result;
 }
 
-const transaction_dispatch_record& require_started_dispatch(
+const transaction_dispatch_record& require_dispatch_state(
     const transaction_run_journal_record& record,
     const transaction_dispatch& dispatch,
-    transaction_unit_kind expected_kind)
+    transaction_unit_kind expected_kind,
+    transaction_dispatch_state expected_state)
 {
   const auto found = std::find_if(
       record.dispatches().begin(), record.dispatches().end(),
@@ -66,14 +67,61 @@ const transaction_dispatch_record& require_started_dispatch(
   {
     invalid_record("durable run record does not retain the selected dispatch");
   }
-  if (found->state() != transaction_dispatch_state::started ||
-      !found->attempt_session())
-  {
-    invalid_record("transaction-run evidence requires a started dispatch");
-  }
+  if (found->state() != expected_state)
+    invalid_record("transaction-run evidence sees the wrong dispatch state");
   if (dispatch.unit().kind() != expected_kind)
     invalid_record("transaction-run evidence names the wrong dispatch kind");
   return *found;
+}
+
+const transaction_dispatch_record& require_started_dispatch(
+    const transaction_run_journal_record& record,
+    const transaction_dispatch& dispatch,
+    transaction_unit_kind expected_kind)
+{
+  const auto& retained = require_dispatch_state(
+      record, dispatch, expected_kind, transaction_dispatch_state::started);
+  if (!retained.attempt_session())
+    invalid_record("transaction-run evidence requires a started attempt");
+  return retained;
+}
+
+session_identity construction_attempt_identity(
+    const session_identity& journal,
+    const session_identity& transaction,
+    const session_identity& dispatch,
+    const pkgtransaction::transaction_node_identity& node,
+    const session_identity& attempt_session,
+    const session_identity& controller_request,
+    const construction_session_encoding& session_encoding)
+{
+  return make_session_identity(
+      "pkgctl/construction-dispatch-attempt/1",
+      {
+          journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
+          attempt_session.hex(), controller_request.hex(),
+          encoding_digest(session_encoding),
+      });
+}
+
+session_identity check_attempt_identity(
+    const session_identity& journal,
+    const session_identity& transaction,
+    const session_identity& dispatch,
+    const pkgtransaction::transaction_node_identity& node,
+    const session_identity& attempt_session,
+    const session_identity& controller_request,
+    const session_identity& construction,
+    const pkgcheck::check_request_identity& check_request,
+    const check_session_encoding& session_encoding)
+{
+  return make_session_identity(
+      "pkgctl/check-dispatch-attempt/1",
+      {
+          journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
+          attempt_session.hex(), controller_request.hex(), construction.hex(),
+          check_request.hex(), encoding_digest(session_encoding),
+      });
 }
 
 session_identity construction_record_identity(
@@ -159,6 +207,147 @@ int transaction_run_evidence_error::system_error() const noexcept
 {
   return system_error_;
 }
+
+construction_dispatch_attempt_record::construction_dispatch_attempt_record(
+    session_identity identity,
+    session_identity journal,
+    session_identity transaction,
+    session_identity dispatch,
+    pkgtransaction::transaction_node_identity node,
+    session_identity attempt_session,
+    session_identity controller_request,
+    construction_session_encoding session_encoding)
+    : identity_(std::move(identity)), journal_(std::move(journal)),
+      transaction_(std::move(transaction)), dispatch_(std::move(dispatch)),
+      node_(std::move(node)), attempt_session_(std::move(attempt_session)),
+      controller_request_(std::move(controller_request)),
+      session_encoding_(std::move(session_encoding))
+{
+}
+
+construction_dispatch_attempt_record
+construction_dispatch_attempt_record::admit(
+    const transaction_run_journal_record& reserved_record,
+    const transaction_dispatch& dispatch,
+    const construction_session& session)
+{
+  (void)require_dispatch_state(
+      reserved_record, dispatch, transaction_unit_kind::construction,
+      transaction_dispatch_state::reserved);
+  const auto& request = session.request();
+  if (reserved_record.transaction() != request.transaction().identity() ||
+      dispatch.unit().primary_node() != request.build_node())
+  {
+    invalid_record("construction attempt belongs to another transaction node");
+  }
+  auto encoding = encode_construction_session(session);
+  auto identity = construction_attempt_identity(
+      reserved_record.journal(), reserved_record.transaction(),
+      dispatch.identity(), dispatch.unit().primary_node(), session.identity(),
+      request.identity(), encoding);
+  return construction_dispatch_attempt_record(
+      std::move(identity), reserved_record.journal(),
+      reserved_record.transaction(), dispatch.identity(),
+      dispatch.unit().primary_node(), session.identity(), request.identity(),
+      std::move(encoding));
+}
+
+std::uint16_t construction_dispatch_attempt_record::schema_version() const noexcept
+{ return schema_version_; }
+const session_identity& construction_dispatch_attempt_record::identity() const noexcept
+{ return identity_; }
+const session_identity& construction_dispatch_attempt_record::journal() const noexcept
+{ return journal_; }
+const session_identity& construction_dispatch_attempt_record::transaction() const noexcept
+{ return transaction_; }
+const session_identity& construction_dispatch_attempt_record::dispatch() const noexcept
+{ return dispatch_; }
+const pkgtransaction::transaction_node_identity&
+construction_dispatch_attempt_record::node() const noexcept
+{ return node_; }
+const session_identity&
+construction_dispatch_attempt_record::attempt_session() const noexcept
+{ return attempt_session_; }
+const session_identity&
+construction_dispatch_attempt_record::controller_request() const noexcept
+{ return controller_request_; }
+const construction_session_encoding&
+construction_dispatch_attempt_record::session_encoding() const noexcept
+{ return session_encoding_; }
+
+check_dispatch_attempt_record::check_dispatch_attempt_record(
+    session_identity identity,
+    session_identity journal,
+    session_identity transaction,
+    session_identity dispatch,
+    pkgtransaction::transaction_node_identity node,
+    session_identity attempt_session,
+    session_identity controller_request,
+    session_identity construction,
+    pkgcheck::check_request_identity check_request,
+    check_session_encoding session_encoding)
+    : identity_(std::move(identity)), journal_(std::move(journal)),
+      transaction_(std::move(transaction)), dispatch_(std::move(dispatch)),
+      node_(std::move(node)), attempt_session_(std::move(attempt_session)),
+      controller_request_(std::move(controller_request)),
+      construction_(std::move(construction)),
+      check_request_(std::move(check_request)),
+      session_encoding_(std::move(session_encoding))
+{
+}
+
+check_dispatch_attempt_record check_dispatch_attempt_record::admit(
+    const transaction_run_journal_record& reserved_record,
+    const transaction_dispatch& dispatch,
+    const transaction_check_session& session)
+{
+  (void)require_dispatch_state(
+      reserved_record, dispatch, transaction_unit_kind::check,
+      transaction_dispatch_state::reserved);
+  const auto& request = session.request();
+  if (reserved_record.transaction() != request.transaction().identity() ||
+      dispatch.unit().primary_node() != request.check_node())
+  {
+    invalid_record("check attempt belongs to another transaction node");
+  }
+  auto encoding = encode_check_session(session);
+  auto identity = check_attempt_identity(
+      reserved_record.journal(), reserved_record.transaction(),
+      dispatch.identity(), dispatch.unit().primary_node(), session.identity(),
+      request.identity(), request.construction().identity(),
+      request.check().identity(), encoding);
+  return check_dispatch_attempt_record(
+      std::move(identity), reserved_record.journal(),
+      reserved_record.transaction(), dispatch.identity(),
+      dispatch.unit().primary_node(), session.identity(), request.identity(),
+      request.construction().identity(), request.check().identity(),
+      std::move(encoding));
+}
+
+std::uint16_t check_dispatch_attempt_record::schema_version() const noexcept
+{ return schema_version_; }
+const session_identity& check_dispatch_attempt_record::identity() const noexcept
+{ return identity_; }
+const session_identity& check_dispatch_attempt_record::journal() const noexcept
+{ return journal_; }
+const session_identity& check_dispatch_attempt_record::transaction() const noexcept
+{ return transaction_; }
+const session_identity& check_dispatch_attempt_record::dispatch() const noexcept
+{ return dispatch_; }
+const pkgtransaction::transaction_node_identity&
+check_dispatch_attempt_record::node() const noexcept
+{ return node_; }
+const session_identity& check_dispatch_attempt_record::attempt_session() const noexcept
+{ return attempt_session_; }
+const session_identity& check_dispatch_attempt_record::controller_request() const noexcept
+{ return controller_request_; }
+const session_identity& check_dispatch_attempt_record::construction() const noexcept
+{ return construction_; }
+const pkgcheck::check_request_identity&
+check_dispatch_attempt_record::check_request() const noexcept
+{ return check_request_; }
+const check_session_encoding& check_dispatch_attempt_record::session_encoding() const noexcept
+{ return session_encoding_; }
 
 construction_dispatch_evidence_record::construction_dispatch_evidence_record(
     session_identity identity,

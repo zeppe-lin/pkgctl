@@ -17,6 +17,10 @@
 namespace pkgctl {
 namespace {
 
+constexpr std::array<std::uint8_t, 8> construction_attempt_magic{
+    'P', 'K', 'G', 'C', 'A', 'T', '0', '1'};
+constexpr std::array<std::uint8_t, 8> check_attempt_magic{
+    'P', 'K', 'G', 'K', 'A', 'T', '0', '1'};
 constexpr std::array<std::uint8_t, 8> construction_magic{
     'P', 'K', 'G', 'C', 'E', 'V', '0', '1'};
 constexpr std::array<std::uint8_t, 8> check_magic{
@@ -245,6 +249,40 @@ void read_magic(reader& input, const std::array<std::uint8_t, 8>& expected)
     unsupported("transaction-run evidence encoding version is unsupported");
 }
 
+session_identity construction_attempt_identity(
+    const session_identity& journal,
+    const session_identity& transaction,
+    const session_identity& dispatch,
+    const pkgtransaction::transaction_node_identity& node,
+    const session_identity& attempt_session,
+    const session_identity& controller_request,
+    const construction_session_encoding& session_encoding)
+{
+  return make_session_identity(
+      "pkgctl/construction-dispatch-attempt/1",
+      {journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
+       attempt_session.hex(), controller_request.hex(),
+       encoding_digest(session_encoding)});
+}
+
+session_identity check_attempt_identity(
+    const session_identity& journal,
+    const session_identity& transaction,
+    const session_identity& dispatch,
+    const pkgtransaction::transaction_node_identity& node,
+    const session_identity& attempt_session,
+    const session_identity& controller_request,
+    const session_identity& construction,
+    const pkgcheck::check_request_identity& check_request,
+    const check_session_encoding& session_encoding)
+{
+  return make_session_identity(
+      "pkgctl/check-dispatch-attempt/1",
+      {journal.hex(), transaction.hex(), dispatch.hex(), node.hex(),
+       attempt_session.hex(), controller_request.hex(), construction.hex(),
+       check_request.hex(), encoding_digest(session_encoding)});
+}
+
 session_identity construction_record_identity(
     const session_identity& journal,
     const session_identity& transaction,
@@ -306,6 +344,41 @@ session_identity check_record_identity(
 } // namespace
 
 struct detail_run_evidence_codec_access final {
+  static construction_dispatch_attempt_record construction_attempt(
+      session_identity identity,
+      session_identity journal,
+      session_identity transaction,
+      session_identity dispatch,
+      pkgtransaction::transaction_node_identity node,
+      session_identity attempt_session,
+      session_identity controller_request,
+      construction_session_encoding session_encoding)
+  {
+    return construction_dispatch_attempt_record(
+        std::move(identity), std::move(journal), std::move(transaction),
+        std::move(dispatch), std::move(node), std::move(attempt_session),
+        std::move(controller_request), std::move(session_encoding));
+  }
+
+  static check_dispatch_attempt_record check_attempt(
+      session_identity identity,
+      session_identity journal,
+      session_identity transaction,
+      session_identity dispatch,
+      pkgtransaction::transaction_node_identity node,
+      session_identity attempt_session,
+      session_identity controller_request,
+      session_identity construction,
+      pkgcheck::check_request_identity check_request,
+      check_session_encoding session_encoding)
+  {
+    return check_dispatch_attempt_record(
+        std::move(identity), std::move(journal), std::move(transaction),
+        std::move(dispatch), std::move(node), std::move(attempt_session),
+        std::move(controller_request), std::move(construction),
+        std::move(check_request), std::move(session_encoding));
+  }
+
   static construction_dispatch_evidence_record construction(
       session_identity identity,
       session_identity journal,
@@ -367,6 +440,135 @@ struct detail_run_evidence_codec_access final {
         std::move(execution), std::move(check), std::move(encoding));
   }
 };
+
+transaction_run_evidence_encoding encode_construction_dispatch_attempt(
+    const construction_dispatch_attempt_record& record)
+{
+  const auto expected = construction_attempt_identity(
+      record.journal(), record.transaction(), record.dispatch(), record.node(),
+      record.attempt_session(), record.controller_request(),
+      record.session_encoding());
+  if (record.schema_version() != transaction_run_evidence_schema_version ||
+      record.identity() != expected)
+  {
+    throw transaction_run_evidence_error(
+        transaction_run_evidence_error_code::invalid_record,
+        "construction attempt record identity is not canonical");
+  }
+
+  writer output;
+  output.raw(construction_attempt_magic);
+  output.u16(record.schema_version());
+  output.identity(record.identity().hex());
+  output.identity(record.journal().hex());
+  output.identity(record.transaction().hex());
+  output.identity(record.dispatch().hex());
+  output.identity(record.node().hex());
+  output.identity(record.attempt_session().hex());
+  output.identity(record.controller_request().hex());
+  output.bytes(record.session_encoding());
+  return output.finish();
+}
+
+construction_dispatch_attempt_record decode_construction_dispatch_attempt(
+    const transaction_run_evidence_encoding& encoding)
+{
+  validate_checksum(encoding);
+  const auto payload_size = encoding.size() - checksum_size;
+  reader input(encoding, payload_size);
+  read_magic(input, construction_attempt_magic);
+  auto retained_identity = session_identity::from_hex(input.identity());
+  auto journal = session_identity::from_hex(input.identity());
+  auto transaction = session_identity::from_hex(input.identity());
+  auto dispatch = session_identity::from_hex(input.identity());
+  auto node = pkgtransaction::transaction_node_identity::from_sha256(
+      input.identity());
+  auto attempt = session_identity::from_hex(input.identity());
+  auto request = session_identity::from_hex(input.identity());
+  auto session_encoding = input.bytes(maximum_construction_session_encoding_size);
+  input.finish();
+
+  const auto expected = construction_attempt_identity(
+      journal, transaction, dispatch, node, attempt, request, session_encoding);
+  if (retained_identity != expected)
+    corrupt("construction attempt record identity mismatch");
+
+  auto record = detail_run_evidence_codec_access::construction_attempt(
+      std::move(retained_identity), std::move(journal),
+      std::move(transaction), std::move(dispatch), std::move(node),
+      std::move(attempt), std::move(request), std::move(session_encoding));
+  if (encode_construction_dispatch_attempt(record) != encoding)
+    corrupt("construction attempt encoding is not canonical");
+  return record;
+}
+
+transaction_run_evidence_encoding encode_check_dispatch_attempt(
+    const check_dispatch_attempt_record& record)
+{
+  const auto expected = check_attempt_identity(
+      record.journal(), record.transaction(), record.dispatch(), record.node(),
+      record.attempt_session(), record.controller_request(),
+      record.construction(), record.check_request(), record.session_encoding());
+  if (record.schema_version() != transaction_run_evidence_schema_version ||
+      record.identity() != expected)
+  {
+    throw transaction_run_evidence_error(
+        transaction_run_evidence_error_code::invalid_record,
+        "check attempt record identity is not canonical");
+  }
+
+  writer output;
+  output.raw(check_attempt_magic);
+  output.u16(record.schema_version());
+  output.identity(record.identity().hex());
+  output.identity(record.journal().hex());
+  output.identity(record.transaction().hex());
+  output.identity(record.dispatch().hex());
+  output.identity(record.node().hex());
+  output.identity(record.attempt_session().hex());
+  output.identity(record.controller_request().hex());
+  output.identity(record.construction().hex());
+  output.identity(record.check_request().hex());
+  output.bytes(record.session_encoding());
+  return output.finish();
+}
+
+check_dispatch_attempt_record decode_check_dispatch_attempt(
+    const transaction_run_evidence_encoding& encoding)
+{
+  validate_checksum(encoding);
+  const auto payload_size = encoding.size() - checksum_size;
+  reader input(encoding, payload_size);
+  read_magic(input, check_attempt_magic);
+  auto retained_identity = session_identity::from_hex(input.identity());
+  auto journal = session_identity::from_hex(input.identity());
+  auto transaction = session_identity::from_hex(input.identity());
+  auto dispatch = session_identity::from_hex(input.identity());
+  auto node = pkgtransaction::transaction_node_identity::from_sha256(
+      input.identity());
+  auto attempt = session_identity::from_hex(input.identity());
+  auto request = session_identity::from_hex(input.identity());
+  auto construction = session_identity::from_hex(input.identity());
+  auto check_request = pkgcheck::check_request_identity::from_sha256(
+      input.identity());
+  auto session_encoding = input.bytes(maximum_check_session_encoding_size);
+  input.finish();
+
+  const auto expected = check_attempt_identity(
+      journal, transaction, dispatch, node, attempt, request, construction,
+      check_request, session_encoding);
+  if (retained_identity != expected)
+    corrupt("check attempt record identity mismatch");
+
+  auto record = detail_run_evidence_codec_access::check_attempt(
+      std::move(retained_identity), std::move(journal),
+      std::move(transaction), std::move(dispatch), std::move(node),
+      std::move(attempt), std::move(request), std::move(construction),
+      std::move(check_request), std::move(session_encoding));
+  if (encode_check_dispatch_attempt(record) != encoding)
+    corrupt("check attempt encoding is not canonical");
+  return record;
+}
 
 transaction_run_evidence_encoding encode_construction_dispatch_evidence(
     const construction_dispatch_evidence_record& record)

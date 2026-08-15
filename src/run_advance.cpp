@@ -261,10 +261,22 @@ transaction_run_advance_result reconcile_active(
     }
     case transaction_dispatch_restart_disposition::recover_construction:
     {
+      if (const auto* session = handoff.construction_retry())
+      {
+        auto value = reexecute_started_construction_dispatch_durable(
+            handoff.checkpoint().record(), handoff.checkpoint().run(),
+            handoff.dispatch(), *session, require_construction_driver(drivers),
+            stores.evidence, stores.runs);
+        auto evidence = value.result;
+        return detail_transaction_run_advance_access::make(
+            std::move(value.run), std::move(value.record),
+            transaction_run_advance_disposition::reconciled_construction,
+            handoff.dispatch(), std::move(evidence));
+      }
       const auto* result = handoff.construction();
       if (result == nullptr)
         invalid_advancement(
-            "construction recovery handoff carries no recovered evidence");
+            "construction recovery handoff carries no replay or result authority");
       auto value = reconcile_construction_dispatch_durable(
           handoff.checkpoint(), handoff.dispatch(), *result, stores.runs);
       auto evidence = value.result;
@@ -275,10 +287,22 @@ transaction_run_advance_result reconcile_active(
     }
     case transaction_dispatch_restart_disposition::recover_check:
     {
+      if (const auto* session = handoff.check_retry())
+      {
+        auto value = reexecute_started_check_dispatch_durable(
+            handoff.checkpoint().record(), handoff.checkpoint().run(),
+            handoff.dispatch(), *session, require_check_driver(drivers),
+            stores.evidence, stores.runs);
+        auto evidence = value.result;
+        return detail_transaction_run_advance_access::make(
+            std::move(value.run), std::move(value.record),
+            transaction_run_advance_disposition::reconciled_check,
+            handoff.dispatch(), std::move(evidence));
+      }
       const auto* result = handoff.check();
       if (result == nullptr)
         invalid_advancement(
-            "check recovery handoff carries no recovered evidence");
+            "check recovery handoff carries no replay or result authority");
       auto value = reconcile_check_dispatch_durable(
           handoff.checkpoint(), handoff.dispatch(), *result, stores.runs);
       auto evidence = value.result;

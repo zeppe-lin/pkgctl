@@ -26,13 +26,15 @@ struct check_dispatch_recovery_context final {
   pkgexec::backend_capability_profile backend;
 };
 
-/*! \brief Caller-owned source of semantic bodies absent from durable evidence.
+/*! \brief Caller-owned source of context required by terminal result evidence.
  *
- * The durable evidence store retains canonical subordinate result bytes and the
- * identities of every body required to decode them.  It deliberately does not
- * reconstruct those bodies.  Implementations obtain the exact controller
- * session, source/check context, execution request, and backend profile from
- * their owning retained authorities.  Operation recovery remains delegated because its
+ * Terminal construction/check evidence retains canonical subordinate result
+ * bytes and the identities of every body required to decode them. It
+ * deliberately does not reconstruct those bodies. Implementations obtain the
+ * exact source/check context, execution request, and backend profile from their
+ * owning retained authorities. Attempt-only replay does not use this source;
+ * its exact controller session is decoded directly from the immutable attempt
+ * record. Operation recovery remains delegated because its
  * evidence belongs to the effect journal boundary rather than this store.
  */
 class transaction_dispatch_recovery_context_source {
@@ -115,14 +117,14 @@ private:
   transaction_operation_recovery_authority_source* operations_;
 };
 
-/*! \brief Recover exact semantic authorities from durable typed evidence.
+/*! \brief Recover exact result or replay authority from durable typed evidence.
  *
  * Construction and check records are selected by the exact durable journal,
- * dispatch, and attempt identities.  Caller-supplied context is validated
- * against every retained identity before subordinate decoding.  The resulting
- * controller authority is rebuilt canonically and must reproduce the retained
- * controller-result identity.  Missing evidence is never interpreted as work
- * that did not happen.
+ * dispatch, and attempt identities. Terminal result evidence is preferred and
+ * uses caller-supplied context validated against every retained identity. When
+ * terminal evidence is absent, the exact pre-start attempt record is decoded
+ * into replay authority without consulting that context source. Missing both
+ * forms fails closed and is never interpreted as work that did not happen.
  */
 class stored_transaction_dispatch_recovery_authority_source final
     : public transaction_dispatch_recovery_authority_source {
@@ -131,12 +133,12 @@ public:
       transaction_run_evidence_store& evidence,
       transaction_dispatch_recovery_context_source& context);
 
-  [[nodiscard]] construction_result construction(
+  [[nodiscard]] construction_dispatch_recovery_authority construction(
       const transaction_run_restart_checkpoint& checkpoint,
       const transaction_dispatch_restart_assessment& assessment,
       const transaction_dispatch& dispatch) override;
 
-  [[nodiscard]] transaction_check_result check(
+  [[nodiscard]] check_dispatch_recovery_authority check(
       const transaction_run_restart_checkpoint& checkpoint,
       const transaction_dispatch_restart_assessment& assessment,
       const transaction_dispatch& dispatch) override;

@@ -44,9 +44,37 @@ struct operation_dispatch_execution_checkpoint final {
   effectful_operation_result result;
 };
 
+/*! \brief Replay one durably started construction attempt.
+ *
+ * The supplied session must be the exact admitted attempt retained before the
+ * started run record was committed.  The started record is not appended again;
+ * successful replay publishes terminal evidence and commits only retirement.
+ */
+[[nodiscard]] construction_dispatch_execution_checkpoint
+reexecute_started_construction_dispatch_durable(
+    const transaction_run_journal_record& started_record,
+    transaction_run run,
+    const transaction_dispatch& dispatch,
+    construction_session session,
+    construction_driver& driver,
+    transaction_run_evidence_store& evidence_store,
+    transaction_run_journal_store& run_store);
+
+/*! \brief Replay one durably started check attempt. */
+[[nodiscard]] check_dispatch_execution_checkpoint
+reexecute_started_check_dispatch_durable(
+    const transaction_run_journal_record& started_record,
+    transaction_run run,
+    const transaction_dispatch& dispatch,
+    transaction_check_session session,
+    transaction_check_driver& driver,
+    transaction_run_evidence_store& evidence_store,
+    transaction_run_journal_store& run_store);
+
 /*! \brief Start, execute, and durably retire one construction dispatch.
  *
- * The started run successor is committed before the construction driver is
+ * The exact admitted attempt authority is published before the started run
+ * successor.  The started successor is committed before the construction driver is
  * invoked. Returned evidence is published before terminal retirement. An
  * execution or evidence-store failure leaves only the exact started dispatch;
  * a terminal-commit failure leaves that ownership plus loadable evidence.

@@ -2802,7 +2802,7 @@ private:
 class unreachable_effect_recovery_source final
     : public pkgctl::transaction_dispatch_recovery_authority_source {
 public:
-  pkgctl::construction_result construction(
+  pkgctl::construction_dispatch_recovery_authority construction(
       const pkgctl::transaction_run_restart_checkpoint&,
       const pkgctl::transaction_dispatch_restart_assessment&,
       const pkgctl::transaction_dispatch&) override
@@ -2810,7 +2810,7 @@ public:
     throw std::runtime_error("unexpected construction recovery request");
   }
 
-  pkgctl::transaction_check_result check(
+  pkgctl::check_dispatch_recovery_authority check(
       const pkgctl::transaction_run_restart_checkpoint&,
       const pkgctl::transaction_dispatch_restart_assessment&,
       const pkgctl::transaction_dispatch&) override
@@ -2908,7 +2908,7 @@ public:
   {
   }
 
-  pkgctl::construction_result construction(
+  pkgctl::construction_dispatch_recovery_authority construction(
       const pkgctl::transaction_run_restart_checkpoint&,
       const pkgctl::transaction_dispatch_restart_assessment&,
       const pkgctl::transaction_dispatch&) override
@@ -2916,7 +2916,7 @@ public:
     throw std::runtime_error("unexpected construction recovery authority request");
   }
 
-  pkgctl::transaction_check_result check(
+  pkgctl::check_dispatch_recovery_authority check(
       const pkgctl::transaction_run_restart_checkpoint&,
       const pkgctl::transaction_dispatch_restart_assessment&,
       const pkgctl::transaction_dispatch&) override

@@ -20,6 +20,21 @@ inline constexpr std::size_t maximum_transaction_run_evidence_encoding_size =
 using transaction_run_evidence_encoding = std::vector<std::uint8_t>;
 
 [[nodiscard]] transaction_run_evidence_encoding
+encode_construction_dispatch_attempt(
+    const construction_dispatch_attempt_record& record);
+
+[[nodiscard]] construction_dispatch_attempt_record
+decode_construction_dispatch_attempt(
+    const transaction_run_evidence_encoding& encoding);
+
+[[nodiscard]] transaction_run_evidence_encoding
+encode_check_dispatch_attempt(
+    const check_dispatch_attempt_record& record);
+
+[[nodiscard]] check_dispatch_attempt_record decode_check_dispatch_attempt(
+    const transaction_run_evidence_encoding& encoding);
+
+[[nodiscard]] transaction_run_evidence_encoding
 encode_construction_dispatch_evidence(
     const construction_dispatch_evidence_record& record);
 

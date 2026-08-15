@@ -25,10 +25,22 @@ using transaction_dispatch_execution_authority_body = std::variant<
     transaction_check_session,
     operation_dispatch_execution_authority>;
 
+/*! \brief Recoverable construction authority: replay or retained result. */
+using construction_dispatch_recovery_authority = std::variant<
+    construction_session,
+    construction_result>;
+
+/*! \brief Recoverable check authority: replay or retained result. */
+using check_dispatch_recovery_authority = std::variant<
+    transaction_check_session,
+    transaction_check_result>;
+
 /*! \brief Closed recovery authority for one restart-classified dispatch. */
 using transaction_dispatch_recovery_authority_body = std::variant<
     std::monostate,
+    construction_session,
     construction_result,
+    transaction_check_session,
     transaction_check_result,
     effect_restart_checkpoint>;
 
@@ -139,12 +151,12 @@ class transaction_dispatch_recovery_authority_source {
 public:
   virtual ~transaction_dispatch_recovery_authority_source() = default;
 
-  [[nodiscard]] virtual construction_result construction(
+  [[nodiscard]] virtual construction_dispatch_recovery_authority construction(
       const transaction_run_restart_checkpoint& checkpoint,
       const transaction_dispatch_restart_assessment& assessment,
       const transaction_dispatch& dispatch) = 0;
 
-  [[nodiscard]] virtual transaction_check_result check(
+  [[nodiscard]] virtual check_dispatch_recovery_authority check(
       const transaction_run_restart_checkpoint& checkpoint,
       const transaction_dispatch_restart_assessment& assessment,
       const transaction_dispatch& dispatch) = 0;
@@ -205,7 +217,9 @@ public:
   [[nodiscard]] const transaction_dispatch_recovery_authority_body&
   authority() const noexcept;
   [[nodiscard]] bool releases_reserved() const noexcept;
+  [[nodiscard]] const construction_session* construction_retry() const noexcept;
   [[nodiscard]] const construction_result* construction() const noexcept;
+  [[nodiscard]] const transaction_check_session* check_retry() const noexcept;
   [[nodiscard]] const transaction_check_result* check() const noexcept;
   [[nodiscard]] const effect_restart_checkpoint* operation() const noexcept;
   [[nodiscard]] const session_identity& identity() const noexcept;

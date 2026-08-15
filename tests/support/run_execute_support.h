@@ -72,10 +72,47 @@ public:
   explicit sequenced_evidence_store(
       std::vector<std::string>& trace,
       bool fail_construction = false,
-      bool fail_check = false)
+      bool fail_check = false,
+      bool fail_construction_attempt = false,
+      bool fail_check_attempt = false)
       : trace_(trace), fail_construction_(fail_construction),
-        fail_check_(fail_check)
+        fail_check_(fail_check),
+        fail_construction_attempt_(fail_construction_attempt),
+        fail_check_attempt_(fail_check_attempt)
   {
+  }
+
+  pkgctl::construction_dispatch_attempt_record publish(
+      const pkgctl::construction_dispatch_attempt_record& record) override
+  {
+    trace_.push_back("attempt-construction");
+    if (fail_construction_attempt_)
+      throw pkgctl::transaction_run_evidence_error(
+          pkgctl::transaction_run_evidence_error_code::store_write_failed,
+          "injected construction-attempt failure");
+    if (construction_attempt_ &&
+        construction_attempt_->identity() != record.identity())
+      throw pkgctl::transaction_run_evidence_error(
+          pkgctl::transaction_run_evidence_error_code::store_conflict,
+          "construction attempt conflicts");
+    construction_attempt_ = record;
+    return record;
+  }
+
+  pkgctl::check_dispatch_attempt_record publish(
+      const pkgctl::check_dispatch_attempt_record& record) override
+  {
+    trace_.push_back("attempt-check");
+    if (fail_check_attempt_)
+      throw pkgctl::transaction_run_evidence_error(
+          pkgctl::transaction_run_evidence_error_code::store_write_failed,
+          "injected check-attempt failure");
+    if (check_attempt_ && check_attempt_->identity() != record.identity())
+      throw pkgctl::transaction_run_evidence_error(
+          pkgctl::transaction_run_evidence_error_code::store_conflict,
+          "check attempt conflicts");
+    check_attempt_ = record;
+    return record;
   }
 
   pkgctl::construction_dispatch_evidence_record publish(
@@ -110,6 +147,31 @@ public:
     return record;
   }
 
+  std::optional<pkgctl::construction_dispatch_attempt_record>
+  load_construction_attempt(
+      const pkgctl::session_identity& journal,
+      const pkgctl::session_identity& dispatch,
+      const pkgctl::session_identity& attempt_session) const override
+  {
+    if (!construction_attempt_ || construction_attempt_->journal() != journal ||
+        construction_attempt_->dispatch() != dispatch ||
+        construction_attempt_->attempt_session() != attempt_session)
+      return std::nullopt;
+    return construction_attempt_;
+  }
+
+  std::optional<pkgctl::check_dispatch_attempt_record> load_check_attempt(
+      const pkgctl::session_identity& journal,
+      const pkgctl::session_identity& dispatch,
+      const pkgctl::session_identity& attempt_session) const override
+  {
+    if (!check_attempt_ || check_attempt_->journal() != journal ||
+        check_attempt_->dispatch() != dispatch ||
+        check_attempt_->attempt_session() != attempt_session)
+      return std::nullopt;
+    return check_attempt_;
+  }
+
   std::optional<pkgctl::construction_dispatch_evidence_record>
   load_construction(
       const pkgctl::session_identity& journal,
@@ -139,6 +201,11 @@ private:
   std::vector<std::string>& trace_;
   bool fail_construction_;
   bool fail_check_;
+  bool fail_construction_attempt_;
+  bool fail_check_attempt_;
+  std::optional<pkgctl::construction_dispatch_attempt_record>
+      construction_attempt_;
+  std::optional<pkgctl::check_dispatch_attempt_record> check_attempt_;
   std::optional<pkgctl::construction_dispatch_evidence_record> construction_;
   std::optional<pkgctl::check_dispatch_evidence_record> check_;
 };

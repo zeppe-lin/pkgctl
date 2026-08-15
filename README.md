@@ -75,12 +75,15 @@ target binding comes from retained state evidence. Both enter only through
 `--max-steps` bound.
 
 The command retains subordinate effect bodies in owner encodings before the
-controller journal may reference them. A started construction likewise retains
-the exact controller-owned admitted construction session plus owner-encoded
-fetch/build evidence before terminal retirement, and a started check retains its
-exact admitted controller session beside owner-encoded check evidence.
-Construction/check restart decodes those retained sessions under the exact
-retained transaction/progress/node authority; it does not reconsult current
+controller journal may reference them. Construction and check now follow the
+same write-ahead rule: the exact controller-owned admitted attempt session is
+immutable evidence before the `started` run successor can become durable.
+Terminal fetch/build or check evidence remains a separate later record. Restart
+prefers that terminal evidence; when process death leaves only durable started
+ownership, it decodes and replays the exact retained attempt session instead of
+reconsulting current construction/check configuration. Construction/check
+restart validates those retained sessions under the exact retained
+transaction/progress/node authority; it does not reconsult current
 construction/check configuration, the fresh session locator, or retained-installed-package lookup. A started operation likewise retains the complete admitted
 operation session before an effect journal may name it, together with the exact
 incoming-authority-to-artifact-path binding needed by application restart. Operation

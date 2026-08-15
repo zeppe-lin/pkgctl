@@ -143,7 +143,12 @@ session_identity recovery_identity(
       checkpoint.run().identity().hex(),
       dispatch.identity().hex(),
       disposition_field(assessment.disposition())};
-  if (const auto* value = std::get_if<construction_result>(&authority))
+  if (const auto* value = std::get_if<construction_session>(&authority))
+    fields.push_back(value->identity().hex());
+  else if (const auto* value = std::get_if<construction_result>(&authority))
+    fields.push_back(value->identity().hex());
+  else if (const auto* value =
+               std::get_if<transaction_check_session>(&authority))
     fields.push_back(value->identity().hex());
   else if (const auto* value =
                std::get_if<transaction_check_result>(&authority))
@@ -158,6 +163,21 @@ session_identity recovery_identity(
       "pkgctl.transaction-dispatch-recovery-authority.v1", fields);
 }
 
+void validate_construction_retry(
+    const transaction_dispatch_restart_assessment& assessment,
+    const construction_session& session)
+{
+  if (assessment.disposition() !=
+          transaction_dispatch_restart_disposition::recover_construction ||
+      assessment.state() != transaction_dispatch_state::started ||
+      !assessment.attempt_session() ||
+      *assessment.attempt_session() != session.identity())
+  {
+    invalid_authority(
+        "construction replay authority belongs to another started attempt");
+  }
+}
+
 void validate_construction_recovery(
     const transaction_dispatch_restart_assessment& assessment,
     const construction_result& result)
@@ -170,6 +190,21 @@ void validate_construction_recovery(
   {
     invalid_authority(
         "construction recovery authority belongs to another started attempt");
+  }
+}
+
+void validate_check_retry(
+    const transaction_dispatch_restart_assessment& assessment,
+    const transaction_check_session& session)
+{
+  if (assessment.disposition() !=
+          transaction_dispatch_restart_disposition::recover_check ||
+      assessment.state() != transaction_dispatch_state::started ||
+      !assessment.attempt_session() ||
+      *assessment.attempt_session() != session.identity())
+  {
+    invalid_authority(
+        "check replay authority belongs to another started attempt");
   }
 }
 
@@ -321,9 +356,15 @@ transaction_dispatch_recovery_handoff::authority() const noexcept
 { return authority_; }
 bool transaction_dispatch_recovery_handoff::releases_reserved() const noexcept
 { return std::holds_alternative<std::monostate>(authority_); }
+const construction_session*
+transaction_dispatch_recovery_handoff::construction_retry() const noexcept
+{ return std::get_if<construction_session>(&authority_); }
 const construction_result*
 transaction_dispatch_recovery_handoff::construction() const noexcept
 { return std::get_if<construction_result>(&authority_); }
+const transaction_check_session*
+transaction_dispatch_recovery_handoff::check_retry() const noexcept
+{ return std::get_if<transaction_check_session>(&authority_); }
 const transaction_check_result*
 transaction_dispatch_recovery_handoff::check() const noexcept
 { return std::get_if<transaction_check_result>(&authority_); }
@@ -410,13 +451,25 @@ acquire_transaction_dispatch_recovery_authority(
         return std::monostate{};
       case transaction_dispatch_restart_disposition::recover_construction:
       {
-        auto result = source.construction(checkpoint, assessment, dispatch);
+        auto recovered = source.construction(checkpoint, assessment, dispatch);
+        if (auto* session = std::get_if<construction_session>(&recovered))
+        {
+          validate_construction_retry(assessment, *session);
+          return std::move(*session);
+        }
+        auto result = std::get<construction_result>(std::move(recovered));
         validate_construction_recovery(assessment, result);
         return result;
       }
       case transaction_dispatch_restart_disposition::recover_check:
       {
-        auto result = source.check(checkpoint, assessment, dispatch);
+        auto recovered = source.check(checkpoint, assessment, dispatch);
+        if (auto* session = std::get_if<transaction_check_session>(&recovered))
+        {
+          validate_check_retry(assessment, *session);
+          return std::move(*session);
+        }
+        auto result = std::get<transaction_check_result>(std::move(recovered));
         validate_check_recovery(assessment, result);
         return result;
       }

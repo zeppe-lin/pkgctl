@@ -9,6 +9,95 @@
 #include <utility>
 
 namespace pkgctl {
+namespace {
+
+void validate_started_replay(
+    const transaction_run_journal_record& started_record,
+    const transaction_run& run,
+    const transaction_dispatch& dispatch,
+    const session_identity& session,
+    transaction_unit_kind kind)
+{
+  if (dispatch.unit().kind() != kind ||
+      started_record.run() != run.identity() ||
+      started_record.transaction() != run.progress().transaction().identity())
+  {
+    throw error(
+        error_code::invalid_dispatch,
+        "started replay authority names another durable run");
+  }
+  const auto reopened = started_record.reopen(run.progress());
+  if (reopened.identity() != run.identity())
+    throw error(
+        error_code::invalid_dispatch,
+        "started replay record does not reopen the supplied run");
+  const auto* retained = run.record(dispatch.identity());
+  if (retained == nullptr ||
+      retained->dispatch().identity() != dispatch.identity() ||
+      retained->state() != transaction_dispatch_state::started ||
+      !retained->attempt_session() || *retained->attempt_session() != session)
+  {
+    throw error(
+        error_code::invalid_dispatch,
+        "started replay session differs from durable attempt ownership");
+  }
+}
+
+} // namespace
+
+construction_dispatch_execution_checkpoint
+reexecute_started_construction_dispatch_durable(
+    const transaction_run_journal_record& started_record,
+    transaction_run run,
+    const transaction_dispatch& dispatch,
+    construction_session session,
+    construction_driver& driver,
+    transaction_run_evidence_store& evidence_store,
+    transaction_run_journal_store& run_store)
+{
+  validate_started_replay(
+      started_record, run, dispatch, session.identity(),
+      transaction_unit_kind::construction);
+  auto result = execute_construction(std::move(session), driver);
+  auto admitted_evidence = construction_dispatch_evidence_record::admit(
+      started_record, dispatch, result);
+  auto evidence = evidence_store.publish(admitted_evidence);
+  auto completed = complete_construction_dispatch(
+      std::move(run), dispatch, result);
+  auto completed_checkpoint = commit_transaction_run_successor(
+      started_record, std::move(completed), run_store);
+  return construction_dispatch_execution_checkpoint{
+      std::move(completed_checkpoint.run),
+      std::move(completed_checkpoint.record),
+      std::move(result),
+      std::move(evidence)};
+}
+
+check_dispatch_execution_checkpoint reexecute_started_check_dispatch_durable(
+    const transaction_run_journal_record& started_record,
+    transaction_run run,
+    const transaction_dispatch& dispatch,
+    transaction_check_session session,
+    transaction_check_driver& driver,
+    transaction_run_evidence_store& evidence_store,
+    transaction_run_journal_store& run_store)
+{
+  validate_started_replay(
+      started_record, run, dispatch, session.identity(),
+      transaction_unit_kind::check);
+  auto result = execute_transaction_check(std::move(session), driver);
+  auto admitted_evidence = check_dispatch_evidence_record::admit(
+      started_record, dispatch, result);
+  auto evidence = evidence_store.publish(admitted_evidence);
+  auto completed = complete_check_dispatch(std::move(run), dispatch, result);
+  auto completed_checkpoint = commit_transaction_run_successor(
+      started_record, std::move(completed), run_store);
+  return check_dispatch_execution_checkpoint{
+      std::move(completed_checkpoint.run),
+      std::move(completed_checkpoint.record),
+      std::move(result),
+      std::move(evidence)};
+}
 
 construction_dispatch_execution_checkpoint
 execute_construction_dispatch_durable(
@@ -20,6 +109,9 @@ execute_construction_dispatch_durable(
     transaction_run_evidence_store& evidence_store,
     transaction_run_journal_store& run_store)
 {
+  auto attempt = construction_dispatch_attempt_record::admit(
+      current_record, dispatch, session);
+  (void)evidence_store.publish(attempt);
   auto started = start_construction_dispatch(
       std::move(run), dispatch, session);
   auto started_checkpoint = commit_transaction_run_successor(
@@ -51,6 +143,9 @@ execute_check_dispatch_durable(
     transaction_run_evidence_store& evidence_store,
     transaction_run_journal_store& run_store)
 {
+  auto attempt = check_dispatch_attempt_record::admit(
+      current_record, dispatch, session);
+  (void)evidence_store.publish(attempt);
   auto started = start_check_dispatch(
       std::move(run), dispatch, session);
   auto started_checkpoint = commit_transaction_run_successor(

@@ -66,6 +66,102 @@ void validate_evidence_binding(
   }
 }
 
+template<typename Attempt>
+void validate_attempt_binding(
+    const transaction_run_restart_checkpoint& checkpoint,
+    const transaction_dispatch_restart_assessment& assessment,
+    const transaction_dispatch& dispatch,
+    const Attempt& attempt)
+{
+  if (attempt.journal() != checkpoint.record().journal() ||
+      attempt.transaction() != checkpoint.record().transaction() ||
+      attempt.dispatch() != dispatch.identity() ||
+      attempt.node() != dispatch.unit().primary_node() ||
+      attempt.attempt_session() != require_attempt(assessment))
+  {
+    context_mismatch(
+        "stored dispatch attempt belongs to another durable attempt");
+  }
+}
+
+construction_session rehydrate_construction_attempt(
+    const transaction_run_restart_checkpoint& checkpoint,
+    const transaction_dispatch_restart_assessment& assessment,
+    const transaction_dispatch& dispatch,
+    const construction_dispatch_attempt_record& attempt)
+{
+  validate_attempt_binding(checkpoint, assessment, dispatch, attempt);
+  try
+  {
+    auto session = decode_construction_session(
+        attempt.session_encoding(), checkpoint.run().progress().transaction(),
+        dispatch.unit().primary_node());
+    if (session.identity() != attempt.attempt_session() ||
+        session.request().identity() != attempt.controller_request() ||
+        session.request().transaction().identity() != attempt.transaction() ||
+        session.request().build_node() != attempt.node())
+    {
+      context_mismatch(
+          "construction attempt authority differs from retained session");
+    }
+    return session;
+  }
+  catch (const transaction_run_evidence_error&)
+  {
+    throw;
+  }
+  catch (const construction_codec_error& problem)
+  {
+    if (problem.code() == construction_codec_error_code::authority_mismatch)
+      context_mismatch(problem.what());
+    decode_failed("construction attempt session", problem);
+  }
+  catch (const std::exception& problem)
+  {
+    decode_failed("construction attempt session", problem);
+  }
+}
+
+transaction_check_session rehydrate_check_attempt(
+    const transaction_run_restart_checkpoint& checkpoint,
+    const transaction_dispatch_restart_assessment& assessment,
+    const transaction_dispatch& dispatch,
+    const check_dispatch_attempt_record& attempt)
+{
+  validate_attempt_binding(checkpoint, assessment, dispatch, attempt);
+  try
+  {
+    auto request = transaction_check_request::make(
+        checkpoint.run().progress(), dispatch.unit().primary_node());
+    auto session = decode_check_session(
+        attempt.session_encoding(), std::move(request));
+    if (session.identity() != attempt.attempt_session() ||
+        session.request().identity() != attempt.controller_request() ||
+        session.request().transaction().identity() != attempt.transaction() ||
+        session.request().check_node() != attempt.node() ||
+        session.request().construction().identity() != attempt.construction() ||
+        session.request().check().identity() != attempt.check_request())
+    {
+      context_mismatch("check attempt authority differs from retained session");
+    }
+    return session;
+  }
+  catch (const transaction_run_evidence_error&)
+  {
+    throw;
+  }
+  catch (const check_codec_error& problem)
+  {
+    if (problem.code() == check_codec_error_code::authority_mismatch)
+      context_mismatch(problem.what());
+    decode_failed("check attempt session", problem);
+  }
+  catch (const std::exception& problem)
+  {
+    decode_failed("check attempt session", problem);
+  }
+}
+
 void validate_construction_context(
     const construction_dispatch_evidence_record& evidence,
     const construction_dispatch_recovery_context& context)
@@ -496,43 +592,54 @@ stored_transaction_dispatch_recovery_authority_source(
 {
 }
 
-construction_result
+construction_dispatch_recovery_authority
 stored_transaction_dispatch_recovery_authority_source::construction(
     const transaction_run_restart_checkpoint& checkpoint,
     const transaction_dispatch_restart_assessment& assessment,
     const transaction_dispatch& dispatch)
 {
   const auto& attempt = require_attempt(assessment);
-  auto evidence = evidence_.load_construction(
-      checkpoint.record().journal(), dispatch.identity(), attempt);
-  if (!evidence)
-    evidence_missing(
-        "started construction dispatch lacks durable execution evidence");
-  validate_evidence_binding(checkpoint, assessment, dispatch, *evidence);
+  if (auto evidence = evidence_.load_construction(
+          checkpoint.record().journal(), dispatch.identity(), attempt))
+  {
+    validate_evidence_binding(checkpoint, assessment, dispatch, *evidence);
+    auto context = context_.construction(
+        checkpoint, assessment, dispatch, *evidence);
+    return detail::rehydrate_construction_dispatch_evidence(
+        *evidence, std::move(context));
+  }
 
-  auto context = context_.construction(
-      checkpoint, assessment, dispatch, *evidence);
-  return detail::rehydrate_construction_dispatch_evidence(
-      *evidence, std::move(context));
+  auto admitted = evidence_.load_construction_attempt(
+      checkpoint.record().journal(), dispatch.identity(), attempt);
+  if (!admitted)
+    evidence_missing(
+        "started construction dispatch lacks durable attempt authority");
+  return rehydrate_construction_attempt(
+      checkpoint, assessment, dispatch, *admitted);
 }
 
-transaction_check_result
+check_dispatch_recovery_authority
 stored_transaction_dispatch_recovery_authority_source::check(
     const transaction_run_restart_checkpoint& checkpoint,
     const transaction_dispatch_restart_assessment& assessment,
     const transaction_dispatch& dispatch)
 {
   const auto& attempt = require_attempt(assessment);
-  auto evidence = evidence_.load_check(
-      checkpoint.record().journal(), dispatch.identity(), attempt);
-  if (!evidence)
-    evidence_missing("started check dispatch lacks durable execution evidence");
-  validate_evidence_binding(checkpoint, assessment, dispatch, *evidence);
+  if (auto evidence = evidence_.load_check(
+          checkpoint.record().journal(), dispatch.identity(), attempt))
+  {
+    validate_evidence_binding(checkpoint, assessment, dispatch, *evidence);
+    auto context = context_.check(
+        checkpoint, assessment, dispatch, *evidence);
+    return detail::rehydrate_check_dispatch_evidence(
+        *evidence, std::move(context));
+  }
 
-  auto context = context_.check(
-      checkpoint, assessment, dispatch, *evidence);
-  return detail::rehydrate_check_dispatch_evidence(
-      *evidence, std::move(context));
+  auto admitted = evidence_.load_check_attempt(
+      checkpoint.record().journal(), dispatch.identity(), attempt);
+  if (!admitted)
+    evidence_missing("started check dispatch lacks durable attempt authority");
+  return rehydrate_check_attempt(checkpoint, assessment, dispatch, *admitted);
 }
 
 effect_restart_checkpoint
