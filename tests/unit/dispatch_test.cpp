@@ -693,7 +693,7 @@ void check_check_inputs_gate_check_not_construction()
   CHECK(after_tool.ready_units().front().primary_node() ==
         tester_build);
   CHECK(after_tool.status(check_node(fixture.transaction).identity()) ==
-        pkgctl::transaction_node_status::blocked);
+        pkgctl::transaction_node_status::pending);
 
   auto tester_session = construction_session_for(
       fixture.transaction, fixture.temporary.path() / "tester-build",
