@@ -555,13 +555,14 @@ started session. Operation results that report lost lease or indeterminate
 publication remain ordered observations on an active dispatch; they cannot
 carry a resulting state snapshot.
 
-Before construction starts, every package input must match one exact
-*libpkgtransaction* requirement edge and exact selected or retained package
-truth. Build and artifact identities must reproduce successful predecessor
-construction evidence. Retained installed inputs must still be the same package
-in the current canonical state. *libpkgtransaction* Version 3.0.0 or later orders
-both build- and check-scoped package inputs before the construction that seals
-them.
+Before construction starts, every build-scoped package input must match one
+exact *libpkgtransaction* requirement edge and exact selected or retained
+package truth. Build and artifact identities must reproduce successful
+predecessor construction evidence. Retained installed inputs must still be the
+same package in the current canonical state. Check-scoped package-input edges
+target the independent check node and do not gate construction; check dispatch
+captures both the checked-package construction and exact check-input predecessor
+evidence.
 
 The only containment policy in this release stops new reservations and starting
 merely reserved work after terminal failure. Already-started independent work

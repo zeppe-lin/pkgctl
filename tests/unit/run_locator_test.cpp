@@ -194,7 +194,7 @@ void check_native_locator()
   test_support::write(collection / "tool" / "payload", payload);
 
   tool_source_options options;
-  // A build-scoped dependency must not enter the check resource set.
+  // A check-only dependency must not enter the construction resource set.
   options.with_build_dependency = false;
   options.check_dependencies = {"dep"};
   options.source_document =
@@ -246,20 +246,11 @@ void check_native_locator()
   CHECK(session.request().build_node() == dispatch.unit().primary_node());
   CHECK(session.paths().local_source_root == collection / "tool");
   CHECK(session.paths().content_store_root == runtime_root / "content");
-  CHECK(session.package_inputs().size() == 1U);
+  CHECK(session.package_inputs().empty());
   CHECK(installed_packages.calls() == 0U);
   CHECK(!fs::exists(session.paths().build.session_root));
   CHECK(!fs::exists(session.paths().build.package_output_root));
   CHECK(!fs::exists(session.paths().build.artifact_path));
-
-  const auto output_slot = pkgexec::resource_slot::singleton(
-      pkgexec::resource_role::package_output_root);
-  const auto dependency_output =
-      dependency_result.build().execution().request().resources()
-          .binding(output_slot).resource();
-  CHECK(session.package_inputs().front().resource == dependency_output);
-  CHECK(session.package_inputs().front().path ==
-        dependency_result.session().paths().build.package_output_root);
 
   auto started_run = pkgctl::start_construction_dispatch(
       reservation.run, dispatch, session);

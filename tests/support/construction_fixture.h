@@ -697,8 +697,10 @@ inline pkgctl::construction_session construction_session_with_inputs(
 
   std::vector<pkgbuild_exec::package_input_resource> resources;
   if (supply_inputs) {
-    resources.reserve(request.inputs().size());
-    for (const auto& input : request.inputs()) {
+    const auto build_inputs =
+        request.build().inputs().for_scope(pkgbuild::input_scope::build);
+    resources.reserve(build_inputs.size());
+    for (const auto& input : build_inputs) {
       const auto input_path = root / "inputs" / input.identity().hex();
       test_support::write(input_path / "payload", "dependency tree\n");
       if (::chmod(input_path.c_str(), 0555) != 0 ||

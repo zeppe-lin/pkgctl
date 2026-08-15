@@ -26,6 +26,12 @@
   check phase and installed check inputs are located from state-owned retained
   resources, so one package selected in both scopes cannot alias a construction
   resource.
+- Aligns transaction scheduling with that phase boundary: build-scoped
+  requirements gate construction, check-scoped requirements gate the independent
+  check node, and the checked package's own construction remains a separate
+  check predecessor. Qualification now rejects the obsolete model where a
+  check-only dependency delays construction or appears as a construction
+  resource.
 
 ## 0.38.0 - 2026-08-15
 

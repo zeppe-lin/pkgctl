@@ -655,23 +655,24 @@ void check_construction_binds_exact_predecessor_evidence()
 }
 
 
-void check_check_inputs_are_constructed_before_checked_package()
+void check_check_inputs_gate_check_not_construction()
 {
   check_input_fixture fixture;
-  CHECK(fixture.progress.ready_units().size() == 1U);
-  CHECK(fixture.progress.ready_units().front().primary_node() ==
-        build_node_for(fixture.transaction, "tester").identity());
-
-  auto tester_session = construction_session_for(
-      fixture.transaction, fixture.temporary.path() / "tester-build",
-      "tester");
-  auto tester = execute_build(
-      tester_session, fixture.payload, backend_mode::succeed);
-  auto after_tester = pkgctl::advance_construction(
-      fixture.progress, tester);
-  CHECK(after_tester.ready_units().size() == 1U);
-  CHECK(after_tester.ready_units().front().primary_node() ==
-        build_node_for(fixture.transaction, "tool").identity());
+  const auto tool_build =
+      build_node_for(fixture.transaction, "tool").identity();
+  const auto tester_build =
+      build_node_for(fixture.transaction, "tester").identity();
+  CHECK(fixture.progress.ready_units().size() == 2U);
+  CHECK(std::any_of(
+      fixture.progress.ready_units().begin(),
+      fixture.progress.ready_units().end(), [&](const auto& unit) {
+        return unit.primary_node() == tool_build;
+      }));
+  CHECK(std::any_of(
+      fixture.progress.ready_units().begin(),
+      fixture.progress.ready_units().end(), [&](const auto& unit) {
+        return unit.primary_node() == tester_build;
+      }));
 
   auto tool_session = construction_session_for(
       fixture.transaction, fixture.temporary.path() / "checked-build",
@@ -682,28 +683,55 @@ void check_check_inputs_are_constructed_before_checked_package()
   CHECK(tool_session.package_inputs().empty());
   const auto check_input = tool_session.request().inputs().front();
 
-  auto run = pkgctl::transaction_run::begin(
-      after_tester,
-      pkgctl::transaction_dispatch_policy::make(1U, 1U));
-  auto build_reservation = pkgctl::reserve_next(run, nonce(19U));
-  CHECK(build_reservation.dispatch.has_value());
-  CHECK(build_reservation.dispatch->dependencies().size() == 1U);
-  auto started_build = pkgctl::start_construction_dispatch(
-      build_reservation.run, *build_reservation.dispatch, tool_session);
   auto tool = execute_build(
       tool_session, fixture.payload, backend_mode::succeed);
-  auto after_tool = pkgctl::complete_construction_dispatch(
-      started_build, *build_reservation.dispatch, tool);
+  auto after_tool = pkgctl::advance_construction(
+      fixture.progress, tool);
+  CHECK(after_tool.ready_units().size() == 1U);
+  CHECK(after_tool.ready_units().front().kind() ==
+        pkgctl::transaction_unit_kind::construction);
+  CHECK(after_tool.ready_units().front().primary_node() ==
+        tester_build);
+  CHECK(after_tool.status(check_node(fixture.transaction).identity()) ==
+        pkgctl::transaction_node_status::blocked);
 
-  CHECK(after_tool.progress().ready_units().size() == 1U);
-  CHECK(after_tool.progress().ready_units().front().kind() ==
+  auto tester_session = construction_session_for(
+      fixture.transaction, fixture.temporary.path() / "tester-build",
+      "tester");
+  auto tester_run = pkgctl::transaction_run::begin(
+      after_tool,
+      pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto tester_reservation = pkgctl::reserve_next(tester_run, nonce(19U));
+  CHECK(tester_reservation.dispatch.has_value());
+  CHECK(tester_reservation.dispatch->unit().primary_node() ==
+        tester_build);
+  CHECK(tester_reservation.dispatch->dependencies().empty());
+  auto started_tester = pkgctl::start_construction_dispatch(
+      tester_reservation.run, *tester_reservation.dispatch, tester_session);
+  auto tester = execute_build(
+      tester_session, fixture.payload, backend_mode::succeed);
+  auto after_tester = pkgctl::complete_construction_dispatch(
+      started_tester, *tester_reservation.dispatch, tester);
+
+  CHECK(after_tester.progress().ready_units().size() == 1U);
+  CHECK(after_tester.progress().ready_units().front().kind() ==
         pkgctl::transaction_unit_kind::check);
   auto check_reservation = pkgctl::reserve_next(
-      after_tool, nonce(21U));
+      after_tester, nonce(21U));
   CHECK(check_reservation.dispatch.has_value());
-  CHECK(check_reservation.dispatch->dependencies().size() == 1U);
-  CHECK(check_reservation.dispatch->dependencies().front().evidence() ==
-        tool.identity());
+  CHECK(check_reservation.dispatch->dependencies().size() == 2U);
+  CHECK(std::any_of(
+      check_reservation.dispatch->dependencies().begin(),
+      check_reservation.dispatch->dependencies().end(),
+      [&](const auto& dependency) {
+        return dependency.evidence() == tool.identity();
+      }));
+  CHECK(std::any_of(
+      check_reservation.dispatch->dependencies().begin(),
+      check_reservation.dispatch->dependencies().end(),
+      [&](const auto& dependency) {
+        return dependency.evidence() == tester.identity();
+      }));
 
   auto request = pkgctl::transaction_check_request::make(
       check_reservation.run.progress(),
@@ -711,6 +739,10 @@ void check_check_inputs_are_constructed_before_checked_package()
   CHECK(request.check().inputs().inputs().size() == 1U);
   CHECK(request.check().inputs().inputs().front().identity() ==
         check_input.identity());
+  CHECK(request.constructed_inputs().size() == 1U);
+  CHECK(request.constructed_inputs().front().input == check_input.identity());
+  CHECK(request.constructed_inputs().front().construction.identity() ==
+        tester.identity());
   auto session = pkgctl::transaction_check_session::admit(
       std::move(request),
       check_resources(
@@ -890,7 +922,7 @@ int main()
     check_construction_completion_and_failure_containment();
     check_failure_stops_unstarted_reservations();
     check_construction_binds_exact_predecessor_evidence();
-    check_check_inputs_are_constructed_before_checked_package();
+    check_check_inputs_gate_check_not_construction();
     check_check_completion_and_cross_session_refusal();
     check_failed_check_stops_new_reservations();
     check_unrelated_progress_does_not_stale_check();

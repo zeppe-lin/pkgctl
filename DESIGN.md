@@ -1713,18 +1713,19 @@ back into unstarted work merely because the controller has not yet received
 terminal evidence. This prevents lost processes, lease loss, or publication
 uncertainty from being misreported as harmless cancellation.
 
-Starting a construction dispatch validates every exact package-input edge. A
-built input must reproduce the selected package release, source snapshot, build
-result, artifact, and retained predecessor construction evidence. A retained
-installed input must still name the same installed package in the current state
-and reproduce its source and build provenance. `libpkgtransaction >= 4.0.0`
-orders both build- and check-scoped package inputs before the construction that
-seals them.
+Starting a construction dispatch validates every exact build-scoped
+package-input edge. A built input must reproduce the selected package release,
+source snapshot, build result, artifact, and retained predecessor construction
+evidence. A retained installed input must still name the same installed package
+in the current state and reproduce its source and build provenance. Check-scoped
+package-input edges target the independent check node and therefore do not gate
+construction.
 
-Starting a check dispatch requires the exact construction result already
-retained by progression and captured by the dispatch dependency. Starting an
-operation requires the exact action, transaction, admitted effect session, and
-state epoch against which the operation was reserved.
+Starting a check dispatch requires the exact checked-package construction result
+and every exact check-input predecessor already retained by progression and
+captured by the dispatch dependencies. Starting an operation requires the exact
+action, transaction, admitted effect session, and state epoch against which the
+operation was reserved.
 
 ### Completion and uncertainty
 
