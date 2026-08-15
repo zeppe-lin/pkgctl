@@ -55,7 +55,7 @@ for required in \
   'current_execution_backend.get()' \
   'require_native_execution_credentials(' \
   'current interpreter differs from admitted run authority' \
-  'resume_native_execution_scopes(' \
+  'native_transaction_resume_execution_scopes(' \
   'admitted_execution_profiles.lifecycle' \
   'pkgexec::encode_backend_capability_profile(' \
   'pkgexec::decode_backend_capability_profile(' \

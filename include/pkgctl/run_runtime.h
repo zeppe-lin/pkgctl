@@ -160,6 +160,34 @@ private:
 [[nodiscard]] bool native_transaction_requires_target_operation_authority(
     const transaction_session& transaction) noexcept;
 
+/*! \brief Native process execution scopes required by one command. */
+struct native_transaction_execution_scope final {
+  bool construction = false;
+  bool check = false;
+  bool lifecycle = false;
+
+  [[nodiscard]] bool any() const noexcept;
+};
+
+/*! \brief Process execution scopes required by one fresh program. */
+[[nodiscard]] native_transaction_execution_scope
+native_transaction_execution_scopes(
+    const pkgtransaction::transaction_program& program);
+
+/*! \brief Process execution scopes still required by one retained run.
+ *
+ * The caller supplies already-selected evidence/effect directory authorities.
+ * This runtime boundary inspects durable construction/check result-or-attempt
+ * authority and effect restart state; the command frontend does not open or
+ * interpret transaction-run evidence storage itself.
+ */
+[[nodiscard]] native_transaction_execution_scope
+native_transaction_resume_execution_scopes(
+    const pkgtransaction::transaction_program& program,
+    const transaction_run_journal_record& record,
+    int evidence_store_directory_fd,
+    int effect_store_directory_fd);
+
 /*! \brief Complete fixed semantic/mechanical configuration for one transaction. */
 class native_transaction_run_runtime_configuration final {
 public:

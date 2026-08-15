@@ -38,6 +38,11 @@ for required in \
   'std::optional<std::filesystem::path> target_lock_store;' \
   'enum class native_transaction_run_runtime_error_code' \
   'native_transaction_requires_target_operation_authority(' \
+  'struct native_transaction_execution_scope final' \
+  'native_transaction_execution_scopes(' \
+  'native_transaction_resume_execution_scopes(' \
+  'evidence_store_directory_fd' \
+  'effect_store_directory_fd' \
   'class native_transaction_run_runtime_configuration final' \
   'const native_transaction_operation_configuration*' \
   'struct native_transaction_run_runtime_authorities final' \
@@ -227,5 +232,10 @@ if grep -R -n -E \
     'launch_transaction_run[[:space:]]*\(|drive_transaction_run[[:space:]]*\(' \
     "$srcdir/cli" >/dev/null 2>&1; then
   echo 'command frontend bypasses the native runtime root' >&2
+  exit 1
+fi
+if grep -F 'posix_transaction_run_evidence_store' "$srcdir/cli/run_command.cpp" \
+    >/dev/null 2>&1; then
+  echo 'command frontend opens transaction-run evidence storage directly' >&2
   exit 1
 fi

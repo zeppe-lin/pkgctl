@@ -5,6 +5,7 @@
 
 #include "run_recovery_detail.h"
 
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cstring>
@@ -314,6 +315,112 @@ private:
   native_transaction_operation_authority_source* operations_;
 };
 
+
+void include_native_execution_scope(
+    native_transaction_execution_scope& scopes,
+    pkgtransaction::transaction_action_kind action)
+{
+  switch (action)
+  {
+    case pkgtransaction::transaction_action_kind::build:
+      scopes.construction = true;
+      return;
+    case pkgtransaction::transaction_action_kind::check:
+      scopes.check = true;
+      return;
+    case pkgtransaction::transaction_action_kind::lifecycle:
+      scopes.lifecycle = true;
+      return;
+    case pkgtransaction::transaction_action_kind::install:
+    case pkgtransaction::transaction_action_kind::upgrade:
+    case pkgtransaction::transaction_action_kind::retain:
+    case pkgtransaction::transaction_action_kind::remove:
+      return;
+  }
+}
+
+[[nodiscard]] bool contains_node(
+    const std::vector<pkgtransaction::transaction_node_identity>& nodes,
+    const pkgtransaction::transaction_node_identity& needle)
+{
+  return std::find(nodes.begin(), nodes.end(), needle) != nodes.end();
+}
+
+void include_unit_nodes(
+    std::vector<pkgtransaction::transaction_node_identity>& result,
+    const ready_transaction_unit& unit)
+{
+  for (const auto& node : unit.members())
+  {
+    if (!contains_node(result, node))
+      result.push_back(node);
+  }
+}
+
+[[nodiscard]] bool effect_recovery_stops_run(
+    const effect_attempt_record& record)
+{
+  const auto assessment = assess_effect_restart(record);
+  if (!assessment.automatically_continuable())
+    return true;
+
+  if (assessment.disposition() == effect_restart_disposition::terminal)
+  {
+    return record.terminal_outcome() !=
+        std::optional<effectful_operation_outcome>(
+            effectful_operation_outcome::completed);
+  }
+
+  if (assessment.disposition() != effect_restart_disposition::seal_terminal)
+    return false;
+
+  switch (record.stage())
+  {
+    case effect_attempt_stage::before_lifecycle_terminal:
+      return !record.before().back().succeeded();
+    case effect_attempt_stage::application_terminal:
+      return record.application()->outcome() !=
+          pkgapply::application_attempt_outcome::completed;
+    case effect_attempt_stage::after_lifecycle_terminal:
+      return !record.after().back().succeeded();
+    case effect_attempt_stage::publication_terminal:
+      return record.publication()->outcome() !=
+          pkgstate::state_publication_outcome::published;
+    case effect_attempt_stage::admitted:
+    case effect_attempt_stage::before_lifecycle_intent:
+    case effect_attempt_stage::application_intent:
+    case effect_attempt_stage::after_lifecycle_intent:
+    case effect_attempt_stage::publication_intent:
+    case effect_attempt_stage::terminal:
+      break;
+  }
+  throw std::runtime_error(
+      "seal-terminal effect assessment has an invalid journal stage");
+}
+
+[[nodiscard]] bool effect_recovery_may_execute_lifecycle(
+    const effect_attempt_record& record)
+{
+  const auto disposition = assess_effect_restart(record).disposition();
+  switch (disposition)
+  {
+    case effect_restart_disposition::continue_before_lifecycle:
+    case effect_restart_disposition::start_application:
+    case effect_restart_disposition::resume_application:
+    case effect_restart_disposition::continue_after_application:
+    case effect_restart_disposition::continue_after_lifecycle:
+      return record.before().size() < record.before_total() ||
+          record.after().size() < record.after_total();
+    case effect_restart_disposition::start_publication:
+    case effect_restart_disposition::reconcile_publication:
+    case effect_restart_disposition::seal_terminal:
+    case effect_restart_disposition::terminal:
+    case effect_restart_disposition::external_resolution_required:
+      return false;
+  }
+  return false;
+}
+
 class transaction_run_runtime_engine final {
 public:
   transaction_run_runtime_engine(
@@ -418,6 +525,108 @@ private:
 };
 
 } // namespace
+
+bool native_transaction_execution_scope::any() const noexcept
+{
+  return construction || check || lifecycle;
+}
+
+native_transaction_execution_scope native_transaction_execution_scopes(
+    const pkgtransaction::transaction_program& program)
+{
+  native_transaction_execution_scope result;
+  for (const auto& node : program.nodes())
+    include_native_execution_scope(result, node.action());
+  return result;
+}
+
+native_transaction_execution_scope native_transaction_resume_execution_scopes(
+    const pkgtransaction::transaction_program& program,
+    const transaction_run_journal_record& record,
+    int evidence_store_directory_fd,
+    int effect_store_directory_fd)
+{
+  if (record.complete() || record.failed() || record.stopped())
+    return {};
+
+  auto evidence = posix_transaction_run_evidence_store::from_directory_fd(
+      evidence_store_directory_fd);
+  auto effects = posix_effect_journal_store::from_directory_fd(
+      effect_store_directory_fd);
+
+  native_transaction_execution_scope result;
+  std::vector<pkgtransaction::transaction_node_identity> owned;
+  for (const auto& retained : record.dispatches())
+  {
+    if (retained.state() != transaction_dispatch_state::completed &&
+        retained.state() != transaction_dispatch_state::started)
+    {
+      continue;
+    }
+
+    include_unit_nodes(owned, retained.dispatch().unit());
+    if (retained.state() != transaction_dispatch_state::started)
+      continue;
+
+    const auto& dispatch = retained.dispatch();
+    if (dispatch.unit().kind() == transaction_unit_kind::construction ||
+        dispatch.unit().kind() == transaction_unit_kind::check)
+    {
+      if (!retained.attempt_session())
+        continue;
+      const auto& attempt = *retained.attempt_session();
+      if (dispatch.unit().kind() == transaction_unit_kind::construction)
+      {
+        if (!evidence.load_construction(
+                record.journal(), dispatch.identity(), attempt) &&
+            evidence.load_construction_attempt(
+                record.journal(), dispatch.identity(), attempt))
+          result.construction = true;
+      }
+      else
+      {
+        if (!evidence.load_check(
+                record.journal(), dispatch.identity(), attempt) &&
+            evidence.load_check_attempt(
+                record.journal(), dispatch.identity(), attempt))
+          result.check = true;
+      }
+      continue;
+    }
+
+    if (!retained.observations().empty())
+      return {};
+
+    if (!retained.effect_attempt())
+    {
+      for (const auto& member : retained.dispatch().unit().members())
+      {
+        const auto* node = program.find(member);
+        if (node == nullptr)
+          throw std::runtime_error(
+              "retained operation dispatch names an unknown transaction node");
+        include_native_execution_scope(result, node->action());
+      }
+      continue;
+    }
+
+    const auto effect = effects.load_latest(*retained.effect_attempt());
+    if (!effect)
+      throw std::runtime_error(
+          "started operation dispatch lacks retained effect evidence");
+    if (effect_recovery_stops_run(*effect))
+      return {};
+    if (effect_recovery_may_execute_lifecycle(*effect))
+      result.lifecycle = true;
+  }
+
+  for (const auto& node : program.nodes())
+  {
+    if (!contains_node(owned, node.identity()))
+      include_native_execution_scope(result, node.action());
+  }
+  return result;
+}
 
 bool native_transaction_requires_target_operation_authority(
     const transaction_session& transaction) noexcept
