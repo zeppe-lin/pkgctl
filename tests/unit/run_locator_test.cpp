@@ -177,7 +177,7 @@ pkgctl::construction_result build_dependency(
           static_cast<std::uint64_t>(::getegid()),
           {},
       });
-  fixture_backend backend(backend_mode::succeed);
+  fixture_backend backend(backend_mode::succeed, true);
   pkgctl::native_construction_driver driver(backend);
   return pkgctl::execute_construction(std::move(session), driver);
 }
@@ -270,7 +270,10 @@ void check_native_locator()
   CHECK(recovered.paths().build.session_root ==
         session.paths().build.session_root);
 
-  fixture_backend build_backend(backend_mode::succeed);
+  // Deliberately make the two fixture package trees metadata-identical so
+  // this case proves role-scoped execution identities do not collapse when
+  // candidate and principal package-image authority is equal.
+  fixture_backend build_backend(backend_mode::succeed, true);
   pkgctl::native_construction_driver build_driver(build_backend);
   auto construction = pkgctl::execute_construction(session, build_driver);
   CHECK(construction.succeeded());

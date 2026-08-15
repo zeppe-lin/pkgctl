@@ -14,6 +14,7 @@
 
 #include <openssl/evp.h>
 
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -543,7 +544,12 @@ enum class backend_mode { succeed, fail };
 
 class fixture_backend final : public pkgexec::execution_backend {
 public:
-  explicit fixture_backend(backend_mode mode) : mode_(mode) {}
+  explicit fixture_backend(
+      backend_mode mode,
+      bool normalize_output_mtime = false)
+      : mode_(mode), normalize_output_mtime_(normalize_output_mtime)
+  {
+  }
 
   pkgexec::backend_capability_profile capabilities() const override
   { return construction_fixture::capabilities(); }
@@ -572,6 +578,24 @@ public:
     if (::chmod((output / "usr/bin/tool").c_str(), 0755) != 0)
       throw std::runtime_error("cannot chmod fixture payload");
 
+    if (normalize_output_mtime_) {
+      const auto epoch = request.environment().source_date_epoch();
+      if (!epoch)
+        throw std::runtime_error(
+            "deterministic fixture output requires SOURCE_DATE_EPOCH");
+      const timespec times[2] = {
+          {static_cast<time_t>(*epoch), 0},
+          {static_cast<time_t>(*epoch), 0},
+      };
+      for (const auto* relative : {"usr/bin/tool", "usr/bin", "usr"}) {
+        const auto path = output / relative;
+        if (::utimensat(
+                AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) != 0)
+          throw std::runtime_error(
+              "cannot normalize fixture output timestamp");
+      }
+    }
+
     return pkgexec::execution_result::succeeded(
         request, capabilities(), request.interpreter(),
         pkgexec::stream_capture::retained("fixture stdout\n"),
@@ -581,6 +605,7 @@ public:
 
 private:
   backend_mode mode_;
+  bool normalize_output_mtime_;
 };
 
 

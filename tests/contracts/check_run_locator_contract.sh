@@ -47,6 +47,8 @@ grep -q 'Release 0.31.0 native session/resource locator boundary'   "$root/DESIG
 grep -q 'Release 0.31.0 native locator qualification' "$root/TESTING.md"
 grep -q 'NATIVE CONSTRUCTION AND CHECK SESSION LOCATION'   "$root/man/pkgctl_orchestration.7.scd"
 
+grep -q 'fixture_backend backend(backend_mode::succeed, true)' "$test_source"
+grep -q 'fixture_backend build_backend(backend_mode::succeed, true)' "$test_source"
 grep -q 'dependency_result.build().image_authority()->image().image().identity() ==' "$test_source"
 grep -q 'inputs().front().resource !=' "$test_source"
 grep -q 'repeated_check.execution_session().package().tree ==' "$test_source"
