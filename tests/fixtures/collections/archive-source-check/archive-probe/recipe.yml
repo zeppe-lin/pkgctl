@@ -18,7 +18,7 @@ sources:
   - path: files/archive-probe.tar
     name: archive-probe.tar
     unpack: archive
-    sha256: fe950834e818090a0ad63e431bd0157215bc33a2e9e44ef8f8517292abf84ce9
+    sha256: 4fd7f5659897a904b772628cf3de2f03104cf284c45d305138c809639120d2e9
 
 build:
   language: posix-shell
@@ -26,10 +26,32 @@ build:
     set -eu
     [ -f "$PKG_SOURCE_ROOT/archive-probe.tar" ]
     [ ! -e "$PKG_SOURCE_ROOT/tree/source.txt" ]
+    [ -c /dev/null ]
+    printf 'discarded\n' >/dev/null
+    if IFS= read -r unexpected_stdin; then
+      exit 90
+    fi
+    [ "$TMPDIR" = /tmp ]
+    printf 'build-temporary\n' >"$TMPDIR/archive-build-temporary"
+    IFS= read -r build_temporary <"$TMPDIR/archive-build-temporary"
+    [ "$build_temporary" = build-temporary ]
+    printf 'build-home\n' >"$HOME/archive-build-home"
+    IFS= read -r build_home <"$HOME/archive-build-home"
+    [ "$build_home" = build-home ]
+    if printf 'mutation\n' >>"$PKG_SOURCE_ROOT/archive-probe.tar" 2>/dev/null; then
+      exit 91
+    fi
+    if printf 'mutation\n' >>"$PKG_BUILD_INPUT_ROOT/archive-dep/dep-token" 2>/dev/null; then
+      exit 92
+    fi
     IFS= read -r source <tree/source.txt
+    source_tool=$(tree/source-tool)
     IFS= read -r dependency <"$PKG_BUILD_INPUT_ROOT/archive-dep/dep-token"
+    executed_dependency=$("$PKG_BUILD_INPUT_ROOT/archive-dep/dep-tool")
     [ "$source" = archive-source ]
+    [ "$source_tool" = archive-source-tool ]
     [ "$dependency" = archive-dependency ]
+    [ "$executed_dependency" = "$dependency" ]
     printf '%s+%s\n' "$source" "$dependency" >"$PKG_DESTDIR/archive-result"
 
 check:
@@ -38,8 +60,34 @@ check:
     set -eu
     [ -f "$PKG_SOURCE_ROOT/archive-probe.tar" ]
     [ ! -e "$PKG_SOURCE_ROOT/tree/source.txt" ]
+    [ -c /dev/null ]
+    printf 'discarded\n' >/dev/null
+    if IFS= read -r unexpected_stdin; then
+      exit 96
+    fi
+    [ "$TMPDIR" = /tmp ]
+    [ "$HOME" = /tmp/home ]
+    printf 'check-temporary\n' >"$TMPDIR/archive-check-temporary"
+    IFS= read -r check_temporary <"$TMPDIR/archive-check-temporary"
+    [ "$check_temporary" = check-temporary ]
+    printf 'check-home\n' >"$HOME/archive-check-home"
+    IFS= read -r check_home <"$HOME/archive-check-home"
+    [ "$check_home" = check-home ]
+    if printf 'mutation\n' >>"$PKG_SOURCE_ROOT/archive-probe.tar" 2>/dev/null; then
+      exit 93
+    fi
+    if printf 'mutation\n' >>"$PKG_PACKAGE_ROOT/archive-result" 2>/dev/null; then
+      exit 94
+    fi
+    if printf 'mutation\n' >>/check/inputs/archive-dep/dep-token 2>/dev/null; then
+      exit 95
+    fi
     IFS= read -r payload <"$PKG_PACKAGE_ROOT/archive-result"
+    IFS= read -r dependency </check/inputs/archive-dep/dep-token
+    executed_dependency=$(/check/inputs/archive-dep/dep-tool)
     [ "$payload" = archive-source+archive-dependency ]
+    [ "$dependency" = archive-dependency ]
+    [ "$executed_dependency" = "$dependency" ]
     printf 'checked:%s\n' "$payload" >/tmp/archive-check-ran
 
 architectures:

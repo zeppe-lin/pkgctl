@@ -151,6 +151,22 @@ resource identities for source, checked package, and candidate inputs; equal
 package-image content must never collapse two disjoint check resources into one
 `pkgexec` materialization handle.
 
+The same vertical is also an execution-substrate assault rather than only a
+resource-presence test. Both construction and check must observe the private
+`/dev/null`, EOF/closed standard input policy, writable `TMPDIR` and `HOME`, and
+read-only source/package/input resources. An executable delivered through the
+constructed dependency must remain executable when consumed as a build input
+and again after independent package-tree realization as a check input.
+
+A companion authority-refusal campaign completes both constructions, destroys
+all construction-private trees, then separately corrupts either the retained
+raw source object or the retained selected-package archive before check resume.
+Check realization must fail closed at the corresponding source/package provider,
+the check program must not execute, and canonical package state must remain
+unchanged. This qualification exists specifically to prevent retained evidence
+from becoming permission to reconstruct usable bytes from stale or mutated
+private state.
+
 ## Release 0.36.0 construction-only authority qualification
 
 The native runtime unit campaign now seals a build-only transaction through the

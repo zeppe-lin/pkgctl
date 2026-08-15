@@ -1,0 +1,184 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 Alexandr Savca
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -eu
+
+pkgctl=$1
+state_fixture=$2
+state_inspect_fixture=$3
+runtime_root_fixture=$4
+fixture_collection=$5
+root_view_fixture=$6
+
+fail()
+{
+  printf 'pkgctl:cli-build-check-authority-refusal: %s\n' "$*" >&2
+  exit 1
+}
+
+dump_file()
+{
+  label=$1
+  file=$2
+  printf '%s\n' "--- $label ---" >&2
+  if [ -s "$file" ]; then cat "$file" >&2; else printf '%s\n' '<empty>' >&2; fi
+}
+
+run_scenario()
+{
+  scenario=$1
+  root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-check-authority-$scenario.XXXXXX")
+  collection=$root/collection
+  state=$root/state
+  runtime=$root/runtime
+  build=$root/build
+  artifacts=$root/artifacts
+  nonce=$(printf '%064d' "$2")
+  cp -R "$fixture_collection" "$collection"
+  binding=$("$state_fixture" "$state")
+  uid=$(id -u)
+  gid=$(id -g)
+  groups=$(id -G | tr ' ' '\n' | sort -nu)
+
+  mkdir "$runtime" "$build" "$artifacts"
+  for directory in \
+    command-evidence run evidence effects content construction-sessions \
+    package-outputs check-resources check-temporary; do
+    mkdir "$runtime/$directory"
+  done
+  "$root_view_fixture" "$build"
+  chmod_program=$(command -v chmod) || fail 'host chmod is unavailable'
+  interpreter=$("$runtime_root_fixture" "$build" /bin/sh "$chmod_program")
+
+  initial_state=$("$state_inspect_fixture" "$state")
+  set -- build archive-probe --check \
+    --canonical-store "$state" \
+    --collection "core=$collection" \
+    --build-architecture x86_64 \
+    --target-architecture x86_64 \
+    --start "$nonce" \
+    --runtime-root "$runtime" \
+    --build-root "$build" \
+    --artifact-root "$artifacts" \
+    --interpreter "$interpreter" \
+    --build-user-id "$uid" \
+    --build-group-id "$gid" \
+    --source-date-epoch 0 \
+    --max-steps 2
+  for group in $groups; do
+    [ "$group" = "$gid" ] || set -- "$@" --build-supplementary-group "$group"
+  done
+
+  set +e
+  # shellcheck disable=SC2086
+  "$pkgctl" "$@" $binding >"$root/run.out" 2>"$root/run.err"
+  status=$?
+  set -e
+  if [ "$status" -ne 0 ]; then
+    if grep -F 'native execution unavailable before transaction execution;' \
+        "$root/run.err" >/dev/null; then
+      dump_file 'native execution preflight' "$root/run.err"
+      rm -rf "$root"
+      return 77
+    fi
+    dump_file 'initial stdout' "$root/run.out"
+    dump_file 'initial stderr' "$root/run.err"
+    fail "$scenario initial construction returned status $status"
+  fi
+  grep -Fx 'complete no' "$root/run.out" >/dev/null || \
+    fail "$scenario did not stop before check"
+  grep -Fx 'artifacts 2' "$root/run.out" >/dev/null || \
+    fail "$scenario did not retain the two construction artifacts"
+
+  case $scenario in
+    source)
+      digest=4fd7f5659897a904b772628cf3de2f03104cf284c45d305138c809639120d2e9
+      authority=$runtime/content/sha256/fe/$digest
+      [ -f "$authority" ] || fail 'retained archive source authority is absent'
+      chmod u+w "$authority"
+      printf 'mutated-after-construction\n' >>"$authority"
+      chmod a-w "$authority"
+      expected='native check source realization failed:'
+      ;;
+    package)
+      probe_index=$(awk '
+        $1 ~ /^artifact\.[0-9]+\.package$/ && $2 == "archive-probe" {
+          split($1, fields, "."); print fields[2]; exit
+        }
+      ' "$root/run.out")
+      [ -n "$probe_index" ] || fail 'archive-probe artifact index is absent'
+      authority=$(awk -v key="artifact.$probe_index.path" \
+        '$1 == key { print $2; exit }' "$root/run.out")
+      [ -f "$authority" ] || fail 'retained archive-probe package authority is absent'
+      chmod u+w "$authority"
+      printf 'mutated-after-construction\n' >>"$authority"
+      chmod a-w "$authority"
+      expected='native check package realization failed:'
+      ;;
+    *)
+      fail "unknown authority-refusal scenario: $scenario"
+      ;;
+  esac
+
+  # Check must reconstruct from retained authority, not accidentally consume
+  # construction-private trees that already happened to contain usable bytes.
+  find "$runtime/construction-sessions" "$runtime/package-outputs" \
+    -type d -exec chmod u+w {} + 2>/dev/null || :
+  rm -rf "$runtime/construction-sessions" "$runtime/package-outputs"
+  mkdir "$runtime/construction-sessions" "$runtime/package-outputs"
+
+  set -- build \
+    --canonical-store "$state" \
+    --resume "$nonce" \
+    --runtime-root "$runtime" \
+    --build-root "$build" \
+    --artifact-root "$artifacts" \
+    --interpreter "$interpreter" \
+    --build-user-id "$uid" \
+    --build-group-id "$gid" \
+    --source-date-epoch 0 \
+    --max-steps 1
+  for group in $groups; do
+    [ "$group" = "$gid" ] || set -- "$@" --build-supplementary-group "$group"
+  done
+
+  set +e
+  "$pkgctl" "$@" >"$root/resume.out" 2>"$root/resume.err"
+  status=$?
+  set -e
+  [ "$status" -ne 0 ] || {
+    dump_file 'unexpected resume stdout' "$root/resume.out"
+    dump_file 'unexpected resume stderr' "$root/resume.err"
+    fail "$scenario mutated retained authority was admitted"
+  }
+  grep -F "$expected" "$root/resume.err" >/dev/null || {
+    dump_file 'resume stdout' "$root/resume.out"
+    dump_file 'resume stderr' "$root/resume.err"
+    fail "$scenario failed outside the expected realization boundary"
+  }
+
+  if find "$runtime/check-temporary" -type f -name archive-check-ran -print -quit | \
+      grep . >/dev/null; then
+    fail "$scenario check program executed after retained authority corruption"
+  fi
+  final_state=$("$state_inspect_fixture" "$state")
+  [ "$initial_state" = "$final_state" ] || \
+    fail "$scenario check authority failure changed canonical package state"
+
+  find "$root" -type d -exec chmod u+w {} + 2>/dev/null || :
+  rm -rf "$root"
+  return 0
+}
+
+set +e
+run_scenario source 31
+source_status=$?
+set -e
+if [ "$source_status" -eq 77 ]; then
+  if [ "${PKGCTL_REQUIRE_NATIVE_INTEGRATION:-0}" = 1 ]; then
+    fail 'release qualification requires native check authority refusal'
+  fi
+  exit 77
+fi
+[ "$source_status" -eq 0 ] || exit "$source_status"
+run_scenario package 32

@@ -16,7 +16,7 @@ for path in "$meson" "$test_source" "$recipe" "$archive"; do
   }
 done
 
-expected_archive=fe950834e818090a0ad63e431bd0157215bc33a2e9e44ef8f8517292abf84ce9
+expected_archive=4fd7f5659897a904b772628cf3de2f03104cf284c45d305138c809639120d2e9
 actual_archive=$(sha256sum "$archive" | awk '{print $1}')
 [ "$actual_archive" = "$expected_archive" ] || {
   echo "archive-source fixture digest changed: $actual_archive" >&2
@@ -24,6 +24,10 @@ actual_archive=$(sha256sum "$archive" | awk '{print $1}')
 }
 [ "$(tar -xOf "$archive" tree/source.txt)" = archive-source ] || {
   echo 'archive-source fixture payload changed' >&2
+  exit 1
+}
+[ "$(tar -xOf "$archive" tree/source-tool | tail -n 1)" = "printf '%s\\n' archive-source-tool" ] || {
+  echo 'archive-source executable fixture changed' >&2
   exit 1
 }
 
@@ -44,10 +48,11 @@ dependency_mentions=$(grep -F '    - package: archive-dep' "$recipe" | wc -l | t
 for required in \
   'name: archive-probe.tar' \
   'unpack: archive' \
-  'sha256: fe950834e818090a0ad63e431bd0157215bc33a2e9e44ef8f8517292abf84ce9' \
+  'sha256: 4fd7f5659897a904b772628cf3de2f03104cf284c45d305138c809639120d2e9' \
   '$PKG_SOURCE_ROOT/archive-probe.tar' \
   '! -e "$PKG_SOURCE_ROOT/tree/source.txt"' \
   'read -r source <tree/source.txt' \
+  'source_tool=$(tree/source-tool)' \
   '$PKG_DESTDIR/archive-result' \
   '$PKG_PACKAGE_ROOT/archive-result' \
   '/tmp/archive-check-ran'; do

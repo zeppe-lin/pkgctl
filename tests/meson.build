@@ -531,6 +531,30 @@ if not get_option('tests').disabled()
     suite: 'integration-privileged',
   )
 
+  cli_build_check_authority_refusal_test = find_program(
+    'integration/cli_build_check_authority_refusal_test.sh',
+  )
+  test(
+    'cli-build-check-authority-refusal',
+    cli_build_check_authority_refusal_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_runtime_root_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/archive-source-check',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: native_runtime_root_fixture,
+    suite: 'integration-privileged',
+  )
+
   cli_build_process_death_test = find_program(
     'integration/cli_build_process_death_test.sh',
   )
