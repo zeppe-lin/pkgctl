@@ -170,7 +170,7 @@ libpkgcheck_dep = dependency(
 )
 libpkgcheck_exec_dep = dependency(
   'libpkgcheck-exec',
-  version: ['>=0.6.0', '<1.0.0'],
+  version: ['>=0.7.0', '<1.0.0'],
   required: true,
   static: want_static,
 )

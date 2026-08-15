@@ -5,9 +5,10 @@
 - Renders structured native construction and check execution failures in the CLI,
   including execution classification and termination status even when the invoked
   program writes no diagnostic output.
-- Uses the common `PKG_SOURCE_ROOT` / `PKG_PACKAGE_ROOT` check recipe
-  environment from libpkgcheck-exec 0.6.0 and rejects resurrection of the retired
-  branded check-variable dialect.
+- Requires libpkgcheck-exec 0.7.0 so check dependencies are recipe-addressable
+  by canonical package name through `PKG_CHECK_INPUT_ROOT` / `PKG_CHECK_INPUTS`;
+  exact logical authority remains the sealed `build_input_identity`, and the
+  retired branded check-variable dialect remains rejected.
 - Adds privileged archive-source build/check qualification that distinguishes
   retained source objects from the archive-realized construction workspace and
   verifies the independent check view of the sealed package image.

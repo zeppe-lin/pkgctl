@@ -79,12 +79,14 @@ check:
     if printf 'mutation\n' >>"$PKG_PACKAGE_ROOT/archive-result" 2>/dev/null; then
       exit 94
     fi
-    if printf 'mutation\n' >>/check/inputs/archive-dep/dep-token 2>/dev/null; then
+    [ "$PKG_CHECK_INPUT_ROOT" = /check/inputs ]
+    [ "$PKG_CHECK_INPUTS" = archive-dep ]
+    if printf 'mutation\n' >>"$PKG_CHECK_INPUT_ROOT/archive-dep/dep-token" 2>/dev/null; then
       exit 95
     fi
     IFS= read -r payload <"$PKG_PACKAGE_ROOT/archive-result"
-    IFS= read -r dependency </check/inputs/archive-dep/dep-token
-    executed_dependency=$(/check/inputs/archive-dep/dep-tool)
+    IFS= read -r dependency <"$PKG_CHECK_INPUT_ROOT/archive-dep/dep-token"
+    executed_dependency=$("$PKG_CHECK_INPUT_ROOT/archive-dep/dep-tool")
     [ "$payload" = archive-source+archive-dependency ]
     [ "$dependency" = archive-dependency ]
     [ "$executed_dependency" = "$dependency" ]

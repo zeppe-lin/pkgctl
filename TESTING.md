@@ -308,6 +308,10 @@ The final command suite must prove:
 - native check execution resets the exact call-scoped temporary host resource
   and prepares `/tmp/home` before entering `libpkgcheck-exec`, while the
   caller-owned execution root view remains untouched;
+- archive-source check qualification consumes its candidate check dependency
+  through the package-name-addressable `PKG_CHECK_INPUT_ROOT` namespace after
+  construction-private resource trees are deleted; opaque build-input identities
+  are not a recipe pathname contract;
 - target observations are per-dispatch; the complete admitted operation session is
   retained before effect/run journals can name it, and an incoming operation also
   retains its exact construction-artifact path binding. Started or completed replay

@@ -60,7 +60,7 @@ require_dependency_range libpkgbuild-plan '>=1.1.0' '<2.0.0'
 require_dependency_range libpkgresolve '>=4.0.0' '<5.0.0'
 require_dependency_range libpkgtransaction '>=4.0.0' '<5.0.0'
 require_dependency_range libpkgcheck '>=0.3.0' '<1.0.0'
-require_dependency_range libpkgcheck-exec '>=0.6.0' '<1.0.0'
+require_dependency_range libpkgcheck-exec '>=0.7.0' '<1.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
 require_dependency_range libpkgexec '>=2.1.1' '<3.0.0'
 require_dependency_range libpkgapply '>=3.0.1' '<4.0.0'
@@ -181,7 +181,9 @@ awk '
 
 grep -F 'Renders structured native construction and check execution failures' \
   "$temporary.unreleased" >/dev/null
-grep -F 'common `PKG_SOURCE_ROOT` / `PKG_PACKAGE_ROOT` check recipe' \
+grep -F 'Requires libpkgcheck-exec 0.7.0 so check dependencies are recipe-addressable' \
+  "$temporary.unreleased" >/dev/null
+grep -F '`PKG_CHECK_INPUT_ROOT` / `PKG_CHECK_INPUTS`' \
   "$temporary.unreleased" >/dev/null
 grep -F 'archive-source build/check qualification' \
   "$temporary.unreleased" >/dev/null
