@@ -11,6 +11,8 @@ package:
 requirements:
   build:
     - package: archive-dep
+  check:
+    - package: archive-dep
 
 sources:
   - path: files/archive-probe.tar

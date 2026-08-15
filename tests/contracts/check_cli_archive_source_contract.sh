@@ -27,6 +27,20 @@ actual_archive=$(sha256sum "$archive" | awk '{print $1}')
   exit 1
 }
 
+grep -F '  build:' "$recipe" >/dev/null || {
+  echo 'archive-source recipe omits build-scoped dependency authority' >&2
+  exit 1
+}
+grep -F '  check:' "$recipe" >/dev/null || {
+  echo 'archive-source recipe omits check-scoped dependency authority' >&2
+  exit 1
+}
+dependency_mentions=$(grep -F '    - package: archive-dep' "$recipe" | wc -l | tr -d ' ')
+[ "$dependency_mentions" -eq 2 ] || {
+  echo "archive-source recipe must declare archive-dep once for build and once for check" >&2
+  exit 1
+}
+
 for required in \
   'name: archive-probe.tar' \
   'unpack: archive' \
