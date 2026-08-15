@@ -5,6 +5,7 @@ set -eu
 
 srcdir=${1:-.}
 version=0.38.0
+latest_release=0.38.0
 
 require_line()
 {
@@ -67,7 +68,9 @@ require_dependency_range libpkgexec-linux '>=0.6.2' '<1.0.0'
 
 grep -F '## 0.38.0 - 2026-08-15' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.37.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
-grep -F 'HISTORY.md` preserves tagged release facts only' \
+grep -F 'HISTORY.md` keeps one mutable `Unreleased` section' \
+  "$srcdir/MAINTAINING.md" >/dev/null
+grep -F '`Unreleased` does not predict the next version number or release class.' \
   "$srcdir/MAINTAINING.md" >/dev/null
 grep -F '## 0.36.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.35.1 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
@@ -87,7 +90,7 @@ grep -F 'Version 0.35.0 exposes *pkgctl run*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 temporary=${TMPDIR:-/tmp}/pkgctl-release-contract.$$
-trap 'rm -f "$temporary.current" "$temporary.deps" "$temporary.027"' EXIT HUP INT TERM
+trap 'rm -f "$temporary.current" "$temporary.deps" "$temporary.027" "$temporary.unreleased"' EXIT HUP INT TERM
 
 awk '
   /^## 0\.35\.0 / { current = 1; next }
@@ -161,4 +164,22 @@ if grep -F -x -- '- libpkgresolve >= 3.0.0, < 4.0.0' "$temporary.027" >/dev/null
 fi
 
 [ "$(sed -n 's/^## \([0-9][0-9.]*\) - .*/\1/p' \
-    "$srcdir/HISTORY.md" | head -n 1)" = "$version" ]
+    "$srcdir/HISTORY.md" | head -n 1)" = "$latest_release" ]
+
+[ "$(sed -n 's/^## \(.*\)$/\1/p' "$srcdir/HISTORY.md" | head -n 1)" = "Unreleased" ] || {
+  echo 'HISTORY.md must begin with an Unreleased section' >&2
+  exit 1
+}
+
+awk '
+  /^## Unreleased$/ { current = 1; next }
+  /^## / && current { exit }
+  current { print }
+' "$srcdir/HISTORY.md" > "$temporary.unreleased"
+
+grep -F 'Renders structured native construction and check execution failures' \
+  "$temporary.unreleased" >/dev/null
+grep -F 'common `PKG_SOURCE_ROOT` / `PKG_PACKAGE_ROOT` check recipe' \
+  "$temporary.unreleased" >/dev/null
+grep -F 'archive-source build/check qualification' \
+  "$temporary.unreleased" >/dev/null

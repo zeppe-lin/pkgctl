@@ -1,5 +1,17 @@
 # pkgctl history
 
+## Unreleased
+
+- Renders structured native construction and check execution failures in the CLI,
+  including execution classification and termination status even when the invoked
+  program writes no diagnostic output.
+- Uses the common `PKG_SOURCE_ROOT` / `PKG_PACKAGE_ROOT` check recipe
+  environment from libpkgcheck-exec 0.6.0 and rejects resurrection of the retired
+  branded check-variable dialect.
+- Adds privileged archive-source build/check qualification that distinguishes
+  retained source objects from the archive-realized construction workspace and
+  verifies the independent check view of the sealed package image.
+
 ## 0.38.0 - 2026-08-15
 
 - Makes durably started construction and check dispatches restartable after

@@ -230,9 +230,18 @@ Current-facing documentation is normative for the current controller boundary:
   later release replaced their mechanism;
 - `TESTING.md` states the current qualification contract;
 - installed manual pages describe only current observable behavior; and
-- `HISTORY.md` preserves tagged release facts only and may preserve superseded
-  behavior as historical record. Unreleased work must not be appended to or
-  retrofitted into the latest tagged release section.
+- `HISTORY.md` keeps one mutable `Unreleased` section for significant facts
+  already landed since the newest tag; dated/versioned sections preserve tagged
+  release facts and may preserve superseded behavior as historical record.
+  Unreleased work must never be appended to or retrofitted into the latest
+  tagged release section.
+
+`Unreleased` does not predict the next version number or release class. Whether
+the accumulated work becomes a patch, minor, or other release is decided when
+the release is cut. At that point move the landed facts under the chosen dated
+version heading and leave a new empty `Unreleased` section above it. Do not
+reconstruct release notes from memory or backfill current implementation facts
+into the previous release.
 
 A historical mechanism must not remain in a current testing requirement,
 maintenance rule, manual contract, or unqualified design statement. When an
