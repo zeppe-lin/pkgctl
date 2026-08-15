@@ -59,3 +59,14 @@ caller-named executable runtimes. Each executable brings only its program
 interpreter and `ldd`-reported shared-library closure. The fixture reports the
 canonical interpreter path used by `pkgctl`; it never copies an ambient command
 set or filesystem tree.
+
+`run_head_interrupt_fixture.cpp` kills a traced `pkgctl` only after a selected
+transaction-run journal head sequence has been synchronized. It is used to
+qualify process death after a durable construction/check `STARTED` record while
+no terminal execution evidence exists yet.
+
+`artifact_publication_interrupt_fixture.cpp` kills a traced `pkgctl` after a
+final public package archive exists without an unpublished temporary sibling.
+It qualifies the construction window where artifact publication has escaped the
+private executor but controller-owned terminal construction evidence has not yet
+been retained.

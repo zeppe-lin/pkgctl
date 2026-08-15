@@ -299,6 +299,16 @@ if not get_option('tests').disabled()
     'fixtures/lifecycle_intent_interrupt_probe.cpp',
   )
 
+  run_head_interrupt_fixture = executable(
+    'run-head-interrupt-fixture',
+    'fixtures/run_head_interrupt_fixture.cpp',
+  )
+
+  artifact_publication_interrupt_fixture = executable(
+    'artifact-publication-interrupt-fixture',
+    'fixtures/artifact_publication_interrupt_fixture.cpp',
+  )
+
   application_intent_interrupt_fixture_test = find_program(
     'integration/application_intent_interrupt_fixture_test.sh',
   )
@@ -489,6 +499,43 @@ if not get_option('tests').disabled()
     depends: native_runtime_root_fixture,
     suite: 'integration-privileged',
   )
+
+  cli_build_process_death_test = find_program(
+    'integration/cli_build_process_death_test.sh',
+  )
+  foreach process_death_mode : [
+    'construction-started',
+    'artifact-published',
+    'check-started',
+  ]
+    test(
+      'cli-build-process-death-' + process_death_mode,
+      cli_build_process_death_test,
+      args: [
+        process_death_mode,
+        pkgctl_exe,
+        state_fixture,
+        state_inspect_fixture,
+        native_runtime_root_fixture,
+        run_head_interrupt_fixture,
+        artifact_publication_interrupt_fixture,
+        join_paths(
+          meson.project_source_root(),
+          'tests/fixtures/collections/native-construction',
+        ),
+        join_paths(
+          meson.project_source_root(),
+          'tests/fixtures/native_root_view_fixture.sh',
+        ),
+      ],
+      depends: [
+        native_runtime_root_fixture,
+        run_head_interrupt_fixture,
+        artifact_publication_interrupt_fixture,
+      ],
+      suite: 'integration-privileged',
+    )
+  endforeach
 
   cli_run_rootfs_campaign_test = find_program(
     'integration/cli_run_rootfs_campaign_test.sh',
@@ -965,6 +1012,16 @@ if not get_option('tests').disabled()
   test(
     'cli-build-contract',
     cli_build_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_process_death_contract = find_program(
+    'contracts/check_cli_process_death_contract.sh',
+  )
+  test(
+    'cli-process-death-contract',
+    cli_process_death_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

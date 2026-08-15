@@ -156,6 +156,13 @@ done
   "$tmp/lifecycle-intent-interrupt-fixture" \
   "$tmp/lifecycle-intent-interrupt-probe"
 
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/run_head_interrupt_fixture.cpp" \
+  -o "$tmp/run-head-interrupt-fixture"
+"$cxx" -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  "$srcdir/tests/fixtures/artifact_publication_interrupt_fixture.cpp" \
+  -o "$tmp/artifact-publication-interrupt-fixture"
+
 "$srcdir/tests/integration/native_root_view_fixture_test.sh" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
@@ -196,6 +203,15 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
   "$tmp/native-runtime-root-fixture" \
   "$srcdir/tests/fixtures/collections/native-construction" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
+for mode in construction-started artifact-published check-started; do
+  "$srcdir/tests/integration/cli_build_process_death_test.sh" "$mode" \
+    "$tmp/pkgctl" "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+    "$tmp/native-runtime-root-fixture" "$tmp/run-head-interrupt-fixture" \
+    "$tmp/artifact-publication-interrupt-fixture" \
+    "$srcdir/tests/fixtures/collections/native-construction" \
+    "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+done
 
 "$srcdir/tests/integration/cli_run_rootfs_campaign_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
