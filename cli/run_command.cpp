@@ -3,6 +3,8 @@
 
 #include "run_command.h"
 
+#include "execution_report.h"
+
 #include <pkgctl/controller.h>
 #include <pkgctl/effect_restart.h>
 #include <pkgctl/effect_store.h>
@@ -2118,6 +2120,8 @@ void render_execution_failure(
   if (!diagnostic.empty())
     std::cerr << ": " << diagnostic;
   std::cerr << '\n';
+  render_execution_classification(
+      std::cerr, stage, execution.failure(), execution.termination());
   render_captured_stderr(stage, execution);
 }
 

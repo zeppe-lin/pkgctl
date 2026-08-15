@@ -3,7 +3,7 @@
 
 pkgctl_exe = executable(
   'pkgctl',
-  ['main.cpp', 'options.cpp', 'run_command.cpp'],
+  ['main.cpp', 'options.cpp', 'execution_report.cpp', 'run_command.cpp'],
   dependencies: [
     pkgctl_core_dep,
     libpkgsource_yaml_dep,

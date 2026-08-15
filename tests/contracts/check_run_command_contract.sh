@@ -6,6 +6,8 @@ set -eu
 srcdir=${1:-.}
 options="$srcdir/cli/options.cpp"
 command="$srcdir/cli/run_command.cpp"
+execution_report="$srcdir/cli/execution_report.cpp"
+execution_report_header="$srcdir/cli/execution_report.h"
 main="$srcdir/cli/main.cpp"
 meson="$srcdir/cli/meson.build"
 tests_meson="$srcdir/tests/meson.build"
@@ -24,7 +26,7 @@ lease_loss_integration="$srcdir/tests/integration/cli_run_lease_loss_test.sh"
 lifecycle_interrupt_fixture="$srcdir/tests/fixtures/lifecycle_intent_interrupt_fixture.cpp"
 interrupt_fixture="$srcdir/tests/fixtures/application_intent_interrupt_fixture.cpp"
 
-for file in "$options" "$command" "$main" "$meson" "$tests_meson" "$integration" \
+for file in "$options" "$command" "$execution_report" "$execution_report_header" "$main" "$meson" "$tests_meson" "$integration" \
             "$construction_only_integration" \
             "$readonly_integration" \
             "$removal_integration" "$restart_integration" "$publication_restart_integration" \
@@ -96,6 +98,19 @@ for required in \
   }
 done
 
+for required in \
+  'failure=' \
+  'termination=' \
+  'status=' \
+  'signal=' \
+  'pkgexec::to_string(*failure)' \
+  'pkgexec::to_string(termination->kind())'; do
+  grep -F -- "$required" "$execution_report" >/dev/null || {
+    echo "missing structured execution-failure presentation: $required" >&2
+    exit 1
+  }
+done
+
 for retired_private_format in \
   'PKGCTL-COMMAND-UNIVERSE-3' \
   'pkgctl/command-universe/3' \
@@ -150,7 +165,7 @@ if grep -n -E 'while[[:space:]]*\([^)]*(complete|failed|quiescent|steps)' \
   exit 1
 fi
 
-grep -F "['main.cpp', 'options.cpp', 'run_command.cpp']" "$meson" >/dev/null || {
+grep -F "['main.cpp', 'options.cpp', 'execution_report.cpp', 'run_command.cpp']" "$meson" >/dev/null || {
   echo 'bounded run command is not linked into the CLI' >&2
   exit 1
 }

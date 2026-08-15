@@ -23,6 +23,13 @@ if not get_option('tests').disabled()
   )
   test('preparation-policy', preparation_policy_test, suite: 'unit')
 
+  cli_execution_report_test = executable(
+    'cli-execution-report-test',
+    ['unit/cli_execution_report_test.cpp', '../cli/execution_report.cpp'],
+    dependencies: pkgctl_core_dep,
+  )
+  test('cli-execution-report', cli_execution_report_test, suite: 'unit')
+
   dispatch_test = executable(
     'dispatch-test',
     'unit/dispatch_test.cpp',
