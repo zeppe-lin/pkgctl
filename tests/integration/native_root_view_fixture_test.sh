@@ -22,8 +22,7 @@ for path in \
   build/source \
   build/work \
   build/package \
-  build/inputs/build \
-  build/inputs/check \
+  build/inputs \
   check/source \
   check/inputs \
   target \
@@ -33,10 +32,12 @@ done
 
 [ -z "$(find "$view/dev" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
   fail 'fixture populated backend-owned /dev authority'
-[ -z "$(find "$view/build/inputs/build" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
-  fail 'fixture invented a scenario-specific build input'
-[ -z "$(find "$view/build/inputs/check" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
-  fail 'fixture invented a scenario-specific build-time check input'
+[ -z "$(find "$view/build/inputs" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
+  fail 'fixture populated backend-owned build input namespace'
+[ ! -e "$view/build/inputs/build" ] ||
+  fail 'fixture retained obsolete build-scope namespace child'
+[ ! -e "$view/build/inputs/check" ] ||
+  fail 'fixture retained obsolete construction check-scope namespace child'
 [ -z "$(find "$view/check/inputs" -mindepth 1 -maxdepth 1 -print -quit)" ] ||
   fail 'fixture populated backend-owned check input namespace'
 [ ! -e "$view/check/package" ] ||

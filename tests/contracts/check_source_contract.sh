@@ -67,7 +67,7 @@ for constraint in \
   'libpkgfetch >= 3.0.0' 'libpkgfetch < 4.0.0' \
   'libpkgsource-exec >= 0.1.0' 'libpkgsource-exec < 1.0.0' \
   'libpkgbuild >= 3.0.1' 'libpkgbuild < 4.0.0' \
-  'libpkgbuild-exec >= 3.2.0' 'libpkgbuild-exec < 4.0.0' \
+  'libpkgbuild-exec >= 3.3.0' 'libpkgbuild-exec < 4.0.0' \
   'libpkgbuild-image >= 1.0.1' 'libpkgbuild-image < 2.0.0' \
   'libpkgimage-exec >= 0.1.0' 'libpkgimage-exec < 1.0.0' \
   'libpkgbuild-plan >= 1.1.0' 'libpkgbuild-plan < 2.0.0' \

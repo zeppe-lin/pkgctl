@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Requires libpkgbuild-exec 3.3.0 and supplies the normalized phase-local
+  construction input mountpoint `/build/inputs`. Build dependencies remain
+  recipe-addressable as `PKG_BUILD_INPUT_ROOT/<canonical-package-name>`; pkgctl
+  no longer provisions the retired `/build/inputs/build` or
+  `/build/inputs/check` scope children.
 - Renders structured native construction and check execution failures in the CLI,
   including execution classification and termination status even when the invoked
   program writes no diagnostic output.

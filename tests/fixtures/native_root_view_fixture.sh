@@ -23,15 +23,16 @@ esac
 # the supplied root view is caller-owned authority.  /dev is only a structural
 # mountpoint: the Linux backend replaces it with its private execution-only
 # device namespace.  Package-input leaves, including the checked package used
-# by check execution, are backend-owned children of the empty build/check input
-# namespaces and are therefore never part of caller root-view authority.
+# by check execution, are backend-owned children of the empty phase-local input
+# namespaces and are therefore never part of caller root-view authority. Build
+# inputs live directly beneath /build/inputs; there is no residual build/check
+# scope child inside the construction namespace.
 mkdir -p \
   "$root/dev" \
   "$root/build/source" \
   "$root/build/work" \
   "$root/build/package" \
-  "$root/build/inputs/build" \
-  "$root/build/inputs/check" \
+  "$root/build/inputs" \
   "$root/check/source" \
   "$root/check/inputs" \
   "$root/target" \
