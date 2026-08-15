@@ -104,7 +104,7 @@ for required in \
   '- package: runtime-lib' \
   '$PKG_BUILD_INPUT_ROOT/build-tool/build-tool-token' \
   '$PKG_DESTDIR/rootfs-probe-marker' \
-  '$ZEPPE_LIN_CHECK_ROOT/rootfs-probe-marker' \
+  '$PKG_PACKAGE_ROOT/rootfs-probe-marker' \
   '/tmp/rootfs-check-ran'; do
   grep -F -- "$required" "$rootfs_probe" >/dev/null || \
     fail "scope-separation probe omits: $required"

@@ -112,8 +112,8 @@ read-only package-input resource. The two results must agree before it combines
 them with its materialized source and emits `tool-token`. This proves declared
 package-input resources are executable according to admitted file mode rather
 than inheriting `noexec` from their host staging filesystem. The real check then
-reads its source through `ZEPPE_LIN_CHECK_SOURCE`, reads the constructed package
-through `ZEPPE_LIN_CHECK_ROOT`, and leaves one marker in its private temporary
+reads its source through `PKG_SOURCE_ROOT`, reads the constructed package
+through `PKG_PACKAGE_ROOT`, and leaves one marker in its private temporary
 resource only after both values match.
 
 One bounded start must complete in exactly three durable dispatches: dependency

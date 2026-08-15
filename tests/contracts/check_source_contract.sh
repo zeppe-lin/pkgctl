@@ -49,6 +49,13 @@ cli_modules=$(sed -n "s/^cli_modules='\(.*\)'$/\1/p" "$direct_build")
 }
 
 reviewed_core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
+
+if grep -R -n 'ZEPPE_LIN_CHECK_' \
+    "$srcdir/tests/fixtures" "$srcdir/tests/integration" "$srcdir/README.md" \
+    "$srcdir/DESIGN.md" "$srcdir/TESTING.md" "$srcdir/man" >/dev/null; then
+  echo 'current pkgctl sources retain branded check recipe variables' >&2
+  exit 1
+fi
 reviewed_cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
 for constraint in \
   'libpkgsource >= 4.1.0' 'libpkgsource < 5.0.0' \
@@ -71,7 +78,7 @@ for constraint in \
   'libpkgapply >= 3.0.1' 'libpkgapply < 4.0.0' \
   'libpkgapply-posix >= 3.2.1' 'libpkgapply-posix < 4.0.0' \
   'libpkgapply-exec >= 3.0.1' 'libpkgapply-exec < 4.0.0' \
-  'libpkgcheck-exec >= 0.5.0' 'libpkgcheck-exec < 1.0.0'; do
+  'libpkgcheck-exec >= 0.6.0' 'libpkgcheck-exec < 1.0.0'; do
   grep -F "'$constraint'" "$direct_build" >/dev/null || {
     echo "direct qualification omits adapter API constraint: $constraint" >&2
     exit 1

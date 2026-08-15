@@ -31,8 +31,8 @@ build:
 check:
   language: posix-shell
   script: |
-    IFS= read -r source <"$ZEPPE_LIN_CHECK_SOURCE/source.txt"
-    IFS= read -r payload <"$ZEPPE_LIN_CHECK_ROOT/rootfs-probe-marker"
+    IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
+    IFS= read -r payload <"$PKG_PACKAGE_ROOT/rootfs-probe-marker"
     [ "$source" = rootfs-probe-source ]
     [ "$payload" = rootfs-probe-source+build-tool-source ]
     printf 'checked:%s\n' "$payload" >/tmp/rootfs-check-ran

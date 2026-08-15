@@ -31,8 +31,8 @@ build:
 check:
   language: posix-shell
   script: |
-    IFS= read -r source <"$ZEPPE_LIN_CHECK_SOURCE/source.txt"
-    IFS= read -r payload <"$ZEPPE_LIN_CHECK_ROOT/tool-token"
+    IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
+    IFS= read -r payload <"$PKG_PACKAGE_ROOT/tool-token"
     [ "$source" = tool-source ]
     [ "$payload" = tool-source+dependency-source ]
     printf 'checked:%s\n' "$payload" > /tmp/check-ran

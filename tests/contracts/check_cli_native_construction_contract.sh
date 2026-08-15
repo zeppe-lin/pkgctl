@@ -76,8 +76,8 @@ for required in \
   'sha256: 42d26b2e82cf8ed42651ab63ec29927658d2e15f91c72d3ffd72a3755eb1f66f' \
   '$PKG_BUILD_INPUT_ROOT/dep/dep-token' \
   '$PKG_BUILD_INPUT_ROOT/dep/dep-tool' \
-  '$ZEPPE_LIN_CHECK_SOURCE/source.txt' \
-  '$ZEPPE_LIN_CHECK_ROOT/tool-token' \
+  '$PKG_SOURCE_ROOT/source.txt' \
+  '$PKG_PACKAGE_ROOT/tool-token' \
   '/tmp/check-ran'; do
   grep -F -- "$required" "$tool" >/dev/null || {
     echo "native dependent/check recipe omits: $required" >&2
