@@ -2621,6 +2621,8 @@ void check_single_step_transaction_advancement()
     auto started_run = pkgctl::start_construction_dispatch(
         reservation.run, *reservation.dispatch, session);
     auto started = reserved.successor(started_run);
+    fs::remove(session.paths().build.artifact_path);
+    CHECK(!fs::exists(session.paths().build.artifact_path));
     auto recovered_result =
         pkgctl::execute_construction_unpublished(session, native_driver);
     CHECK(!fs::exists(session.paths().build.artifact_path));
@@ -2660,6 +2662,8 @@ void check_single_step_transaction_advancement()
     auto started_run = pkgctl::start_construction_dispatch(
         reservation.run, *reservation.dispatch, session);
     auto started = reserved.successor(started_run);
+    fs::remove(session.paths().build.artifact_path);
+    CHECK(!fs::exists(session.paths().build.artifact_path));
 
     fixed_progress_source progress_source(started_run.progress());
     construction_execution_authority_source execution_source(session);
