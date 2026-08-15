@@ -65,19 +65,21 @@ require_dependency_range libpkgapply-posix '>=3.2.1' '<4.0.0'
 require_dependency_range libpkgapply-exec '>=3.0.1' '<4.0.0'
 require_dependency_range libpkgexec-linux '>=0.6.2' '<1.0.0'
 
-grep -F '## 0.37.0 - 2026-08-13' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F '## 0.36.0 - 2026-08-13' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F '## 0.35.1 - 2026-08-12' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F '## 0.35.0 - 2026-08-12' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F '## 0.37.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
+grep -F 'HISTORY.md` preserves tagged release facts only' \
+  "$srcdir/MAINTAINING.md" >/dev/null
+grep -F '## 0.36.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
+grep -F '## 0.35.1 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
+grep -F '## 0.35.0 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
 grep -F 'Release 0.37.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.36.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
 grep -F 'Version 0.37.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.36.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
-grep -F 'Bounded native transaction command' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F '`pkgctl run`' "$srcdir/CHANGELOG.md" >/dev/null
-grep -F 'Uses one current fail-closed private command-evidence proof format' "$srcdir/CHANGELOG.md" >/dev/null
+grep -F 'Bounded native transaction command' "$srcdir/HISTORY.md" >/dev/null
+grep -F '`pkgctl run`' "$srcdir/HISTORY.md" >/dev/null
+grep -F 'Uses one current fail-closed private command-evidence proof format' "$srcdir/HISTORY.md" >/dev/null
 grep -F 'Version 0.35.0 exposes *pkgctl run*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
@@ -88,7 +90,7 @@ awk '
   /^## 0\.35\.0 / { current = 1; next }
   /^## / && current { exit }
   current { print }
-' "$srcdir/CHANGELOG.md" > "$temporary.current"
+' "$srcdir/HISTORY.md" > "$temporary.current"
 awk '
   /^### Dependency contract$/ { dependencies = 1; next }
   /^### / && dependencies { exit }
@@ -140,7 +142,7 @@ awk '
   /^## 0\.27\.0 / { current = 1; next }
   /^## / && current { exit }
   current { print }
-' "$srcdir/CHANGELOG.md" > "$temporary.027"
+' "$srcdir/HISTORY.md" > "$temporary.027"
 grep -F -x -- '- libpkgresolve >= 2.0.0, < 3.0.0' "$temporary.027" >/dev/null || {
   echo '0.27 resolver dependency history was rewritten' >&2
   exit 1
@@ -156,4 +158,4 @@ if grep -F -x -- '- libpkgresolve >= 3.0.0, < 4.0.0' "$temporary.027" >/dev/null
 fi
 
 [ "$(sed -n 's/^## \([0-9][0-9.]*\) - .*/\1/p' \
-    "$srcdir/CHANGELOG.md" | head -n 1)" = "$version" ]
+    "$srcdir/HISTORY.md" | head -n 1)" = "$version" ]

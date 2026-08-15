@@ -5,7 +5,12 @@ set -eu
 
 srcdir=${1:-.}
 
-for document in CHANGELOG.md CONTRIBUTING.md DESIGN.md MAINTAINING.md README.md TESTING.md; do
+[ ! -e "$srcdir/CHANGELOG.md" ] || {
+  echo 'retired CHANGELOG.md remains beside tagged HISTORY.md' >&2
+  exit 1
+}
+
+for document in HISTORY.md CONTRIBUTING.md DESIGN.md MAINTAINING.md README.md TESTING.md; do
   file="$srcdir/$document"
   first=$(sed -n '1p' "$file")
   case $first in

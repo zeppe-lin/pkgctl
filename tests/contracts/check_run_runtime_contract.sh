@@ -149,7 +149,7 @@ for required_doc in \
   'NATIVE TARGET AND RUNTIME COMPOSITION' \
   'explicit durable run-intent nonce' \
   'live per-dispatch operation specifications'; do
-  grep -F -- "$required_doc" "$srcdir/CHANGELOG.md" "$readme" "$design" \
+  grep -F -- "$required_doc" "$srcdir/HISTORY.md" "$readme" "$design" \
       "$testing" "$manual" >/dev/null || {
     echo "missing native runtime documentation: $required_doc" >&2
     exit 1

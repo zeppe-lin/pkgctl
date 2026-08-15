@@ -104,7 +104,7 @@ for retired_private_format in \
   'schemas v1/v2'; do
   if grep -R -F -- "$retired_private_format" "$srcdir/cli" \
       "$srcdir/README.md" "$srcdir/DESIGN.md" "$srcdir/TESTING.md" \
-      "$srcdir/MAINTAINING.md" "$srcdir/CHANGELOG.md" "$srcdir/man" \
+      "$srcdir/MAINTAINING.md" "$srcdir/HISTORY.md" "$srcdir/man" \
       >/dev/null 2>&1; then
     echo "retired private command-evidence history remains: $retired_private_format" >&2
     exit 1

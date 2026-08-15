@@ -141,7 +141,7 @@ for required_doc in \
   'Caller-configured POSIX per-dispatch effect runtime' \
   'Release 0.24.0 native effect-runtime boundary' \
   'CALLER-CONFIGURED POSIX EFFECT RUNTIME'; do
-  grep -F -- "$required_doc" "$srcdir/CHANGELOG.md" "$design" "$manual" \
+  grep -F -- "$required_doc" "$srcdir/HISTORY.md" "$design" "$manual" \
       >/dev/null || {
     echo "missing native effect-runtime documentation: $required_doc" >&2
     exit 1

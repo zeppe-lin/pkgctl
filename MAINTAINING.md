@@ -230,7 +230,9 @@ Current-facing documentation is normative for the current controller boundary:
   later release replaced their mechanism;
 - `TESTING.md` states the current qualification contract;
 - installed manual pages describe only current observable behavior; and
-- `CHANGELOG.md` may preserve superseded behavior as release history.
+- `HISTORY.md` preserves tagged release facts only and may preserve superseded
+  behavior as historical record. Unreleased work must not be appended to or
+  retrofitted into the latest tagged release section.
 
 A historical mechanism must not remain in a current testing requirement,
 maintenance rule, manual contract, or unqualified design statement. When an
