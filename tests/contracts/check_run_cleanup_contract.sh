@@ -31,6 +31,15 @@ require()
     fail "${file#$root/} omits: $text"
 }
 
+forbid()
+{
+  file=$1
+  text=$2
+  if grep -F -- "$text" "$file" >/dev/null; then
+    fail "${file#$root/} retains forbidden text: $text"
+  fi
+}
+
 for file in \
   "$header" "$source" "$command" "$unit" "$cli" "$process" "$refusal" \
   "$inspector" "$design" "$readme" "$history" "$manual"; do
@@ -136,8 +145,14 @@ require "$refusal" 'failed transaction attempted terminal cleanup'
 # disposable runtime trees.
 require "$inspector" 'completed construction lacks retained evidence'
 require "$inspector" 'completed check lacks retained evidence'
-require "$inspector" 'construction evidence identity contradicts durable run head'
-require "$inspector" 'check evidence identity contradicts durable run head'
+require "$inspector" 'evidence.journal() != record.journal()'
+require "$inspector" 'evidence.transaction() != record.transaction()'
+require "$inspector" 'evidence.dispatch() != dispatch.identity()'
+require "$inspector" 'evidence.node() != dispatch.unit().primary_node()'
+require "$inspector" 'evidence.attempt_session() != *retained.attempt_session()'
+require "$inspector" 'evidence.result() != *retained.terminal_evidence()'
+require "$inspector" ' evidence binding contradicts durable run head'
+forbid "$inspector" 'evidence->identity() != *retained.terminal_evidence()'
 
 # User-facing documentation keeps the same authority split: completed dispatches
 # own disposable realization; released/incomplete/failed history does not, and

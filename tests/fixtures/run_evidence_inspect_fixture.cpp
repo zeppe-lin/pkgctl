@@ -47,6 +47,29 @@ const char* yes(bool value) noexcept
   return value ? "yes" : "no";
 }
 
+template<typename Evidence>
+void require_evidence_binding(
+    const pkgctl::transaction_run_journal_record& record,
+    const pkgctl::transaction_dispatch_record& retained,
+    const Evidence& evidence,
+    const char* kind)
+{
+  const auto& dispatch = retained.dispatch();
+  if (!retained.attempt_session() || !retained.terminal_evidence())
+    throw std::runtime_error(std::string("completed ") + kind +
+                             " lacks exact terminal authority");
+  if (evidence.journal() != record.journal() ||
+      evidence.transaction() != record.transaction() ||
+      evidence.dispatch() != dispatch.identity() ||
+      evidence.node() != dispatch.unit().primary_node() ||
+      evidence.attempt_session() != *retained.attempt_session() ||
+      evidence.result() != *retained.terminal_evidence())
+  {
+    throw std::runtime_error(std::string(kind) +
+                             " evidence binding contradicts durable run head");
+  }
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -94,8 +117,12 @@ int main(int argc, char** argv)
       std::cout << "dispatch." << index << ".terminal-evidence "
                 << yes(retained.terminal_evidence().has_value()) << '\n';
 
-      if (!retained.attempt_session() || !retained.terminal_evidence())
+      if (retained.state() != pkgctl::transaction_dispatch_state::completed)
         continue;
+      if (!retained.attempt_session() || !retained.terminal_evidence())
+        throw std::runtime_error(
+            "completed dispatch lacks exact terminal authority");
+
       if (dispatch.unit().kind() == pkgctl::transaction_unit_kind::construction)
       {
         ++constructions;
@@ -105,12 +132,12 @@ int main(int argc, char** argv)
         if (!evidence)
           throw std::runtime_error(
               "completed construction lacks retained evidence");
-        if (evidence->identity() != *retained.terminal_evidence())
-          throw std::runtime_error(
-              "construction evidence identity contradicts durable run head");
+        require_evidence_binding(*record, retained, *evidence, "construction");
         ++construction_evidence;
-        std::cout << "dispatch." << index << ".evidence "
+        std::cout << "dispatch." << index << ".evidence-record "
                   << evidence->identity().hex() << '\n';
+        std::cout << "dispatch." << index << ".result "
+                  << evidence->result().hex() << '\n';
       }
       else if (dispatch.unit().kind() == pkgctl::transaction_unit_kind::check)
       {
@@ -120,12 +147,12 @@ int main(int argc, char** argv)
             *retained.attempt_session());
         if (!evidence)
           throw std::runtime_error("completed check lacks retained evidence");
-        if (evidence->identity() != *retained.terminal_evidence())
-          throw std::runtime_error(
-              "check evidence identity contradicts durable run head");
+        require_evidence_binding(*record, retained, *evidence, "check");
         ++check_evidence;
-        std::cout << "dispatch." << index << ".evidence "
+        std::cout << "dispatch." << index << ".evidence-record "
                   << evidence->identity().hex() << '\n';
+        std::cout << "dispatch." << index << ".result "
+                  << evidence->result().hex() << '\n';
       }
     }
 
