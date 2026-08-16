@@ -1,0 +1,21 @@
+format: zeppe-lin.recipe/1
+package:
+  name: cohort-checker
+  version: 1.0
+  release: 1
+  summary: runtime cohort independent check fixture
+  licenses: [GPL-3.0-or-later]
+requirements:
+  build:
+    - package: cohort-headers
+sources: []
+build:
+  language: posix-shell
+  script: |
+    set -eu
+    IFS= read -r header <"$PKG_BUILD_INPUT_ROOT/cohort-headers/usr/include/cohort.h"
+    [ "$header" = cohort-header ]
+    printf '%s\n' cohort-checker >"$PKG_DESTDIR/checker-token"
+architectures:
+  build: [x86_64]
+  target: [x86_64]

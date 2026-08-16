@@ -522,6 +522,31 @@ if not get_option('tests').disabled()
     suite: 'integration-privileged',
   )
 
+  cli_build_runtime_cohort_test = find_program(
+    'integration/cli_build_runtime_cohort_test.sh',
+  )
+  test(
+    'cli-build-runtime-cohort',
+    cli_build_runtime_cohort_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      run_evidence_inspect_fixture,
+      native_runtime_root_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/runtime-cohort',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [native_runtime_root_fixture, run_evidence_inspect_fixture],
+    suite: 'integration-privileged',
+  )
+
   cli_build_cleanup_test = find_program(
     'integration/cli_build_cleanup_test.sh',
   )
@@ -1133,6 +1158,16 @@ if not get_option('tests').disabled()
   test(
     'cli-build-contract',
     cli_build_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_runtime_cohort_contract = find_program(
+    'contracts/check_cli_runtime_cohort_contract.sh',
+  )
+  test(
+    'cli-runtime-cohort-contract',
+    cli_runtime_cohort_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

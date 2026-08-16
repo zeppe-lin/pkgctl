@@ -1,0 +1,19 @@
+format: zeppe-lin.recipe/1
+package:
+  name: cohort-headers
+  version: 1.0
+  release: 1
+  summary: runtime cohort header authority fixture
+  licenses: [GPL-3.0-or-later]
+requirements: {}
+sources: []
+build:
+  language: posix-shell
+  script: |
+    set -eu
+    test -z "${PKG_CHECK_INPUT_ROOT+x}"
+    mkdir -p "$PKG_DESTDIR/usr/include"
+    printf '%s\n' cohort-header >"$PKG_DESTDIR/usr/include/cohort.h"
+architectures:
+  build: [x86_64]
+  target: [x86_64]

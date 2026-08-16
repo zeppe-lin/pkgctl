@@ -1,0 +1,24 @@
+format: zeppe-lin.recipe/1
+package:
+  name: cohort-libc
+  version: 1.0
+  release: 1
+  summary: runtime cohort libc fixture
+  licenses: [GPL-3.0-or-later]
+requirements:
+  build:
+    - package: cohort-headers
+  run:
+    - package: cohort-libgcc
+sources: []
+build:
+  language: posix-shell
+  script: |
+    set -eu
+    IFS= read -r header <"$PKG_BUILD_INPUT_ROOT/cohort-headers/usr/include/cohort.h"
+    [ "$header" = cohort-header ]
+    mkdir -p "$PKG_DESTDIR/usr/lib"
+    printf '%s\n' cohort-libc >"$PKG_DESTDIR/usr/lib/libc-token"
+architectures:
+  build: [x86_64]
+  target: [x86_64]

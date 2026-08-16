@@ -1,0 +1,88 @@
+format: zeppe-lin.recipe/1
+package:
+  name: cohort-probe
+  version: 1.0
+  release: 1
+  summary: runtime cohort build and check projection fixture
+  licenses: [GPL-3.0-or-later]
+requirements:
+  build:
+    - package: cohort-filesystem
+    - package: cohort-libc
+    - package: cohort-libgcc
+  check:
+    - package: cohort-filesystem
+    - package: cohort-libc
+    - package: cohort-libgcc
+    - package: cohort-checker
+sources: []
+build:
+  language: posix-shell
+  script: |
+    set -eu
+    fail() { printf '%s\n' "cohort-probe build: $*" >&2; exit 1; }
+    [ -z "${PKG_CHECK_INPUT_ROOT+x}" ] || fail 'check input root ABI leaked into build'
+    [ -z "${PKG_CHECK_INPUTS+x}" ] || fail 'check input vocabulary leaked into build'
+    old_ifs=$IFS
+    IFS=:
+    set -- $PKG_BUILD_INPUTS
+    IFS=$old_ifs
+    [ "$#" -eq 3 ] || fail 'build input vocabulary cardinality differs from direct authority'
+    vocabulary=:$PKG_BUILD_INPUTS:
+    for input in cohort-filesystem cohort-libc cohort-libgcc; do
+      case $vocabulary in
+        *:"$input":*) ;;
+        *) fail "build input vocabulary omits direct authority: $input" ;;
+      esac
+    done
+    for input in cohort-filesystem cohort-libc cohort-libgcc; do
+      [ -d "$PKG_BUILD_INPUT_ROOT/$input" ] || fail "missing direct build input: $input"
+    done
+    [ -L "$PKG_BUILD_INPUT_ROOT/cohort-filesystem/lib64" ] || fail 'filesystem topology absent'
+    [ "$(readlink "$PKG_BUILD_INPUT_ROOT/cohort-filesystem/lib64")" = usr/lib64 ] || fail 'filesystem lib64 topology differs'
+    IFS= read -r libc_token <"$PKG_BUILD_INPUT_ROOT/cohort-libc/usr/lib/libc-token"
+    IFS= read -r libgcc_token <"$PKG_BUILD_INPUT_ROOT/cohort-libgcc/usr/lib/libgcc-token"
+    [ "$libc_token" = cohort-libc ] || fail 'libc token differs'
+    [ "$libgcc_token" = cohort-libgcc ] || fail 'libgcc token differs'
+    [ ! -e "$PKG_BUILD_INPUT_ROOT/cohort-libc/usr/lib/libgcc-token" ] || fail 'runtime closure contaminated libc package tree'
+    [ ! -e "$PKG_BUILD_INPUT_ROOT/cohort-libgcc/usr/lib/libc-token" ] || fail 'runtime closure contaminated libgcc package tree'
+    mkdir -p "$PKG_DESTDIR/usr/share/cohort-probe"
+    printf '%s\n' filesystem+libc+libgcc >"$PKG_DESTDIR/usr/share/cohort-probe/result"
+check:
+  language: posix-shell
+  script: |
+    set -eu
+    fail() { printf '%s\n' "cohort-probe check: $*" >&2; exit 1; }
+    [ -z "${PKG_BUILD_INPUT_ROOT+x}" ] || fail 'build input root ABI leaked into check'
+    [ -z "${PKG_BUILD_INPUTS+x}" ] || fail 'build input vocabulary leaked into check'
+    IFS= read -r result <"$PKG_PACKAGE_ROOT/usr/share/cohort-probe/result"
+    IFS= read -r libc_token <"$PKG_CHECK_INPUT_ROOT/cohort-libc/usr/lib/libc-token"
+    IFS= read -r libgcc_token <"$PKG_CHECK_INPUT_ROOT/cohort-libgcc/usr/lib/libgcc-token"
+    IFS= read -r checker_token <"$PKG_CHECK_INPUT_ROOT/cohort-checker/checker-token"
+    [ "$result" = filesystem+libc+libgcc ] || fail 'checked package result differs'
+    [ -L "$PKG_CHECK_INPUT_ROOT/cohort-filesystem/lib64" ] || fail 'filesystem check input absent'
+    [ "$libc_token" = cohort-libc ] || fail 'libc check input differs'
+    [ "$libgcc_token" = cohort-libgcc ] || fail 'libgcc check input differs'
+    [ "$checker_token" = cohort-checker ] || fail 'independent checker input differs'
+    old_ifs=$IFS
+    IFS=:
+    set -- $PKG_CHECK_INPUTS
+    IFS=$old_ifs
+    [ "$#" -eq 4 ] || fail 'check input vocabulary cardinality differs from direct authority'
+    vocabulary=:$PKG_CHECK_INPUTS:
+    for input in cohort-checker cohort-filesystem cohort-libc cohort-libgcc; do
+      case $vocabulary in
+        *:"$input":*) ;;
+        *) fail "check input vocabulary omits direct authority: $input" ;;
+      esac
+    done
+    if printf hostile >"$PKG_PACKAGE_ROOT/usr/share/cohort-probe/write" 2>/dev/null; then
+      fail 'checked package is writable'
+    fi
+    if printf hostile >"$PKG_CHECK_INPUT_ROOT/cohort-libc/usr/lib/write" 2>/dev/null; then
+      fail 'check input is writable'
+    fi
+    printf '%s\n' cohort-check-ok >/tmp/cohort-check-ran
+architectures:
+  build: [x86_64]
+  target: [x86_64]

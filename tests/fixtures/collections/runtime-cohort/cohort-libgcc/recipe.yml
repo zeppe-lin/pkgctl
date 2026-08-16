@@ -1,0 +1,24 @@
+format: zeppe-lin.recipe/1
+package:
+  name: cohort-libgcc
+  version: 1.0
+  release: 1
+  summary: runtime cohort libgcc fixture
+  licenses: [GPL-3.0-or-later]
+requirements:
+  build:
+    - package: cohort-libc-bootstrap
+  run:
+    - package: cohort-libc
+sources: []
+build:
+  language: posix-shell
+  script: |
+    set -eu
+    IFS= read -r bootstrap <"$PKG_BUILD_INPUT_ROOT/cohort-libc-bootstrap/usr/lib/bootstrap-libc-token"
+    [ "$bootstrap" = bootstrap-libc ]
+    mkdir -p "$PKG_DESTDIR/usr/lib"
+    printf '%s\n' cohort-libgcc >"$PKG_DESTDIR/usr/lib/libgcc-token"
+architectures:
+  build: [x86_64]
+  target: [x86_64]
