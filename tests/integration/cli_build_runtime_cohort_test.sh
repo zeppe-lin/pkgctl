@@ -209,27 +209,145 @@ for group in $groups; do [ "$group" = "$gid" ] || set -- "$@" --build-supplement
   fail 'hostile setup construction failed'
 }
 require_contains hostile-build "$root/hostile-build.out" 'disposition step-limit-reached'
+require_contains hostile-build "$root/hostile-build.out" 'complete no'
+require_contains hostile-build "$root/hostile-build.out" 'failed no'
 require_contains hostile-build "$root/hostile-build.out" 'artifacts 7'
+journal2=$(sed -n 's/^journal //p' "$root/hostile-build.out")
+[ -n "$journal2" ] || fail 'hostile setup report omitted journal'
+"$run_evidence_inspect_fixture" "$runtime2/run" "$runtime2/evidence" "$journal2" \
+  >"$root/hostile-before.out" || {
+  dump_file hostile-before "$root/hostile-before.out"
+  fail 'hostile setup durable evidence inspection failed'
+}
+require_contains hostile-before "$root/hostile-before.out" 'complete no'
+require_contains hostile-before "$root/hostile-before.out" 'failed no'
+require_contains hostile-before "$root/hostile-before.out" 'constructions 7'
+require_contains hostile-before "$root/hostile-before.out" 'checks 0'
+before_record=$(sed -n 's/^record //p' "$root/hostile-before.out")
+before_sequence=$(sed -n 's/^sequence //p' "$root/hostile-before.out")
+[ -n "$before_record" ] && [ -n "$before_sequence" ] ||
+  fail 'hostile setup durable head identity is unavailable'
+
 idx=$(sed -n 's/^artifact\.\([0-9][0-9]*\)\.package cohort-libgcc$/\1/p' "$root/hostile-build.out")
 [ -n "$idx" ] || fail 'hostile setup cannot locate cohort-libgcc artifact'
 libgcc_artifact=$(sed -n "s/^artifact\.$idx\.path //p" "$root/hostile-build.out")
 [ -f "$libgcc_artifact" ] || fail 'cohort-libgcc artifact path is absent'
+cp "$libgcc_artifact" "$root/cohort-libgcc.clean"
 printf '%s\n' hostile >>"$libgcc_artifact"
 
-set -- build --canonical-store "$state2" --resume "$nonce2" \
-  --runtime-root "$runtime2" --build-root "$build2" --artifact-root "$artifacts2" \
-  --interpreter "$interpreter2" --build-user-id "$uid" --build-group-id "$gid" \
-  --source-date-epoch 0 --max-steps 1
-for group in $groups; do [ "$group" = "$gid" ] || set -- "$@" --build-supplementary-group "$group"; done
-set +e
-"$pkgctl" "$@" >"$root/hostile-check.out" 2>"$root/hostile-check.err"
-status=$?
-set -e
-[ "$status" -ne 0 ] || fail 'corrupted cohort check input was accepted'
-require_contains hostile-check "$root/hostile-check.out" 'failed yes'
+set_hostile_resume()
+{
+  set -- build --canonical-store "$state2" --resume "$nonce2" \
+    --runtime-root "$runtime2" --build-root "$build2" --artifact-root "$artifacts2" \
+    --interpreter "$interpreter2" --build-user-id "$uid" --build-group-id "$gid" \
+    --source-date-epoch 0 --max-steps 1
+  for group in $groups; do
+    [ "$group" = "$gid" ] || set -- "$@" --build-supplementary-group "$group"
+  done
+  HOSTILE_RESUME_ARGS=$(printf '%s\n' "$@")
+}
+run_hostile_refusal()
+{
+  label=$1
+  set_hostile_resume
+  set --
+  while IFS= read -r arg; do set -- "$@" "$arg"; done <<EOF_HOSTILE_ARGS
+$HOSTILE_RESUME_ARGS
+EOF_HOSTILE_ARGS
+  set +e
+  "$pkgctl" "$@" >"$root/$label.out" 2>"$root/$label.err"
+  status=$?
+  set -e
+  [ "$status" -ne 0 ] || fail "$label: corrupted cohort check input was accepted"
+  require_contains "$label" "$root/$label.err" \
+    'native check package realization failed:'
+  if find "$runtime2/check-temporary" -type f -name cohort-check-ran -print -quit | \
+      grep . >/dev/null; then
+    fail "$label: check program executed after retained cohort authority corruption"
+  fi
+}
+
+# The first refusal happens after the CHECK attempt/session authority is durably
+# started. It must retain one recoverable active check, not invent failed truth.
+run_hostile_refusal hostile-check
+"$run_evidence_inspect_fixture" "$runtime2/run" "$runtime2/evidence" "$journal2" \
+  >"$root/hostile-started.out" || {
+  dump_file hostile-started "$root/hostile-started.out"
+  fail 'started cohort check evidence became unreadable after authority refusal'
+}
+require_contains hostile-started "$root/hostile-started.out" 'complete no'
+require_contains hostile-started "$root/hostile-started.out" 'failed no'
+require_contains hostile-started "$root/hostile-started.out" 'constructions 7'
+require_contains hostile-started "$root/hostile-started.out" 'checks 0'
+started_index=$(sed -n 's/^dispatch\.\([0-9][0-9]*\)\.state started$/\1/p' \
+  "$root/hostile-started.out")
+[ -n "$started_index" ] || fail 'authority refusal retained no started dispatch'
+case $started_index in
+  *[!0-9]*|'') fail 'authority refusal retained ambiguous started dispatches' ;;
+esac
+[ "$(grep -c '\.state started$' "$root/hostile-started.out" || :)" -eq 1 ] ||
+  fail 'authority refusal retained more than one started dispatch'
+require_contains hostile-started "$root/hostile-started.out" \
+  "dispatch.$started_index.kind check"
+require_contains hostile-started "$root/hostile-started.out" \
+  "dispatch.$started_index.attempt yes"
+require_contains hostile-started "$root/hostile-started.out" \
+  "dispatch.$started_index.terminal-evidence no"
+started_record=$(sed -n 's/^record //p' "$root/hostile-started.out")
+started_sequence=$(sed -n 's/^sequence //p' "$root/hostile-started.out")
+[ "$started_record" != "$before_record" ] ||
+  fail 'retained authority refusal did not durably start the check attempt'
+[ "$started_sequence" -eq $((before_sequence + 1)) ] ||
+  fail 'retained authority refusal advanced more than the check-start checkpoint'
+started_snapshot=$(cat "$root/hostile-started.out")
 find "$runtime2/construction-sessions" -mindepth 1 -print -quit | grep . >/dev/null ||
-  fail 'failed cohort check cleaned construction residue'
+  fail 'authority-refused cohort check cleaned construction residue'
 find "$runtime2/package-outputs" -mindepth 1 -print -quit | grep . >/dev/null ||
-  fail 'failed cohort check cleaned package-output residue'
+  fail 'authority-refused cohort check cleaned package-output residue'
+
+# Repeating the same refusal must recover the retained started attempt, not
+# publish another start record or mint a second attempt session.
+run_hostile_refusal hostile-check-repeat
+"$run_evidence_inspect_fixture" "$runtime2/run" "$runtime2/evidence" "$journal2" \
+  >"$root/hostile-started-repeat.out" || {
+  dump_file hostile-started-repeat "$root/hostile-started-repeat.out"
+  fail 'repeated authority refusal made started check evidence unreadable'
+}
+started_repeat_snapshot=$(cat "$root/hostile-started-repeat.out")
+[ "$started_snapshot" = "$started_repeat_snapshot" ] || {
+  dump_file hostile-started "$root/hostile-started.out"
+  dump_file hostile-started-repeat "$root/hostile-started-repeat.out"
+  fail 'repeated retained authority refusal changed the durable started checkpoint'
+}
+
+# Restore the exact public artifact bytes. Recovery must execute the same
+# retained CHECK attempt and complete; refusal above is not terminal failure.
+cp "$root/cohort-libgcc.clean" "$libgcc_artifact"
+set_hostile_resume
+set --
+while IFS= read -r arg; do set -- "$@" "$arg"; done <<EOF_HOSTILE_RECOVERY_ARGS
+$HOSTILE_RESUME_ARGS
+EOF_HOSTILE_RECOVERY_ARGS
+"$pkgctl" "$@" >"$root/hostile-recovered.out" 2>"$root/hostile-recovered.err" || {
+  dump_file hostile-recovered-stdout "$root/hostile-recovered.out"
+  dump_file hostile-recovered-stderr "$root/hostile-recovered.err"
+  fail 'restored cohort authority did not recover the pending check'
+}
+require_contains hostile-recovered "$root/hostile-recovered.out" 'origin resumed'
+require_contains hostile-recovered "$root/hostile-recovered.out" 'disposition completed'
+require_contains hostile-recovered "$root/hostile-recovered.out" 'complete yes'
+require_contains hostile-recovered "$root/hostile-recovered.out" 'failed no'
+for directory in construction-sessions package-outputs check-resources check-temporary; do
+  if find "$runtime2/$directory" -mindepth 1 -print -quit | grep . >/dev/null; then
+    fail "recovered cohort terminal cleanup retained private realization: $directory"
+  fi
+done
+"$run_evidence_inspect_fixture" "$runtime2/run" "$runtime2/evidence" "$journal2" \
+  >"$root/hostile-recovered-evidence.out" || {
+  dump_file hostile-recovered-evidence "$root/hostile-recovered-evidence.out"
+  fail 'recovered cohort durable evidence inspection failed'
+}
+require_contains hostile-recovered-evidence "$root/hostile-recovered-evidence.out" 'constructions 7'
+require_contains hostile-recovered-evidence "$root/hostile-recovered-evidence.out" 'checks 1'
 
 printf '%s\n' 'pkgctl:cli-build-runtime-cohort: ok'

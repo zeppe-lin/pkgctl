@@ -45,7 +45,12 @@ for required in \
   'rm -rf "$runtime/construction-sessions" "$runtime/package-outputs"' \
   'durable-steps 0' \
   'corrupted cohort check input was accepted' \
-  'failed cohort check cleaned construction residue' \
+  'native check package realization failed:' \
+  'retained authority refusal did not durably start the check attempt' \
+  'retained authority refusal advanced more than the check-start checkpoint' \
+  'repeated retained authority refusal changed the durable started checkpoint' \
+  'authority-refused cohort check cleaned construction residue' \
+  'restored cohort authority did not recover the pending check' \
   'construction-evidence 7' \
   'check-evidence 1'; do
   grep -F -- "$required" "$test_source" >/dev/null || { echo "runtime-cohort CLI assault omits: $required" >&2; exit 1; }
