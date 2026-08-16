@@ -64,4 +64,9 @@ for required in \
   "suite: 'integration-privileged'"; do
   grep -F -- "$required" "$meson" >/dev/null || { echo "runtime-cohort Meson wiring omits: $required" >&2; exit 1; }
 done
+cohort_meson=$(sed -n "/'cli-build-runtime-cohort'/,/^  )/p" "$meson")
+printf '%s\n' "$cohort_meson" | grep -F -- 'timeout: 90,' >/dev/null || {
+  echo 'runtime-cohort staged native assault lacks its explicit 90-second budget' >&2
+  exit 1
+}
 printf '%s\n' 'runtime-cohort CLI contract: ok'

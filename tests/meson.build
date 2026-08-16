@@ -545,6 +545,11 @@ if not get_option('tests').disabled()
     ],
     depends: [native_runtime_root_fixture, run_evidence_inspect_fixture],
     suite: 'integration-privileged',
+    # This is deliberately one staged native campaign: construction stop/resume,
+    # terminal reconstruction, retained-authority refusal twice, then recovery.
+    # Keep a finite budget, but do not let Meson's 30 s default truncate the
+    # hostile half before its restart invariants are observed.
+    timeout: 90,
   )
 
   cli_build_cleanup_test = find_program(
