@@ -66,7 +66,7 @@ require_dependency_range libpkgexec '>=2.2.0' '<3.0.0'
 require_dependency_range libpkgapply '>=3.0.1' '<4.0.0'
 require_dependency_range libpkgapply-posix '>=3.2.1' '<4.0.0'
 require_dependency_range libpkgapply-exec '>=3.0.1' '<4.0.0'
-require_dependency_range libpkgexec-linux '>=0.7.0' '<1.0.0'
+require_dependency_range libpkgexec-linux '>=0.7.1' '<1.0.0'
 
 grep -F '## 0.38.0 - 2026-08-15' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.37.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
@@ -181,7 +181,7 @@ awk '
 
 grep -F 'Renders structured native construction and check execution failures' \
   "$temporary.unreleased" >/dev/null
-grep -F 'Requires libpkgexec 2.2.0, libpkgexec-linux 0.7.0, and libpkgcheck-exec' \
+grep -F 'Requires libpkgexec 2.2.0, libpkgexec-linux 0.7.1, and libpkgcheck-exec' \
   "$temporary.unreleased" >/dev/null
 grep -F 'only check dependencies inhabit `/check/inputs/<canonical-package-name>`' \
   "$temporary.unreleased" >/dev/null

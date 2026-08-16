@@ -76,7 +76,7 @@ for constraint in \
   'libpkgtransaction >= 4.0.0' 'libpkgtransaction < 5.0.0' \
   'libpkgcheck >= 0.3.0' 'libpkgcheck < 1.0.0' \
   'libpkgexec >= 2.2.0' 'libpkgexec < 3.0.0' \
-  'libpkgexec-linux >= 0.7.0' 'libpkgexec-linux < 1.0.0' \
+  'libpkgexec-linux >= 0.7.1' 'libpkgexec-linux < 1.0.0' \
   'libpkgapply >= 3.0.1' 'libpkgapply < 4.0.0' \
   'libpkgapply-posix >= 3.2.1' 'libpkgapply-posix < 4.0.0' \
   'libpkgapply-exec >= 3.0.1' 'libpkgapply-exec < 4.0.0' \

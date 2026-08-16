@@ -32,8 +32,12 @@
 - Renders structured native construction and check execution failures in the CLI,
   including execution classification and termination status even when the invoked
   program writes no diagnostic output.
-- Requires libpkgexec 2.2.0, libpkgexec-linux 0.7.0, and libpkgcheck-exec
-  0.8.0 so the checked package and check inputs have distinct execution roles.
+- Requires libpkgexec 2.2.0, libpkgexec-linux 0.7.1, and libpkgcheck-exec
+  0.8.0. The Linux provider floor includes repeatable descriptor-based isolated
+  realization and private propagation sealing, so native preflight cannot admit
+  the older provider whose mount probe/realization can fail on newer detached-mount
+  propagation semantics. The checked package and check inputs retain distinct
+  execution roles.
   The checked subject uses singleton `package_tree` authority at `/check/package`;
   only check dependencies inhabit `/check/inputs/<canonical-package-name>`. Exact
   logical dependency authority remains the sealed `build_input_identity`, and
