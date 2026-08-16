@@ -4,7 +4,7 @@
 project(
   'pkgctl',
   'cpp',
-  version: '0.38.0',
+  version: '0.39.0',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.6.0',
   default_options: [

@@ -4,8 +4,8 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.38.0
-latest_release=0.38.0
+version=0.39.0
+latest_release=0.39.0
 
 require_line()
 {
@@ -22,13 +22,13 @@ require_line "$srcdir/meson.build" "  meson_version: '>=1.6.0',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 38;'
+  'inline constexpr unsigned version_minor = 39;'
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.38.0";'
+  'inline constexpr const char* version_string = "0.39.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 38);'
+  'static_assert(pkgctl::version_minor == 39);'
 
 require_dependency_range()
 {
@@ -68,6 +68,7 @@ require_dependency_range libpkgapply-posix '>=3.2.1' '<4.0.0'
 require_dependency_range libpkgapply-exec '>=3.0.1' '<4.0.0'
 require_dependency_range libpkgexec-linux '>=0.7.1' '<1.0.0'
 
+grep -F '## 0.39.0 - 2026-08-17' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.38.0 - 2026-08-15' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.37.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
 grep -F 'HISTORY.md` keeps one mutable `Unreleased` section' \
@@ -77,10 +78,12 @@ grep -F '`Unreleased` does not predict the next version number or release class.
 grep -F '## 0.36.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.35.1 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.35.0 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
+grep -F 'Release 0.39.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.38.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.37.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.36.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.39.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.38.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.37.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.36.0' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
@@ -92,7 +95,7 @@ grep -F 'Version 0.35.0 exposes *pkgctl run*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 temporary=${TMPDIR:-/tmp}/pkgctl-release-contract.$$
-trap 'rm -f "$temporary.current" "$temporary.deps" "$temporary.027" "$temporary.unreleased"' EXIT HUP INT TERM
+trap 'rm -f "$temporary.current" "$temporary.deps" "$temporary.027" "$temporary.unreleased" "$temporary.039"' EXIT HUP INT TERM
 
 awk '
   /^## 0\.35\.0 / { current = 1; next }
@@ -179,11 +182,22 @@ awk '
   current { print }
 ' "$srcdir/HISTORY.md" > "$temporary.unreleased"
 
+if grep -q '[^[:space:]]' "$temporary.unreleased"; then
+  echo 'release commit must leave the Unreleased history section empty' >&2
+  exit 1
+fi
+
+awk '
+  /^## 0\.39\.0 / { current = 1; next }
+  /^## / && current { exit }
+  current { print }
+' "$srcdir/HISTORY.md" > "$temporary.039"
+
 grep -F 'Renders structured native construction and check execution failures' \
-  "$temporary.unreleased" >/dev/null
+  "$temporary.039" >/dev/null
 grep -F 'Requires libpkgexec 2.2.0, libpkgexec-linux 0.7.1, and libpkgcheck-exec' \
-  "$temporary.unreleased" >/dev/null
+  "$temporary.039" >/dev/null
 grep -F 'only check dependencies inhabit `/check/inputs/<canonical-package-name>`' \
-  "$temporary.unreleased" >/dev/null
+  "$temporary.039" >/dev/null
 grep -F 'archive-source build/check qualification' \
-  "$temporary.unreleased" >/dev/null
+  "$temporary.039" >/dev/null

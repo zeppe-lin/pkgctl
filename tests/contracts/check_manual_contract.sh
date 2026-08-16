@@ -42,14 +42,18 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
+grep -F 'Version 0.39.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.38.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_' \
   "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '# RUN AND BUILD OPTIONS' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *build* _package_ [*--check*]' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--artifact-root* _path_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'PHASE-LOCAL CONSTRUCTION AND CHECK AUTHORITY' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'CONSTRUCTION AND CHECK PROCESS-DEATH RECOVERY' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.39.0 keeps build- and check-scoped package relations' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.38.0 gives durably started construction and check dispatches' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'PACKAGE BUILD FRONTEND' "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null

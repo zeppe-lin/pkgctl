@@ -34,6 +34,16 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
+Version 0.39.0 phase-separates concrete construction and check inputs while
+retaining one sealed logical build request. Check execution reconstructs source,
+the checked package, and candidate check dependencies from retained owner authority
+instead of borrowing construction-private staging. Start admits one complete build
+policy and resume recovers it without redeclaration. Completed durable dispatches
+also authorize bounded disposal of their exact private realizations; failed or
+incomplete work remains available for restart or diagnosis. Native Linux preflight
+requires libpkgexec-linux 0.7.1 so isolated realization is repeatable and detached
+mount propagation is sealed private before attachment.
+
 Version 0.38.0 makes durable construction and check ownership recoverable
 after process death. Before either dispatch becomes durably *started*, the
 controller retains its exact admitted attempt session. If terminal result evidence

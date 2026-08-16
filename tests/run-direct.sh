@@ -21,7 +21,7 @@ pkg-config --exists \
   'libpkgcatalog-acquire >= 4.0.0' 'libpkgcatalog-acquire < 5.0.0' \
   'libpkgfetch >= 3.0.0' 'libpkgfetch < 4.0.0' \
   'libpkgsource-exec >= 0.1.0' 'libpkgsource-exec < 1.0.0' \
-  'libpkgbuild >= 3.0.1' 'libpkgbuild < 4.0.0' \
+  'libpkgbuild >= 3.0.2' 'libpkgbuild < 4.0.0' \
   'libpkgbuild-exec >= 3.3.0' 'libpkgbuild-exec < 4.0.0' \
   'libpkgbuild-image >= 1.0.1' 'libpkgbuild-image < 2.0.0' \
   'libpkgimage-exec >= 0.1.0' 'libpkgimage-exec < 1.0.0' \
@@ -35,7 +35,7 @@ pkg-config --exists \
   'libpkgresolve >= 4.0.0' 'libpkgresolve < 5.0.0' \
   'libpkgtransaction >= 4.0.0' 'libpkgtransaction < 5.0.0' \
   'libpkgcheck >= 0.3.0' 'libpkgcheck < 1.0.0' \
-  'libpkgcheck-exec >= 0.8.0' 'libpkgcheck-exec < 1.0.0' \
+  'libpkgcheck-exec >= 0.9.0' 'libpkgcheck-exec < 1.0.0' \
   'libpkgreconcile >= 0.3.0' 'libpkgreconcile < 1.0.0' \
   'libpkgreconcile-apply >= 0.1.1' 'libpkgreconcile-apply < 1.0.0' \
   'libpkgreconcile-posix >= 0.1.0' 'libpkgreconcile-posix < 1.0.0' \

@@ -1,22 +1,16 @@
 # pkgctl
 
-Current construction/check input scope is phase-separated. The sealed
-`libpkgbuild` request still retains both build- and check-scoped logical
-requirements, but native construction concretizes only build-scoped package
-inputs. Check-scoped candidate inputs are realized later by the independent
-check boundary, and installed check inputs are located from their state-owned
-retained resources rather than borrowed from construction sessions.
-
-Current development makes native check resources independently reconstructible.
-The session locator projects private check coordinates and phase-neutral resource
-identities only; immediately before check execution, retained source
-materialization is realized through `libpkgsource-exec` and the exact sealed
-package artifact/image is realized through `libpkgimage-exec`. Candidate package
-inputs are likewise recreated from their retained predecessor construction
-artifacts; only installed inputs remain borrowed from their state-owned retained
-resources. Checks therefore do not borrow construction-session source staging,
-workspaces, or package-output trees, and restart remains valid after those
-construction-private trees are gone.
+Release 0.39.0 closes phase-local construction/check authority around the
+current native build frontend. The sealed build request still retains both
+build- and check-scoped logical requirements, but construction concretizes only
+build inputs. Check source, checked-package, and candidate check-input resources
+are reconstructed independently from retained source and artifact/image authority;
+installed check inputs come from state-owned retained resources. Complete build
+policy is admitted and retained as one start-only command authority, and terminal
+private construction/check realizations are disposed only from completed durable
+dispatch authority. The release also requires libpkgexec-linux 0.7.1 so native
+preflight receives repeatable descriptor-based isolated realization with private
+mount-propagation sealing.
 
 Release 0.38.0 makes native construction and check restartable across
 process death at their durable execution boundaries. Exact admitted attempt
@@ -91,7 +85,7 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
-Current unreleased work adds terminal disposal of private construction/check
+Release 0.39.0 also adds terminal disposal of private construction/check
 realizations. A successful durable run head, not directory discovery, authorizes
 the exact construction-session, package-output, check-resource, and check-temporary
 leaves owned by completed dispatches. Released reservations own no disposable

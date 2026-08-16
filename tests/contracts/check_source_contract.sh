@@ -66,7 +66,7 @@ for constraint in \
   'libpkgcatalog-acquire >= 4.0.0' 'libpkgcatalog-acquire < 5.0.0' \
   'libpkgfetch >= 3.0.0' 'libpkgfetch < 4.0.0' \
   'libpkgsource-exec >= 0.1.0' 'libpkgsource-exec < 1.0.0' \
-  'libpkgbuild >= 3.0.1' 'libpkgbuild < 4.0.0' \
+  'libpkgbuild >= 3.0.2' 'libpkgbuild < 4.0.0' \
   'libpkgbuild-exec >= 3.3.0' 'libpkgbuild-exec < 4.0.0' \
   'libpkgbuild-image >= 1.0.1' 'libpkgbuild-image < 2.0.0' \
   'libpkgimage-exec >= 0.1.0' 'libpkgimage-exec < 1.0.0' \
@@ -80,7 +80,7 @@ for constraint in \
   'libpkgapply >= 3.0.1' 'libpkgapply < 4.0.0' \
   'libpkgapply-posix >= 3.2.1' 'libpkgapply-posix < 4.0.0' \
   'libpkgapply-exec >= 3.0.1' 'libpkgapply-exec < 4.0.0' \
-  'libpkgcheck-exec >= 0.8.0' 'libpkgcheck-exec < 1.0.0'; do
+  'libpkgcheck-exec >= 0.9.0' 'libpkgcheck-exec < 1.0.0'; do
   grep -F "'$constraint'" "$direct_build" >/dev/null || {
     echo "direct qualification omits adapter API constraint: $constraint" >&2
     exit 1

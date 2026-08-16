@@ -10,6 +10,23 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+# PHASE-LOCAL CONSTRUCTION AND CHECK AUTHORITY
+
+Version 0.39.0 keeps build- and check-scoped package relations in one sealed
+logical request while concretizing them only in the phase that consumes them.
+Construction receives build inputs. Check reconstructs retained source material,
+the exact sealed package image, and candidate check inputs independently; installed
+check inputs are located from state-owned retained resources. The command retains
+one complete build-policy value and identity at start and refuses semantic policy
+redeclaration on resume.
+
+Terminal cleanup is downstream of completed durable dispatch authority. Exact
+private construction/check realizations may be disposed idempotently after whole-
+transaction success, but filesystem discovery, released reservations, or cleanup
+residue never become historical truth. The native Linux provider floor is 0.7.1 so
+preflight receives repeatable descriptor-based isolated realization with private
+detached-mount propagation before attachment.
+
 # CONSTRUCTION AND CHECK PROCESS-DEATH RECOVERY
 
 Version 0.38.0 gives durably started construction and check dispatches exact

@@ -2,10 +2,14 @@
 
 ## Unreleased
 
+## 0.39.0 - 2026-08-17
+
 - Treats construction/check build policy as one admitted command authority rather
   than loose CLI scalars. `--start` explicitly selects parallelism and source-date
   epoch while pkgctl closes umask 0022 and package-root layout; libpkgbuild closes
-  locale, timezone, network, and HOME invariants. The complete policy value and
+  locale, timezone, network, and HOME invariants. This requires libpkgbuild 3.0.2
+  and libpkgcheck-exec 0.9.0 so the same sealed policy reaches BUILD and CHECK.
+  The complete policy value and
   identity are retained in private command evidence, `--resume` forbids policy
   redeclaration, and resumed BUILD/CHECK recover the retained policy. Privileged
   qualification uses one non-default policy witness across a bounded start/resume
@@ -33,7 +37,7 @@
   including execution classification and termination status even when the invoked
   program writes no diagnostic output.
 - Requires libpkgexec 2.2.0, libpkgexec-linux 0.7.1, and libpkgcheck-exec
-  0.8.0. The Linux provider floor includes repeatable descriptor-based isolated
+  0.9.0. The Linux provider floor includes repeatable descriptor-based isolated
   realization and private propagation sealing, so native preflight cannot admit
   the older provider whose mount probe/realization can fail on newer detached-mount
   propagation semantics. The checked package and check inputs retain distinct
