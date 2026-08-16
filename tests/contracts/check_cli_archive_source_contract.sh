@@ -53,6 +53,7 @@ for required in \
   '! -e "$PKG_SOURCE_ROOT/tree/source.txt"' \
   'read -r source <tree/source.txt' \
   'source_tool=$(tree/source-tool)' \
+  '$PKG_BUILD_INPUT_ROOT/archive-dep/dep-token' \
   '$PKG_DESTDIR/archive-result' \
   '$PKG_PACKAGE_ROOT/archive-result' \
   '/tmp/archive-check-ran'; do
@@ -70,9 +71,11 @@ for required in \
   '.package archive-dep' \
   '.package archive-probe' \
   'rm -rf "$runtime/construction-sessions" "$runtime/package-outputs"' \
-  'dep-token' \
   'archive-payload archive-source+archive-dependency' \
-  'check-payload checked:archive-source+archive-dependency'; do
+  '"$run_evidence_inspect_fixture"' \
+  'construction-evidence 2' \
+  'check-evidence 1' \
+  'terminal cleanup retained private realization under $directory'; do
   grep -F -- "$required" "$test_source" >/dev/null || {
     echo "archive-source process proof omits: $required" >&2
     exit 1

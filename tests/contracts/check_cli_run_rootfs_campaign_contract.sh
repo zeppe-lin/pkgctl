@@ -56,7 +56,10 @@ for required in \
   "'package build-tool '" \
   'build-only-target "$target/build-tool-token"' \
   'package archives, expected 4' \
-  'checked:rootfs-probe-source+build-tool-source' \
+  '"$run_evidence_inspect_fixture"' \
+  'construction-evidence 4' \
+  'check-evidence 1' \
+  'terminal cleanup retained private realization under $directory' \
   '"$rootfs_audit_fixture" "$state" "$target"' \
   'findings 0' \
   'finding missing-object runtime-lib runtime-lib-marker'; do

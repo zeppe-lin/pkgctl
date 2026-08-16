@@ -91,6 +91,22 @@ It coordinates sealed package authorities without reimplementing their
 semantics. The project is original C++17 code licensed under
 GPL-3.0-or-later and copyright Alexandr Savca.
 
+Current unreleased work adds terminal disposal of private construction/check
+realizations. A successful durable run head, not directory discovery, authorizes
+the exact construction-session, package-output, check-resource, and check-temporary
+leaves owned by completed dispatches. Released reservations own no disposable
+execution tree. Incomplete and failed runs retain their realizations for
+restart or diagnosis. Cleanup is idempotent operational work rather than new
+historical evidence: a refused or interrupted sweep leaves the completed
+transaction intact and a terminal resume retries it. Descriptor-anchored no-follow
+removal refuses hostile path substitution. Because realization owners may seal private
+directories read-only, cleanup may add owner removability only through already-opened
+authorized private directory descriptors; caller-owned runtime class roots are never
+chmodded. Public artifacts, content, run and execution evidence, command authority,
+collection projection, and canonical state remain outside the cleanup boundary.
+Privileged qualification exercises partial build/check stages, process death after
+terminal commit, sealed-directory and symlink assault, and zero-work cleanup retry.
+
 Release 0.35.0 closes the functional package-management chain with one
 bounded native transaction command. Before fresh-run retention or admission,
 `pkgctl run` proves that the selected native Linux backend can establish the

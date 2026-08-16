@@ -96,7 +96,10 @@ for required in \
   'private-artifact-root "$runtime/artifacts"' \
   'dependency-payload dependency-source' \
   'tool-payload tool-source+dependency-source' \
-  'check-payload checked:tool-source+dependency-source' \
+  '"$run_evidence_inspect_fixture"' \
+  'construction-evidence 2' \
+  'check-evidence 1' \
+  'terminal cleanup retained private realization under $directory' \
   'rm -rf "$collection"'; do
   grep -F -- "$required" "$test_source" >/dev/null || {
     echo "build process proof omits: $required" >&2

@@ -14,7 +14,7 @@ fixture_collection=$8
 root_view_fixture=$9
 
 case $mode in
-  construction-started|artifact-published|check-started)
+  construction-started|artifact-published|check-started|transaction-completed)
     ;;
   *)
     printf '%s\n' "pkgctl:cli-build-process-death: unknown mode: $mode" >&2
@@ -246,6 +246,11 @@ case $mode in
       "$pkgctl" "$@" $binding >"$root/interrupted.out" 2>"$root/interrupted.err"
     interrupt_status=$?
     ;;
+  transaction-completed)
+    "$run_head_interrupt_fixture" "$runtime/run" 9 -- \
+      "$pkgctl" "$@" $binding >"$root/interrupted.out" 2>"$root/interrupted.err"
+    interrupt_status=$?
+    ;;
 esac
 set -e
 
@@ -270,6 +275,15 @@ final_state=$("$state_inspect_fixture" "$state")
 require_equal interrupted-canonical-state "$initial_state" "$final_state"
 require_absent lifecycle-root "$lifecycle"
 require_absent target-root "$target"
+
+if [ "$mode" = transaction-completed ]; then
+  for directory in construction-sessions package-outputs check-resources check-temporary; do
+    if [ ! -d "$runtime/$directory" ] || \
+        ! find "$runtime/$directory" -mindepth 1 -print -quit | grep . >/dev/null; then
+      fail "terminal crash did not retain expected pre-cleanup residue under $directory"
+    fi
+  done
+fi
 
 set -- build \
   --canonical-store "$state" \
@@ -303,6 +317,9 @@ require_contains resume "$root/resume.out" 'complete yes'
 require_contains resume "$root/resume.out" 'failed no'
 require_contains resume "$root/resume.out" 'frontend build'
 require_contains resume "$root/resume.out" 'artifacts 2'
+if [ "$mode" = transaction-completed ]; then
+  require_contains resume "$root/resume.out" 'durable-steps 0'
+fi
 
 final_state=$("$state_inspect_fixture" "$state")
 require_equal canonical-state "$initial_state" "$final_state"
@@ -315,9 +332,9 @@ artifact_count=$(wc -l <"$artifact_list")
 [ "$artifact_count" -eq 2 ] || \
   fail "recovered build retained $artifact_count archives, expected 2"
 
-check_count=$(find "$runtime/check-temporary" -type f -name check-ran | wc -l)
-[ "$check_count" -eq 1 ] || \
-  fail "recovered build retained $check_count check markers, expected 1"
-check_marker=$(find "$runtime/check-temporary" -type f -name check-ran)
-require_equal check-payload checked:tool-source+dependency-source \
-  "$(cat "$check_marker")"
+for directory in construction-sessions package-outputs check-resources check-temporary; do
+  if [ -d "$runtime/$directory" ] && \
+      find "$runtime/$directory" -mindepth 1 -print -quit | grep . >/dev/null; then
+    fail "terminal cleanup retained private realization under $directory"
+  fi
+done

@@ -40,6 +40,7 @@
 #include <pkgctl/run_admit.h>
 #include <pkgctl/run_advance.h>
 #include <pkgctl/run_commit.h>
+#include <pkgctl/run_cleanup.h>
 #include <pkgctl/run_drive.h>
 #include <pkgctl/run_evidence.h>
 #include <pkgctl/run_evidence_codec.h>

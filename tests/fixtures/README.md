@@ -70,3 +70,22 @@ final public package archive exists without an unpublished temporary sibling.
 It qualifies the construction window where artifact publication has escaped the
 private executor but controller-owned terminal construction evidence has not yet
 been retained.
+
+`run_evidence_inspect_fixture.cpp` reopens one exact transaction-run head and
+its construction/check evidence store after disposable runtime realizations have
+been removed. It checks that every completed construction/check dispatch still
+has terminal evidence matching the durable head and reports stage counts. The
+fixture exists so cleanup qualification does not use a surviving workspace or
+`/tmp` marker as a proxy for historical execution truth.
+
+The terminal-cleanup CLI assault reuses the `archive-source-check` collection so
+one dependency is realized under both the build-input and check-input namespaces,
+while the selected package consumes an archive source and the final check consumes
+the published package subject. This keeps cleanup qualification coupled to the
+restart/reconstruction boundaries rather than to a trivial one-package workspace.
+
+The process-death campaign also uses `run_head_interrupt_fixture.cpp` at the
+terminal run-head sequence. That mode kills `pkgctl` after whole-transaction
+completion is durable but before frontend private-realization cleanup can be
+assumed. A zero-work resume must then remove the exact derived leaves without
+replaying build or check work.

@@ -40,6 +40,7 @@ unsafe_fixed_greps=$(
 for path in \
   'unit/construction_test.cpp' \
   'fixtures/state_fixture.cpp' \
+  'fixtures/run_evidence_inspect_fixture.cpp' \
   'fixtures/native_root_view_fixture.sh' \
   'fixtures/native_runtime_root_fixture.cpp' \
   'fixtures/rootfs_audit_fixture.cpp' \
@@ -71,6 +72,7 @@ for path in \
   'integration/cli_run_construction_only_test.sh' \
   'integration/cli_run_native_construction_test.sh' \
   'integration/cli_build_test.sh' \
+  'integration/cli_build_cleanup_test.sh' \
   'integration/cli_build_archive_source_test.sh' \
   'integration/cli_build_check_authority_refusal_test.sh' \
   'integration/cli_build_process_death_test.sh' \
@@ -82,6 +84,7 @@ for path in \
   'integration/cli_run_publication_terminal_restart_test.sh' \
   'integration/cli_run_lifecycle_resolution_test.sh' \
   'contracts/check_package_pipeline_contract.sh' \
+  'contracts/check_run_cleanup_contract.sh' \
   'contracts/check_package_fault_matrix_contract.sh' \
   'contracts/check_cli_lease_contention_contract.sh' \
   'contracts/check_cli_native_construction_contract.sh' \

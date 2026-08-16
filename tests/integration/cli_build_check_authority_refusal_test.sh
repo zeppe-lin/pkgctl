@@ -136,10 +136,26 @@ run_scenario()
 
   # Check must reconstruct from retained authority, not accidentally consume
   # construction-private trees that already happened to contain usable bytes.
+  # Remember one exact planned leaf in each construction-private class, remove
+  # all real residue, then recreate those exact leaves with hostile sentinels.
+  # The upcoming check failure must authorize no terminal cleanup at all.
+  construction_leaf=$(find "$runtime/construction-sessions" \
+    -mindepth 2 -maxdepth 2 -type d | sort | sed -n '1p')
+  package_leaf=$(find "$runtime/package-outputs" \
+    -mindepth 2 -maxdepth 2 -type d | sort | sed -n '1p')
+  [ -n "$construction_leaf" ] || fail 'construction cleanup leaf is absent'
+  [ -n "$package_leaf" ] || fail 'package-output cleanup leaf is absent'
+  construction_relative=${construction_leaf#"$runtime/construction-sessions/"}
+  package_relative=${package_leaf#"$runtime/package-outputs/"}
   find "$runtime/construction-sessions" "$runtime/package-outputs" \
     -type d -exec chmod u+w {} + 2>/dev/null || :
   rm -rf "$runtime/construction-sessions" "$runtime/package-outputs"
   mkdir "$runtime/construction-sessions" "$runtime/package-outputs"
+  construction_leaf=$runtime/construction-sessions/$construction_relative
+  package_leaf=$runtime/package-outputs/$package_relative
+  mkdir -p "$construction_leaf" "$package_leaf"
+  printf '%s\n' 'must-survive-failed-check' >"$construction_leaf/sentinel"
+  printf '%s\n' 'must-survive-failed-check' >"$package_leaf/sentinel"
 
   set -- build \
     --canonical-store "$state" \
@@ -174,6 +190,13 @@ run_scenario()
   if find "$runtime/check-temporary" -type f -name archive-check-ran -print -quit | \
       grep . >/dev/null; then
     fail "$scenario check program executed after retained authority corruption"
+  fi
+  [ "$(cat "$construction_leaf/sentinel")" = must-survive-failed-check ] || \
+    fail "$scenario failed check cleaned construction-session residue"
+  [ "$(cat "$package_leaf/sentinel")" = must-survive-failed-check ] || \
+    fail "$scenario failed check cleaned package-output residue"
+  if grep -F 'private realization cleanup' "$root/resume.err" >/dev/null; then
+    fail "$scenario failed transaction attempted terminal cleanup"
   fi
   final_state=$("$state_inspect_fixture" "$state")
   [ "$initial_state" = "$final_state" ] || \

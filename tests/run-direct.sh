@@ -58,7 +58,7 @@ for source in "$srcdir"/src/*.cpp; do
   objects="$objects $object"
 done
 
-for test_source in check_test construction_test dispatch_test run_journal_test run_progress_test run_locator_test request_test session_test effect_journal_test effect_inspect_test effect_test report_test version_test; do
+for test_source in check_test construction_test dispatch_test run_cleanup_test run_journal_test run_progress_test run_locator_test request_test session_test effect_journal_test effect_inspect_test effect_test report_test version_test; do
   # shellcheck disable=SC2086
   "$cxx" $flags "$srcdir/tests/unit/$test_source.cpp" $objects $core_libs \
     -o "$tmp/$test_source"
@@ -83,6 +83,12 @@ for fixture in state_fixture state_inspect_fixture run_store_fixture effect_stor
   "$cxx" $flags "$srcdir/tests/fixtures/$fixture.cpp" $objects $core_libs \
     -o "$tmp/$name-fixture"
 done
+
+# The durable run/evidence inspector proves terminal cleanup does not erase
+# historical construction/check authority.
+# shellcheck disable=SC2086
+"$cxx" $flags "$srcdir/tests/fixtures/run_evidence_inspect_fixture.cpp" \
+  $objects $core_libs -o "$tmp/run-evidence-inspect-fixture"
 
 # The rootfs feedback oracle is test-only and remains outside pkgctl production.
 # shellcheck disable=SC2086
@@ -196,17 +202,23 @@ version=$(sed -n 's/^inline constexpr const char\* version_string = "\([^"]*\)";
 
 "$srcdir/tests/integration/cli_run_native_construction_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
-  "$tmp/native-runtime-root-fixture" \
+  "$tmp/run-evidence-inspect-fixture" "$tmp/native-runtime-root-fixture" \
   "$srcdir/tests/fixtures/collections/native-construction" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
 "$srcdir/tests/integration/cli_build_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
-  "$tmp/native-runtime-root-fixture" \
+  "$tmp/run-evidence-inspect-fixture" "$tmp/native-runtime-root-fixture" \
   "$srcdir/tests/fixtures/collections/native-construction" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 
-for mode in construction-started artifact-published check-started; do
+"$srcdir/tests/integration/cli_build_cleanup_test.sh" "$tmp/pkgctl" \
+  "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
+  "$tmp/run-evidence-inspect-fixture" "$tmp/native-runtime-root-fixture" \
+  "$srcdir/tests/fixtures/collections/archive-source-check" \
+  "$srcdir/tests/fixtures/native_root_view_fixture.sh"
+
+for mode in construction-started artifact-published check-started transaction-completed; do
   "$srcdir/tests/integration/cli_build_process_death_test.sh" "$mode" \
     "$tmp/pkgctl" "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
     "$tmp/native-runtime-root-fixture" "$tmp/run-head-interrupt-fixture" \
@@ -217,7 +229,8 @@ done
 
 "$srcdir/tests/integration/cli_run_rootfs_campaign_test.sh" "$tmp/pkgctl" \
   "$tmp/state-fixture" "$tmp/state-inspect-fixture" \
-  "$tmp/native-runtime-root-fixture" "$tmp/rootfs-audit-fixture" \
+  "$tmp/run-evidence-inspect-fixture" "$tmp/native-runtime-root-fixture" \
+  "$tmp/rootfs-audit-fixture" \
   "$srcdir/tests/fixtures/collections/rootfs-campaign" \
   "$srcdir/tests/fixtures/native_root_view_fixture.sh"
 

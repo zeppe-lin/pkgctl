@@ -38,6 +38,7 @@ pkgctl_core = static_library(
     'run_recovery.cpp',
     'run_progress.cpp',
     'run_commit.cpp',
+    'run_cleanup.cpp',
     'run_drive.cpp',
     'run_evidence.cpp',
     'run_evidence_codec.cpp',

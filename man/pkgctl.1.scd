@@ -69,8 +69,12 @@ goal, resolution-policy, or convergence request.
 
 The command does not initialize or enumerate stores, discover journals, replan
 a resumed transaction from live catalog/state, loop without a bound, sleep,
-retry implicitly, schedule workers, roll back, repair, clean up, compact, or
-collect history. Effect restart bodies are retained in owner encodings before
+retry implicitly, schedule workers, roll back, repair, compact, or collect
+history. After a successful durable terminal run, it may dispose only the exact
+construction/check private realization leaves derived from retained dispatch
+authority. Incomplete and failed runs authorize no such cleanup, and disposal
+failure is an operational warning rather than rewritten transaction truth. Effect
+restart bodies are retained in owner encodings before
 controller journals reference them. A started construction also retains its
 exact admitted controller session plus owner-encoded fetch/build evidence, while
 a started check retains its exact admitted controller session plus owner-encoded
@@ -269,8 +273,14 @@ The following construction/check authorities are required by both frontends:
 *--runtime-root* _path_
 	Existing absolute private runtime hierarchy. Construction/check execution
 	requires pre-created *run*, *evidence*, *effects*, *command-evidence*,
-	*content*, *construction-sessions*, *package-outputs*, and *check-temporary*
-	children. Operation-capable *run* additionally requires its target-lock,
+	*content*, *construction-sessions*, *package-outputs*, *check-resources*, and
+	*check-temporary* children. The hierarchy roots remain caller-owned; after
+	successful terminal completion the frontend may prune only exact private
+	dispatch leaves authorized by the durable run head and then a now-empty private
+	journal container. Read-only private realization directories may be made
+	owner-removable only through already-opened descriptors; the caller-owned class
+	roots are not chmodded. Operation-capable
+	*run* additionally requires its target-lock,
 	application, lifecycle, effect-body, rejected/completed, and related private
 	children. *build* does not create or open those target-operation namespaces.
 

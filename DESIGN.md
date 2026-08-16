@@ -13,6 +13,53 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+## Current terminal private-realization cleanup boundary
+
+Successful transaction completion authorizes disposal of execution realization,
+not deletion of history. `transaction_run_cleanup_plan` therefore projects exact
+private leaves only from the durable terminal run head and the already admitted
+native session roots:
+
+```text
+successful terminal run record
+        |
+        +-- completed construction dispatch -> construction-session + package-output leaf
+        |
+        `-- completed check dispatch        -> check-resource + check-temporary leaf
+```
+
+Incomplete, failure-contained, and externally unresolved runs project no cleanup
+targets. Released-unstarted reservations also project nothing: ledger history is
+not evidence that an execution realization ever existed. The projection never
+discovers candidates by enumerating a runtime root.
+Construction/check evidence, the run journal, command evidence, source content,
+public package artifacts, collection authority, and canonical state are outside
+this disposal boundary. Cleanup adds no durable schema or historical bit saying
+that garbage was removed: after process death or partial refusal, a terminal
+zero-work resume derives the same exact leaves and retries idempotently.
+
+The POSIX mechanism opens the configured root and each journal/dispatch component
+through directory descriptors with no-follow inspection. A substituted exact leaf
+that is not a directory is refused; internal symbolic links are unlinked as links,
+not traversed. Realization owners may have sealed private directories read-only, so
+the cleaner may add owner read/write/search permission only through an already-opened
+authorized private directory descriptor. It never chmods the caller-owned runtime
+class root by pathname. Failure to dispose one leaf does not suppress attempts against
+the others and cannot rewrite an already completed transaction as failed. CLI
+reporting therefore treats cleanup failure as an operational warning after durable
+terminal result/artifact reporting.
+
+Qualification attacks this boundary rather than merely observing an empty directory.
+API tests build records at admitted, started, failed, check-started, and successful
+build+check stages; they inject mechanism failure, foreign sibling residue, sealed
+read-only directories, repeated cleanup, and symlink substitution. Privileged CLI
+tests cross bounded dependency build, selected-package build, and check invocations,
+retain residue while the run is
+resumable, corrupt one exact cleanup target before terminal check, and require a
+zero-work terminal resume to finish a partial sweep without live catalog authority.
+A process-death fixture also kills the frontend after the completed run head is
+durable but before cleanup and requires the same terminal retry behavior.
+
 ## Current construction/check input-scope boundary
 
 A sealed `pkgbuild::build_request` retains both build- and check-scoped logical
@@ -369,8 +416,10 @@ authority domains.
 The runtime hierarchy is explicit and existing-only. The command creates no
 store or workspace namespace, discovers no journal, loops no more than the
 positive invocation bound, retries no timer, rolls back no side effects, and
-performs no repair, cleanup, compaction, or garbage collection. This closes the
-functional architecture; subsequent work is qualification and publication.
+performs no repair, compaction, or historical garbage collection. Terminal
+private construction/check realization disposal is the narrow exception: the
+frontend derives exact leaves from a successfully completed durable run head and
+never scans runtime directories for garbage.
 
 ## Release 0.34.0 native target/runtime composition boundary
 

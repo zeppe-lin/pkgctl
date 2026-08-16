@@ -9,6 +9,7 @@
 #include <pkgctl/effect_restart.h>
 #include <pkgctl/effect_store.h>
 #include <pkgctl/preparation.h>
+#include <pkgctl/run_cleanup.h>
 #include <pkgctl/run_runtime.h>
 #include <pkgctl/run_store.h>
 #include <pkgctl/target_observation.h>
@@ -2301,6 +2302,34 @@ void render_build_artifacts(const transaction_run_drive_result& result)
   return EXIT_FAILURE;
 }
 
+void cleanup_terminal_private_realizations(
+    const transaction_run_journal_record& record,
+    const native_transaction_session_configuration& configuration)
+{
+  try
+  {
+    posix_transaction_run_private_realization_cleaner cleaner;
+    auto result = cleanup_transaction_run_private_realizations(
+        transaction_run_cleanup_plan::make(record, configuration), cleaner);
+    for (const auto& failure : result.failures())
+    {
+      std::cerr << "pkgctl: private realization cleanup incomplete: "
+                << failure.target.path().string() << ": "
+                << failure.problem << '\n';
+    }
+  }
+  catch (const std::exception& problem)
+  {
+    std::cerr << "pkgctl: private realization cleanup unavailable: "
+              << problem.what() << '\n';
+  }
+  catch (...)
+  {
+    std::cerr << "pkgctl: private realization cleanup unavailable: "
+              << "unknown cleanup failure\n";
+  }
+}
+
 } // namespace
 
 int execute_transaction_run(transaction_run_command command)
@@ -2418,6 +2447,7 @@ int execute_transaction_run(transaction_run_command command)
       : current_interpreter->identity();
   auto session_configuration =
       command_sessions(command, binding, admitted_interpreter);
+  const auto cleanup_configuration = session_configuration;
 
   if (current_execution_backend)
   {
@@ -2456,6 +2486,8 @@ int execute_transaction_run(transaction_run_command command)
       if (command.frontend == transaction_run_command_frontend::build)
         render_build_artifacts(result.drive());
       render_terminal_failure(result.drive());
+      cleanup_terminal_private_realizations(
+          result.drive().record(), cleanup_configuration);
       return drive_status(result.drive().disposition());
     }
 
@@ -2465,6 +2497,7 @@ int execute_transaction_run(transaction_run_command command)
     if (command.frontend == transaction_run_command_frontend::build)
       render_build_artifacts(result);
     render_terminal_failure(result);
+    cleanup_terminal_private_realizations(result.record(), cleanup_configuration);
     return drive_status(result.disposition());
   };
 

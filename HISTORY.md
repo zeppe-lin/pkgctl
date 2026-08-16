@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Disposes construction-session, package-output, check-resource, and check-temporary
+  realizations only after the durable run head proves successful whole-transaction
+  completion. Cleanup authority is projected only from exact completed dispatch
+  identities; released-unstarted reservations authorize no deletion. It does not scan
+  private runtime directories, create durable cleanup truth, or alter
+  a completed transaction when disposal fails. The POSIX mechanism uses descriptor-
+  anchored no-follow traversal, refuses hostile exact-target substitutions, attempts
+  every independently authorized leaf, and is idempotently retried by zero-work
+  terminal resume. Sealed private realization directories are made owner-removable
+  only through already-opened authorized directory descriptors; caller-owned runtime
+  class roots are never chmodded. Unit and privileged CLI qualification attack
+  resumable build/check stages, process death after terminal commit, partial cleanup
+  failure, sealed directories, foreign siblings, and symlink escape while proving
+  durable evidence and public artifacts survive.
 - Requires libpkgbuild-exec 3.3.0 and supplies the normalized phase-local
   construction input mountpoint `/build/inputs`. Build dependencies remain
   recipe-addressable as `PKG_BUILD_INPUT_ROOT/<canonical-package-name>`; pkgctl

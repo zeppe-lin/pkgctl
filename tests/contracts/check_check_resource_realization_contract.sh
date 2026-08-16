@@ -63,9 +63,8 @@ require "$probe" 'package: archive-dep'
 require "$dep" 'archive-dependency'
 require "$archive_test" '--max-steps 2'
 require "$archive_test" 'rm -rf "$runtime/construction-sessions" "$runtime/package-outputs"'
-require "$archive_test" 'independent check source-object tree is absent'
-require "$archive_test" 'independent checked-package tree is absent'
-require "$archive_test" 'independent constructed check input is absent'
+require "$archive_test" 'check resume after construction-residue removal failed'
+require "$archive_test" 'terminal cleanup retained private realization under $directory'
 
 # Execution resource identities are controller-owned per-instance bindings.
 grep -F 'pkgctl/native-check-source-resource/1' "$locator" >/dev/null || { echo 'check-resource contract: source instance identity is not controller-owned' >&2; exit 1; }

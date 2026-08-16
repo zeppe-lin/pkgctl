@@ -21,6 +21,7 @@ for required in \
   'construction-started' \
   'artifact-published' \
   'check-started' \
+  'transaction-completed' \
   'run-head-interrupt-fixture' \
   'artifact-publication-interrupt-fixture' \
   "suite: 'integration-privileged'"; do
@@ -64,6 +65,7 @@ for required in \
   'exit 77' \
   '"$runtime/run" 2 --' \
   '"$runtime/run" 8 --' \
+  '"$runtime/run" 9 --' \
   '"$artifact_interrupt_fixture" "$artifacts" --' \
   '--resume "$nonce"' \
   'origin resumed' \
@@ -71,7 +73,9 @@ for required in \
   'complete yes' \
   'failed no' \
   'artifacts 2' \
-  'check-payload checked:tool-source+dependency-source'; do
+  'terminal cleanup retained private realization under $directory' \
+  'terminal crash did not retain expected pre-cleanup residue' \
+  "'durable-steps 0'"; do
   grep -F -- "$required" "$test_source" >/dev/null || {
     echo "process-death CLI proof omits: $required" >&2
     exit 1

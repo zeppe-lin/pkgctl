@@ -37,6 +37,13 @@ if not get_option('tests').disabled()
   )
   test('dispatch', dispatch_test, suite: 'unit')
 
+  run_cleanup_test = executable(
+    'run-cleanup-test',
+    'unit/run_cleanup_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('run-cleanup', run_cleanup_test, suite: 'unit')
+
   run_journal_test = executable(
     'run-journal-test',
     'unit/run_journal_test.cpp',
@@ -173,6 +180,12 @@ if not get_option('tests').disabled()
   state_fixture = executable(
     'state-fixture',
     'fixtures/state_fixture.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+
+  run_evidence_inspect_fixture = executable(
+    'run-evidence-inspect-fixture',
+    'fixtures/run_evidence_inspect_fixture.cpp',
     dependencies: pkgctl_core_dep,
   )
 
@@ -469,6 +482,7 @@ if not get_option('tests').disabled()
       pkgctl_exe,
       state_fixture,
       state_inspect_fixture,
+      run_evidence_inspect_fixture,
       native_runtime_root_fixture,
       join_paths(
         meson.project_source_root(),
@@ -479,7 +493,7 @@ if not get_option('tests').disabled()
         'tests/fixtures/native_root_view_fixture.sh',
       ),
     ],
-    depends: native_runtime_root_fixture,
+    depends: [native_runtime_root_fixture, run_evidence_inspect_fixture],
     suite: 'integration-privileged',
   )
 
@@ -493,6 +507,7 @@ if not get_option('tests').disabled()
       pkgctl_exe,
       state_fixture,
       state_inspect_fixture,
+      run_evidence_inspect_fixture,
       native_runtime_root_fixture,
       join_paths(
         meson.project_source_root(),
@@ -503,7 +518,32 @@ if not get_option('tests').disabled()
         'tests/fixtures/native_root_view_fixture.sh',
       ),
     ],
-    depends: native_runtime_root_fixture,
+    depends: [native_runtime_root_fixture, run_evidence_inspect_fixture],
+    suite: 'integration-privileged',
+  )
+
+  cli_build_cleanup_test = find_program(
+    'integration/cli_build_cleanup_test.sh',
+  )
+  test(
+    'cli-build-cleanup',
+    cli_build_cleanup_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      run_evidence_inspect_fixture,
+      native_runtime_root_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/archive-source-check',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [native_runtime_root_fixture, run_evidence_inspect_fixture],
     suite: 'integration-privileged',
   )
 
@@ -517,6 +557,7 @@ if not get_option('tests').disabled()
       pkgctl_exe,
       state_fixture,
       state_inspect_fixture,
+      run_evidence_inspect_fixture,
       native_runtime_root_fixture,
       join_paths(
         meson.project_source_root(),
@@ -527,7 +568,7 @@ if not get_option('tests').disabled()
         'tests/fixtures/native_root_view_fixture.sh',
       ),
     ],
-    depends: native_runtime_root_fixture,
+    depends: [native_runtime_root_fixture, run_evidence_inspect_fixture],
     suite: 'integration-privileged',
   )
 
@@ -562,6 +603,7 @@ if not get_option('tests').disabled()
     'construction-started',
     'artifact-published',
     'check-started',
+    'transaction-completed',
   ]
     test(
       'cli-build-process-death-' + process_death_mode,
@@ -602,6 +644,7 @@ if not get_option('tests').disabled()
       pkgctl_exe,
       state_fixture,
       state_inspect_fixture,
+      run_evidence_inspect_fixture,
       native_runtime_root_fixture,
       rootfs_audit_fixture,
       join_paths(
@@ -613,7 +656,11 @@ if not get_option('tests').disabled()
         'tests/fixtures/native_root_view_fixture.sh',
       ),
     ],
-    depends: [native_runtime_root_fixture, rootfs_audit_fixture],
+    depends: [
+      native_runtime_root_fixture,
+      rootfs_audit_fixture,
+      run_evidence_inspect_fixture,
+    ],
     suite: 'integration-privileged',
   )
 
@@ -872,6 +919,7 @@ if not get_option('tests').disabled()
     'run_recovery.h',
     'run_progress.h',
     'run_commit.h',
+    'run_cleanup.h',
     'run_execute.h',
     'run_restart.h',
     'run_runtime.h',
@@ -944,6 +992,14 @@ if not get_option('tests').disabled()
 
   dispatch_contract = find_program('contracts/check_dispatch_contract.sh')
   test('dispatch-contract', dispatch_contract, args: [meson.project_source_root()], suite: 'contract')
+
+  run_cleanup_contract = find_program('contracts/check_run_cleanup_contract.sh')
+  test(
+    'run-cleanup-contract',
+    run_cleanup_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
 
   run_journal_contract = find_program('contracts/check_run_journal_contract.sh')
   test('run-journal-contract', run_journal_contract, args: [meson.project_source_root()], suite: 'contract')

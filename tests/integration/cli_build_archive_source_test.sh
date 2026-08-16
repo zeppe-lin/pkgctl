@@ -6,9 +6,10 @@ set -eu
 pkgctl=$1
 state_fixture=$2
 state_inspect_fixture=$3
-runtime_root_fixture=$4
-fixture_collection=$5
-root_view_fixture=$6
+run_evidence_inspect_fixture=$4
+runtime_root_fixture=$5
+fixture_collection=$6
+root_view_fixture=$7
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-build-archive-source.XXXXXX")
 cleanup()
 {
@@ -186,13 +187,6 @@ require_contains resume "$root/resume.out" 'artifacts 2'
 require_contains resume "$root/resume.out" '.package archive-dep'
 require_contains resume "$root/resume.out" '.package archive-probe'
 
-[ -d "$runtime/check-resources" ] || fail 'check resource root is absent'
-find "$runtime/check-resources" -type f -name archive-probe.tar -print -quit | \
-  grep . >/dev/null || fail 'independent check source-object tree is absent'
-find "$runtime/check-resources" -type f -name archive-result -print -quit | \
-  grep . >/dev/null || fail 'independent checked-package tree is absent'
-find "$runtime/check-resources" -type f -name dep-token -print -quit | \
-  grep . >/dev/null || fail 'independent constructed check input is absent'
 
 final_state=$("$state_inspect_fixture" "$state")
 require_equal canonical-state "$initial_state" "$final_state"
@@ -211,8 +205,26 @@ artifact=$(awk -v key="artifact.$probe_index.path" '$1 == key { print $2; exit }
 require_equal archive-payload archive-source+archive-dependency \
   "$(tar -xOf "$artifact" archive-result)"
 
-check_count=$(find "$runtime/check-temporary" -type f -name archive-check-ran | wc -l)
-[ "$check_count" -eq 1 ] || \
-  fail "retained $check_count archive check markers, expected 1"
-check_marker=$(find "$runtime/check-temporary" -type f -name archive-check-ran)
-require_equal check-payload checked:archive-source+archive-dependency "$(cat "$check_marker")"
+journal=$(sed -n 's/^journal //p' "$root/resume.out")
+[ -n "$journal" ] || fail 'terminal report did not expose journal identity'
+"$run_evidence_inspect_fixture" \
+  "$runtime/run" "$runtime/evidence" "$journal" >"$root/terminal-evidence.out" || {
+  dump_file 'terminal durable evidence' "$root/terminal-evidence.out"
+  fail 'terminal durable construction/check evidence is unavailable after cleanup'
+}
+require_contains terminal-evidence "$root/terminal-evidence.out" 'complete yes'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'failed no'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'stopped no'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'constructions 2'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'checks 1'
+require_contains terminal-evidence "$root/terminal-evidence.out" \
+  'construction-evidence 2'
+require_contains terminal-evidence "$root/terminal-evidence.out" \
+  'check-evidence 1'
+
+for directory in construction-sessions package-outputs check-resources check-temporary; do
+  if [ -d "$runtime/$directory" ] && \
+      find "$runtime/$directory" -mindepth 1 -print -quit | grep . >/dev/null; then
+    fail "terminal cleanup retained private realization under $directory"
+  fi
+done

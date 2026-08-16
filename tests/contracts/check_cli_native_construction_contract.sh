@@ -49,7 +49,10 @@ for required in \
   "package archives, expected 2" \
   "dependency-payload dependency-source" \
   "tool-payload tool-source+dependency-source" \
-  "check-payload checked:tool-source+dependency-source"; do
+  '"$run_evidence_inspect_fixture"' \
+  'construction-evidence 2' \
+  'check-evidence 1' \
+  'terminal cleanup retained private realization under $directory'; do
   grep -F -- "$required" "$test_source" >/dev/null || {
     echo "native construction process proof omits: $required" >&2
     exit 1

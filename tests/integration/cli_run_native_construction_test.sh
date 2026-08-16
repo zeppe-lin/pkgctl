@@ -6,9 +6,10 @@ set -eu
 pkgctl=$1
 state_fixture=$2
 state_inspect_fixture=$3
-runtime_root_fixture=$4
-fixture_collection=$5
-root_view_fixture=$6
+run_evidence_inspect_fixture=$4
+runtime_root_fixture=$5
+fixture_collection=$6
+root_view_fixture=$7
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-run-native-construction.XXXXXX")
 cleanup()
 {
@@ -208,9 +209,26 @@ require_equal dependency-payload dependency-source \
 require_equal tool-payload tool-source+dependency-source \
   "$(tar -xOf "$tool_archive" tool-token)"
 
-check_count=$(find "$runtime/check-temporary" -type f -name check-ran | wc -l)
-[ "$check_count" -eq 1 ] || \
-  fail "native construction retained $check_count check markers, expected 1"
-check_marker=$(find "$runtime/check-temporary" -type f -name check-ran)
-require_equal check-payload checked:tool-source+dependency-source \
-  "$(cat "$check_marker")"
+journal=$(sed -n 's/^journal //p' "$root/run.out")
+[ -n "$journal" ] || fail 'terminal report did not expose journal identity'
+"$run_evidence_inspect_fixture" \
+  "$runtime/run" "$runtime/evidence" "$journal" >"$root/terminal-evidence.out" || {
+  dump_file 'terminal durable evidence' "$root/terminal-evidence.out"
+  fail 'terminal durable construction/check evidence is unavailable after cleanup'
+}
+require_contains terminal-evidence "$root/terminal-evidence.out" 'complete yes'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'failed no'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'stopped no'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'constructions 2'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'checks 1'
+require_contains terminal-evidence "$root/terminal-evidence.out" \
+  'construction-evidence 2'
+require_contains terminal-evidence "$root/terminal-evidence.out" \
+  'check-evidence 1'
+
+for directory in construction-sessions package-outputs check-resources check-temporary; do
+  if [ -d "$runtime/$directory" ] && \
+      find "$runtime/$directory" -mindepth 1 -print -quit | grep . >/dev/null; then
+    fail "terminal cleanup retained private realization under $directory"
+  fi
+done

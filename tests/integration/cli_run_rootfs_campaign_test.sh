@@ -6,10 +6,11 @@ set -eu
 pkgctl=$1
 state_fixture=$2
 state_inspect_fixture=$3
-runtime_root_fixture=$4
-rootfs_audit_fixture=$5
-fixture_collection=$6
-root_view_fixture=$7
+run_evidence_inspect_fixture=$4
+runtime_root_fixture=$5
+rootfs_audit_fixture=$6
+fixture_collection=$7
+root_view_fixture=$8
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-run-rootfs-campaign.XXXXXX")
 cleanup()
 {
@@ -261,14 +262,29 @@ require_equal runtime-lib-archive runtime-lib-source \
 require_equal rootfs-probe-archive rootfs-probe-source+build-tool-source \
   "$(tar -xOf "$rootfs_probe_archive" rootfs-probe-marker)"
 
-check_count=$(find "$runtime/check-temporary" -type f \
-  -name rootfs-check-ran | wc -l)
-[ "$check_count" -eq 1 ] || \
-  fail "rootfs campaign retained $check_count check markers, expected 1"
-check_marker=$(find "$runtime/check-temporary" -type f -name rootfs-check-ran)
-require_equal rootfs-check \
-  checked:rootfs-probe-source+build-tool-source \
-  "$(cat "$check_marker")"
+journal=$(sed -n 's/^journal //p' "$root/run.out")
+[ -n "$journal" ] || fail 'terminal report did not expose journal identity'
+"$run_evidence_inspect_fixture" \
+  "$runtime/run" "$runtime/evidence" "$journal" >"$root/terminal-evidence.out" || {
+  dump_file 'terminal durable evidence' "$root/terminal-evidence.out"
+  fail 'terminal durable construction/check evidence is unavailable after cleanup'
+}
+require_contains terminal-evidence "$root/terminal-evidence.out" 'complete yes'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'failed no'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'stopped no'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'constructions 4'
+require_contains terminal-evidence "$root/terminal-evidence.out" 'checks 1'
+require_contains terminal-evidence "$root/terminal-evidence.out" \
+  'construction-evidence 4'
+require_contains terminal-evidence "$root/terminal-evidence.out" \
+  'check-evidence 1'
+
+for directory in construction-sessions package-outputs check-resources check-temporary; do
+  if [ -d "$runtime/$directory" ] && \
+      find "$runtime/$directory" -mindepth 1 -print -quit | grep . >/dev/null; then
+    fail "terminal cleanup retained private realization under $directory"
+  fi
+done
 
 set +e
 "$rootfs_audit_fixture" "$state" "$target" >"$root/audit-clean.out" 2>"$root/audit-clean.err"
