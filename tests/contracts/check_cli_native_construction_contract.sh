@@ -45,8 +45,17 @@ fi
 for required in \
   "--goal 'build=tool'" \
   "--goal 'check=tool'" \
-  "'durable-steps 3'" \
+  '--build-parallelism 3' \
+  '--build-source-date-epoch 123456789' \
+  "'durable-steps 1'" \
+  "'durable-steps 2'" \
+  'constructions 1' \
+  'checks 0' \
+  'policy-parallelism-redeclaration' \
+  'policy-epoch-redeclaration' \
+  'policy redeclaration changed durable run/evidence history' \
   "package archives, expected 2" \
+  'build-policy' \
   "dependency-payload dependency-source" \
   "tool-payload tool-source+dependency-source" \
   '"$run_evidence_inspect_fixture"' \
@@ -65,7 +74,10 @@ for required in \
   '$PKG_SOURCE_ROOT/source.txt' \
   '$PKG_DESTDIR/dep-token' \
   '$PKG_DESTDIR/dep-tool' \
-  'chmod 0555 "$PKG_DESTDIR/dep-tool"'; do
+  'chmod 0555 "$PKG_DESTDIR/dep-tool"' \
+  '[ "$PKG_JOBS" = 3 ]' \
+  '[ "$SOURCE_DATE_EPOCH" = 123456789 ]' \
+  '[ "$(umask)" = 0022 ]'; do
   grep -F -- "$required" "$dep" >/dev/null || {
     echo "native dependency recipe omits: $required" >&2
     exit 1
@@ -81,6 +93,13 @@ for required in \
   '$PKG_BUILD_INPUT_ROOT/dep/dep-tool' \
   '$PKG_SOURCE_ROOT/source.txt' \
   '$PKG_PACKAGE_ROOT/tool-token' \
+  '$PKG_DESTDIR/build-policy' \
+  'parallelism=%s' \
+  'source-date-epoch=%s' \
+  'umask=%s' \
+  '[ "$PKG_JOBS" = 3 ]' \
+  '[ "$SOURCE_DATE_EPOCH" = 123456789 ]' \
+  '[ "$(umask)" = 0022 ]' \
   '/tmp/check-ran'; do
   grep -F -- "$required" "$tool" >/dev/null || {
     echo "native dependent/check recipe omits: $required" >&2

@@ -74,6 +74,9 @@ set_command()
       --build-architecture x86_64 \
       --target-architecture x86_64 \
       --start "$(printf '%064d' 71)"
+    set -- "$@" \
+      --build-parallelism 1 \
+      --build-source-date-epoch 0
   else
     set -- build \
       --canonical-store "$state" \
@@ -86,7 +89,6 @@ set_command()
     --interpreter "$interpreter" \
     --build-user-id "$uid" \
     --build-group-id "$gid" \
-    --source-date-epoch 0 \
     --max-steps "$steps"
   for group in $groups; do
     [ "$group" = "$gid" ] || set -- "$@" --build-supplementary-group "$group"
@@ -199,9 +201,11 @@ nonce2=$(printf '%064d' 72)
 set -- build cohort-probe --check \
   --canonical-store "$state2" --collection "core=$collection2" \
   --build-architecture x86_64 --target-architecture x86_64 --start "$nonce2" \
+  --build-parallelism 1 \
+  --build-source-date-epoch 0 \
   --runtime-root "$runtime2" --build-root "$build2" --artifact-root "$artifacts2" \
   --interpreter "$interpreter2" --build-user-id "$uid" --build-group-id "$gid" \
-  --source-date-epoch 0 --max-steps 7
+  --max-steps 7
 for group in $groups; do [ "$group" = "$gid" ] || set -- "$@" --build-supplementary-group "$group"; done
 # shellcheck disable=SC2086
 "$pkgctl" "$@" $binding2 >"$root/hostile-build.out" 2>"$root/hostile-build.err" || {
@@ -242,7 +246,7 @@ set_hostile_resume()
   set -- build --canonical-store "$state2" --resume "$nonce2" \
     --runtime-root "$runtime2" --build-root "$build2" --artifact-root "$artifacts2" \
     --interpreter "$interpreter2" --build-user-id "$uid" --build-group-id "$gid" \
-    --source-date-epoch 0 --max-steps 1
+    --max-steps 1
   for group in $groups; do
     [ "$group" = "$gid" ] || set -- "$@" --build-supplementary-group "$group"
   done

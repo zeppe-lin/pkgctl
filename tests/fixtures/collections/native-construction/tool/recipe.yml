@@ -20,6 +20,9 @@ sources:
 build:
   language: posix-shell
   script: |
+    [ "$PKG_JOBS" = 3 ]
+    [ "$SOURCE_DATE_EPOCH" = 123456789 ]
+    [ "$(umask)" = 0022 ]
     IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
     IFS= read -r recorded_dependency <"$PKG_BUILD_INPUT_ROOT/dep/dep-token"
     dependency=$("$PKG_BUILD_INPUT_ROOT/dep/dep-tool")
@@ -27,10 +30,18 @@ build:
     [ "$recorded_dependency" = dependency-source ]
     [ "$dependency" = "$recorded_dependency" ]
     printf '%s+%s\n' "$source" "$dependency" >"$PKG_DESTDIR/tool-token"
+    {
+      printf 'parallelism=%s\n' "$PKG_JOBS"
+      printf 'source-date-epoch=%s\n' "$SOURCE_DATE_EPOCH"
+      printf 'umask=%s\n' "$(umask)"
+    } >"$PKG_DESTDIR/build-policy"
 
 check:
   language: posix-shell
   script: |
+    [ "$PKG_JOBS" = 3 ]
+    [ "$SOURCE_DATE_EPOCH" = 123456789 ]
+    [ "$(umask)" = 0022 ]
     IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
     IFS= read -r payload <"$PKG_PACKAGE_ROOT/tool-token"
     [ "$source" = tool-source ]

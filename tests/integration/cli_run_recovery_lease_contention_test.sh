@@ -149,6 +149,9 @@ run_command()
       --build-architecture x86_64 \
       --target-architecture x86_64 \
       --goal 'run=@base'
+    set -- "$@" \
+      --build-parallelism 1 \
+      --build-source-date-epoch 0
   fi
   set -- "$@" \
     "$intent" "$nonce" \
@@ -161,7 +164,6 @@ run_command()
     --build-group-id "$build_gid" \
     --lifecycle-user-id "$uid" \
     --lifecycle-group-id "$gid" \
-    --source-date-epoch 0 \
     --max-steps "$maximum_steps"
   for group in $build_groups; do
     if [ "$group" != "$build_gid" ]; then
@@ -195,6 +197,8 @@ run_interrupted_command()
     --target-architecture x86_64 \
     --goal 'run=@base' \
     "$intent" "$nonce" \
+    --build-parallelism 1 \
+    --build-source-date-epoch 0 \
     --runtime-root "$runtime" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
@@ -204,7 +208,6 @@ run_interrupted_command()
     --build-group-id "$build_gid" \
     --lifecycle-user-id "$uid" \
     --lifecycle-group-id "$gid" \
-    --source-date-epoch 0 \
     --max-steps "$maximum_steps"
   for group in $build_groups; do
     if [ "$group" != "$build_gid" ]; then

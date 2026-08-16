@@ -65,7 +65,8 @@ struct raw_options final {
   std::optional<std::uint64_t> lifecycle_user_id;
   std::optional<std::uint64_t> lifecycle_group_id;
   std::vector<std::uint64_t> lifecycle_supplementary_groups;
-  std::optional<std::uint64_t> source_date_epoch;
+  std::optional<std::uint64_t> build_parallelism;
+  std::optional<std::uint64_t> build_source_date_epoch;
   std::optional<std::uint64_t> maximum_steps;
   std::vector<installed_tree_option> installed_trees;
   std::optional<std::string> build_subject;
@@ -504,12 +505,21 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
           "lifecycle supplementary group id", true));
       continue;
     }
-    if (argument == "--source-date-epoch")
+    if (argument == "--build-parallelism")
     {
-      if (parsed.source_date_epoch)
-        fail("--source-date-epoch specified more than once");
-      parsed.source_date_epoch = decimal(
-          require_value(argc, argv, index, argument), "source date epoch", true);
+      if (parsed.build_parallelism)
+        fail("--build-parallelism specified more than once");
+      parsed.build_parallelism = decimal(
+          require_value(argc, argv, index, argument), "build parallelism");
+      continue;
+    }
+    if (argument == "--build-source-date-epoch")
+    {
+      if (parsed.build_source_date_epoch)
+        fail("--build-source-date-epoch specified more than once");
+      parsed.build_source_date_epoch = decimal(
+          require_value(argc, argv, index, argument),
+          "build source date epoch", true);
       continue;
     }
     if (argument == "--max-steps")
@@ -542,7 +552,8 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
       parsed.state_backend || parsed.publication_domain ||
       parsed.build_architecture || parsed.target_architecture ||
       !parsed.goals.empty() || parsed.prefer_catalog || parsed.converge_exact ||
-      parsed.build_subject || parsed.build_check;
+      parsed.build_subject || parsed.build_check || parsed.build_parallelism ||
+      parsed.build_source_date_epoch;
 
   if (resume)
   {
@@ -623,8 +634,8 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
       !parsed.build_supplementary_groups.empty() || parsed.lifecycle_user_id ||
       parsed.lifecycle_group_id ||
       !parsed.lifecycle_supplementary_groups.empty() ||
-      parsed.source_date_epoch || parsed.maximum_steps ||
-      !parsed.installed_trees.empty();
+      parsed.build_parallelism || parsed.build_source_date_epoch ||
+      parsed.maximum_steps || !parsed.installed_trees.empty();
   if (kind == command_kind::run)
   {
     if (parsed.artifact_root_path)
@@ -634,20 +645,25 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
         !parsed.interpreter || !parsed.build_user_id.has_value() ||
         !parsed.build_group_id.has_value() ||
         !parsed.lifecycle_user_id.has_value() ||
-        !parsed.lifecycle_group_id.has_value() ||
-        !parsed.source_date_epoch.has_value() || !parsed.maximum_steps)
-      fail("run requires roots, interpreter, build/lifecycle credentials, epoch, and bound");
+        !parsed.lifecycle_group_id.has_value() || !parsed.maximum_steps)
+      fail("run requires roots, interpreter, build/lifecycle credentials, and bound");
+    if (!resume &&
+        (!parsed.build_parallelism || !parsed.build_source_date_epoch))
+      fail("run --start requires complete build policy authority");
   }
   else if (kind == command_kind::build)
   {
     if (!parsed.runtime_root || !parsed.build_root_path ||
         !parsed.artifact_root_path || !parsed.interpreter ||
         !parsed.build_user_id.has_value() || !parsed.build_group_id.has_value() ||
-        !parsed.source_date_epoch.has_value() || !parsed.maximum_steps)
+        !parsed.maximum_steps)
     {
       fail("build requires runtime/build/artifact roots, interpreter, build "
-           "credentials, epoch, and bound");
+           "credentials, and bound");
     }
+    if (!resume &&
+        (!parsed.build_parallelism || !parsed.build_source_date_epoch))
+      fail("build --start requires complete build policy authority");
     if (parsed.lifecycle_root_path || parsed.target_root_path ||
         parsed.lifecycle_user_id || parsed.lifecycle_group_id ||
         !parsed.lifecycle_supplementary_groups.empty())
@@ -661,6 +677,14 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
   if (run_like && *parsed.maximum_steps >
       static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
     fail("maximum step count is too large for this platform");
+  if (run_like && parsed.build_parallelism &&
+      *parsed.build_parallelism >
+          static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+    fail("build parallelism is too large");
+  if (run_like && parsed.build_source_date_epoch &&
+      *parsed.build_source_date_epoch >
+          static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+    fail("build source date epoch is too large");
 
   return parsed;
 }
@@ -732,6 +756,16 @@ transaction_run_command transaction_run_from(
         std::move(parsed.lifecycle_supplementary_groups), true));
   }
 
+  std::optional<pkgbuild::build_policy> admitted_build_policy;
+  if (*parsed.run_intent == transaction_run_command_intent::start)
+  {
+    admitted_build_policy.emplace(pkgbuild::build_policy::make(
+        pkgbuild::environment_policy::hermetic(
+            static_cast<std::uint32_t>(*parsed.build_parallelism), 0022,
+            static_cast<std::int64_t>(*parsed.build_source_date_epoch)),
+        pkgbuild::output_layout_kind::package_root));
+  }
+
   return transaction_run_command{
       frontend, std::move(transaction), std::move(canonical_store),
       *parsed.run_intent,
@@ -750,7 +784,7 @@ transaction_run_command transaction_run_from(
       pkgexec::credential_policy::fixed(
           *parsed.build_user_id, *parsed.build_group_id,
           std::move(parsed.build_supplementary_groups), true),
-      std::move(lifecycle_credentials), *parsed.source_date_epoch,
+      std::move(lifecycle_credentials), std::move(admitted_build_policy),
       static_cast<std::size_t>(*parsed.maximum_steps),
       std::move(parsed.installed_trees)};
 }
@@ -899,10 +933,19 @@ Run/build intent:
   --resume SHA256                 resume retained semantic request and intent
 
 Catalog acquisition, target-binding, architecture, goal, build subject/check,
-resolution-policy, and convergence options are start-only. Resume refuses their
-re-declaration and uses command-evidence retained at admission.
+resolution-policy, convergence, and build-policy options are start-only. Resume
+refuses their re-declaration and uses command-evidence retained at admission.
 --canonical-store remains live resume authority naming the existing physical
 canonical state store.
+
+Admitted build policy required by run/build --start:
+  --build-parallelism N           positive construction/check parallelism
+  --build-source-date-epoch N     non-negative reproducible build epoch
+
+The frontend closes the remaining build-policy dimensions: file-creation mask
+0022, package-root output layout, C.UTF-8 locale, UTC timezone, denied network,
+and isolated HOME. The complete build policy is retained at admission and is not
+redeclared on --resume.
 
 Shared native execution authority:
   --runtime-root PATH             existing private runtime hierarchy
@@ -911,7 +954,6 @@ Shared native execution authority:
   --build-user-id N               construction/check execution user id
   --build-group-id N              construction/check execution group id
   --build-supplementary-group N   repeatable construction/check group id
-  --source-date-epoch N           hermetic construction epoch
   --max-steps N                   positive bound for this invocation
   --installed-tree P=R,PATH       retained installed package/resource tree
 

@@ -88,6 +88,26 @@ require_help_text 'pkgctl run --canonical-store PATH --resume SHA256 RUN-AUTHORI
 require_help_text 'pkgctl build PACKAGE [--check] OPTIONS --start SHA256 BUILD-AUTHORITY'
 require_help_text 'pkgctl build --canonical-store PATH --resume SHA256 BUILD-AUTHORITY'
 require_help_text '--artifact-root PATH'
+require_help_text '--build-parallelism N'
+require_help_text '--build-source-date-epoch N'
+require_help_text 'complete build policy is retained at admission'
+require_help_absent()
+{
+  forbidden=$1
+  if printf '%s\n' "$help" | grep -F -- "$forbidden" >/dev/null; then
+    echo "pkgctl:cli-readonly: help exposes fixed policy as a knob: $forbidden" >&2
+    exit 1
+  fi
+}
+for forbidden in \
+  --build-file-creation-mask \
+  --build-output-layout \
+  --build-locale \
+  --build-timezone \
+  --build-network \
+  --build-home; do
+  require_help_absent "$forbidden"
+done
 require_help_text 'performs at most --max-steps controller advances'
 require_help_text 'pkgctl inspect-run --run-store PATH --journal SHA256'
 require_help_text 'pkgctl inspect-effect --effect-store PATH --attempt SHA256'
@@ -108,6 +128,43 @@ grep -F 'native execution authority options are valid only for run or build' \
 [ ! -e "$root/ignored" ]
 
 build_nonce=$(printf '%064d' 9)
+assert_incomplete_build_policy_refused()
+{
+  label=$1
+  shift
+  runtime=$root/$label-runtime
+  build_root=$root/$label-build
+  artifacts=$root/$label-artifacts
+  # shellcheck disable=SC2086
+  if $pkgctl build app \
+      --collection "core=$collection" \
+      --canonical-store "$state" $binding \
+      --build-architecture x86_64 --target-architecture x86_64 \
+      --start "$build_nonce" \
+      "$@" \
+      --runtime-root "$runtime" \
+      --build-root "$build_root" \
+      --artifact-root "$artifacts" \
+      --interpreter /bin/false \
+      --build-user-id 0 --build-group-id 0 \
+      --max-steps 1 \
+      >"$root/$label.out" 2>"$root/$label.err"; then
+    echo "build unexpectedly accepted incomplete policy: $label" >&2
+    exit 1
+  else
+    [ "$?" -eq 2 ]
+  fi
+  grep -F 'build --start requires complete build policy authority' \
+    "$root/$label.err" >/dev/null
+  [ ! -e "$runtime" ] && [ ! -e "$build_root" ] && [ ! -e "$artifacts" ] || {
+    echo "incomplete policy created runtime coordinates: $label" >&2
+    exit 1
+  }
+}
+assert_incomplete_build_policy_refused missing-parallelism \
+  --build-source-date-epoch 0
+assert_incomplete_build_policy_refused missing-epoch \
+  --build-parallelism 1
 # Build owns its exact build/check goals; generic goal policy is not a second
 # route into the frontend. This refusal happens at parse time and creates none
 # of the supplied runtime coordinates.
@@ -118,12 +175,14 @@ if $pkgctl build app \
     --build-architecture x86_64 --target-architecture x86_64 \
     --goal 'build=app' \
     --start "$build_nonce" \
+    --build-parallelism 1 \
+    --build-source-date-epoch 0 \
     --runtime-root "$root/build-policy-runtime" \
     --build-root "$root/build-policy-root" \
     --artifact-root "$root/build-policy-artifacts" \
     --interpreter /bin/false \
     --build-user-id 0 --build-group-id 0 \
-    --source-date-epoch 0 --max-steps 1 \
+    --max-steps 1 \
     >"$root/build-policy.out" 2>"$root/build-policy.err"; then
   echo 'build unexpectedly accepted caller-supplied goal policy' >&2
   exit 1
@@ -143,13 +202,15 @@ if $pkgctl build app \
     --canonical-store "$state" $binding \
     --build-architecture x86_64 --target-architecture x86_64 \
     --start "$build_nonce" \
+    --build-parallelism 1 \
+    --build-source-date-epoch 0 \
     --runtime-root "$root/build-target-runtime" \
     --build-root "$root/build-target-root" \
     --artifact-root "$root/build-target-artifacts" \
     --target-root "$root/build-forbidden-target" \
     --interpreter /bin/false \
     --build-user-id 0 --build-group-id 0 \
-    --source-date-epoch 0 --max-steps 1 \
+    --max-steps 1 \
     >"$root/build-target.out" 2>"$root/build-target.err"; then
   echo 'build unexpectedly accepted target-operation authority' >&2
   exit 1

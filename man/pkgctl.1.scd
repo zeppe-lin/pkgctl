@@ -334,8 +334,19 @@ identity. Construction/check and lifecycle credentials remain separate command
 authorities; *pkgctl* does not imply fakeroot, ownership virtualization, or a
 credential transition that the backend cannot establish.
 
-*--source-date-epoch* _number_
-	Explicit non-negative hermetic construction epoch.
+The following build-policy authorities are required only with *--start* and are
+retained as one sealed build policy. They are invalid with *--resume*:
+
+*--build-parallelism* _number_
+	Positive construction/check parallelism selected by the operator.
+
+*--build-source-date-epoch* _number_
+	Non-negative reproducible build epoch selected by the maintainer/campaign.
+
+The frontend fixes the remaining policy dimensions rather than exposing them as
+operator knobs: file-creation mask 0022, package-root output layout, C.UTF-8
+locale, UTC timezone, denied network, and isolated HOME. Resume recovers the
+retained complete policy from command evidence.
 
 *--max-steps* _number_
 	Positive maximum number of controller advances in this invocation. Reaching

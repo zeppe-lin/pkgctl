@@ -111,9 +111,10 @@ Release 0.35.0 closes the functional package-management chain with one
 bounded native transaction command. Before fresh-run retention or admission,
 `pkgctl run` proves that the selected native Linux backend can establish the
 execution guarantees implied by the transaction. `--start` then retains the
-complete start-only transaction inputs, the exact admitted construction/check/
-lifecycle backend capability profiles, and the owner-encoded catalog/state universe
-before admitting one explicit run nonce. `--resume` requires that retained
+complete start-only transaction inputs, one exact admitted `libpkgbuild`
+build-policy value, the exact admitted construction/check/lifecycle backend
+capability profiles, and the owner-encoded catalog/state universe before admitting
+one explicit run nonce. `--resume` requires that retained
 command evidence and the exact admitted journal; it refuses a second collection,
 target-binding, architecture, goal, resolution-policy, or convergence request.
 The current canonical-store pathname remains live resume authority while its
@@ -169,8 +170,11 @@ All authority remains explicit: existing runtime and construction/check roots;
 operation-capable transactions additionally require existing lifecycle and target
 roots and their target-operation stores. One exact interpreter authority is
 required when current execution is possible, alongside explicit numeric
-credentials, source-date epoch, retained installed-package trees, canonical state
-binding, and a caller-issued run nonce. The command creates no namespace, starts no daemon, waits on no timer,
+credentials, a start-only complete build policy, retained installed-package trees,
+canonical state binding, and a caller-issued run nonce. The configurable policy
+surface is parallelism plus source-date epoch; pkgctl fixes umask 0022,
+package-root layout, C.UTF-8/UTC, denied network, and isolated HOME. Resume
+recovers that admitted policy instead of asking the caller to restate it. The command creates no namespace, starts no daemon, waits on no timer,
 loops beyond the bound, retries implicitly, rolls back, repairs, cleans up, or
 collects history. At 0.35.0 this closed the functional package-management
 chain; later releases reduce construction-only authority and expose that path

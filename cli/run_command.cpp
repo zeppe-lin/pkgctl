@@ -679,6 +679,79 @@ struct retained_native_execution_profiles final {
   }
 }
 
+[[nodiscard]] std::uint64_t output_layout_tag(
+    pkgbuild::output_layout_kind value)
+{
+  switch (value)
+  {
+    case pkgbuild::output_layout_kind::package_root:
+      return 1U;
+  }
+  throw std::runtime_error("build policy output layout is invalid");
+}
+
+[[nodiscard]] pkgbuild::output_layout_kind output_layout_from_tag(
+    std::uint64_t value)
+{
+  switch (value)
+  {
+    case 1U:
+      return pkgbuild::output_layout_kind::package_root;
+    default:
+      throw std::runtime_error(
+          "command evidence build policy output layout tag is invalid");
+  }
+}
+
+void append_build_policy(
+    std::vector<std::uint8_t>& bytes,
+    const pkgbuild::build_policy& policy)
+{
+  const auto& environment = policy.environment();
+  append_text(bytes, policy.identity().hex());
+  append_u64(bytes, environment.parallelism());
+  append_u64(bytes, environment.file_creation_mask());
+  append_u64(bytes, environment.source_date_epoch() ? 1U : 0U);
+  if (environment.source_date_epoch())
+    append_u64(
+        bytes, static_cast<std::uint64_t>(*environment.source_date_epoch()));
+  append_u64(bytes, output_layout_tag(policy.output_layout()));
+}
+
+[[nodiscard]] pkgbuild::build_policy read_build_policy(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset)
+{
+  const auto retained_identity = pkgbuild::build_policy_identity::from_sha256(
+      read_text(bytes, offset));
+  const auto parallelism = read_u32_value(
+      bytes, offset, "build policy parallelism");
+  const auto file_creation_mask = read_u32_value(
+      bytes, offset, "build policy file creation mask");
+  const auto epoch_present = read_u64(bytes, offset);
+  if (epoch_present > 1U)
+    throw std::runtime_error(
+        "command evidence build policy epoch tag is invalid");
+  std::optional<std::int64_t> source_date_epoch;
+  if (epoch_present != 0U)
+  {
+    const auto value = read_u64(bytes, offset);
+    if (value > static_cast<std::uint64_t>(
+                    std::numeric_limits<std::int64_t>::max()))
+      throw std::runtime_error(
+          "command evidence build policy epoch is too large");
+    source_date_epoch = static_cast<std::int64_t>(value);
+  }
+  auto policy = pkgbuild::build_policy::make(
+      pkgbuild::environment_policy::hermetic(
+          parallelism, file_creation_mask, source_date_epoch),
+      output_layout_from_tag(read_u64(bytes, offset)));
+  if (policy.identity() != retained_identity)
+    throw std::runtime_error(
+        "command evidence build policy identity contradicts retained fields");
+  return policy;
+}
+
 struct retained_command_evidence final {
   transaction_run_command_frontend frontend;
   std::filesystem::path artifact_root;
@@ -687,6 +760,7 @@ struct retained_command_evidence final {
   pkgcatalog::catalog_snapshot catalog;
   pkgstate::snapshot state;
   pkgexec::interpreter_identity interpreter;
+  pkgbuild::build_policy build_policy;
   retained_native_execution_profiles execution_profiles;
 };
 
@@ -703,6 +777,7 @@ public:
       const std::filesystem::path& artifact_root,
       const transaction_session& transaction,
       const pkgexec::interpreter_identity& interpreter,
+      const pkgbuild::build_policy& build_policy,
       const retained_native_execution_profiles& execution_profiles)
   {
     const auto catalog = pkgcatalog::encode_catalog_snapshot(
@@ -720,6 +795,7 @@ public:
     append_bytes(bytes, state);
     append_bytes(bytes, request);
     append_text(bytes, interpreter.hex());
+    append_build_policy(bytes, build_policy);
     append_bytes(bytes, pkgexec::encode_backend_capability_profile(
         execution_profiles.construction));
     append_bytes(bytes, pkgexec::encode_backend_capability_profile(
@@ -747,6 +823,7 @@ public:
     const auto request_encoding = read_bytes(bytes, offset);
     auto interpreter = pkgexec::interpreter_identity::from_sha256(
         read_text(bytes, offset));
+    auto build_policy = read_build_policy(bytes, offset);
     const auto construction_profile_encoding = read_bytes(bytes, offset);
     const auto check_profile_encoding = read_bytes(bytes, offset);
     const auto lifecycle_profile_encoding = read_bytes(bytes, offset);
@@ -776,7 +853,7 @@ public:
       throw std::runtime_error("command evidence request has trailing bytes");
     return {frontend, artifact_root, transaction, std::move(request),
             std::move(catalog), std::move(state), std::move(interpreter),
-            std::move(execution_profiles)};
+            std::move(build_policy), std::move(execution_profiles)};
   }
 
 private:
@@ -1959,7 +2036,8 @@ void require_operation_command_authority(
 [[nodiscard]] native_transaction_session_configuration command_sessions(
     const transaction_run_command& command,
     const pkgstate::state_target_binding& binding,
-    const pkgexec::interpreter_identity& interpreter)
+    const pkgexec::interpreter_identity& interpreter,
+    const pkgbuild::build_policy& build_policy)
 {
   return native_transaction_session_configuration::make(
       {
@@ -1973,9 +2051,7 @@ void require_operation_command_authority(
           command.build_root,
       },
       {
-          pkgbuild::build_policy::make(
-              pkgbuild::environment_policy::hermetic(
-                  1U, 0022, command.source_date_epoch)),
+          build_policy,
           pkgfetch::acquisition_policy::defaults(),
           {interpreter, command.build_credentials.user_id(),
            command.build_credentials.group_id(),
@@ -2445,8 +2521,17 @@ int execute_transaction_run(transaction_run_command command)
   const auto admitted_interpreter = retained_evidence
       ? retained_evidence->interpreter
       : current_interpreter->identity();
-  auto session_configuration =
-      command_sessions(command, binding, admitted_interpreter);
+  if (retained_evidence && command.build_policy)
+    throw std::runtime_error(
+        "resumed run carries duplicate build policy authority");
+  if (!retained_evidence && !command.build_policy)
+    throw std::runtime_error(
+        "fresh run lacks explicit build policy authority");
+  const auto& admitted_build_policy = retained_evidence
+      ? retained_evidence->build_policy
+      : *command.build_policy;
+  auto session_configuration = command_sessions(
+      command, binding, admitted_interpreter, admitted_build_policy);
   const auto cleanup_configuration = session_configuration;
 
   if (current_execution_backend)
@@ -2472,7 +2557,8 @@ int execute_transaction_run(transaction_run_command command)
   {
     command_evidence.retain(
         command.nonce, command.frontend, command.artifact_root, transaction,
-        admitted_interpreter, admitted_execution_profiles);
+        admitted_interpreter, admitted_build_policy,
+        admitted_execution_profiles);
   }
 
   const auto drive_policy =

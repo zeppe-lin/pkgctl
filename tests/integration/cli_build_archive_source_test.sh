@@ -102,13 +102,14 @@ set -- build archive-probe --check \
   --build-architecture x86_64 \
   --target-architecture x86_64 \
   --start "$nonce" \
+  --build-parallelism 1 \
+  --build-source-date-epoch 0 \
   --runtime-root "$runtime" \
   --build-root "$build" \
   --artifact-root "$artifacts" \
   --interpreter "$interpreter" \
   --build-user-id "$uid" \
   --build-group-id "$gid" \
-  --source-date-epoch 0 \
   --max-steps 2
 for group in $groups; do
   if [ "$group" != "$gid" ]; then
@@ -165,7 +166,6 @@ set -- build \
   --interpreter "$interpreter" \
   --build-user-id "$uid" \
   --build-group-id "$gid" \
-  --source-date-epoch 0 \
   --max-steps 1
 for group in $groups; do
   if [ "$group" != "$gid" ]; then

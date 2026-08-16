@@ -119,6 +119,9 @@ run_command()
     if [ "$convergence" = exact ]; then
       set -- "$@" --converge-exact
     fi
+    set -- "$@" \
+      --build-parallelism 1 \
+      --build-source-date-epoch 0
   fi
   set -- "$@" \
     "$intent" "$nonce" \
@@ -131,7 +134,6 @@ run_command()
     --build-group-id "$build_gid" \
     --lifecycle-user-id "$uid" \
     --lifecycle-group-id "$gid" \
-    --source-date-epoch 0 \
     --max-steps "$maximum_steps"
   for group in $build_groups; do
     if [ "$group" != "$build_gid" ]; then

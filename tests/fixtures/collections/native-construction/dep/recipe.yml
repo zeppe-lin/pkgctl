@@ -19,6 +19,9 @@ sources:
 build:
   language: posix-shell
   script: |
+    [ "$PKG_JOBS" = 3 ]
+    [ "$SOURCE_DATE_EPOCH" = 123456789 ]
+    [ "$(umask)" = 0022 ]
     IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
     [ "$source" = dependency-source ]
     printf '%s\n' "$source" >"$PKG_DESTDIR/dep-token"

@@ -250,18 +250,23 @@ The final command suite must prove:
 
 - `--start` and `--resume` are mutually exclusive and require one explicit
   lowercase run nonce, existing roots, interpreter coordinate, numeric credentials,
-  source-date epoch, and positive step bound; current interpreter inspection is
-  required only when this invocation can execute new process work;
+  and positive step bound; start additionally requires complete build-policy
+  authority (parallelism plus source-date epoch), while current interpreter
+  inspection is required only when this invocation can execute new process work;
 - start retains the current private command-evidence format before admission: the
-  complete start-only transaction inputs, exact admitted interpreter identity, exact
-  admitted backend capability profiles for construction/check/lifecycle, plus
-  owner-encoded catalog/state snapshots.
+  complete start-only transaction inputs, exact admitted interpreter identity, the
+  complete `pkgbuild::build_policy` value and identity, exact admitted backend
+  capability profiles for construction/check/lifecycle, plus owner-encoded
+  catalog/state snapshots. The native-construction vertical stops after one build,
+  then resumes without policy options and requires the retained non-default policy
+  to reach both the remaining BUILD and CHECK; policy redeclaration on resume must
+  fail without changing durable run/evidence history;
   Resume requires
   that retained command evidence and exact journal, omits all catalog, target-binding,
   architecture, goal, resolution-policy, and convergence options, and reproduces
   the same transaction identity using only the current canonical-store pathname
-  as live state-store coordinate; re-declaring start semantics on resume is a
-  usage error and bytes outside the one current private command-evidence format
+  as live state-store coordinate; re-declaring build policy or other start
+  semantics on resume is a usage error and bytes outside the one current private command-evidence format
   fail closed without a compatibility decoder;
 - completed/native-runtime reopen is qualified with null construction/check/lifecycle
   backends and no injected recovery profiles; construction/check attempt evidence decodes

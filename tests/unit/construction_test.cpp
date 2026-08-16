@@ -1239,7 +1239,7 @@ void check_admission()
         transaction,
         source_identity<pkgtransaction::transaction_node_identity>('f'),
         pkgbuild::build_policy::make(
-            pkgbuild::environment_policy::hermetic(1)));
+            pkgbuild::environment_policy::hermetic(1, 0022, std::nullopt)));
   }
   catch (const pkgctl::error& value)
   {
@@ -1251,7 +1251,7 @@ void check_admission()
   auto request = pkgctl::construction_request::make(
       transaction, build_node(transaction).identity(),
       pkgbuild::build_policy::make(
-          pkgbuild::environment_policy::hermetic(1)));
+          pkgbuild::environment_policy::hermetic(1, 0022, std::nullopt)));
   CHECK(request.inputs().size() == 1U);
   const auto& input = request.inputs().front();
   pkgbuild_exec::package_input_resource exact{

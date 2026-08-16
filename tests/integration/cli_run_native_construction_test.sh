@@ -113,13 +113,17 @@ initial_state=$("$state_inspect_fixture" "$state")
 printf '%s\n' "$initial_state" >"$root/initial-state.out"
 require_contains initial-state "$root/initial-state.out" 'packages 0'
 
+nonce=$(printf '%064d' 7)
+
 set -- run --canonical-store "$state" \
   --collection "core=$collection" \
   --build-architecture x86_64 \
   --target-architecture x86_64 \
   --goal 'build=tool' \
   --goal 'check=tool' \
-  --start "$(printf '%064d' 7)" \
+  --start "$nonce" \
+  --build-parallelism 3 \
+  --build-source-date-epoch 123456789 \
   --runtime-root "$runtime" \
   --build-root "$build" \
   --lifecycle-root "$lifecycle" \
@@ -129,8 +133,7 @@ set -- run --canonical-store "$state" \
   --build-group-id "$gid" \
   --lifecycle-user-id "$uid" \
   --lifecycle-group-id "$gid" \
-  --source-date-epoch 0 \
-  --max-steps 3
+  --max-steps 1
 for group in $groups; do
   if [ "$group" != "$gid" ]; then
     set -- "$@" --build-supplementary-group "$group"
@@ -162,10 +165,58 @@ if [ "$status" -ne 0 ]; then
 fi
 
 require_contains run "$root/run.out" 'origin admitted'
-require_contains run "$root/run.out" 'disposition completed'
-require_contains run "$root/run.out" 'durable-steps 3'
-require_contains run "$root/run.out" 'complete yes'
+require_contains run "$root/run.out" 'disposition step-limit-reached'
+require_contains run "$root/run.out" 'durable-steps 1'
+require_contains run "$root/run.out" 'complete no'
 require_contains run "$root/run.out" 'failed no'
+
+journal=$(sed -n 's/^journal //p' "$root/run.out")
+[ -n "$journal" ] || fail 'bounded start did not expose journal identity'
+"$run_evidence_inspect_fixture" \
+  "$runtime/run" "$runtime/evidence" "$journal" >"$root/bounded-evidence.out" || {
+  dump_file 'bounded durable evidence' "$root/bounded-evidence.out"
+  fail 'bounded start durable evidence is unavailable'
+}
+require_contains bounded-evidence "$root/bounded-evidence.out" 'complete no'
+require_contains bounded-evidence "$root/bounded-evidence.out" 'constructions 1'
+require_contains bounded-evidence "$root/bounded-evidence.out" 'checks 0'
+
+# Resume deliberately carries no build-policy options. The remaining tool BUILD
+# and CHECK must recover the complete admitted policy from command evidence.
+set -- run --canonical-store "$state" \
+  --resume "$nonce" \
+  --runtime-root "$runtime" \
+  --build-root "$build" \
+  --lifecycle-root "$lifecycle" \
+  --target-root "$target" \
+  --interpreter "$interpreter" \
+  --build-user-id "$uid" \
+  --build-group-id "$gid" \
+  --lifecycle-user-id "$uid" \
+  --lifecycle-group-id "$gid" \
+  --max-steps 3
+for group in $groups; do
+  if [ "$group" != "$gid" ]; then
+    set -- "$@" --build-supplementary-group "$group"
+    set -- "$@" --lifecycle-supplementary-group "$group"
+  fi
+done
+
+set +e
+"$pkgctl" "$@" >"$root/resume.out" 2>"$root/resume.err"
+status=$?
+set -e
+[ "$status" -eq 0 ] || {
+  dump_file 'resume stdout' "$root/resume.out"
+  dump_file 'resume stderr' "$root/resume.err"
+  fail "resume: expected status 0, got $status"
+}
+require_contains resume "$root/resume.out" 'origin resumed'
+require_contains resume "$root/resume.out" 'disposition completed'
+require_contains resume "$root/resume.out" 'durable-steps 2'
+require_contains resume "$root/resume.out" 'complete yes'
+require_contains resume "$root/resume.out" 'failed no'
+require_equal journal "$journal" "$(sed -n 's/^journal //p' "$root/resume.out")"
 
 final_state=$("$state_inspect_fixture" "$state")
 require_equal canonical-state "$initial_state" "$final_state"
@@ -208,9 +259,13 @@ require_equal dependency-payload dependency-source \
   "$(tar -xOf "$dep_archive" dep-token)"
 require_equal tool-payload tool-source+dependency-source \
   "$(tar -xOf "$tool_archive" tool-token)"
+expected_policy=$(printf '%s\n' \
+  'parallelism=3' \
+  'source-date-epoch=123456789' \
+  'umask=0022')
+require_equal build-policy "$expected_policy" \
+  "$(tar -xOf "$tool_archive" build-policy)"
 
-journal=$(sed -n 's/^journal //p' "$root/run.out")
-[ -n "$journal" ] || fail 'terminal report did not expose journal identity'
 "$run_evidence_inspect_fixture" \
   "$runtime/run" "$runtime/evidence" "$journal" >"$root/terminal-evidence.out" || {
   dump_file 'terminal durable evidence' "$root/terminal-evidence.out"
@@ -225,6 +280,57 @@ require_contains terminal-evidence "$root/terminal-evidence.out" \
   'construction-evidence 2'
 require_contains terminal-evidence "$root/terminal-evidence.out" \
   'check-evidence 1'
+
+capture_policy_redeclaration()
+{
+  label=$1
+  option=$2
+  value=$3
+  set -- run --canonical-store "$state" \
+    --resume "$nonce" \
+    "$option" "$value" \
+    --runtime-root "$runtime" \
+    --build-root "$build" \
+    --lifecycle-root "$lifecycle" \
+    --target-root "$target" \
+    --interpreter "$interpreter" \
+    --build-user-id "$uid" \
+    --build-group-id "$gid" \
+    --lifecycle-user-id "$uid" \
+    --lifecycle-group-id "$gid" \
+    --max-steps 1
+  for group in $groups; do
+    if [ "$group" != "$gid" ]; then
+      set -- "$@" --build-supplementary-group "$group"
+      set -- "$@" --lifecycle-supplementary-group "$group"
+    fi
+  done
+  set +e
+  "$pkgctl" "$@" >"$root/$label.out" 2>"$root/$label.err"
+  status=$?
+  set -e
+  [ "$status" -eq 2 ] || {
+    dump_file "$label stdout" "$root/$label.out"
+    dump_file "$label stderr" "$root/$label.err"
+    fail "$label: expected usage status 2, got $status"
+  }
+  require_contains "$label" "$root/$label.err" \
+    '--resume uses retained transaction semantics'
+}
+
+capture_policy_redeclaration policy-parallelism-redeclaration \
+  --build-parallelism 2
+capture_policy_redeclaration policy-epoch-redeclaration \
+  --build-source-date-epoch 123456790
+"$run_evidence_inspect_fixture" \
+  "$runtime/run" "$runtime/evidence" "$journal" \
+  >"$root/post-redeclaration-evidence.out" || {
+  dump_file 'post-redeclaration durable evidence' \
+    "$root/post-redeclaration-evidence.out"
+  fail 'policy redeclaration damaged durable evidence'
+}
+cmp -s "$root/terminal-evidence.out" "$root/post-redeclaration-evidence.out" || \
+  fail 'policy redeclaration changed durable run/evidence history'
 
 for directory in construction-sessions package-outputs check-resources check-temporary; do
   if [ -d "$runtime/$directory" ] && \

@@ -319,8 +319,8 @@ allowed to become its first consumer.
 The final functional closure is one command, not a new semantic subsystem:
 
 ```text
---start: explicit transaction semantics + run nonce
---resume: retained transaction semantics + same nonce
+--start: explicit transaction semantics + complete build policy + run nonce
+--resume: retained transaction semantics + retained build policy + same nonce
              + live native roots and credentials
              + current canonical-store pathname
                          |
@@ -337,15 +337,19 @@ Linux backend can establish the guarantees required by the transaction's build,
 check, and lifecycle nodes. Capability absence is a control-plane refusal: no
 initial command evidence or run/effect evidence is retained. Only after that
 preflight does start retain the current private command-evidence format: the
-complete start-only transaction inputs, exact admitted interpreter identity, exact
-construction/check/lifecycle backend capability profiles, and the original owner-encoded catalog and
-state snapshots.
-Resume supplies no second collection, target-binding, architecture, goal,
+complete start-only transaction inputs, exact admitted interpreter identity, the
+complete `pkgbuild::build_policy` value and identity, exact construction/check/
+lifecycle backend capability profiles, and the original owner-encoded catalog and
+state snapshots. The frontend admits operator-selected parallelism and maintainer-
+selected source-date epoch while fixing umask 0022 and package-root layout;
+libpkgbuild closes C.UTF-8, UTC, denied-network, and isolated-HOME invariants.
+Resume supplies no second build policy, collection, target-binding, architecture, goal,
 resolution-policy, or convergence request. It reconstructs the retained request from those inputs,
 binds its retained target identity to the caller-supplied current canonical-store
 pathname, and recomposes the same transaction identity without collection
-reacquisition or live-state replanning. Semantic start options on resume are a
-usage error. Bytes outside the one current private command-evidence format fail
+reacquisition or live-state replanning. Build-policy or other semantic start
+options on resume are a usage error. Bytes outside the one current private
+command-evidence format fail
 closed; there is no compatibility decoder or migration path. An already admitted
 run is refused by start; a missing run is refused by resume.
 

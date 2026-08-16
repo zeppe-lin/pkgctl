@@ -92,6 +92,9 @@ run_command()
       --build-architecture x86_64 \
       --target-architecture x86_64 \
       --goal 'build=fixture'
+    set -- "$@" \
+      --build-parallelism 1 \
+      --build-source-date-epoch 0
   fi
   set -- "$@" \
     "$intent" "$nonce" \
@@ -104,7 +107,6 @@ run_command()
     --build-group-id "$gid" \
     --lifecycle-user-id "$uid" \
     --lifecycle-group-id "$gid" \
-    --source-date-epoch 0 \
     --max-steps 1
   for group in $groups; do
     if [ "$group" != "$gid" ]; then

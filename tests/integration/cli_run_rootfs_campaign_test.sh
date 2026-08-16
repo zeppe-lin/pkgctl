@@ -151,6 +151,8 @@ set -- run --canonical-store "$state" \
   --goal 'check=rootfs-probe' \
   --converge-exact \
   --start "$(printf '%064d' 6)" \
+  --build-parallelism 1 \
+  --build-source-date-epoch 0 \
   --runtime-root "$runtime" \
   --build-root "$build" \
   --lifecycle-root "$lifecycle" \
@@ -160,7 +162,6 @@ set -- run --canonical-store "$state" \
   --build-group-id "$gid" \
   --lifecycle-user-id "$uid" \
   --lifecycle-group-id "$gid" \
-  --source-date-epoch 0 \
   --max-steps 16
 for group in $groups; do
   if [ "$group" != "$gid" ]; then

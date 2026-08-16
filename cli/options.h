@@ -10,6 +10,7 @@
 #include <variant>
 #include <vector>
 
+#include <libpkgbuild/request.h>
 #include <libpkgexec/model.h>
 #include <libpkgstate/installed_package.h>
 
@@ -59,7 +60,7 @@ struct transaction_run_command final {
   std::filesystem::path interpreter;
   pkgexec::credential_policy build_credentials;
   std::optional<pkgexec::credential_policy> lifecycle_credentials;
-  std::uint64_t source_date_epoch;
+  std::optional<pkgbuild::build_policy> build_policy;
   std::size_t maximum_steps;
   std::vector<installed_tree_option> installed_trees;
 };

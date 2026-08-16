@@ -45,7 +45,16 @@ for required in \
   '--start SHA256' \
   '--resume SHA256' \
   '--max-steps N' \
+  '--build-parallelism N' \
+  '--build-source-date-epoch N' \
+  'std::optional<pkgbuild::build_policy> build_policy' \
   'class command_evidence_store final' \
+  'pkgbuild::build_policy build_policy' \
+  'append_build_policy' \
+  'read_build_policy' \
+  'policy.identity().hex()' \
+  'command evidence build policy identity contradicts retained fields' \
+  'retained_evidence->build_policy' \
   'std::optional<transaction_request> transaction' \
   'PKGCTL-COMMAND-EVIDENCE' \
   'pkgctl/command-evidence' \
@@ -90,12 +99,31 @@ for required in \
   'exact transaction run is not admitted; use --start' \
   'retained command evidence recomposes another transaction' \
   'mutation-authority-unavailable' \
-  'transaction_run_drive_disposition::mutation_authority_unavailable'; do
+  'transaction_run_drive_disposition::mutation_authority_unavailable' \
+  'pkgbuild::environment_policy::hermetic(' \
+  'pkgbuild::output_layout_kind::package_root' \
+  '0022'; do
   grep -F -- "$required" "$srcdir/cli/options.h" "$options" "$command" \
       >/dev/null || {
     echo "missing bounded transaction command contract: $required" >&2
     exit 1
   }
+done
+
+for forbidden in \
+  '--source-date-epoch' \
+  '--build-file-creation-mask' \
+  '--build-output-layout' \
+  '--build-locale' \
+  '--build-timezone' \
+  '--build-network' \
+  '--build-home' \
+  'command.source_date_epoch' \
+  'environment_policy::hermetic(1U'; do
+  if grep -F -- "$forbidden" "$srcdir/cli/options.h" "$options" "$command" >/dev/null 2>&1; then
+    echo "build policy regressed to scalar/hard-coded command authority: $forbidden" >&2
+    exit 1
+  fi
 done
 
 for required in \
