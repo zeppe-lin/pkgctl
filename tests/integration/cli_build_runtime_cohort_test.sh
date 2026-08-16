@@ -225,7 +225,9 @@ require_contains hostile-before "$root/hostile-before.out" 'constructions 7'
 require_contains hostile-before "$root/hostile-before.out" 'checks 0'
 before_record=$(sed -n 's/^record //p' "$root/hostile-before.out")
 before_sequence=$(sed -n 's/^sequence //p' "$root/hostile-before.out")
-[ -n "$before_record" ] && [ -n "$before_sequence" ] ||
+before_dispatches=$(sed -n 's/^dispatches //p' "$root/hostile-before.out")
+[ -n "$before_record" ] && [ -n "$before_sequence" ] && \
+  [ -n "$before_dispatches" ] ||
   fail 'hostile setup durable head identity is unavailable'
 
 idx=$(sed -n 's/^artifact\.\([0-9][0-9]*\)\.package cohort-libgcc$/\1/p' "$root/hostile-build.out")
@@ -295,10 +297,16 @@ require_contains hostile-started "$root/hostile-started.out" \
   "dispatch.$started_index.terminal-evidence no"
 started_record=$(sed -n 's/^record //p' "$root/hostile-started.out")
 started_sequence=$(sed -n 's/^sequence //p' "$root/hostile-started.out")
+started_dispatches=$(sed -n 's/^dispatches //p' "$root/hostile-started.out")
 [ "$started_record" != "$before_record" ] ||
   fail 'retained authority refusal did not durably start the check attempt'
-[ "$started_sequence" -eq $((before_sequence + 1)) ] ||
-  fail 'retained authority refusal advanced more than the check-start checkpoint'
+[ "$started_dispatches" -eq $((before_dispatches + 1)) ] ||
+  fail 'retained authority refusal did not reserve exactly one check dispatch'
+[ "$started_index" -eq "$before_dispatches" ] ||
+  fail 'retained authority refusal did not append the started check dispatch'
+# A new executable dispatch is two durable transitions: reservation, then start.
+[ "$started_sequence" -eq $((before_sequence + 2)) ] ||
+  fail 'retained authority refusal changed history beyond check reservation and start'
 started_snapshot=$(cat "$root/hostile-started.out")
 find "$runtime2/construction-sessions" -mindepth 1 -print -quit | grep . >/dev/null ||
   fail 'authority-refused cohort check cleaned construction residue'

@@ -47,7 +47,9 @@ for required in \
   'corrupted cohort check input was accepted' \
   'native check package realization failed:' \
   'retained authority refusal did not durably start the check attempt' \
-  'retained authority refusal advanced more than the check-start checkpoint' \
+  'retained authority refusal did not reserve exactly one check dispatch' \
+  'retained authority refusal did not append the started check dispatch' \
+  'retained authority refusal changed history beyond check reservation and start' \
   'repeated retained authority refusal changed the durable started checkpoint' \
   'authority-refused cohort check cleaned construction residue' \
   'restored cohort authority did not recover the pending check' \
