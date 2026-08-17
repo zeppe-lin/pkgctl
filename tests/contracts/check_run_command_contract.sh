@@ -224,6 +224,15 @@ target_open_line=$(grep -n -F 'open_directory(*command.target_root)' "$command" 
   exit 1
 }
 
+for sequencing_contract in \
+  'auto build_architecture = read_text(bytes, offset);' \
+  'auto target_architecture = read_text(bytes, offset);'; do
+  grep -F -- "$sequencing_contract" "$command" >/dev/null || {
+    echo "retained command evidence decode lacks explicit sequencing: $sequencing_contract" >&2
+    exit 1
+  }
+done
+
 for artifact_reporting_contract in \
   'void render_construction_artifacts(' \
   'bool public_build_frontend' \
@@ -236,6 +245,8 @@ for artifact_reporting_contract in \
 done
 
 for construction_only_contract in \
+  '--build-architecture x86_64' \
+  '--target-architecture fixture-target' \
   "--goal 'build=fixture'" \
   'lifecycle-must-remain-absent' \
   'target-must-remain-absent' \

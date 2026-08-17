@@ -588,9 +588,11 @@ void append_transaction_request_inputs(
       std::move(collections),
       pkgcatalog::acquire::limits(maximum_document_bytes));
 
+  auto build_architecture = read_text(bytes, offset);
+  auto target_architecture = read_text(bytes, offset);
   pkgresolve::architecture_context architectures(
-      pkgsource::architecture_reference(read_text(bytes, offset)),
-      pkgsource::architecture_reference(read_text(bytes, offset)));
+      pkgsource::architecture_reference(std::move(build_architecture)),
+      pkgsource::architecture_reference(std::move(target_architecture)));
   const auto goal_count = read_count(bytes, offset, "goal");
   std::vector<pkgresolve::resolution_goal> goals;
   goals.reserve(goal_count);

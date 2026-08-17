@@ -246,6 +246,11 @@ before adding corresponding frontend behavior.
 
 ## Release 0.35.0 bounded native command qualification
 
+The construction-only restart case deliberately uses different build and
+target architecture references (`x86_64` and `fixture-target`). Equal values
+would let unspecified C++ argument-evaluation order swap adjacent retained
+fields without detection.
+
 The final command suite must prove:
 
 - `--start` and `--resume` are mutually exclusive and require one explicit

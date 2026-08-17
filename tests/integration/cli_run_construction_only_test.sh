@@ -90,8 +90,10 @@ run_command()
     set -- "$@" \
       --collection "core=$collection" \
       --build-architecture x86_64 \
-      --target-architecture x86_64 \
+      --target-architecture fixture-target \
       --goal 'build=fixture'
+    # Keep build and target architecture intentionally distinct. Command
+    # evidence decoding must preserve field order across a fresh process.
     set -- "$@" \
       --build-parallelism 1 \
       --build-source-date-epoch 0
