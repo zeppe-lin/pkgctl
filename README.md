@@ -48,6 +48,11 @@ a frontend mismatch or artifact-root redirection before durable advancement.
 Build output reports the exact retained artifact path and release/artifact/build
 identities, digest, size, and image/binding identities as historical admitted
 authority; it does not reopen a completed archive merely to claim present truth.
+Ordinary `pkgctl run` output reports the same successful construction
+evidence when its transaction builds packages, so a product controller can bind
+later composition to exact retained construction results. Those run paths remain
+beneath the run-private runtime hierarchy; only the `build` frontend projects
+artifacts into caller-selected public `--artifact-root` authority.
 Privileged qualification
 drives a real shell/source/dependency/check campaign across bounded start/resume,
 then removes the live collection and proves terminal replay returns the same

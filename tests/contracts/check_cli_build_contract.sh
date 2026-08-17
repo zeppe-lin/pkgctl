@@ -59,7 +59,8 @@ for required in \
   'selection->identity() == *check_selection' \
   'build frontend direct subject lacks catalog-backed construction' \
   'build frontend requested check lacks an executable check node' \
-  'render_build_artifacts' \
+  'render_construction_artifacts' \
+  'public_build_frontend' \
   'frontend build' \
   'successful construction lacks complete retained artifact authority'; do
   grep -F -- "$required" "$run" >/dev/null || {

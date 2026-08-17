@@ -201,6 +201,13 @@ require_contains run "$root/run.out" 'origin admitted'
 require_contains run "$root/run.out" 'disposition completed'
 require_contains run "$root/run.out" 'complete yes'
 require_contains run "$root/run.out" 'failed no'
+require_contains run "$root/run.out" 'artifacts 4'
+require_contains run "$root/run.out" 'artifact.0.package base-files'
+require_contains run "$root/run.out" 'artifact.1.package build-tool'
+require_contains run "$root/run.out" 'artifact.2.package rootfs-probe'
+require_contains run "$root/run.out" 'artifact.3.package runtime-lib'
+require_contains run "$root/run.out" "artifact.0.path $runtime/artifacts/"
+require_not_contains run "$root/run.out" 'frontend build'
 
 final_state=$("$state_inspect_fixture" "$state")
 printf '%s\n' "$final_state" >"$root/final-state.out"

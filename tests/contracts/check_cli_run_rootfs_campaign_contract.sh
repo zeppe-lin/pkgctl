@@ -49,6 +49,13 @@ for required in \
   "--goal 'run=@rootfs-test'" \
   "--goal 'check=rootfs-probe'" \
   '--converge-exact' \
+  'artifacts 4' \
+  'artifact.0.package base-files' \
+  'artifact.1.package build-tool' \
+  'artifact.2.package rootfs-probe' \
+  'artifact.3.package runtime-lib' \
+  'artifact.0.path $runtime/artifacts/' \
+  "'frontend build'" \
   'packages 3' \
   'package base-files 1.0-1' \
   'package runtime-lib 1.0-1' \

@@ -224,6 +224,17 @@ target_open_line=$(grep -n -F 'open_directory(*command.target_root)' "$command" 
   exit 1
 }
 
+for artifact_reporting_contract in \
+  'void render_construction_artifacts(' \
+  'bool public_build_frontend' \
+  'render_construction_artifacts(' \
+  'command.frontend == transaction_run_command_frontend::build'; do
+  grep -F -- "$artifact_reporting_contract" "$command" >/dev/null || {
+    echo "run construction reporting omits: $artifact_reporting_contract" >&2
+    exit 1
+  }
+done
+
 for construction_only_contract in \
   "--goal 'build=fixture'" \
   'lifecycle-must-remain-absent' \

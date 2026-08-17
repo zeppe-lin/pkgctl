@@ -2303,7 +2303,9 @@ void render_run_result(
             << '\n';
 }
 
-void render_build_artifacts(const transaction_run_drive_result& result)
+void render_construction_artifacts(
+    const transaction_run_drive_result& result,
+    bool public_build_frontend)
 {
   std::vector<const construction_result*> constructions;
   for (const auto& construction : result.run().progress().constructions())
@@ -2323,8 +2325,9 @@ void render_build_artifacts(const transaction_run_drive_result& result)
         return left.release() < right.release();
       });
 
-  std::cout << "frontend build\n"
-            << "artifacts " << constructions.size() << '\n';
+  if (public_build_frontend)
+    std::cout << "frontend build\n";
+  std::cout << "artifacts " << constructions.size() << '\n';
   for (std::size_t index = 0U; index < constructions.size(); ++index)
   {
     const auto& construction = *constructions[index];
@@ -2569,8 +2572,9 @@ int execute_transaction_run(transaction_run_command command)
       const auto result = runtime.launch(
           dispatch_policy, command.nonce, drive_policy);
       render_run_result(transaction, result.drive(), true);
-      if (command.frontend == transaction_run_command_frontend::build)
-        render_build_artifacts(result.drive());
+      render_construction_artifacts(
+          result.drive(),
+          command.frontend == transaction_run_command_frontend::build);
       render_terminal_failure(result.drive());
       cleanup_terminal_private_realizations(
           result.drive().record(), cleanup_configuration);
@@ -2580,8 +2584,8 @@ int execute_transaction_run(transaction_run_command command)
     const auto result = runtime.drive(
         expected_admission.journal(), drive_policy);
     render_run_result(transaction, result, false);
-    if (command.frontend == transaction_run_command_frontend::build)
-      render_build_artifacts(result);
+    render_construction_artifacts(
+        result, command.frontend == transaction_run_command_frontend::build);
     render_terminal_failure(result);
     cleanup_terminal_private_realizations(result.record(), cleanup_configuration);
     return drive_status(result.disposition());

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Reports successful construction artifact evidence from ordinary `pkgctl run`
+  transactions as well as from the build frontend. Run reporting exposes the
+  exact retained construction path/digest/binding/image authority already owned
+  by the durable run; it does not reinterpret the run-private artifact hierarchy
+  as the build frontend's caller-selected public artifact root.
+
 - Tightens BUILD/CHECK vocabulary around the authority boundary: retained semantic
   evidence is decoded or rehydrated, semantic values are derived/projected, and
   ephemeral source/package/dependency trees are realized from exact retained

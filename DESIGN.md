@@ -124,6 +124,14 @@ closes the qualification loop; deliberate post-terminal deletion of one owned
 object must be observed as drift without changing the retained transaction or
 canonical state.
 
+A run that performs construction also reports the exact successful construction
+artifact evidence retained by that durable run. This is observation of existing
+controller evidence, not public artifact projection: run artifacts remain beneath
+the private runtime hierarchy, while the build frontend alone owns a caller-selected
+public artifact root. A product composer may therefore bind subsequent product
+composition to exact run construction evidence without discovering archives by
+directory scan or weakening the build-frontend boundary.
+
 This boundary keeps deployment composition outside `pkgctl`: a future rootfs
 client may select policy and invoke convergence plus audit, but package source,
 resolution, transaction, state, and observation authority remain with their
