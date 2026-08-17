@@ -502,6 +502,18 @@ pkgplan::package_policy_snapshot policy()
       {});
 }
 
+pkgplan::package_policy_snapshot alternate_policy()
+{
+  return pkgplan::package_policy_snapshot(
+      plan_identity<pkgplan::policy_snapshot_identity>(51),
+      pkgplan::normalized_path_policy(
+          pkgplan::incoming_path_policy::activate(),
+          pkgplan::obsolete_path_policy::remove(),
+          pkgplan::shared_ownership_policy::allow_compatible,
+          pkgplan::directory_cleanup_policy::remove_if_empty),
+      {});
+}
+
 
 pkgplan::installation_plan installation_plan(
     const pkgstate::snapshot& expected,
@@ -5428,7 +5440,7 @@ pkgctl::native_transaction_operation_configuration removal_configuration(
     const std::filesystem::path& root)
 {
   return pkgctl::native_transaction_operation_configuration::make(
-      value.transaction,
+      value.transaction, policy(),
       {pkgexec::root_view_identity::from_sha256(hex_digest(92)),
        root / "execution", root / "target", root / "sessions",
        test_lifecycle_execution_identity()});
@@ -5442,7 +5454,7 @@ pkgctl::native_transaction_operation_specification removal_specification(
       action_node(value.transaction,
                   pkgtransaction::transaction_action_kind::remove)
           .identity(),
-      value.target, execution_control(), std::move(observations), policy(),
+      value.target, execution_control(), std::move(observations),
       operation_lifecycle_order(
           value.transaction, pkgtransaction::transaction_action_kind::remove));
 }
@@ -5569,7 +5581,7 @@ void check_native_operation_authority_source()
               upgrade.target_system,
               pkgplan::fact_set_completeness::complete, {}),
           plan_identity<pkgplan::runtime_dependency_closure_identity>(84),
-          policy(), explicit_lifecycle_order);
+          explicit_lifecycle_order);
   CHECK(explicit_specification.lifecycle().before() == explicit_before);
   CHECK(explicit_specification.lifecycle().after() == explicit_after);
 
@@ -5696,6 +5708,35 @@ void check_native_operation_authority_source()
   CHECK(drift_specifications.calls() == 0U);
   CHECK(drift_bodies.calls() == 1U);
 
+  empty_restart_body_source policy_drift_bodies;
+  fixed_operation_specification_source policy_drift_specifications(
+      removal_specification(
+          value, removal_observations(value, 82U, true)));
+  pkgctl::native_transaction_operation_authority_source policy_drifted(
+      pkgctl::native_transaction_operation_configuration::make(
+          value.transaction, alternate_policy(),
+          {pkgexec::root_view_identity::from_sha256(hex_digest(92)),
+           value.temp.path() / "policy-drift-operation-authority/execution",
+           value.temp.path() / "policy-drift-operation-authority/target",
+           value.temp.path() / "policy-drift-operation-authority/sessions",
+           test_lifecycle_execution_identity()}),
+      policy_drift_specifications, effects, policy_drift_bodies, &sessions);
+  bool policy_drift_refused = false;
+  try
+  {
+    (void)policy_drifted.operation(
+        restart, restart.assessment().active().front(),
+        *reservation.dispatch);
+  }
+  catch (const pkgctl::native_operation_authority_error& problem)
+  {
+    policy_drift_refused = problem.code() ==
+        pkgctl::native_operation_authority_error_code::session_invalid;
+  }
+  CHECK(policy_drift_refused);
+  CHECK(policy_drift_specifications.calls() == 0U);
+  CHECK(policy_drift_bodies.calls() == 0U);
+
   auto corrupt_sessions = sessions;
   corrupt_sessions.corrupt(fresh.session.identity());
   empty_restart_body_source corrupt_bodies;
@@ -5726,7 +5767,7 @@ void check_native_operation_authority_source()
   try
   {
     (void)pkgctl::native_transaction_operation_configuration::make(
-        value.transaction,
+        value.transaction, policy(),
         {pkgexec::root_view_identity::from_sha256(hex_digest(92)),
          authority_root / "shared", authority_root / "shared/target",
          authority_root / "sessions", test_lifecycle_execution_identity()});
@@ -5745,7 +5786,7 @@ void check_native_operation_authority_source()
                       pkgtransaction::transaction_action_kind::remove)
               .identity(),
           value.target, execution_control(),
-          removal_observations(value, 80U, true), policy(),
+          removal_observations(value, 80U, true),
           pkgctl::lifecycle_order::make({}, {})));
   pkgctl::native_transaction_operation_authority_source incomplete_lifecycle(
       removal_configuration(
@@ -5844,14 +5885,13 @@ void check_native_incoming_operation_authority_source()
           construction_fixture::empty_target_observations(target_system),
           construction_fixture::plan_identity<
               pkgplan::runtime_dependency_closure_identity>(53U),
-          construction_fixture::package_policy(),
           pkgctl::lifecycle_order::make({}, {}),
           pkgstate::installation_reason::explicit_request()));
   memory_effect_journal_store effects;
   empty_restart_body_source bodies;
   const auto authority_root = temporary.path() / "incoming-operation-authority";
   auto configuration = pkgctl::native_transaction_operation_configuration::make(
-      transaction,
+      transaction, construction_fixture::package_policy(),
       {pkgexec::root_view_identity::from_sha256(hex_digest(93)),
        authority_root / "execution", authority_root / "target",
        authority_root / "sessions", test_lifecycle_execution_identity()});

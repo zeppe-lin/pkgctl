@@ -124,6 +124,7 @@ set -- run --canonical-store "$state" \
   --start "$nonce" \
   --build-parallelism 3 \
   --build-source-date-epoch 123456789 \
+  --operation-policy strict-exclusive \
   --runtime-root "$runtime" \
   --build-root "$build" \
   --lifecycle-root "$lifecycle" \
@@ -322,6 +323,8 @@ capture_policy_redeclaration policy-parallelism-redeclaration \
   --build-parallelism 2
 capture_policy_redeclaration policy-epoch-redeclaration \
   --build-source-date-epoch 123456790
+capture_policy_redeclaration policy-operation-redeclaration \
+  --operation-policy exact-compatible-sharing
 "$run_evidence_inspect_fixture" \
   "$runtime/run" "$runtime/evidence" "$journal" \
   >"$root/post-redeclaration-evidence.out" || {

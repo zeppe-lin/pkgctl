@@ -528,7 +528,7 @@ application model, archive catalog, target observer, or executor:
 ```text
 sealed transaction + exact progress + reserved dispatch
              + replayable operation specification
-             + fixed lifecycle configuration
+             + fixed admitted package policy/lifecycle configuration
                               |
                  existing preparation authorities
                               |
@@ -539,7 +539,12 @@ sealed transaction + exact progress + reserved dispatch
 
 One replayable specification is requested for the exact current dispatch and
 must name that action and operation kind. This avoids freezing future target
-observations across state-changing actions. Incoming operations require the
+observations across state-changing actions. Package policy is not per-dispatch
+observation: current composition supplies one transaction-wide normalized policy
+from the selected controller policy adapter through fixed operation
+configuration. Operation-session encoding therefore retains no second planner
+policy body; restart receives the exact owner-decoded command policy and validates
+the retained request/session identities against it. Incoming operations require the
 exact successful predecessor construction already retained in progress. The
 specification also supplies explicit lifecycle execution order. The existing
 effect boundary validates that this order contains exactly the lifecycle nodes

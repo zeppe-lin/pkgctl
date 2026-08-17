@@ -173,6 +173,7 @@ set -- run --canonical-store "$state" \
   --start "$(printf '%064d' 6)" \
   --build-parallelism 1 \
   --build-source-date-epoch 0 \
+  --operation-policy strict-exclusive \
   --runtime-root "$runtime" \
   --build-root "$build" \
   --lifecycle-root "$lifecycle" \

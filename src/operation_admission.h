@@ -11,6 +11,7 @@ namespace pkgctl::detail {
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
     const native_transaction_operation_specification& specification,
+    const pkgplan::package_policy_snapshot& policy,
     const native_transaction_lifecycle_configuration& lifecycle);
 
 } // namespace pkgctl::detail

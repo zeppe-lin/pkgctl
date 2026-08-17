@@ -272,6 +272,13 @@ The construction layer may depend on source, fetch, build, build-exec, image,
 and backend-neutral execution authorities, but must not schedule dependency
 graphs or construct a Linux backend.
 
+The selected native target-operation policy adapter owns command-facing policy
+profiles, their versioned semantic identity, and their private retention codec.
+It may project one complete immutable value into `libpkgplan` vocabulary, but CLI
+parsing, command evidence, and operation-session evidence must not independently
+serialize planner enums or reconstruct policy from target/state residue. Changing
+a profile's normalized semantics requires a new profile version/identity.
+
 The preparation layer may depend on the published state-plan, source-plan,
 build-plan, planner, image, and application values. Incoming preparation must
 consume the exact `libpkgbuild-image` authority retained by construction and use

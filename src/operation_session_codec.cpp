@@ -451,122 +451,6 @@ pkgplan::target_observation_set decode_observations(reader& input)
       std::move(observations));
 }
 
-void encode_incoming_policy(writer& output,
-                            const pkgplan::incoming_path_policy& policy)
-{
-  output.byte(static_cast<std::uint8_t>(policy.active()));
-  output.byte(static_cast<std::uint8_t>(policy.rejected()));
-  output.byte(policy.retained_ownership() ? 1U : 0U);
-  if (policy.retained_ownership())
-    output.byte(static_cast<std::uint8_t>(*policy.retained_ownership()));
-}
-
-pkgplan::incoming_path_policy decode_incoming_policy(reader& input)
-{
-  const auto active = checked_enum<pkgplan::incoming_active_policy>(
-      input.byte(),
-      static_cast<std::uint8_t>(pkgplan::incoming_active_policy::retain_observed),
-      "incoming active policy");
-  const auto rejected = checked_enum<pkgplan::rejected_object_policy>(
-      input.byte(), static_cast<std::uint8_t>(pkgplan::rejected_object_policy::stage),
-      "rejected-object policy");
-  const auto has_ownership = input.byte();
-  if (has_ownership > 1U)
-    corrupt("retained ownership presence is not canonical");
-
-  std::optional<pkgplan::retained_active_ownership_policy> ownership;
-  if (has_ownership != 0U)
-  {
-    ownership = checked_enum<pkgplan::retained_active_ownership_policy>(
-        input.byte(),
-        static_cast<std::uint8_t>(
-            pkgplan::retained_active_ownership_policy::add_operated_owner),
-        "retained ownership policy");
-  }
-
-  if (active == pkgplan::incoming_active_policy::activate_incoming)
-  {
-    if (rejected != pkgplan::rejected_object_policy::none || ownership)
-      corrupt("activate-incoming policy carries retained consequences");
-    return pkgplan::incoming_path_policy::activate();
-  }
-  if (!ownership)
-    corrupt("retain-observed policy lacks ownership policy");
-  return pkgplan::incoming_path_policy::retain(rejected, *ownership);
-}
-
-void encode_normalized_policy(writer& output,
-                              const pkgplan::normalized_path_policy& policy)
-{
-  encode_incoming_policy(output, policy.incoming());
-  output.byte(static_cast<std::uint8_t>(policy.obsolete().active()));
-  output.byte(static_cast<std::uint8_t>(policy.obsolete().rejected()));
-  output.byte(static_cast<std::uint8_t>(policy.shared()));
-  output.byte(static_cast<std::uint8_t>(policy.directory_cleanup()));
-}
-
-pkgplan::normalized_path_policy decode_normalized_policy(reader& input)
-{
-  auto incoming = decode_incoming_policy(input);
-  const auto obsolete_active = checked_enum<pkgplan::obsolete_active_policy>(
-      input.byte(),
-      static_cast<std::uint8_t>(pkgplan::obsolete_active_policy::retain_relic),
-      "obsolete active policy");
-  const auto obsolete_rejected = checked_enum<pkgplan::rejected_object_policy>(
-      input.byte(), static_cast<std::uint8_t>(pkgplan::rejected_object_policy::stage),
-      "obsolete rejected-object policy");
-  auto obsolete = obsolete_active == pkgplan::obsolete_active_policy::retain_relic
-      ? pkgplan::obsolete_path_policy::retain_relic()
-      : pkgplan::obsolete_path_policy::remove(obsolete_rejected);
-  if (obsolete_active == pkgplan::obsolete_active_policy::retain_relic &&
-      obsolete_rejected != pkgplan::rejected_object_policy::none)
-    corrupt("retain-relic policy carries rejected staging");
-
-  const auto shared = checked_enum<pkgplan::shared_ownership_policy>(
-      input.byte(),
-      static_cast<std::uint8_t>(pkgplan::shared_ownership_policy::allow_compatible),
-      "shared ownership policy");
-  const auto cleanup = checked_enum<pkgplan::directory_cleanup_policy>(
-      input.byte(),
-      static_cast<std::uint8_t>(pkgplan::directory_cleanup_policy::remove_if_empty),
-      "directory cleanup policy");
-  return pkgplan::normalized_path_policy(
-      std::move(incoming), std::move(obsolete), shared, cleanup);
-}
-
-void encode_policy(writer& output, const pkgplan::package_policy_snapshot& policy)
-{
-  output.text(policy.identity().string());
-  encode_normalized_policy(output, policy.defaults());
-  if (policy.overrides().size() > maximum_policy_override_count)
-    corrupt("path-policy override cardinality exceeds maximum size");
-  output.u32(static_cast<std::uint32_t>(policy.overrides().size()));
-  for (const auto& override_value : policy.overrides())
-  {
-    output.text(override_value.path().string());
-    encode_normalized_policy(output, override_value.policy());
-  }
-}
-
-pkgplan::package_policy_snapshot decode_policy(reader& input)
-{
-  auto identity = pkgplan::policy_snapshot_identity::parse(input.text());
-  auto defaults = decode_normalized_policy(input);
-  const auto count = input.u32();
-  if (count > maximum_policy_override_count)
-    corrupt("path-policy override cardinality exceeds maximum size");
-  std::vector<pkgplan::path_policy_override> overrides;
-  overrides.reserve(count);
-  for (std::uint32_t index = 0U; index < count; ++index)
-  {
-    auto path = pkgplan::package_path::parse(input.text());
-    auto policy = decode_normalized_policy(input);
-    overrides.emplace_back(std::move(path), std::move(policy));
-  }
-  return pkgplan::package_policy_snapshot(
-      std::move(identity), std::move(defaults), std::move(overrides));
-}
-
 void encode_target(writer& output,
                    const pkgapply::application_target_context& target)
 {
@@ -777,7 +661,6 @@ void encode_specification(
   output.byte(specification.runtime_closure() ? 1U : 0U);
   if (specification.runtime_closure())
     output.text(specification.runtime_closure()->string());
-  encode_policy(output, specification.policy());
   encode_lifecycle_order(output, specification.lifecycle());
   encode_installation_reason(output, specification.installation_reason());
 }
@@ -798,7 +681,6 @@ native_transaction_operation_specification decode_specification(reader& input)
   std::optional<pkgplan::runtime_dependency_closure_identity> closure;
   if (has_closure != 0U)
     closure = pkgplan::runtime_dependency_closure_identity::parse(input.text());
-  auto policy = decode_policy(input);
   auto lifecycle = decode_lifecycle_order(input);
   auto reason = decode_installation_reason(input);
 
@@ -809,21 +691,19 @@ native_transaction_operation_specification decode_specification(reader& input)
         corrupt("installation specification lacks required authority");
       return native_transaction_operation_specification::install(
           std::move(action), std::move(target), std::move(control),
-          std::move(observations), *closure, std::move(policy),
-          std::move(lifecycle), *reason);
+          std::move(observations), *closure, std::move(lifecycle), *reason);
     case pkgplan::operation_kind::upgrade:
       if (!closure || reason)
         corrupt("upgrade specification has invalid optional authority");
       return native_transaction_operation_specification::upgrade(
           std::move(action), std::move(target), std::move(control),
-          std::move(observations), *closure, std::move(policy),
-          std::move(lifecycle));
+          std::move(observations), *closure, std::move(lifecycle));
     case pkgplan::operation_kind::remove:
       if (closure || reason)
         corrupt("removal specification has invalid optional authority");
       return native_transaction_operation_specification::remove(
           std::move(action), std::move(target), std::move(control),
-          std::move(observations), std::move(policy), std::move(lifecycle));
+          std::move(observations), std::move(lifecycle));
   }
   corrupt("operation kind is invalid");
 }
@@ -912,7 +792,8 @@ effectful_operation_session decode_operation_session(
     const operation_session_encoding& encoding,
     const transaction_run_journal_record& record,
     const transaction_progress& progress,
-    const transaction_dispatch& dispatch)
+    const transaction_dispatch& dispatch,
+    const pkgplan::package_policy_snapshot& policy)
 {
   validate_checksum(encoding);
   const auto payload_size = encoding.size() - checksum_size;
@@ -937,7 +818,7 @@ effectful_operation_session decode_operation_session(
   try
   {
     auto session = detail::admit_native_operation_session(
-        record, progress, dispatch, specification, lifecycle);
+        record, progress, dispatch, specification, policy, lifecycle);
     if (session.request().identity() != retained_request ||
         session.identity() != retained_session)
       mismatch("retained operation session differs from supplied semantics");

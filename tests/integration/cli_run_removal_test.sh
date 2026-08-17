@@ -121,7 +121,8 @@ run_command()
     fi
     set -- "$@" \
       --build-parallelism 1 \
-      --build-source-date-epoch 0
+      --build-source-date-epoch 0 \
+      --operation-policy strict-exclusive
   fi
   set -- "$@" \
     "$intent" "$nonce" \

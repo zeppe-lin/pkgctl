@@ -49,7 +49,7 @@ private:
   native_operation_authority_error_code code_;
 };
 
-/*! \brief Exact caller policy and lifecycle order for one action node. */
+/*! \brief Exact per-dispatch operation-local authority for one action node. */
 class native_transaction_operation_specification final {
 public:
   [[nodiscard]] static native_transaction_operation_specification install(
@@ -58,7 +58,6 @@ public:
       pkgapply::application_execution_control control,
       pkgplan::target_observation_set observations,
       pkgplan::runtime_dependency_closure_identity runtime_closure,
-      pkgplan::package_policy_snapshot policy,
       lifecycle_order lifecycle,
       pkgstate::installation_reason installation_reason);
 
@@ -68,7 +67,6 @@ public:
       pkgapply::application_execution_control control,
       pkgplan::target_observation_set observations,
       pkgplan::runtime_dependency_closure_identity runtime_closure,
-      pkgplan::package_policy_snapshot policy,
       lifecycle_order lifecycle);
 
   [[nodiscard]] static native_transaction_operation_specification remove(
@@ -76,7 +74,6 @@ public:
       pkgapply::application_target_context target,
       pkgapply::application_execution_control control,
       pkgplan::target_observation_set observations,
-      pkgplan::package_policy_snapshot policy,
       lifecycle_order lifecycle);
 
   [[nodiscard]] pkgplan::operation_kind kind() const noexcept;
@@ -91,7 +88,6 @@ public:
   [[nodiscard]] const std::optional<
       pkgplan::runtime_dependency_closure_identity>&
   runtime_closure() const noexcept;
-  [[nodiscard]] const pkgplan::package_policy_snapshot& policy() const noexcept;
   [[nodiscard]] const lifecycle_order& lifecycle() const noexcept;
   [[nodiscard]] const std::optional<pkgstate::installation_reason>&
   installation_reason() const noexcept;
@@ -105,7 +101,6 @@ private:
       pkgplan::target_observation_set observations,
       std::optional<pkgplan::runtime_dependency_closure_identity>
           runtime_closure,
-      pkgplan::package_policy_snapshot policy,
       lifecycle_order lifecycle,
       std::optional<pkgstate::installation_reason> installation_reason);
 
@@ -115,7 +110,6 @@ private:
   pkgapply::application_execution_control control_;
   pkgplan::target_observation_set observations_;
   std::optional<pkgplan::runtime_dependency_closure_identity> runtime_closure_;
-  pkgplan::package_policy_snapshot policy_;
   lifecycle_order lifecycle_;
   std::optional<pkgstate::installation_reason> installation_reason_;
 };
@@ -129,23 +123,27 @@ struct native_transaction_lifecycle_configuration final {
   pkgapply_exec::lifecycle_execution_identity execution_identity;
 };
 
-/*! \brief Fixed transaction and lifecycle authority for native operations. */
+/*! \brief Fixed transaction, package-policy, and lifecycle authority. */
 class native_transaction_operation_configuration final {
 public:
   [[nodiscard]] static native_transaction_operation_configuration make(
       transaction_session transaction,
+      pkgplan::package_policy_snapshot policy,
       native_transaction_lifecycle_configuration lifecycle);
 
   [[nodiscard]] const transaction_session& transaction() const noexcept;
+  [[nodiscard]] const pkgplan::package_policy_snapshot& policy() const noexcept;
   [[nodiscard]] const native_transaction_lifecycle_configuration&
   lifecycle() const noexcept;
 
 private:
   native_transaction_operation_configuration(
       transaction_session transaction,
+      pkgplan::package_policy_snapshot policy,
       native_transaction_lifecycle_configuration lifecycle);
 
   transaction_session transaction_;
+  pkgplan::package_policy_snapshot policy_;
   native_transaction_lifecycle_configuration lifecycle_;
 };
 

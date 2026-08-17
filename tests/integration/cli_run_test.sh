@@ -72,7 +72,8 @@ run_command()
       --goal 'run=@base'
     set -- "$@" \
       --build-parallelism 1 \
-      --build-source-date-epoch 0
+      --build-source-date-epoch 0 \
+      --operation-policy strict-exclusive
   elif [ "$inject_resume_semantics" = yes ]; then
     set -- "$@" --goal 'run=@base'
   fi

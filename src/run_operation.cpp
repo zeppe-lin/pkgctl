@@ -128,6 +128,7 @@ void validate_specification(
 [[nodiscard]] operation_preparation_request preparation_request(
     const transaction_progress& progress,
     const native_transaction_operation_specification& specification,
+    const pkgplan::package_policy_snapshot& policy,
     lifecycle_order lifecycle)
 {
   switch (specification.kind())
@@ -138,7 +139,7 @@ void validate_specification(
           require_construction(progress, specification.action_node()),
           specification.target(), specification.control(),
           specification.observations(), *specification.runtime_closure(),
-          specification.policy(), std::move(lifecycle),
+          policy, std::move(lifecycle),
           *specification.installation_reason());
     case pkgplan::operation_kind::upgrade:
       return operation_preparation_request::upgrade(
@@ -146,12 +147,12 @@ void validate_specification(
           require_construction(progress, specification.action_node()),
           specification.target(), specification.control(),
           specification.observations(), *specification.runtime_closure(),
-          specification.policy(), std::move(lifecycle));
+          policy, std::move(lifecycle));
     case pkgplan::operation_kind::remove:
       return operation_preparation_request::remove(
           progress, specification.action_node(), specification.target(),
           specification.control(), specification.observations(),
-          specification.policy(), std::move(lifecycle));
+          policy, std::move(lifecycle));
   }
   throw native_operation_authority_error(
       native_operation_authority_error_code::session_invalid,
@@ -245,6 +246,7 @@ effectful_operation_session admit_native_operation_session(
     const transaction_progress& progress,
     const transaction_dispatch& dispatch,
     const native_transaction_operation_specification& specification,
+    const pkgplan::package_policy_snapshot& policy,
     const native_transaction_lifecycle_configuration& lifecycle)
 {
   if (dispatch.unit().kind() != transaction_unit_kind::operation)
@@ -259,7 +261,7 @@ effectful_operation_session admit_native_operation_session(
     native_operation_preparation_driver driver;
     auto prepared = prepare_operation(
         preparation_request(
-            progress, specification, specification.lifecycle()),
+            progress, specification, policy, specification.lifecycle()),
         driver);
     if (!prepared.prepared() || !prepared.effect() || !prepared.application())
     {
@@ -320,13 +322,12 @@ native_transaction_operation_specification(
     pkgplan::target_observation_set observations,
     std::optional<pkgplan::runtime_dependency_closure_identity>
         runtime_closure,
-    pkgplan::package_policy_snapshot policy,
     lifecycle_order lifecycle,
     std::optional<pkgstate::installation_reason> installation_reason)
     : kind_(kind), action_node_(std::move(action_node)),
       target_(std::move(target)), control_(std::move(control)),
       observations_(std::move(observations)),
-      runtime_closure_(std::move(runtime_closure)), policy_(std::move(policy)),
+      runtime_closure_(std::move(runtime_closure)),
       lifecycle_(std::move(lifecycle)),
       installation_reason_(std::move(installation_reason))
 {
@@ -339,14 +340,13 @@ native_transaction_operation_specification::install(
     pkgapply::application_execution_control control,
     pkgplan::target_observation_set observations,
     pkgplan::runtime_dependency_closure_identity runtime_closure,
-    pkgplan::package_policy_snapshot policy,
     lifecycle_order lifecycle,
     pkgstate::installation_reason installation_reason)
 {
   return native_transaction_operation_specification(
       pkgplan::operation_kind::install, std::move(action_node),
       std::move(target), std::move(control), std::move(observations),
-      std::move(runtime_closure), std::move(policy), std::move(lifecycle),
+      std::move(runtime_closure), std::move(lifecycle),
       std::move(installation_reason));
 }
 
@@ -357,14 +357,12 @@ native_transaction_operation_specification::upgrade(
     pkgapply::application_execution_control control,
     pkgplan::target_observation_set observations,
     pkgplan::runtime_dependency_closure_identity runtime_closure,
-    pkgplan::package_policy_snapshot policy,
     lifecycle_order lifecycle)
 {
   return native_transaction_operation_specification(
       pkgplan::operation_kind::upgrade, std::move(action_node),
       std::move(target), std::move(control), std::move(observations),
-      std::move(runtime_closure), std::move(policy), std::move(lifecycle),
-      std::nullopt);
+      std::move(runtime_closure), std::move(lifecycle), std::nullopt);
 }
 
 native_transaction_operation_specification
@@ -373,13 +371,12 @@ native_transaction_operation_specification::remove(
     pkgapply::application_target_context target,
     pkgapply::application_execution_control control,
     pkgplan::target_observation_set observations,
-    pkgplan::package_policy_snapshot policy,
     lifecycle_order lifecycle)
 {
   return native_transaction_operation_specification(
       pkgplan::operation_kind::remove, std::move(action_node),
       std::move(target), std::move(control), std::move(observations),
-      std::nullopt, std::move(policy), std::move(lifecycle), std::nullopt);
+      std::nullopt, std::move(lifecycle), std::nullopt);
 }
 
 pkgplan::operation_kind
@@ -418,11 +415,6 @@ native_transaction_operation_specification::runtime_closure() const noexcept
   return runtime_closure_;
 }
 
-const pkgplan::package_policy_snapshot&
-native_transaction_operation_specification::policy() const noexcept
-{
-  return policy_;
-}
 
 const lifecycle_order&
 native_transaction_operation_specification::lifecycle() const noexcept
@@ -439,14 +431,17 @@ native_transaction_operation_specification::installation_reason() const noexcept
 native_transaction_operation_configuration::
 native_transaction_operation_configuration(
     transaction_session transaction,
+    pkgplan::package_policy_snapshot policy,
     native_transaction_lifecycle_configuration lifecycle)
-    : transaction_(std::move(transaction)), lifecycle_(std::move(lifecycle))
+    : transaction_(std::move(transaction)), policy_(std::move(policy)),
+      lifecycle_(std::move(lifecycle))
 {
 }
 
 native_transaction_operation_configuration
 native_transaction_operation_configuration::make(
     transaction_session transaction,
+    pkgplan::package_policy_snapshot policy,
     native_transaction_lifecycle_configuration lifecycle)
 {
   if (!absolute_normal(lifecycle.execution_root_path) ||
@@ -464,13 +459,19 @@ native_transaction_operation_configuration::make(
         "native lifecycle execution, target, and session roots must be disjoint");
 
   return native_transaction_operation_configuration(
-      std::move(transaction), std::move(lifecycle));
+      std::move(transaction), std::move(policy), std::move(lifecycle));
 }
 
 const transaction_session&
 native_transaction_operation_configuration::transaction() const noexcept
 {
   return transaction_;
+}
+
+const pkgplan::package_policy_snapshot&
+native_transaction_operation_configuration::policy() const noexcept
+{
+  return policy_;
 }
 
 const native_transaction_lifecycle_configuration&
@@ -508,7 +509,8 @@ native_transaction_operation_authority_source::fresh_session(
   }
   auto specification = specifications_.operation(record, progress, dispatch);
   auto admitted = detail::admit_native_operation_session(
-      record, progress, dispatch, specification, configuration_.lifecycle());
+      record, progress, dispatch, specification, configuration_.policy(),
+      configuration_.lifecycle());
   if (sessions_ == nullptr)
     throw native_operation_authority_error(
         native_operation_authority_error_code::invalid_configuration,
@@ -561,7 +563,8 @@ native_transaction_operation_authority_source::operation(
     try
     {
       return decode_operation_session(
-          *retained, checkpoint.record(), checkpoint.run().progress(), dispatch);
+          *retained, checkpoint.record(), checkpoint.run().progress(), dispatch,
+          configuration_.policy());
     }
     catch (const operation_codec_error& problem)
     {
@@ -604,7 +607,8 @@ native_transaction_operation_authority_source::rehydrate(
   effectful_operation_session value = [&]() {
     try
     {
-      return decode_operation_session(*retained, record, progress, dispatch);
+      return decode_operation_session(
+          *retained, record, progress, dispatch, configuration_.policy());
     }
     catch (const operation_codec_error& problem)
     {

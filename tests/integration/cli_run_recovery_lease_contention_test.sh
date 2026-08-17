@@ -151,7 +151,8 @@ run_command()
       --goal 'run=@base'
     set -- "$@" \
       --build-parallelism 1 \
-      --build-source-date-epoch 0
+      --build-source-date-epoch 0 \
+      --operation-policy strict-exclusive
   fi
   set -- "$@" \
     "$intent" "$nonce" \
@@ -199,6 +200,7 @@ run_interrupted_command()
     "$intent" "$nonce" \
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
+    --operation-policy strict-exclusive \
     --runtime-root "$runtime" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \

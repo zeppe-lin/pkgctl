@@ -67,6 +67,7 @@ struct raw_options final {
   std::vector<std::uint64_t> lifecycle_supplementary_groups;
   std::optional<std::uint64_t> build_parallelism;
   std::optional<std::uint64_t> build_source_date_epoch;
+  std::optional<native_operation_policy_profile> operation_policy;
   std::optional<std::uint64_t> maximum_steps;
   std::vector<installed_tree_option> installed_trees;
   std::optional<std::string> build_subject;
@@ -127,6 +128,15 @@ pkgsource::lifecycle_action lifecycle(std::string_view value)
   if (value == "pre-remove") return pkgsource::lifecycle_action::pre_remove;
   if (value == "post-remove") return pkgsource::lifecycle_action::post_remove;
   fail("unknown lifecycle action: " + std::string(value));
+}
+
+native_operation_policy_profile operation_policy_profile(
+    std::string_view value)
+{
+  const auto profile = native_operation_policy_profile_from_name(value);
+  if (!profile)
+    fail("unknown operation policy profile: " + std::string(value));
+  return *profile;
 }
 
 pkgsource::requirement_subject subject(std::string value)
@@ -522,6 +532,14 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
           "build source date epoch", true);
       continue;
     }
+    if (argument == "--operation-policy")
+    {
+      if (parsed.operation_policy)
+        fail("--operation-policy specified more than once");
+      parsed.operation_policy = operation_policy_profile(
+          require_value(argc, argv, index, argument));
+      continue;
+    }
     if (argument == "--max-steps")
     {
       if (parsed.maximum_steps) fail("--max-steps specified more than once");
@@ -553,7 +571,7 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
       parsed.build_architecture || parsed.target_architecture ||
       !parsed.goals.empty() || parsed.prefer_catalog || parsed.converge_exact ||
       parsed.build_subject || parsed.build_check || parsed.build_parallelism ||
-      parsed.build_source_date_epoch;
+      parsed.build_source_date_epoch || parsed.operation_policy;
 
   if (resume)
   {
@@ -635,7 +653,8 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
       parsed.lifecycle_group_id ||
       !parsed.lifecycle_supplementary_groups.empty() ||
       parsed.build_parallelism || parsed.build_source_date_epoch ||
-      parsed.maximum_steps || !parsed.installed_trees.empty();
+      parsed.operation_policy || parsed.maximum_steps ||
+      !parsed.installed_trees.empty();
   if (kind == command_kind::run)
   {
     if (parsed.artifact_root_path)
@@ -650,6 +669,8 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
     if (!resume &&
         (!parsed.build_parallelism || !parsed.build_source_date_epoch))
       fail("run --start requires complete build policy authority");
+    if (!resume && !parsed.operation_policy)
+      fail("run --start requires explicit operation policy authority");
   }
   else if (kind == command_kind::build)
   {
@@ -664,6 +685,8 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
     if (!resume &&
         (!parsed.build_parallelism || !parsed.build_source_date_epoch))
       fail("build --start requires complete build policy authority");
+    if (parsed.operation_policy)
+      fail("--operation-policy is valid only for run --start");
     if (parsed.lifecycle_root_path || parsed.target_root_path ||
         parsed.lifecycle_user_id || parsed.lifecycle_group_id ||
         !parsed.lifecycle_supplementary_groups.empty())
@@ -757,6 +780,7 @@ transaction_run_command transaction_run_from(
   }
 
   std::optional<pkgbuild::build_policy> admitted_build_policy;
+  std::optional<native_operation_policy> admitted_operation_policy;
   if (*parsed.run_intent == transaction_run_command_intent::start)
   {
     admitted_build_policy.emplace(pkgbuild::build_policy::make(
@@ -764,6 +788,9 @@ transaction_run_command transaction_run_from(
             static_cast<std::uint32_t>(*parsed.build_parallelism), 0022,
             static_cast<std::int64_t>(*parsed.build_source_date_epoch)),
         pkgbuild::output_layout_kind::package_root));
+    if (frontend == transaction_run_command_frontend::run)
+      admitted_operation_policy.emplace(
+          native_operation_policy::seal(*parsed.operation_policy));
   }
 
   return transaction_run_command{
@@ -785,6 +812,7 @@ transaction_run_command transaction_run_from(
           *parsed.build_user_id, *parsed.build_group_id,
           std::move(parsed.build_supplementary_groups), true),
       std::move(lifecycle_credentials), std::move(admitted_build_policy),
+      std::move(admitted_operation_policy),
       static_cast<std::size_t>(*parsed.maximum_steps),
       std::move(parsed.installed_trees)};
 }
@@ -933,14 +961,22 @@ Run/build intent:
   --resume SHA256                 resume retained semantic request and intent
 
 Catalog acquisition, target-binding, architecture, goal, build subject/check,
-resolution-policy, convergence, and build-policy options are start-only. Resume
-refuses their re-declaration and uses command-evidence retained at admission.
+resolution-policy, convergence, build-policy, and operation-policy options are
+start-only. Resume refuses their re-declaration and uses command-evidence retained
+at admission.
 --canonical-store remains live resume authority naming the existing physical
 canonical state store.
 
 Admitted build policy required by run/build --start:
   --build-parallelism N           positive construction/check parallelism
   --build-source-date-epoch N     non-negative reproducible build epoch
+
+Admitted complete target-operation policy required by run --start:
+  --operation-policy PROFILE      strict-exclusive | exact-compatible-sharing
+
+The named profile is one complete immutable pkgctl policy value, not a raw
+libpkgplan enum switch. Its controller-owned encoding and policy identity are
+retained at admission; --resume does not redeclare it.
 
 The frontend closes the remaining build-policy dimensions: file-creation mask
 0022, package-root output layout, C.UTF-8 locale, UTC timezone, denied network,

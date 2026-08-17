@@ -1707,7 +1707,7 @@ public:
     return pkgctl::native_transaction_operation_specification::install(
         action_node_, target_, execution_control(), std::move(observations),
         plan_identity<pkgplan::runtime_dependency_closure_identity>(81),
-        package_policy(), lifecycle_,
+        lifecycle_,
         pkgstate::installation_reason::explicit_request());
   }
 
@@ -2709,7 +2709,7 @@ void check_native_runtime_package_pipeline()
   const auto make_runtime_configuration = [&]() {
     auto operation_configuration =
         pkgctl::native_transaction_operation_configuration::make(
-            transaction,
+            transaction, package_policy(),
             {sessions.roots().root_view, sessions.roots().root_view_path,
              application.target_root, authority_root / "lifecycle-sessions",
              lifecycle_identity});
@@ -2864,7 +2864,7 @@ void check_native_runtime_pre_operation_failure(
   const auto make_runtime_configuration = [&]() {
     auto operation_configuration =
         pkgctl::native_transaction_operation_configuration::make(
-            transaction,
+            transaction, package_policy(),
             {sessions.roots().root_view, sessions.roots().root_view_path,
              application.target_root, authority_root / "lifecycle-sessions",
              lifecycle_identity});
@@ -3087,7 +3087,7 @@ void check_native_runtime_operation_failure(
   const auto make_runtime_configuration = [&]() {
     auto operation_configuration =
         pkgctl::native_transaction_operation_configuration::make(
-            transaction,
+            transaction, package_policy(),
             {sessions.roots().root_view, sessions.roots().root_view_path,
              application.target_root, lifecycle_sessions, lifecycle_identity});
     return pkgctl::native_transaction_run_runtime_configuration::make(
@@ -3369,7 +3369,7 @@ void check_native_runtime_fresh_lease_contention(std::uint8_t nonce_marker)
       {}};
   const auto operation_configuration = [&]() {
     return pkgctl::native_transaction_operation_configuration::make(
-        transaction,
+        transaction, package_policy(),
         {sessions.roots().root_view, sessions.roots().root_view_path,
          application.target_root, authority_root / "lifecycle-sessions",
          lifecycle_identity});
@@ -3522,7 +3522,7 @@ void check_native_runtime_recovery_lease_contention(std::uint8_t nonce_marker)
       {}};
   const auto operation_configuration = [&]() {
     return pkgctl::native_transaction_operation_configuration::make(
-        transaction,
+        transaction, package_policy(),
         {sessions.roots().root_view, sessions.roots().root_view_path,
          application.target_root, authority_root / "lifecycle-sessions",
          lifecycle_identity});
@@ -3738,7 +3738,7 @@ void check_native_runtime_outer_lease_loss(
   const auto make_runtime_configuration = [&]() {
     auto operation_configuration =
         pkgctl::native_transaction_operation_configuration::make(
-            transaction,
+            transaction, package_policy(),
             {sessions.roots().root_view, sessions.roots().root_view_path,
              application.target_root, lifecycle_sessions, lifecycle_identity});
     return pkgctl::native_transaction_run_runtime_configuration::make(
@@ -3968,7 +3968,7 @@ void check_native_runtime_publication_intent_uncertainty(
       {}};
   const auto make_operation_configuration = [&]() {
     return pkgctl::native_transaction_operation_configuration::make(
-        transaction,
+        transaction, package_policy(),
         {sessions.roots().root_view, sessions.roots().root_view_path,
          application.target_root, authority_root / "lifecycle-sessions",
          lifecycle_identity});
@@ -4208,7 +4208,7 @@ void check_native_runtime_terminal_indeterminate_publication(
   const auto make_runtime_configuration = [&]() {
     auto operation_configuration =
         pkgctl::native_transaction_operation_configuration::make(
-            transaction,
+            transaction, package_policy(),
             {sessions.roots().root_view, sessions.roots().root_view_path,
              application.target_root, authority_root / "lifecycle-sessions",
              lifecycle_identity});
@@ -4399,7 +4399,7 @@ void check_native_runtime_lifecycle_intent_external_resolution(
       {}};
   const auto make_operation_configuration = [&]() {
     return pkgctl::native_transaction_operation_configuration::make(
-        transaction,
+        transaction, package_policy(),
         {sessions.roots().root_view, sessions.roots().root_view_path,
          application.target_root, lifecycle_sessions, lifecycle_identity});
   };

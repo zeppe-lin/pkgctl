@@ -322,6 +322,11 @@ The final command suite must prove:
   through the package-name-addressable `PKG_CHECK_INPUT_ROOT` namespace after
   construction-private resource trees are deleted; opaque build-input identities
   are not a recipe pathname contract;
+- target-operation policy is one complete versioned command authority, retained
+  through the pkgctl owner codec and supplied transaction-wide to operation
+  configuration. Restart with a different policy identity must reject retained
+  operation-session evidence without consulting the live operation-specification
+  source; operation-session bytes contain no home-grown `libpkgplan` policy codec;
 - target observations are per-dispatch; the complete admitted operation session is
   retained before effect/run journals can name it, and an incoming operation also
   retains its exact construction-artifact path binding. Started or completed replay

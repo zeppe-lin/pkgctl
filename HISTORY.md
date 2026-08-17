@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Replaces hidden/partial target-operation policy defaults with one explicit
+  controller-owned native operation-policy authority. `pkgctl run --start`
+  admits a complete versioned profile (`strict-exclusive` or
+  `exact-compatible-sharing`), retains only the pkgctl owner encoding in command
+  evidence, and resumes from that exact retained value. The profile identity
+  binds the complete normalized semantics so a future implementation drift under
+  the same profile version fails closed. Per-operation specifications and
+  operation-session evidence no longer serialize or decode `libpkgplan` policy
+  vocabulary; they consume the single transaction-wide admitted projection.
+
 - Reports successful construction artifact evidence from ordinary `pkgctl run`
   transactions as well as from the build frontend. Run reporting exposes the
   exact retained construction path/digest/binding/image authority already owned

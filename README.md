@@ -113,9 +113,12 @@ bounded native transaction command. Before fresh-run retention or admission,
 `pkgctl run` proves that the selected native Linux backend can establish the
 execution guarantees implied by the transaction. `--start` then retains the
 complete start-only transaction inputs, one exact admitted `libpkgbuild`
-build-policy value, the exact admitted construction/check/lifecycle backend
-capability profiles, and the owner-encoded catalog/state universe before admitting
-one explicit run nonce. `--resume` requires that retained
+build-policy value, one complete controller-owned native target-operation policy
+profile for the run frontend, the exact admitted construction/check/lifecycle
+backend capability profiles, and the owner-encoded catalog/state universe before
+admitting one explicit run nonce. The target-operation policy is retained only
+through its pkgctl owner encoding; operation-session evidence does not carry a
+second `libpkgplan` policy codec. `--resume` requires that retained
 command evidence and the exact admitted journal; it refuses a second collection,
 target-binding, architecture, goal, resolution-policy, or convergence request.
 The current canonical-store pathname remains live resume authority while its

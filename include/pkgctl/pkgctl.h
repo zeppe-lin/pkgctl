@@ -20,6 +20,7 @@
 #include <pkgctl/effect_store.h>
 #include <pkgctl/error.h>
 #include <pkgctl/identity.h>
+#include <pkgctl/native_policy.h>
 #include <pkgctl/operation_codec.h>
 #include <pkgctl/preparation.h>
 #include <pkgctl/progression.h>

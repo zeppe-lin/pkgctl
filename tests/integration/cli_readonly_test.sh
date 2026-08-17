@@ -90,6 +90,9 @@ require_help_text 'pkgctl build --canonical-store PATH --resume SHA256 BUILD-AUT
 require_help_text '--artifact-root PATH'
 require_help_text '--build-parallelism N'
 require_help_text '--build-source-date-epoch N'
+require_help_text '--operation-policy PROFILE'
+require_help_text 'strict-exclusive | exact-compatible-sharing'
+require_help_text 'one complete immutable pkgctl policy value'
 require_help_text 'complete build policy is retained at admission'
 require_help_absent()
 {
@@ -165,6 +168,83 @@ assert_incomplete_build_policy_refused missing-parallelism \
   --build-source-date-epoch 0
 assert_incomplete_build_policy_refused missing-epoch \
   --build-parallelism 1
+
+run_policy_nonce=$(printf '%064d' 19)
+# Target-operation policy is complete semantic start authority, not a hidden
+# planner default. Missing or unknown authority must fail before any supplied
+# physical runtime coordinate is observed or created.
+if $pkgctl run \
+    --collection "core=$collection" \
+    --canonical-store "$state" $binding \
+    --build-architecture x86_64 --target-architecture x86_64 \
+    --goal 'run=@base' \
+    --start "$run_policy_nonce" \
+    --build-parallelism 1 --build-source-date-epoch 0 \
+    --runtime-root "$root/missing-operation-policy-runtime" \
+    --build-root "$root/missing-operation-policy-build" \
+    --lifecycle-root "$root/missing-operation-policy-lifecycle" \
+    --target-root "$root/missing-operation-policy-target" \
+    --interpreter /bin/false \
+    --build-user-id 0 --build-group-id 0 \
+    --lifecycle-user-id 0 --lifecycle-group-id 0 \
+    --max-steps 1 \
+    >"$root/missing-operation-policy.out" \
+    2>"$root/missing-operation-policy.err"; then
+  echo 'run unexpectedly accepted omitted operation policy authority' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F 'run --start requires explicit operation policy authority' \
+  "$root/missing-operation-policy.err" >/dev/null
+[ ! -e "$root/missing-operation-policy-runtime" ]
+
+if $pkgctl run --operation-policy magical \
+    >"$root/unknown-operation-policy.out" \
+    2>"$root/unknown-operation-policy.err"; then
+  echo 'run unexpectedly accepted unknown operation policy profile' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F 'unknown operation policy profile: magical' \
+  "$root/unknown-operation-policy.err" >/dev/null
+
+# Build has no target-operation policy authority at all.
+if $pkgctl build app \
+    --collection "core=$collection" \
+    --canonical-store "$state" $binding \
+    --build-architecture x86_64 --target-architecture x86_64 \
+    --start "$build_nonce" \
+    --build-parallelism 1 --build-source-date-epoch 0 \
+    --operation-policy strict-exclusive \
+    --runtime-root "$root/build-operation-policy-runtime" \
+    --build-root "$root/build-operation-policy-root" \
+    --artifact-root "$root/build-operation-policy-artifacts" \
+    --interpreter /bin/false \
+    --build-user-id 0 --build-group-id 0 \
+    --max-steps 1 \
+    >"$root/build-operation-policy.out" \
+    2>"$root/build-operation-policy.err"; then
+  echo 'build unexpectedly accepted target-operation policy authority' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F -- '--operation-policy is valid only for run --start' \
+  "$root/build-operation-policy.err" >/dev/null
+
+if $pkgctl run --canonical-store "$state" --resume "$run_policy_nonce" \
+    --operation-policy exact-compatible-sharing \
+    >"$root/resume-operation-policy.out" \
+    2>"$root/resume-operation-policy.err"; then
+  echo 'run resume unexpectedly accepted operation-policy redeclaration' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F -- '--resume uses retained transaction semantics' \
+  "$root/resume-operation-policy.err" >/dev/null
 # Build owns its exact build/check goals; generic goal policy is not a second
 # route into the frontend. This refusal happens at parse time and creates none
 # of the supplied runtime coordinates.

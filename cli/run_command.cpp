@@ -763,6 +763,7 @@ struct retained_command_evidence final {
   pkgstate::snapshot state;
   pkgexec::interpreter_identity interpreter;
   pkgbuild::build_policy build_policy;
+  std::optional<native_operation_policy> operation_policy;
   retained_native_execution_profiles execution_profiles;
 };
 
@@ -780,6 +781,7 @@ public:
       const transaction_session& transaction,
       const pkgexec::interpreter_identity& interpreter,
       const pkgbuild::build_policy& build_policy,
+      const std::optional<native_operation_policy>& operation_policy,
       const retained_native_execution_profiles& execution_profiles)
   {
     const auto catalog = pkgcatalog::encode_catalog_snapshot(
@@ -798,6 +800,9 @@ public:
     append_bytes(bytes, request);
     append_text(bytes, interpreter.hex());
     append_build_policy(bytes, build_policy);
+    append_u64(bytes, operation_policy ? 1U : 0U);
+    if (operation_policy)
+      append_bytes(bytes, encode_native_operation_policy(*operation_policy));
     append_bytes(bytes, pkgexec::encode_backend_capability_profile(
         execution_profiles.construction));
     append_bytes(bytes, pkgexec::encode_backend_capability_profile(
@@ -826,6 +831,14 @@ public:
     auto interpreter = pkgexec::interpreter_identity::from_sha256(
         read_text(bytes, offset));
     auto build_policy = read_build_policy(bytes, offset);
+    const auto operation_policy_present = read_u64(bytes, offset);
+    if (operation_policy_present > 1U)
+      throw std::runtime_error(
+          "command evidence operation policy presence is invalid");
+    std::optional<native_operation_policy> operation_policy;
+    if (operation_policy_present != 0U)
+      operation_policy.emplace(
+          decode_native_operation_policy(read_bytes(bytes, offset)));
     const auto construction_profile_encoding = read_bytes(bytes, offset);
     const auto check_profile_encoding = read_bytes(bytes, offset);
     const auto lifecycle_profile_encoding = read_bytes(bytes, offset);
@@ -855,7 +868,8 @@ public:
       throw std::runtime_error("command evidence request has trailing bytes");
     return {frontend, artifact_root, transaction, std::move(request),
             std::move(catalog), std::move(state), std::move(interpreter),
-            std::move(build_policy), std::move(execution_profiles)};
+            std::move(build_policy), std::move(operation_policy),
+            std::move(execution_profiles)};
   }
 
 private:
@@ -1466,17 +1480,7 @@ public:
         control_(pkgapply::application_execution_control::make(
             pkgapply::application_recovery_requirement::exact_prior_state,
             pkgapply::application_durability_requirement::all_application_domains,
-            pkgapply::application_cancellation_policy::recover_after_target_mutation)),
-        policy_(
-            derived_digest_identity<pkgplan::policy_snapshot_identity>(
-                "pkgctl/native-command-policy/1",
-                {transaction_.identity().hex(), target_.identity().string()}),
-            pkgplan::normalized_path_policy(
-                pkgplan::incoming_path_policy::activate(),
-                pkgplan::obsolete_path_policy::remove(),
-                pkgplan::shared_ownership_policy::forbid,
-                pkgplan::directory_cleanup_policy::remove_if_empty),
-            {})
+            pkgapply::application_cancellation_policy::recover_after_target_mutation))
   {
   }
 
@@ -1578,19 +1582,18 @@ public:
     if (action->action() == pkgtransaction::transaction_action_kind::remove)
       return native_transaction_operation_specification::remove(
           action->identity(), target_, control_, std::move(observation_set),
-          policy_, lifecycle);
+          lifecycle);
 
     const auto closure = runtime_closure_for(transaction_, *action);
 
     if (action->action() == pkgtransaction::transaction_action_kind::install)
       return native_transaction_operation_specification::install(
           action->identity(), target_, control_, std::move(observation_set),
-          closure, policy_, lifecycle,
-          installation_reason_for(transaction_, *action));
+          closure, lifecycle, installation_reason_for(transaction_, *action));
     if (action->action() == pkgtransaction::transaction_action_kind::upgrade)
       return native_transaction_operation_specification::upgrade(
           action->identity(), target_, control_, std::move(observation_set),
-          closure, policy_, lifecycle);
+          closure, lifecycle);
     throw std::runtime_error(
         "live operation authority received a non-mutating action node");
   }
@@ -1690,7 +1693,6 @@ private:
   pkgapply::application_target_context target_;
   fd_guard body_directory_;
   pkgapply::application_execution_control control_;
-  pkgplan::package_policy_snapshot policy_;
   std::optional<std::filesystem::path> pending_archive_;
 };
 
@@ -2070,12 +2072,13 @@ void require_operation_command_authority(
     const transaction_run_command& command,
     const transaction_session& transaction,
     const pkgstate::state_target_binding& binding,
-    const pkgexec::interpreter_identity& interpreter)
+    const pkgexec::interpreter_identity& interpreter,
+    pkgplan::package_policy_snapshot policy)
 {
   require_operation_command_authority(command);
   const auto& lifecycle_credentials = *command.lifecycle_credentials;
   return native_transaction_operation_configuration::make(
-      transaction,
+      transaction, std::move(policy),
       {
           execution_root_identity(binding),
           *command.lifecycle_root,
@@ -2535,6 +2538,21 @@ int execute_transaction_run(transaction_run_command command)
   const auto& admitted_build_policy = retained_evidence
       ? retained_evidence->build_policy
       : *command.build_policy;
+  if (retained_evidence && command.operation_policy)
+    throw std::runtime_error(
+        "resumed run carries duplicate operation policy authority");
+  if (command.frontend == transaction_run_command_frontend::run &&
+      !retained_evidence && !command.operation_policy)
+    throw std::runtime_error(
+        "fresh run lacks explicit operation policy authority");
+  if (command.frontend == transaction_run_command_frontend::build &&
+      ((retained_evidence && retained_evidence->operation_policy) ||
+       command.operation_policy))
+    throw std::runtime_error(
+        "build frontend carries surplus operation policy authority");
+  const std::optional<native_operation_policy> admitted_operation_policy =
+      retained_evidence ? retained_evidence->operation_policy
+                        : command.operation_policy;
   auto session_configuration = command_sessions(
       command, binding, admitted_interpreter, admitted_build_policy);
   const auto cleanup_configuration = session_configuration;
@@ -2563,7 +2581,7 @@ int execute_transaction_run(transaction_run_command command)
     command_evidence.retain(
         command.nonce, command.frontend, command.artifact_root, transaction,
         admitted_interpreter, admitted_build_policy,
-        admitted_execution_profiles);
+        admitted_operation_policy, admitted_execution_profiles);
   }
 
   const auto drive_policy =
@@ -2640,13 +2658,18 @@ int execute_transaction_run(transaction_run_command command)
     auto state_store =
         pkgstate::posix::canonical_generation_store::open_existing(
             command.canonical_store, binding);
+    if (!admitted_operation_policy)
+      throw std::runtime_error(
+          "target-operation transaction lacks admitted operation policy authority");
     live_operation_authority operation_authority(
         transaction, target_observer, archive_backend, application_target,
         runtime_path(command, "effect-bodies"));
 
     auto configuration = native_transaction_run_runtime_configuration::make(
         transaction, std::move(session_configuration),
-        command_operations(command, transaction, binding, admitted_interpreter),
+        command_operations(
+            command, transaction, binding, admitted_interpreter,
+            admitted_operation_policy->snapshot()),
         {});
     auto runtime = native_posix_transaction_run_runtime::from_directory_fds(
         run_store.get(), evidence_store.get(), effect_store.get(),

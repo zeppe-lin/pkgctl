@@ -108,9 +108,12 @@ Version 0.35.0 exposes *pkgctl run*, one narrow command over the existing native
 runtime. *--start* composes from the explicit transaction request, then
 immutably retains the one current private command-evidence format: the complete
 start-only transaction inputs, exact admitted interpreter identity, exact admitted
-construction/check/lifecycle backend capability profiles, plus the owner-encoded
-catalog/state universe, before admitting one caller-issued run
-nonce. *--resume* requires the retained command evidence and exact admitted journal and
+construction/check/lifecycle backend capability profiles, one complete
+controller-owned target-operation policy profile for *run*, plus the owner-encoded
+catalog/state universe, before admitting one caller-issued run nonce. The policy
+profile's identity binds its complete normalized semantics, and command evidence
+retains it through the pkgctl owner codec rather than a second *libpkgplan* codec.
+*--resume* requires the retained command evidence and exact admitted journal and
 recomposes the same transaction identity without a second semantic request.
 Catalog acquisition, target-binding, architecture, goal, resolution-policy, and
 convergence options are start-only. Resume accepts the current canonical-store
@@ -212,12 +215,16 @@ into this composition root.
 
 # NATIVE OPERATION AUTHORITY
 
-Version 0.33.0 implements one native operation execution and recovery source
-for an exact sealed transaction. A replayable per-dispatch source supplies the
-current action's target context, application execution control, planner
-observations and policy, runtime closure, explicit lifecycle execution order,
-and installation reason where required. Fixed configuration supplies lifecycle
-coordinates and credentials.
+Version 0.33.0 introduced one native operation execution and recovery source
+for an exact sealed transaction. Current composition keeps per-dispatch and
+transaction-wide authority separate. A replayable per-dispatch source supplies
+the current action's target context, application execution control, planner
+observations, runtime closure, explicit lifecycle execution order, and
+installation reason where required. Fixed configuration supplies the one
+admitted normalized package policy together with lifecycle coordinates and
+credentials. The operation-session codec does not serialize that foreign planner
+policy vocabulary; restart receives the exact policy projection already decoded
+from its controller-owned command authority.
 
 Fresh authority consumes the exact current progress and predecessor
 construction and uses the existing preparation boundary. The effect boundary

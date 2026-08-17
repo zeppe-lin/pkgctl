@@ -23,6 +23,13 @@ if not get_option('tests').disabled()
   )
   test('preparation-policy', preparation_policy_test, suite: 'unit')
 
+  native_policy_test = executable(
+    'native-policy-test',
+    'unit/native_policy_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test('native-policy', native_policy_test, suite: 'unit')
+
   cli_execution_report_test = executable(
     'cli-execution-report-test',
     ['unit/cli_execution_report_test.cpp', '../cli/execution_report.cpp'],
@@ -924,6 +931,7 @@ if not get_option('tests').disabled()
     'effect_store.h',
     'error.h',
     'identity.h',
+    'native_policy.h',
     'operation_codec.h',
     'pkgctl.h',
     'preparation.h',
@@ -1095,6 +1103,16 @@ if not get_option('tests').disabled()
   test(
     'run-operation-contract',
     run_operation_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  native_policy_contract = find_program(
+    'contracts/check_native_policy_contract.sh',
+  )
+  test(
+    'native-policy-contract',
+    native_policy_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

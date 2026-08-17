@@ -796,7 +796,7 @@ native_runtime_operation_configuration(
   const auto execution_root = root / "lifecycle-execution-root";
   std::filesystem::create_directories(execution_root);
   return pkgctl::native_transaction_operation_configuration::make(
-      transaction,
+      transaction, package_policy(),
       {
           pkgexec::root_view_identity::from_sha256(std::string(64U, '7')),
           execution_root,
@@ -3200,7 +3200,7 @@ void check_native_posix_transaction_run_runtime()
   {
     auto contradictory_operation =
         pkgctl::native_transaction_operation_configuration::make(
-            target_transaction,
+            target_transaction, package_policy(),
             {
                 pkgexec::root_view_identity::from_sha256(
                     std::string(64U, '7')),
@@ -3226,7 +3226,7 @@ void check_native_posix_transaction_run_runtime()
   {
     auto overlapping_operation =
         pkgctl::native_transaction_operation_configuration::make(
-            target_transaction,
+            target_transaction, package_policy(),
             {
                 pkgexec::root_view_identity::from_sha256(
                     std::string(64U, '8')),

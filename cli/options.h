@@ -15,6 +15,7 @@
 #include <libpkgstate/installed_package.h>
 
 #include <pkgctl/identity.h>
+#include <pkgctl/native_policy.h>
 #include <pkgctl/request.h>
 #include <pkgctl/run_journal.h>
 
@@ -61,6 +62,7 @@ struct transaction_run_command final {
   pkgexec::credential_policy build_credentials;
   std::optional<pkgexec::credential_policy> lifecycle_credentials;
   std::optional<pkgbuild::build_policy> build_policy;
+  std::optional<native_operation_policy> operation_policy;
   std::size_t maximum_steps;
   std::vector<installed_tree_option> installed_trees;
 };

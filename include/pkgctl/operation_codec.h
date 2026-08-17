@@ -47,17 +47,19 @@ private:
 
 /*! \brief Decode one retained operation session without live specification IO.
  *
- * The journal record, progress, and dispatch are caller-supplied retained
- * controller authority. Decoding restores the exact operation specification
- * and lifecycle admission coordinates, then re-runs only pure controller
- * projection/admission. It does not consult the live operation specification
- * source, observe the target, open archives, read canonical state, or inspect
- * host paths.
+ * The journal record, progress, dispatch, and complete package policy are
+ * caller-supplied retained controller authority. The policy is not serialized
+ * here: its selected configuration adapter owns durable policy encoding.
+ * Decoding restores the exact operation specification and lifecycle admission
+ * coordinates, then re-runs only pure controller projection/admission. It does
+ * not consult the live operation specification source, observe the target, open
+ * archives, read canonical state, or inspect host paths.
  */
 [[nodiscard]] effectful_operation_session decode_operation_session(
     const operation_session_encoding& encoding,
     const transaction_run_journal_record& record,
     const transaction_progress& progress,
-    const transaction_dispatch& dispatch);
+    const transaction_dispatch& dispatch,
+    const pkgplan::package_policy_snapshot& policy);
 
 } // namespace pkgctl
