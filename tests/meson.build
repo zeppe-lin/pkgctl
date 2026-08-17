@@ -435,6 +435,10 @@ if not get_option('tests').disabled()
       meson.project_version(),
     ],
     suite: 'integration',
+    # This is a broad read-only CLI cohort: surface/admission refusals, catalog,
+    # resolution/transaction projection, and run/effect store inspection.
+    # Sanitized builds can exceed Meson's 30 s default without blocking.
+    timeout: 90,
   )
 
   cli_run_test = find_program('integration/cli_run_test.sh')
