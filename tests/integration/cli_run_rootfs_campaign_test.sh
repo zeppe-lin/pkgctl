@@ -9,8 +9,9 @@ state_inspect_fixture=$3
 run_evidence_inspect_fixture=$4
 runtime_root_fixture=$5
 rootfs_authority_audit_fixture=$6
-fixture_collection=$7
-root_view_fixture=$8
+state_ownership_inspect_fixture=$7
+fixture_collection=$8
+root_view_fixture=$9
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-run-rootfs-campaign.XXXXXX")
 cleanup()
 {
@@ -134,7 +135,15 @@ foreign_artifact_before=$(sha256sum "$runtime/artifacts/foreign.tar")
 
 "$root_view_fixture" "$build"
 "$root_view_fixture" "$lifecycle"
-build_interpreter=$("$runtime_root_fixture" "$build" /bin/sh)
+mkdir_program=$(command -v mkdir) || fail 'host mkdir is unavailable for rootfs build fixture'
+case $mkdir_program in
+  /*)
+    ;;
+  *)
+    fail "host mkdir did not resolve to an absolute path: $mkdir_program"
+    ;;
+esac
+build_interpreter=$("$runtime_root_fixture" "$build" /bin/sh "$mkdir_program")
 lifecycle_interpreter=$("$runtime_root_fixture" "$lifecycle" /bin/sh)
 require_equal interpreter-authority "$build_interpreter" "$lifecycle_interpreter"
 case $build_interpreter in
@@ -160,7 +169,7 @@ set -- run --canonical-store "$state" \
   --start "$(printf '%064d' 6)" \
   --build-parallelism 1 \
   --build-source-date-epoch 0 \
-  --operation-policy strict-exclusive \
+  --operation-policy exact-compatible-sharing \
   --runtime-root "$runtime" \
   --build-root "$build" \
   --lifecycle-root "$lifecycle" \
@@ -286,6 +295,44 @@ require_not_contains final-state "$root/final-state.out" 'package build-tool '
 package_count=$(grep -c '^package ' "$root/final-state.out")
 [ "$package_count" -eq 3 ] || \
   fail "canonical state contains $package_count package records, expected 3"
+
+"$state_ownership_inspect_fixture" \
+  "$state" base-files usr/lib/shared-ownership-marker \
+  >"$root/shared-base.out" 2>"$root/shared-base.err" || {
+  dump_file 'rootfs base-files shared ownership stdout' "$root/shared-base.out"
+  dump_file 'rootfs base-files shared ownership stderr' "$root/shared-base.err"
+  fail 'rootfs campaign did not publish base-files shared ownership'
+}
+"$state_ownership_inspect_fixture" \
+  "$state" runtime-lib usr/lib/shared-ownership-marker \
+  >"$root/shared-runtime.out" 2>"$root/shared-runtime.err" || {
+  dump_file 'rootfs runtime-lib shared ownership stdout' "$root/shared-runtime.out"
+  dump_file 'rootfs runtime-lib shared ownership stderr' "$root/shared-runtime.err"
+  fail 'rootfs campaign did not publish runtime-lib shared ownership'
+}
+for report in "$root/shared-base.out" "$root/shared-runtime.out"; do
+  require_contains shared-owner "$report" 'packages 3'
+  require_contains shared-owner "$report" 'path usr/lib/shared-ownership-marker'
+  require_contains shared-owner "$report" 'kind regular'
+  require_contains shared-owner "$report" 'mode 0644'
+  require_contains shared-owner "$report" 'size 17'
+  require_contains shared-owner "$report" \
+    'content v1:sha256:6e231219a7f7e1cef0e59ba1184018819a47b4bebafcd5c9d257e0f6f11d2a06'
+  require_contains shared-owner "$report" 'owners 2'
+  require_contains shared-owner "$report" 'owner.0 base-files '
+  require_contains shared-owner "$report" 'owner.1 runtime-lib '
+done
+base_origin=$(sed -n 's/^origin //p' "$root/shared-base.out")
+runtime_origin=$(sed -n 's/^origin //p' "$root/shared-runtime.out")
+case "$base_origin:$runtime_origin" in
+  incoming-payload:retained-existing|retained-existing:incoming-payload)
+    ;;
+  *)
+    fail "rootfs shared ownership origins are not one incoming/one retained: $base_origin/$runtime_origin"
+    ;;
+esac
+require_equal shared-owned-target shared-authority \
+  "$(cat "$target/usr/lib/shared-ownership-marker")"
 
 require_equal base-files-target base-files-source \
   "$(cat "$target/base-files-marker")"

@@ -176,9 +176,12 @@ private evidence just to manufacture a policy mismatch.
 
 The privileged `cli-run-rootfs-campaign` vertical is the first whole-root
 qualification rather than a single-package installation fixture. It consumes
-already-qualified package/image semantics; shared-path policy is not introduced
-by this campaign until its lower planner/application/state staircase is green.
-It begins with an absent canonical store, explicitly admits one empty canonical generation
+already-qualified package/image semantics and the now-complete five-layer
+shared-ownership staircase; it is not where compatible-sharing behavior is
+discovered. The campaign therefore admits the complete
+`exact-compatible-sharing` controller policy and requires both `base-files` and
+`runtime-lib` images to carry the same qualified shared object. It begins with
+an absent canonical store, explicitly admits one empty canonical generation
 through the provider constructor used by the state test harness, and requires
 an empty managed target before transaction execution. Production
 `pkgstate-init` is qualified in `libpkgstate-posix`; this test deliberately does
@@ -192,12 +195,17 @@ Linux backend and a minimal real POSIX shell closure in both build and
 lifecycle root views, and uses exact target convergence.
 
 A successful terminal run must retain four construction archives but publish
-exactly three installed packages and three target payloads: `base-files`,
-`runtime-lib`, and `rootfs-probe`. The transitive runtime dependency must
-therefore enter target/state even though it is not a profile member, while the
-constructed build-only dependency must remain absent from both. The probe build
-must consume the exact `build-tool` package input and its real check must consume
-the constructed probe package.
+exactly three installed packages: `base-files`, `runtime-lib`, and
+`rootfs-probe`. The transitive runtime dependency must therefore enter
+target/state even though it is not a profile member, while the constructed
+build-only dependency must remain absent from both. `base-files` and
+`runtime-lib` must both own `usr/lib/shared-ownership-marker`; exactly one
+installed entry must identify the active object as incoming payload and the
+other as retained existing, while the target carries the exact
+`shared-authority\n` bytes. This is a final composition consequence only: the
+planner/application/state meanings behind those origins are already qualified by
+Layers 1-5. The probe build must consume the exact `build-tool` package input and
+its real check must consume the constructed probe package.
 
 The terminal target is then handed to a test-only authority/audit adapter. It
 does not derive expected inventory from the state being audited. The campaign

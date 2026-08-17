@@ -49,6 +49,11 @@ for required in \
   "--goal 'run=@rootfs-test'" \
   "--goal 'check=rootfs-probe'" \
   '--converge-exact' \
+  '--operation-policy exact-compatible-sharing' \
+  '"$state_ownership_inspect_fixture"' \
+  'usr/lib/shared-ownership-marker' \
+  'owners 2' \
+  'shared-owned-target shared-authority' \
   'artifacts 4' \
   'artifact.0.package base-files' \
   'artifact.1.package build-tool' \
@@ -103,7 +108,8 @@ done
 for required in \
   '"$root_view_fixture" "$build"' \
   '"$root_view_fixture" "$lifecycle"' \
-  '"$runtime_root_fixture" "$build" /bin/sh' \
+  'mkdir_program=$(command -v mkdir)' \
+  '"$runtime_root_fixture" "$build" /bin/sh "$mkdir_program"' \
   '"$runtime_root_fixture" "$lifecycle" /bin/sh'; do
   grep -F -- "$required" "$test_source" >/dev/null || \
     fail "real native runtime proof omits: $required"
@@ -147,6 +153,19 @@ for pair in \
   grep -F -- "$marker" "$file" >/dev/null || \
     fail "fixture recipe omits expected package marker: $marker"
 done
+
+for file in "$base_files" "$runtime_lib"; do
+  for required in \
+    'mkdir -p "$PKG_DESTDIR/usr/lib" || exit 1' \
+    'shared-authority >"$PKG_DESTDIR/usr/lib/shared-ownership-marker" || exit 1'; do
+    grep -F -- "$required" "$file" >/dev/null || \
+      fail "shared rootfs fixture omits: $required"
+  done
+done
+
+if grep -F -- '--operation-policy strict-exclusive' "$test_source" >/dev/null; then
+  fail 'rootfs campaign regressed to exclusive policy after sharing qualification'
+fi
 
 grep -F -- 'canonical_generation_store store(root, binding());' \
   "$srcdir/tests/support/test_support.h" >/dev/null || \

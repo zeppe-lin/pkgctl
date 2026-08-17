@@ -869,6 +869,7 @@ if not get_option('tests').disabled()
       run_evidence_inspect_fixture,
       native_runtime_root_fixture,
       rootfs_authority_audit_fixture,
+      state_ownership_inspect_fixture,
       join_paths(
         meson.project_source_root(),
         'tests/fixtures/collections/rootfs-campaign',
@@ -881,6 +882,7 @@ if not get_option('tests').disabled()
     depends: [
       native_runtime_root_fixture,
       rootfs_authority_audit_fixture,
+      state_ownership_inspect_fixture,
       run_evidence_inspect_fixture,
     ],
     suite: 'integration-privileged',

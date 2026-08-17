@@ -20,8 +20,10 @@ build:
   language: posix-shell
   script: |
     IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
-    [ "$source" = runtime-lib-source ]
-    printf '%s\n' "$source" >"$PKG_DESTDIR/runtime-lib-marker"
+    [ "$source" = runtime-lib-source ] || exit 1
+    printf '%s\n' "$source" >"$PKG_DESTDIR/runtime-lib-marker" || exit 1
+    mkdir -p "$PKG_DESTDIR/usr/lib" || exit 1
+    printf '%s\n' shared-authority >"$PKG_DESTDIR/usr/lib/shared-ownership-marker" || exit 1
 
 architectures:
   build:
