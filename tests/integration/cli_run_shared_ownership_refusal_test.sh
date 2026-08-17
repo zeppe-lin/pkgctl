@@ -99,6 +99,7 @@ setup_case()
   build=$case_root/build
   lifecycle=$case_root/lifecycle
   target=$case_root/target
+  qualified_artifacts=$case_root/qualified-artifacts
   mkdir -p "$case_root"
 
   binding=$("$state_fixture" "$state")
@@ -106,7 +107,7 @@ setup_case()
   printf '%s\n' "$initial_state" >"$case_root/initial-state.out"
   require_contains "$case_name initial-state" "$case_root/initial-state.out" 'packages 0'
 
-  mkdir "$runtime" "$build" "$lifecycle" "$target"
+  mkdir "$runtime" "$build" "$lifecycle" "$target" "$qualified_artifacts"
   for directory in \
     command-evidence \
     run \
@@ -261,16 +262,17 @@ build_qualified_image()
   expected_content=$7
   expected_payload=$8
 
-  set -- build --canonical-store "$state" \
+  set -- build "$package" \
+    --canonical-store "$state" \
     --collection "core=$collection" \
     --build-architecture x86_64 \
     --target-architecture x86_64 \
-    --goal "build=$package" \
     --start "$(printf '%064d' "$nonce")" \
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
     --runtime-root "$runtime" \
     --build-root "$build" \
+    --artifact-root "$qualified_artifacts" \
     --interpreter "$interpreter" \
     --build-user-id "$uid" \
     --build-group-id "$gid" \

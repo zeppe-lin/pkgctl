@@ -59,6 +59,8 @@ for required in \
   'setup_case incompatible' \
   'build_qualified_image compatible-build "$compatible_collection" runtime-lib 60' \
   'build_qualified_image hostile-build "$hostile_collection" runtime-lib-hostile 71' \
+  'set -- build "$package"' \
+  '--artifact-root "$qualified_artifacts"' \
   'run_package_success base "$compatible_collection" base-files strict-exclusive 72' \
   'run_package_refusal incompatible "$hostile_collection" runtime-lib-hostile' \
   'exact-compatible-sharing 73' \
@@ -93,6 +95,10 @@ for forbidden in \
     fail "pkgctl renders foreign refusal vocabulary: $forbidden"
   fi
 done
+
+if grep -F -- '--goal "build=$package"' "$test_source" >/dev/null 2>&1; then
+  fail 'refusal image qualification bypasses the build frontend subject authority'
+fi
 
 # This layer correlates owner authority with hostile physical non-mutation. It
 # must not decode pkgctl/private application, session, publication, or tar bytes.
