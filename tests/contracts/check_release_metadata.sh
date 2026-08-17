@@ -53,7 +53,7 @@ require_dependency_range libpkgstate-apply '>=3.1.1' '<4.0.0'
 require_dependency_range libpkgfetch '>=3.0.0' '<4.0.0'
 require_dependency_range libpkgsource-exec '>=0.1.0' '<1.0.0'
 require_dependency_range libpkgbuild '>=3.0.2' '<4.0.0'
-require_dependency_range libpkgbuild-exec '>=3.3.0' '<4.0.0'
+require_dependency_range libpkgbuild-exec '>=3.3.1' '<4.0.0'
 require_dependency_range libpkgbuild-image '>=1.0.1' '<2.0.0'
 require_dependency_range libpkgimage-exec '>=0.1.0' '<1.0.0'
 require_dependency_range libpkgbuild-plan '>=1.1.0' '<2.0.0'
@@ -182,10 +182,10 @@ awk '
   current { print }
 ' "$srcdir/HISTORY.md" > "$temporary.unreleased"
 
-if grep -q '[^[:space:]]' "$temporary.unreleased"; then
-  echo 'release commit must leave the Unreleased history section empty' >&2
+grep -F 'Requires libpkgbuild-exec 3.3.1' "$temporary.unreleased" >/dev/null || {
+  echo 'Unreleased history omits the current libpkgbuild-exec 3.3.1 floor' >&2
   exit 1
-fi
+}
 
 awk '
   /^## 0\.39\.0 / { current = 1; next }
@@ -195,6 +195,7 @@ awk '
 
 grep -F 'Renders structured native construction and check execution failures' \
   "$temporary.039" >/dev/null
+grep -F 'Requires libpkgbuild-exec 3.3.0' "$temporary.039" >/dev/null
 grep -F 'Requires libpkgexec 2.2.0, libpkgexec-linux 0.7.1, and libpkgcheck-exec' \
   "$temporary.039" >/dev/null
 grep -F 'only check dependencies inhabit `/check/inputs/<canonical-package-name>`' \

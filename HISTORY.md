@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Requires libpkgbuild-exec 3.3.1 so an admitted `SOURCE_DATE_EPOCH` also
+  closes package-image entry timestamps during build-result sealing. This
+  excludes the 3.3.0 adapter whose package metadata could retain ambient
+  wall-clock mtimes even though the epoch was already admitted build policy.
+
 ## 0.39.0 - 2026-08-17
 
 - Treats construction/check build policy as one admitted command authority rather
