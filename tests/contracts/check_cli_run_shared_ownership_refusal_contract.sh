@@ -61,6 +61,12 @@ for required in \
   'build_qualified_image hostile-build "$hostile_collection" runtime-lib-hostile 71' \
   'set -- build "$package"' \
   '--artifact-root "$qualified_artifacts"' \
+  'check-resources \' \
+  "native execution unavailable before transaction execution;" \
+  "exit 77" \
+  'printf '"'"'%s\n'"'"' "--- $1 ---"' \
+  'grep -F -- "$3" "$2"' \
+  '[ "$3" = "$2" ]' \
   'run_package_success base "$compatible_collection" base-files strict-exclusive 72' \
   'run_package_refusal incompatible "$hostile_collection" runtime-lib-hostile' \
   'exact-compatible-sharing 73' \

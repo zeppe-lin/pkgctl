@@ -34,11 +34,9 @@ fail()
 
 dump_file()
 {
-  label=$1
-  file=$2
-  printf '%s\n' "--- $label ---" >&2
-  if [ -s "$file" ]; then
-    cat "$file" >&2
+  printf '%s\n' "--- $1 ---" >&2
+  if [ -s "$2" ]; then
+    cat "$2" >&2
   else
     printf '%s\n' '<empty>' >&2
   fi
@@ -46,37 +44,27 @@ dump_file()
 
 require_contains()
 {
-  label=$1
-  file=$2
-  expected=$3
-  if ! grep -F -- "$expected" "$file" >/dev/null; then
+  if ! grep -F -- "$3" "$2" >/dev/null; then
     printf '%s\n' \
-      "pkgctl:cli-run-shared-ownership-refusal: $label: missing expected text: $expected" >&2
-    dump_file "$label" "$file"
+      "pkgctl:cli-run-shared-ownership-refusal: $1: missing expected text: $3" >&2
+    dump_file "$1" "$2"
     exit 1
   fi
 }
 
 require_not_contains()
 {
-  label=$1
-  file=$2
-  forbidden=$3
-  if grep -F -- "$forbidden" "$file" >/dev/null; then
+  if grep -F -- "$3" "$2" >/dev/null; then
     printf '%s\n' \
-      "pkgctl:cli-run-shared-ownership-refusal: $label: contains forbidden text: $forbidden" >&2
-    dump_file "$label" "$file"
+      "pkgctl:cli-run-shared-ownership-refusal: $1: contains forbidden text: $3" >&2
+    dump_file "$1" "$2"
     exit 1
   fi
 }
 
 require_equal()
 {
-  label=$1
-  expected=$2
-  actual=$3
-  [ "$actual" = "$expected" ] || \
-    fail "$label: values differ"
+  [ "$3" = "$2" ] || fail "$1: values differ"
 }
 
 field()
@@ -125,6 +113,7 @@ setup_case()
     construction-sessions \
     package-outputs \
     artifacts \
+    check-resources \
     check-temporary \
     lifecycle-sessions; do
     mkdir "$runtime/$directory"
@@ -283,11 +272,31 @@ build_qualified_image()
     fi
   done
 
-  "$pkgctl" "$@" $binding >"$case_root/$label.out" 2>"$case_root/$label.err" || {
+  set +e
+  "$pkgctl" "$@" $binding >"$case_root/$label.out" 2>"$case_root/$label.err"
+  status=$?
+  set -e
+  if [ "$status" -ne 0 ]; then
+    if grep -F 'native execution unavailable before transaction execution;' \
+        "$case_root/$label.err" >/dev/null; then
+      require_equal "$label unavailable-state" "$initial_state" \
+        "$("$state_inspect_fixture" "$state")"
+      if find "$target" -mindepth 1 -print -quit | grep . >/dev/null; then
+        fail "$label native preflight refusal mutated the empty target"
+      fi
+      printf '%s\n' \
+        'pkgctl:cli-run-shared-ownership-refusal: native execution preflight is unavailable;' \
+        'privileged native execution is required for this case' >&2
+      dump_file "$label native execution preflight" "$case_root/$label.err"
+      if [ "${PKGCTL_REQUIRE_NATIVE_INTEGRATION:-0}" = 1 ]; then
+        fail 'release qualification requires the refusal integration path'
+      fi
+      exit 77
+    fi
     dump_file "$label stdout" "$case_root/$label.out"
     dump_file "$label stderr" "$case_root/$label.err"
-    fail "$package image construction failed"
-  }
+    fail "$package image construction failed with status $status"
+  fi
   require_contains "$label" "$case_root/$label.out" 'frontend build'
   require_contains "$label" "$case_root/$label.out" 'disposition completed'
   require_contains "$label" "$case_root/$label.out" "artifact.0.package $package"
