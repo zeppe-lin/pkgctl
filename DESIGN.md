@@ -13,6 +13,15 @@ The central invariant is:
 > not another package-source, resolver, transaction, planner, application, or
 > state model.
 
+Terminology at this boundary is contractual. **Rehydrate/decode** means reopen exact
+retained semantic evidence; **derive/project** means compute a value from existing
+authority; **realize** means create an ephemeral filesystem/process resource from
+already admitted authority; **observe** means inspect present external state. The
+controller does not reconstruct present truth or physical resources from residue,
+paths, names, or stale evidence. In particular, CHECK may realize fresh source,
+package, and dependency trees from retained exact authority, but it may not
+rediscover why those resources belong to the check.
+
 ## Current terminal private-realization cleanup boundary
 
 Successful transaction completion authorizes disposal of execution realization,
@@ -475,16 +484,16 @@ content identities exported by the filesystem realizers. Two logical package
 resources may therefore carry identical normalized image bytes while remaining
 distinct concrete execution resources at disjoint host paths. Immediately before
 native check execution,
-`libpkgsource-exec` recreates `/check/source` from the retained exact
-`pkgfetch::source_materialization`, and `libpkgimage-exec` recreates the checked
+`libpkgsource-exec` realizes fresh `/check/source` from the retained exact
+`pkgfetch::source_materialization`, and `libpkgimage-exec` realizes the checked
 package tree from the exact published artifact digest plus normalized package
-image identity. Candidate check inputs are also reconstructed from the sealed
+image identity. Candidate check inputs are likewise realized from the sealed
 artifact/image authority of the exact predecessor constructions retained by the
 check request; installed inputs continue to use their state-owned retained
 resources. Construction `source`, `work`, `tmp`, and package-output trees are
 therefore disposable after construction dependencies are complete rather than
-check authority. A restarted check can recreate every construction-produced
-check resource after those construction-private trees have disappeared.
+check authority. A restarted check can realize every construction-produced check
+resource after those construction-private trees have disappeared.
 
 Path-based construction opens three existing absolute, normalized journal
 directories and, for an operation-capable transaction, the fourth target-lock

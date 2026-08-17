@@ -135,8 +135,8 @@ run_scenario()
       ;;
   esac
 
-  # Check must reconstruct from retained authority, not accidentally consume
-  # construction-private trees that already happened to contain usable bytes.
+  # Check must realize fresh resources from retained authority, not accidentally
+  # consume construction-private trees that already happened to contain usable bytes.
   # Remember one exact planned leaf in each construction-private class, remove
   # all real residue, then recreate those exact leaves with hostile sentinels.
   # The upcoming check failure must authorize no terminal cleanup at all.

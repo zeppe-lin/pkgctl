@@ -150,7 +150,7 @@ require_contains run "$root/run.out" '.package archive-dep'
 require_contains run "$root/run.out" '.package archive-probe'
 
 # Construction-private resource trees are not check authority. Remove them
-# completely before resuming the check; recovery must recreate source/package
+# completely before resuming the check; recovery must realize fresh source/package
 # resources from retained materialization and sealed artifact evidence.
 find "$runtime/construction-sessions" "$runtime/package-outputs" \
   -type d -exec chmod u+w {} + 2>/dev/null || :

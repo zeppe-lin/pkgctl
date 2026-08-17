@@ -227,7 +227,7 @@ require_private_residue package-outputs
 # Replace one exact private package-output dispatch leaf with a symlink to an
 # external directory. Cleanup must neither follow nor unlink this hostile
 # top-level substitution. The final check does not need package-output
-# realization: it reconstructs its checked package from durable public artifact
+# realization: it realizes its checked package from durable public artifact
 # authority, so this attack is isolated to the cleanup boundary.
 package_journal=$runtime/package-outputs/$journal
 [ -d "$package_journal" ] || fail 'package-output journal directory is absent'

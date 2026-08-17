@@ -150,7 +150,8 @@ require_private_residue package-outputs
 journal=$(sed -n 's/^journal //p' "$root/precheck.out")
 [ -n "$journal" ] || fail 'pre-check report omitted journal'
 
-# CHECK must reconstruct from durable artifacts/evidence, not construction meat.
+# CHECK must realize fresh resources from durable artifacts/evidence, not consume
+# construction meat.
 rm -rf "$runtime/construction-sessions" "$runtime/package-outputs"
 mkdir "$runtime/construction-sessions" "$runtime/package-outputs"
 run_command terminal resume 1

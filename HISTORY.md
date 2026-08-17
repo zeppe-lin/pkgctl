@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Tightens BUILD/CHECK vocabulary around the authority boundary: retained semantic
+  evidence is decoded or rehydrated, semantic values are derived/projected, and
+  ephemeral source/package/dependency trees are realized from exact retained
+  authority. CHECK does not reconstruct present truth, rediscover dependency
+  membership, or accept construction residue as evidence.
+
 - Requires libpkgbuild-exec 3.3.1 so an admitted `SOURCE_DATE_EPOCH` also
   closes package-image entry timestamps during build-result sealing. This
   excludes the 3.3.0 adapter whose package metadata could retain ambient

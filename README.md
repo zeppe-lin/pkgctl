@@ -4,8 +4,10 @@ Release 0.39.0 closes phase-local construction/check authority around the
 current native build frontend. The sealed build request still retains both
 build- and check-scoped logical requirements, but construction concretizes only
 build inputs. Check source, checked-package, and candidate check-input resources
-are reconstructed independently from retained source and artifact/image authority;
-installed check inputs come from state-owned retained resources. Complete build
+are realized independently from retained source and exact artifact/image authority;
+installed check inputs come from state-owned retained resources. CHECK does not
+rediscover or re-resolve why those resources belong to the transaction, and no existing execution
+tree is accepted as truth merely because bytes are present. Complete build
 policy is admitted and retained as one start-only command authority, and terminal
 private construction/check realizations are disposed only from completed durable
 dispatch authority. The release also requires libpkgexec-linux 0.7.1 so native

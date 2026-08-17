@@ -14,10 +14,12 @@ the resulting control state.
 
 Version 0.39.0 keeps build- and check-scoped package relations in one sealed
 logical request while concretizing them only in the phase that consumes them.
-Construction receives build inputs. Check reconstructs retained source material,
-the exact sealed package image, and candidate check inputs independently; installed
-check inputs are located from state-owned retained resources. The command retains
-one complete build-policy value and identity at start and refuses semantic policy
+Construction receives build inputs. Check independently realizes fresh source
+material, the exact sealed package image, and candidate check inputs from retained
+exact authority; installed check inputs are located from state-owned retained
+resources. It does not re-resolve membership or treat construction residue as
+truth. The command retains one complete build-policy value and identity at start
+and refuses semantic policy
 redeclaration on resume.
 
 Terminal cleanup is downstream of completed durable dispatch authority. Exact

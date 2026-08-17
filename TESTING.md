@@ -140,7 +140,7 @@ binding must remain absent from the construction session and build environment.
 The independent check later realizes the same selected candidate as its exact
 logical check input. Qualification first completes the dependency and archive-probe
 constructions, then deletes the complete construction-session and package-output
-trees before resuming the check. The check must independently recreate its
+trees before resuming the check. The check must independently realize its
 source-object tree from retained materialization authority, its package tree
 from the exact sealed artifact/image authority, and its candidate check input
 from the dependency's sealed artifact rather than construction residue. Two

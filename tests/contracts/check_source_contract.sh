@@ -56,6 +56,41 @@ if grep -R -n 'ZEPPE_LIN_CHECK_' \
   echo 'current pkgctl sources retain branded check recipe variables' >&2
   exit 1
 fi
+
+# BUILD/CHECK resources are realized from already admitted authority.  Keep the
+# vocabulary sharp so documentation cannot drift back toward truth reconstruction.
+for required in \
+  'Terminology at this boundary is contractual.' \
+  'CHECK may realize fresh source,' \
+  'Candidate check inputs are likewise realized from the sealed' \
+  'Check source, checked-package, and candidate check-input resources' \
+  'Check execution realizes fresh source,'; do
+  grep -F -- "$required" "$srcdir/DESIGN.md" "$srcdir/README.md" "$srcdir/man"/* >/dev/null || {
+    echo "BUILD/CHECK realization vocabulary is missing: $required" >&2
+    exit 1
+  }
+done
+
+for forbidden in \
+  'resources are reconstructed independently from retained source' \
+  'Candidate check inputs are also reconstructed from the sealed' \
+  'CHECK must reconstruct from durable artifacts/evidence' \
+  'Check must reconstruct from retained authority' \
+  'it reconstructs its checked package from durable public artifact' \
+  'check must independently recreate its' \
+  'recovery must recreate source/package' \
+  'Check execution reconstructs source,' \
+  'Check reconstructs retained source material,'; do
+  if grep -R -n -F -- "$forbidden" \
+      "$srcdir/README.md" "$srcdir/DESIGN.md" "$srcdir/TESTING.md" \
+      "$srcdir/tests/integration" "$srcdir/man" >/dev/null 2>&1; then
+    echo "BUILD/CHECK documentation reconstructs physical resources: $forbidden" >&2
+    grep -R -n -F -- "$forbidden" \
+      "$srcdir/README.md" "$srcdir/DESIGN.md" "$srcdir/TESTING.md" \
+      "$srcdir/tests/integration" "$srcdir/man" >&2 || true
+    exit 1
+  fi
+done
 reviewed_cli_modules='libpkgsource-yaml libpkgcatalog-codec libpkgexec-linux'
 for constraint in \
   'libpkgsource >= 4.1.0' 'libpkgsource < 5.0.0' \
