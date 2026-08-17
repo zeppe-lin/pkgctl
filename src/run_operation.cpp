@@ -8,7 +8,6 @@
 #include "operation_admission.h"
 
 #include <algorithm>
-#include <sstream>
 #include <string_view>
 #include <utility>
 
@@ -265,14 +264,9 @@ effectful_operation_session admit_native_operation_session(
         driver);
     if (!prepared.prepared() || !prepared.effect() || !prepared.application())
     {
-      std::ostringstream message;
-      message << "native operation planning refused";
-      if (prepared.refusal())
-        message << " with code "
-                << static_cast<unsigned>(prepared.refusal()->code());
       throw native_operation_authority_error(
           native_operation_authority_error_code::planning_refused,
-          message.str());
+          "native operation planning refused");
     }
 
     auto before = admit_lifecycle_sessions(

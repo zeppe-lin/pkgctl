@@ -5823,7 +5823,8 @@ void check_native_operation_authority_source()
   catch (const pkgctl::native_operation_authority_error& problem)
   {
     planning_refused = problem.code() ==
-        pkgctl::native_operation_authority_error_code::planning_refused;
+            pkgctl::native_operation_authority_error_code::planning_refused &&
+        std::string(problem.what()) == "native operation planning refused";
   }
   CHECK(planning_refused);
 }

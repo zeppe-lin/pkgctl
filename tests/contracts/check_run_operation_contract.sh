@@ -79,6 +79,22 @@ for required_test in \
   }
 done
 
+# The orchestrator may report that planning refused, but it must not invent or
+# expose a second textual/numeric vocabulary for the planner-owned refusal code.
+grep -F -- '"native operation planning refused"' "$source" >/dev/null || {
+  echo 'native operation refusal lacks generic controller diagnostic' >&2
+  exit 1
+}
+for forbidden in \
+  'prepared.refusal()->code()' \
+  'planning_refusal_name' \
+  'static_cast<unsigned>(prepared.refusal'; do
+  if grep -F -- "$forbidden" "$source" >/dev/null 2>&1; then
+    echo "native operation authority renders foreign refusal vocabulary: $forbidden" >&2
+    exit 1
+  fi
+done
+
 # Session/recovery authority may project and validate, but may not observe or
 # mutate the target, execute effects, append journals, discover archives, or
 # acquire runtime backends. Archive opening is confined to the explicit map.
