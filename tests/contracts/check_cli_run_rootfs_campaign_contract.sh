@@ -56,6 +56,13 @@ for required in \
   'artifact.3.package runtime-lib' \
   'artifact.0.path $runtime/artifacts/' \
   "'frontend build'" \
+  'foreign-not-construction-authority' \
+  'artifact_field' \
+  'report names absent bytes' \
+  'foreign-after-terminal.tar' \
+  'origin resumed' \
+  'durable-steps 0' \
+  'terminal-resume-artifact-' \
   'packages 3' \
   'package base-files 1.0-1' \
   'package runtime-lib 1.0-1' \

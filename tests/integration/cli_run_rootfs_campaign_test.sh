@@ -92,6 +92,18 @@ require_absent()
   [ ! -e "$path" ] || fail "$label: unexpected path exists: $path"
 }
 
+artifact_field()
+{
+  report=$1
+  index=$2
+  field=$3
+  value=$(sed -n "s/^artifact\.$index\.$field //p" "$report")
+  [ -n "$value" ] || fail "artifact $index report omits $field"
+  lines=$(printf '%s\n' "$value" | wc -l)
+  [ "$lines" -eq 1 ] || fail "artifact $index report repeats $field"
+  printf '%s\n' "$value"
+}
+
 # The production provider separately qualifies pkgstate-init.  This campaign
 # uses the pkgctl state fixture only as a test harness around the same explicit
 # canonical_generation_store open-or-initialize authority, so pkgctl tests do
@@ -124,6 +136,14 @@ for directory in \
   lifecycle-sessions; do
   mkdir "$runtime/$directory"
 done
+
+# Poison the private artifact namespace before admission.  Artifact reporting
+# must derive only from retained construction authority, never by scanning the
+# directory for plausible archives.
+mkdir "$root/foreign-artifact"
+printf '%s\n' 'foreign-not-construction-authority' >"$root/foreign-artifact/foreign-marker"
+tar -cf "$runtime/artifacts/foreign.tar" -C "$root/foreign-artifact" foreign-marker
+foreign_artifact_before=$(sha256sum "$runtime/artifacts/foreign.tar")
 
 "$root_view_fixture" "$build"
 "$root_view_fixture" "$lifecycle"
@@ -208,6 +228,39 @@ require_contains run "$root/run.out" 'artifact.2.package rootfs-probe'
 require_contains run "$root/run.out" 'artifact.3.package runtime-lib'
 require_contains run "$root/run.out" "artifact.0.path $runtime/artifacts/"
 require_not_contains run "$root/run.out" 'frontend build'
+require_not_contains run "$root/run.out" 'foreign.tar'
+require_not_contains run "$root/run.out" 'foreign-marker'
+require_equal foreign-artifact-preserved "$foreign_artifact_before" \
+  "$(sha256sum "$runtime/artifacts/foreign.tar")"
+
+# Every reported artifact must still exist after terminal cleanup and its bytes
+# must agree with the retained digest.  This prevents a report that merely
+# prints plausible metadata from an in-memory construction object.
+for index in 0 1 2 3; do
+  path=$(artifact_field "$root/run.out" "$index" path)
+  digest=$(artifact_field "$root/run.out" "$index" sha256)
+  identity=$(artifact_field "$root/run.out" "$index" identity)
+  binding=$(artifact_field "$root/run.out" "$index" binding-identity)
+  image=$(artifact_field "$root/run.out" "$index" image-identity)
+  case $path in
+    "$runtime/artifacts/"*)
+      ;;
+    *)
+      fail "artifact $index escaped private artifact authority: $path"
+      ;;
+  esac
+  [ -f "$path" ] || fail "artifact $index report names absent bytes: $path"
+  require_equal "artifact-$index-sha256" "$digest" "$(sha256sum "$path" | awk '{print $1}')"
+  for value in "$digest" "$identity" "$binding" "$image"; do
+    case $value in
+      *[!0-9a-f]*|'')
+        fail "artifact $index report contains malformed digest identity: $value"
+        ;;
+    esac
+    [ "${#value}" -eq 64 ] || \
+      fail "artifact $index report digest identity has length ${#value}, expected 64"
+  done
+done
 
 final_state=$("$state_inspect_fixture" "$state")
 printf '%s\n' "$final_state" >"$root/final-state.out"
@@ -229,7 +282,7 @@ require_equal rootfs-probe-target rootfs-probe-source+build-tool-source \
 require_absent build-only-target "$target/build-tool-token"
 
 artifact_list=$root/artifacts.list
-find "$runtime/artifacts" -type f -name '*.tar' | sort >"$artifact_list"
+find "$runtime/artifacts" -type f -name '*.tar' ! -name foreign.tar | sort >"$artifact_list"
 artifact_count=$(wc -l <"$artifact_list")
 [ "$artifact_count" -eq 4 ] || \
   fail "rootfs campaign retained $artifact_count package archives, expected 4"
@@ -293,6 +346,66 @@ for directory in construction-sessions package-outputs check-resources check-tem
     fail "terminal cleanup retained private realization under $directory"
   fi
 done
+
+# A fresh process must recover and report the exact same artifact authority
+# after terminal cleanup.  Poison the namespace again to make directory scans
+# observable, remove the collection so semantic rediscovery is impossible, and
+# override the interpreter with an unusable path: zero-work terminal resume
+# must need none of them.
+cp "$root/run.out" "$root/admitted-terminal.out"
+rm -rf "$collection"
+printf '%s\n' 'second-foreign-not-authority' >"$root/foreign-artifact/foreign-marker"
+tar -cf "$runtime/artifacts/foreign-after-terminal.tar" \
+  -C "$root/foreign-artifact" foreign-marker
+
+set -- run --canonical-store "$state" \
+  --resume "$(printf '%064d' 6)" \
+  --runtime-root "$runtime" \
+  --build-root "$build" \
+  --lifecycle-root "$lifecycle" \
+  --target-root "$target" \
+  --interpreter /bin/false \
+  --build-user-id "$uid" \
+  --build-group-id "$gid" \
+  --lifecycle-user-id "$uid" \
+  --lifecycle-group-id "$gid" \
+  --max-steps 16
+for group in $groups; do
+  if [ "$group" != "$gid" ]; then
+    set -- "$@" --build-supplementary-group "$group"
+    set -- "$@" --lifecycle-supplementary-group "$group"
+  fi
+done
+
+set +e
+"$pkgctl" "$@" >"$root/resume.out" 2>"$root/resume.err"
+resume_status=$?
+set -e
+[ "$resume_status" -eq 0 ] || {
+  dump_file 'terminal resume stdout' "$root/resume.out"
+  dump_file 'terminal resume stderr' "$root/resume.err"
+  fail "terminal resume: expected status 0, got $resume_status"
+}
+require_contains terminal-resume "$root/resume.out" 'origin resumed'
+require_contains terminal-resume "$root/resume.out" 'disposition completed'
+require_contains terminal-resume "$root/resume.out" 'durable-steps 0'
+require_contains terminal-resume "$root/resume.out" 'complete yes'
+require_contains terminal-resume "$root/resume.out" 'failed no'
+require_contains terminal-resume "$root/resume.out" 'artifacts 4'
+require_not_contains terminal-resume "$root/resume.out" 'frontend build'
+require_not_contains terminal-resume "$root/resume.out" 'foreign.tar'
+require_not_contains terminal-resume "$root/resume.out" 'foreign-after-terminal.tar'
+
+for index in 0 1 2 3; do
+  for field in package version release release-identity path identity sha256 bytes \
+      build-result-identity binding-identity image-identity; do
+    require_equal "terminal-resume-artifact-$index-$field" \
+      "$(artifact_field "$root/admitted-terminal.out" "$index" "$field")" \
+      "$(artifact_field "$root/resume.out" "$index" "$field")"
+  done
+done
+require_equal terminal-resume-state "$final_state" \
+  "$("$state_inspect_fixture" "$state")"
 
 set +e
 "$rootfs_audit_fixture" "$state" "$target" >"$root/audit-clean.out" 2>"$root/audit-clean.err"
