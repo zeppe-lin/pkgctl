@@ -226,6 +226,12 @@ if not get_option('tests').disabled()
     dependencies: [pkgctl_core_dep, libpkgaudit_test_dep],
   )
 
+  shared_ownership_image_fixture = executable(
+    'shared-ownership-image-fixture',
+    'fixtures/shared_ownership_image_fixture.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+
   native_target_lock_holder = executable(
     'native-target-lock-holder',
     'fixtures/native_target_lock_holder.cpp',
@@ -670,6 +676,31 @@ if not get_option('tests').disabled()
       suite: 'integration-privileged',
     )
   endforeach
+
+  cli_build_shared_ownership_image_test = find_program(
+    'integration/cli_build_shared_ownership_image_test.sh',
+  )
+  test(
+    'cli-build-shared-ownership-image',
+    cli_build_shared_ownership_image_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_runtime_root_fixture,
+      shared_ownership_image_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/shared-ownership-image',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [native_runtime_root_fixture, shared_ownership_image_fixture],
+    suite: 'integration-privileged',
+  )
 
   cli_run_rootfs_campaign_test = find_program(
     'integration/cli_run_rootfs_campaign_test.sh',
@@ -1181,6 +1212,16 @@ if not get_option('tests').disabled()
   test(
     'cli-build-contract',
     cli_build_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_build_shared_ownership_image_contract = find_program(
+    'contracts/check_cli_build_shared_ownership_image_contract.sh',
+  )
+  test(
+    'cli-build-shared-ownership-image-contract',
+    cli_build_shared_ownership_image_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

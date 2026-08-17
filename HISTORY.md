@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Adds a pre-operation shared-ownership image qualification layer. Two
+  independent build-only fixture packages must seal the same nested regular
+  marker with exact normalized metadata, content identity, and replayed bytes
+  through `libpkgimage` under the construction-reported archive digest. The
+  fixture shell programs fail explicitly if their required `mkdir` or marker
+  write fails, and the test makes `mkdir` explicit build-root runtime authority.
+  This keeps a missing package witness from being misdiagnosed as planner,
+  application, state-publication, or rootfs behavior.
+
 - Replaces hidden/partial target-operation policy defaults with one explicit
   controller-owned native operation-policy authority. `pkgctl run --start`
   admits a complete versioned profile (`strict-exclusive` or

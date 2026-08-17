@@ -44,6 +44,7 @@ for path in \
   'fixtures/native_root_view_fixture.sh' \
   'fixtures/native_runtime_root_fixture.cpp' \
   'fixtures/rootfs_audit_fixture.cpp' \
+  'fixtures/shared_ownership_image_fixture.cpp' \
   'fixtures/native_target_lock_holder.cpp' \
   'fixtures/native_credential_context_runner.cpp' \
   'fixtures/native_credential_context_preload.cpp' \
@@ -62,6 +63,7 @@ for path in \
   'fixtures/collections/archive-source-check' \
   'fixtures/collections/runtime-cohort' \
   'fixtures/collections/rootfs-campaign' \
+  'fixtures/collections/shared-ownership-image' \
   'fixtures/collections/lifecycle-post-install' \
   'integration/native_root_view_fixture_test.sh' \
   'integration/application_intent_interrupt_fixture_test.sh' \
@@ -78,6 +80,7 @@ for path in \
   'integration/cli_build_archive_source_test.sh' \
   'integration/cli_build_check_authority_refusal_test.sh' \
   'integration/cli_build_process_death_test.sh' \
+  'integration/cli_build_shared_ownership_image_test.sh' \
   'integration/cli_run_rootfs_campaign_test.sh' \
   'integration/cli_run_lease_contention_test.sh' \
   'integration/cli_run_removal_test.sh' \
@@ -94,6 +97,7 @@ for path in \
   'contracts/check_cli_archive_source_contract.sh' \
   'contracts/check_cli_runtime_cohort_contract.sh' \
   'contracts/check_cli_process_death_contract.sh' \
+  'contracts/check_cli_build_shared_ownership_image_contract.sh' \
   'contracts/check_cli_run_rootfs_campaign_contract.sh' \
   'contracts/check_target_observation_contract.sh' \
   'contracts/check_test_layout_contract.sh' \

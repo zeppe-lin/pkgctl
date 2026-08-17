@@ -15,11 +15,46 @@ The ordinary test pass must preflight native isolation without ptrace and skip
 these cases with status 77 when the required Linux namespace guarantees are not
 available. Sanitizer failure under ptrace is not a substitute for that preflight.
 
+## Shared-ownership build/image qualification
+
+The privileged `cli-build-shared-ownership-image` case is the first layer of
+the shared-ownership staircase. It deliberately stops before target planning.
+`base-files` and `runtime-lib` live in a dedicated collection so adding the
+shared witness cannot accidentally turn the whole-root campaign into the place
+where planner/application/state sharing semantics are discovered.
+
+Each package is built independently from an empty canonical state with no
+target, lifecycle, operation-policy, or audit authority. The fixture programs
+make directory and marker creation explicit success conditions and the caller
+places the exact `mkdir` executable closure into the otherwise minimal build
+root view. This prevents an unavailable helper followed by a later successful
+shell command from producing a nominally successful package that silently
+omits the witness. `libpkgexec` remains responsible for executing the exact
+retained shell program; the fixture, not the executor, owns which shell-command
+failures are fatal to its semantics.
+
+Successful construction reporting must expose one complete retained
+`libpkgbuild-image` authority and the exact public archive path/digest. A
+test-only `libpkgimage` consumer opens that archive with the reported whole-byte
+digest assertion, requires `usr/lib/shared-ownership-marker` to be a regular
+0644 object with the exact content identity, and replays only that selected
+payload through `entry_selection`/`payload_sink` to require the exact
+`shared-authority\n` bytes. The two independently built marker entries must have
+identical normalized metadata and content. No tar listing, target observation,
+planner result, installed state, or audit result is allowed to supply image
+meaning. Canonical state must remain byte-for-byte unchanged by both builds.
+
+This case is a prerequisite for compatible-ownership planning tests. If it
+fails, the defect is confined to construction/image authority and downstream
+operation tests are not evidence about sharing.
+
 ## Empty-target rootfs campaign qualification
 
 The privileged `cli-run-rootfs-campaign` vertical is the first whole-root
-qualification rather than a single-package installation fixture. It begins with
-an absent canonical store, explicitly admits one empty canonical generation
+qualification rather than a single-package installation fixture. It consumes
+already-qualified package/image semantics; shared-path policy is not introduced
+by this campaign until its lower planner/application/state staircase is green.
+It begins with an absent canonical store, explicitly admits one empty canonical generation
 through the provider constructor used by the state test harness, and requires
 an empty managed target before transaction execution. Production
 `pkgstate-init` is qualified in `libpkgstate-posix`; this test deliberately does
