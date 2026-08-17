@@ -22,6 +22,27 @@ paths, names, or stale evidence. In particular, CHECK may realize fresh source,
 package, and dependency trees from retained exact authority, but it may not
 rediscover why those resources belong to the check.
 
+## Current target-operation policy boundary
+
+Native target-operation policy is controller configuration, not package-source,
+planner, or filesystem truth. `pkgctl run --start` therefore admits exactly one
+complete named `native_operation_policy` profile. `strict-exclusive/v1` and
+`exact-compatible-sharing/v1` differ only in their complete shared-ownership
+semantics; their remaining incoming, obsolete, directory-cleanup, and override
+dimensions are closed by the same profile definition.
+
+The pkgctl owner seals the selected profile, derives its policy identity from the
+versioned name plus complete semantic body, and retains the canonical owner
+encoding in command evidence. `libpkgplan` receives only the immutable normalized
+`package_policy_snapshot` projection. Operation specifications and operation-session
+evidence do not serialize planner policy again. Resume reopens the retained pkgctl
+policy and refuses semantic redeclaration; a profile implementation that drifts
+under the same version cannot satisfy the retained identity.
+
+Planner refusal codes remain planner vocabulary. The controller may report that
+planning refused and show implicated retained paths, but it neither publishes raw
+enum ordinals as stable vocabulary nor maintains a parallel refusal dictionary.
+
 ## Current terminal private-realization cleanup boundary
 
 Successful transaction completion authorizes disposal of execution realization,
@@ -116,13 +137,22 @@ historical success without retained controller result authority.
 ## Empty-target feedback qualification
 
 The synthetic rootfs campaign is not a new controller verb. It treats an empty
-managed target as an ordinary desired-state convergence problem, then hands the
-terminal canonical state and target root to `libpkgaudit` as an independent
-test-only observer. The controller does not call the auditor in production and
-does not reinterpret audit findings as transaction evidence. A clean audit
-closes the qualification loop; deliberate post-terminal deletion of one owned
-object must be observed as drift without changing the retained transaction or
-canonical state.
+managed target as an ordinary desired-state convergence problem. Expected package
+inventory comes from the exact sealed construction images reported by retained run
+authority, not from the canonical state being audited and not from a tar/filesystem
+scan. A test-only adapter opens those images through `libpkgimage`, requires
+non-empty installed image authority, and checks the exact path/metadata projection
+against `libpkgstate` before `libpkgaudit` independently observes the current
+target. The controller does not call the auditor in production and does not
+reinterpret audit findings as transaction evidence. A clean audit closes the
+qualification loop; deliberate post-terminal deletion of one owned object must be
+observed as drift without changing the retained transaction or canonical state.
+
+The same campaign may compose exact compatible shared ownership only because that
+semantic path is qualified independently below the package-image, planner,
+application, state-publication, refusal, and restart boundaries. The rootfs
+campaign consumes that authority and checks the final two-owner consequence; it is
+not the oracle that decides whether sharing was valid.
 
 A run that performs construction also reports the exact successful construction
 artifact evidence retained by that durable run. This is observation of existing

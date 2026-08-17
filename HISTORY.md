@@ -2,40 +2,50 @@
 
 ## Unreleased
 
-- Adds the single-owner operation layer of shared-ownership qualification.
-  `base-files` is installed alone into an empty target, terminal run/effect
-  inspection must expose completed application and publication authority, and a
-  public `libpkgstate` reader must prove a non-empty exact marker manifest with
-  exactly one owner. The installed receipt is identity-correlated with retained
-  completed-application/transaction evidence and the published resulting
-  snapshot; only then are target bytes/metadata and independent audit feedback
-  accepted as observations. No private operation/effect body is decoded by the
-  test.
+## 0.40.0 - 2026-08-18
 
-- Adds a pre-operation shared-ownership image qualification layer. Two
-  independent build-only fixture packages must seal the same nested regular
-  marker with exact normalized metadata, content identity, and replayed bytes
-  through `libpkgimage` under the construction-reported archive digest. The
-  fixture shell programs fail explicitly if their required `mkdir` or marker
-  write fails, and the test makes `mkdir` explicit build-root runtime authority.
-  This keeps a missing package witness from being misdiagnosed as planner,
-  application, state-publication, or rootfs behavior.
+- Makes native target-operation policy one explicit start-only controller
+  authority. `pkgctl run --start` requires a complete named profile:
+  `strict-exclusive` forbids shared ownership, while
+  `exact-compatible-sharing` permits only planner-compatible co-ownership. Both
+  profiles otherwise activate incoming objects, remove obsolete objects, remove
+  empty directories, and carry no path overrides. The complete profile is sealed
+  by the pkgctl owner codec; its identity binds the normalized semantics, command
+  evidence retains the owner encoding, operation-session evidence carries no
+  duplicate `libpkgplan` policy codec, and resume refuses policy redeclaration.
 
-- Replaces hidden/partial target-operation policy defaults with one explicit
-  controller-owned native operation-policy authority. `pkgctl run --start`
-  admits a complete versioned profile (`strict-exclusive` or
-  `exact-compatible-sharing`), retains only the pkgctl owner encoding in command
-  evidence, and resumes from that exact retained value. The profile identity
-  binds the complete normalized semantics so a future implementation drift under
-  the same profile version fails closed. Per-operation specifications and
-  operation-session evidence no longer serialize or decode `libpkgplan` policy
-  vocabulary; they consume the single transaction-wide admitted projection.
+- Keeps planner refusal vocabulary owner-side. The CLI reports that native
+  operation planning refused without presenting a raw foreign enum ordinal or
+  maintaining a second semantic-name dictionary. Controller behavior continues to
+  consume the typed planner result rather than interpreting rendered text.
+
+- Fixes retained command-evidence decoding so adjacent cursor-consuming fields are
+  read in explicit sequence rather than relying on C++ function-argument
+  evaluation order. Qualification uses deliberately unequal build/target
+  architecture witnesses across restart so swapped fields cannot hide behind equal
+  fixture values.
 
 - Reports successful construction artifact evidence from ordinary `pkgctl run`
-  transactions as well as from the build frontend. Run reporting exposes the
-  exact retained construction path/digest/binding/image authority already owned
-  by the durable run; it does not reinterpret the run-private artifact hierarchy
-  as the build frontend's caller-selected public artifact root.
+  transactions as well as from the build frontend. Run reporting exposes the exact
+  retained construction path/digest/binding/image authority already owned by the
+  durable run; it does not reinterpret the run-private artifact hierarchy as the
+  build frontend's caller-selected public artifact root.
+
+- Qualifies shared ownership as a five-layer authority staircase rather than a
+  rootfs mega-test: sealed package-image compatibility; first-owner publication;
+  compatible second ownership with retained-existing state and no target rewrite;
+  policy/incompatibility refusals before mutation or publication; and fresh-process
+  restart from the retained complete operation policy. The hostile tests consume
+  owner APIs and retained inspection surfaces instead of decoding private effect or
+  publication bodies.
+
+- Rebuilds empty-target/rootfs qualification around independent sealed image
+  authority. Expected installed inventory is derived from exact construction
+  artifacts opened through `libpkgimage`, checked against durable `libpkgstate`,
+  and only then compared with current target observations through `libpkgaudit`.
+  The campaign now consumes already-qualified compatible shared ownership and
+  proves two owners of one unchanged object without using tar or filesystem scans
+  as controller truth.
 
 - Tightens BUILD/CHECK vocabulary around the authority boundary: retained semantic
   evidence is decoded or rehydrated, semantic values are derived/projected, and
@@ -43,10 +53,10 @@
   authority. CHECK does not reconstruct present truth, rediscover dependency
   membership, or accept construction residue as evidence.
 
-- Requires libpkgbuild-exec 3.3.1 so an admitted `SOURCE_DATE_EPOCH` also
-  closes package-image entry timestamps during build-result sealing. This
-  excludes the 3.3.0 adapter whose package metadata could retain ambient
-  wall-clock mtimes even though the epoch was already admitted build policy.
+- Requires libpkgbuild-exec 3.3.1 so an admitted `SOURCE_DATE_EPOCH` also closes
+  package-image entry timestamps during build-result sealing. This excludes the
+  3.3.0 adapter whose package metadata could retain ambient wall-clock mtimes even
+  though the epoch was already admitted build policy.
 
 ## 0.39.0 - 2026-08-17
 

@@ -34,6 +34,17 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
+Version 0.40.0 makes native target-operation policy explicit start-only
+controller authority. *run --start* requires one complete named profile:
+*strict-exclusive* forbids shared ownership and *exact-compatible-sharing* permits
+planner-compatible co-ownership. The selected complete value is retained through
+the pkgctl owner encoding and recovered on resume; operation-session evidence does
+not carry a second planner-policy codec. Shared ownership is qualified separately
+through image compatibility, publication, no-rewrite co-ownership, hostile
+refusal, and retained-policy restart before the empty-target/rootfs campaign
+consumes it. Rootfs audit expectations come from sealed package images rather than
+from the state or filesystem being audited.
+
 Version 0.39.0 phase-separates concrete construction and check inputs while
 retaining one sealed logical build request. Check execution realizes fresh source,
 the checked package, and candidate check dependencies from retained exact owner
@@ -278,6 +289,18 @@ Exactly one of the following is required by *run* and *build*:
 	the retained current command evidence. The current *--canonical-store* pathname remains caller authority for the
 	existing physical store. Bytes outside the current private command-evidence format
 	are rejected; there is no compatibility decoder or migration path.
+
+The following target-operation policy authority is required only by *run --start*
+and is invalid with *--resume* or *build*:
+
+*--operation-policy* _profile_
+	Select one complete immutable native target-operation policy.
+	*strict-exclusive* activates incoming objects, removes obsolete objects,
+	removes empty directories, carries no path overrides, and forbids shared
+	ownership. *exact-compatible-sharing* has the same complete policy except that
+	it permits planner-compatible shared ownership. The selected profile is sealed
+	and identity-bound at admission; resume recovers it from command evidence and
+	does not accept redeclaration.
 
 The following construction/check authorities are required by both frontends:
 

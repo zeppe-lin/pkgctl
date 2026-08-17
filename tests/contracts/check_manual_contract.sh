@@ -42,6 +42,7 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
+grep -F 'Version 0.40.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.39.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.38.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_' \
@@ -49,6 +50,11 @@ grep -F '*pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_' 
 grep -F '# RUN AND BUILD OPTIONS' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *build* _package_ [*--check*]' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--artifact-root* _path_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '*--operation-policy* _profile_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'TARGET-OPERATION POLICY AUTHORITY' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Version 0.40.0 makes the native target-operation policy one explicit controller-' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'PHASE-LOCAL CONSTRUCTION AND CHECK AUTHORITY' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'CONSTRUCTION AND CHECK PROCESS-DEATH RECOVERY' \

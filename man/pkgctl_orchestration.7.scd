@@ -10,6 +10,30 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+# TARGET-OPERATION POLICY AUTHORITY
+
+Version 0.40.0 makes the native target-operation policy one explicit controller-
+owned command authority. Fresh *run* admission requires either
+*strict-exclusive* or *exact-compatible-sharing*. The pkgctl policy owner seals
+the complete profile, binds its identity to the versioned semantic body, and
+retains its canonical encoding in command evidence. The planner receives the
+normalized immutable snapshot projection; operation-session evidence does not
+carry another planner-policy encoding.
+
+Resume decodes, reseals, identity-checks, and canonicality-checks that retained
+controller value and refuses operation-policy redeclaration. It does not infer the
+policy from canonical state, target bytes, current defaults, or a planner refusal.
+Planner refusal codes remain owner vocabulary; pkgctl composes controller-level
+diagnostics without maintaining a second semantic dictionary or exposing raw enum
+ordinals as stable names.
+
+Shared ownership is qualified below this orchestration boundary before whole-root
+composition consumes it: exact sealed image compatibility, sole-owner publication,
+compatible retained-existing second ownership without target rewrite, hostile
+pre-mutation refusals, and fresh-process retained-policy restart. Rootfs audit
+expectations are then derived independently from sealed package images and checked
+against both durable state and current observation.
+
 # PHASE-LOCAL CONSTRUCTION AND CHECK AUTHORITY
 
 Version 0.39.0 keeps build- and check-scoped package relations in one sealed

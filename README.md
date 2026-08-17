@@ -1,5 +1,16 @@
 # pkgctl
 
+Release 0.40.0 makes target-operation policy explicit durable controller
+authority. `pkgctl run --start` admits one complete named profile:
+`strict-exclusive` or `exact-compatible-sharing`. The selected profile is sealed
+and identity-bound by pkgctl, retained once in command evidence, and recovered on
+resume without a second planner-policy codec or CLI redeclaration. Shared ownership
+is qualified from sealed image compatibility through first-owner publication,
+compatible retained-existing co-ownership, hostile pre-mutation refusal, and
+fresh-process restart. The empty-target campaign then consumes those qualified
+semantics and derives audit expectations independently from sealed package images
+before comparing durable state and the observed target.
+
 Release 0.39.0 closes phase-local construction/check authority around the
 current native build frontend. The sealed build request still retains both
 build- and check-scoped logical requirements, but construction concretizes only
@@ -60,11 +71,13 @@ artifact inventory with zero durable work and unchanged canonical target state.
 
 A separate privileged empty-target campaign drives a profile with distinct
 build-only and runtime dependencies into a fresh canonical state/target pair.
-After convergence, a test-only `libpkgaudit` oracle independently observes the
-target against canonical ownership facts, requires a complete zero-finding
-report, then proves one deliberate owned-object deletion is reported as drift.
-This qualifies rootfs composition as ordinary desired-state convergence plus an
-independent feedback path; it does not add a rootfs verb to `pkgctl`.
+Expected installed inventory is derived independently from the exact sealed
+construction images and checked against canonical state before a test-only
+`libpkgaudit` observer compares that authority with the target. The campaign also
+composes one exact compatible shared object with two canonical owners and proves
+one deliberate owned-object deletion is reported as drift. This qualifies rootfs
+composition as ordinary desired-state convergence plus an independent feedback
+path; it does not add a rootfs verb to `pkgctl`.
 
 Release 0.36.0 removes target-operation authority from native
 construction/check-only runs. Such a sealed transaction enters the same durable
