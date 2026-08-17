@@ -199,15 +199,27 @@ constructed build-only dependency must remain absent from both. The probe build
 must consume the exact `build-tool` package input and its real check must consume
 the constructed probe package.
 
-The terminal target is then handed to a test-only `libpkgaudit` oracle. The
-oracle independently adapts the immutable canonical state snapshot into audit
-facts, observes the separately selected target with the real root-bound POSIX
-backend, and requests object-state plus symlink resolution/ownership checks. A
-clean rootfs must produce a complete report with zero findings and zero failures.
-The campaign then deletes the runtime dependency's owned marker and requires the
-same auditor to report exactly one `missing-object` finding for `runtime-lib`.
-This proves the feedback path is observing the managed object rather than merely
-repeating controller success. `libpkgaudit` remains a test-only pkgctl dependency.
+The terminal target is then handed to a test-only authority/audit adapter. It
+does not derive expected inventory from the state being audited. The campaign
+passes the exact package/path/digest bindings from retained construction
+reporting; the adapter opens all four archives through `libpkgimage`, replays one
+package-specific payload witness from each image, requires the build-only image
+to remain absent from state, and derives the expected installed inventory from
+the three sealed target-package images. Each expected installed image must be
+non-empty, each durable installed manifest must be non-empty, and every state
+path plus complete object metadata must agree with the corresponding normalized
+image entry before target observation is allowed. Thus an empty or truncated
+state cannot make its own audit vacuously green.
+
+The independently derived inventory is observed against the separately selected
+target with the real root-bound `libpkgaudit` POSIX backend using object-state
+plus symlink resolution/ownership checks. A clean rootfs must produce a complete
+report with zero findings and zero failures. The campaign then deletes the
+runtime dependency's owned marker and requires the same image-derived auditor to
+report exactly one `missing-object` finding for `runtime-lib`. `tar` may still be
+used to create hostile namespace poison, but archive listing/extraction is not a
+source of package-image meaning. `libpkgimage` and `libpkgaudit` remain test-only
+qualification dependencies at this boundary.
 
 This campaign is the release gate before any distribution rootfs composition
 client: it proves the existing transaction/run kernel can materialize an empty

@@ -232,6 +232,12 @@ if not get_option('tests').disabled()
     dependencies: [pkgctl_core_dep, libpkgaudit_test_dep],
   )
 
+  rootfs_authority_audit_fixture = executable(
+    'rootfs-authority-audit-fixture',
+    'fixtures/rootfs_authority_audit_fixture.cpp',
+    dependencies: [pkgctl_core_dep, libpkgaudit_test_dep],
+  )
+
   shared_ownership_image_fixture = executable(
     'shared-ownership-image-fixture',
     'fixtures/shared_ownership_image_fixture.cpp',
@@ -862,7 +868,7 @@ if not get_option('tests').disabled()
       state_inspect_fixture,
       run_evidence_inspect_fixture,
       native_runtime_root_fixture,
-      rootfs_audit_fixture,
+      rootfs_authority_audit_fixture,
       join_paths(
         meson.project_source_root(),
         'tests/fixtures/collections/rootfs-campaign',
@@ -874,7 +880,7 @@ if not get_option('tests').disabled()
     ],
     depends: [
       native_runtime_root_fixture,
-      rootfs_audit_fixture,
+      rootfs_authority_audit_fixture,
       run_evidence_inspect_fixture,
     ],
     suite: 'integration-privileged',

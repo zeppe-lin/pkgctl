@@ -8,7 +8,7 @@ state_fixture=$2
 state_inspect_fixture=$3
 run_evidence_inspect_fixture=$4
 runtime_root_fixture=$5
-rootfs_audit_fixture=$6
+rootfs_authority_audit_fixture=$6
 fixture_collection=$7
 root_view_fixture=$8
 root=$(mktemp -d "${TMPDIR:-/tmp}/pkgctl-cli-run-rootfs-campaign.XXXXXX")
@@ -38,11 +38,9 @@ fail()
 
 dump_file()
 {
-  label=$1
-  file=$2
-  printf '%s\n' "--- $label ---" >&2
-  if [ -s "$file" ]; then
-    cat "$file" >&2
+  printf '%s\n' "--- $1 ---" >&2
+  if [ -s "$2" ]; then
+    cat "$2" >&2
   else
     printf '%s\n' '<empty>' >&2
   fi
@@ -50,46 +48,35 @@ dump_file()
 
 require_contains()
 {
-  label=$1
-  file=$2
-  expected=$3
-  if ! grep -F -- "$expected" "$file" >/dev/null; then
+  if ! grep -F -- "$3" "$2" >/dev/null; then
     printf '%s\n' \
-      "pkgctl:cli-run-rootfs-campaign: $label: missing expected text: $expected" \
+      "pkgctl:cli-run-rootfs-campaign: $1: missing expected text: $3" \
       >&2
-    dump_file "$label" "$file"
+    dump_file "$1" "$2"
     exit 1
   fi
 }
 
 require_not_contains()
 {
-  label=$1
-  file=$2
-  forbidden=$3
-  if grep -F -- "$forbidden" "$file" >/dev/null; then
+  if grep -F -- "$3" "$2" >/dev/null; then
     printf '%s\n' \
-      "pkgctl:cli-run-rootfs-campaign: $label: contains forbidden text: $forbidden" \
+      "pkgctl:cli-run-rootfs-campaign: $1: contains forbidden text: $3" \
       >&2
-    dump_file "$label" "$file"
+    dump_file "$1" "$2"
     exit 1
   fi
 }
 
 require_equal()
 {
-  label=$1
-  expected=$2
-  actual=$3
-  [ "$actual" = "$expected" ] || \
-    fail "$label: expected '$expected', got '$actual'"
+  [ "$3" = "$2" ] || \
+    fail "$1: expected '$2', got '$3'"
 }
 
 require_absent()
 {
-  label=$1
-  path=$2
-  [ ! -e "$path" ] || fail "$label: unexpected path exists: $path"
+  [ ! -e "$2" ] || fail "$1: unexpected path exists: $2"
 }
 
 artifact_field()
@@ -237,6 +224,14 @@ require_equal foreign-artifact-preserved "$foreign_artifact_before" \
 # Every reported artifact must still exist after terminal cleanup and its bytes
 # must agree with the retained digest.  This prevents a report that merely
 # prints plausible metadata from an in-memory construction object.
+base_files_archive=
+base_files_digest=
+build_tool_archive=
+build_tool_digest=
+rootfs_probe_archive=
+rootfs_probe_digest=
+runtime_lib_archive=
+runtime_lib_digest=
 for index in 0 1 2 3; do
   path=$(artifact_field "$root/run.out" "$index" path)
   digest=$(artifact_field "$root/run.out" "$index" sha256)
@@ -261,6 +256,24 @@ for index in 0 1 2 3; do
     [ "${#value}" -eq 64 ] || \
       fail "artifact $index report digest identity has length ${#value}, expected 64"
   done
+  case $index in
+    0)
+      base_files_archive=$path
+      base_files_digest=$digest
+      ;;
+    1)
+      build_tool_archive=$path
+      build_tool_digest=$digest
+      ;;
+    2)
+      rootfs_probe_archive=$path
+      rootfs_probe_digest=$digest
+      ;;
+    3)
+      runtime_lib_archive=$path
+      runtime_lib_digest=$digest
+      ;;
+  esac
 done
 
 final_state=$("$state_inspect_fixture" "$state")
@@ -288,41 +301,27 @@ artifact_count=$(wc -l <"$artifact_list")
 [ "$artifact_count" -eq 4 ] || \
   fail "rootfs campaign retained $artifact_count package archives, expected 4"
 
-build_tool_archive=
-base_files_archive=
-runtime_lib_archive=
-rootfs_probe_archive=
-while IFS= read -r archive; do
-  if tar -tf "$archive" | grep -Fx -- 'build-tool-token' >/dev/null; then
-    [ -z "$build_tool_archive" ] || fail 'multiple build-tool archives found'
-    build_tool_archive=$archive
-  fi
-  if tar -tf "$archive" | grep -Fx -- 'base-files-marker' >/dev/null; then
-    [ -z "$base_files_archive" ] || fail 'multiple base-files archives found'
-    base_files_archive=$archive
-  fi
-  if tar -tf "$archive" | grep -Fx -- 'runtime-lib-marker' >/dev/null; then
-    [ -z "$runtime_lib_archive" ] || fail 'multiple runtime-lib archives found'
-    runtime_lib_archive=$archive
-  fi
-  if tar -tf "$archive" | grep -Fx -- 'rootfs-probe-marker' >/dev/null; then
-    [ -z "$rootfs_probe_archive" ] || fail 'multiple rootfs-probe archives found'
-    rootfs_probe_archive=$archive
-  fi
-done <"$artifact_list"
-
-[ -n "$build_tool_archive" ] || fail 'build-tool construction archive is absent'
-[ -n "$base_files_archive" ] || fail 'base-files construction archive is absent'
-[ -n "$runtime_lib_archive" ] || fail 'runtime-lib construction archive is absent'
-[ -n "$rootfs_probe_archive" ] || fail 'rootfs-probe construction archive is absent'
-require_equal build-tool-archive build-tool-source \
-  "$(tar -xOf "$build_tool_archive" build-tool-token)"
-require_equal base-files-archive base-files-source \
-  "$(tar -xOf "$base_files_archive" base-files-marker)"
-require_equal runtime-lib-archive runtime-lib-source \
-  "$(tar -xOf "$runtime_lib_archive" runtime-lib-marker)"
-require_equal rootfs-probe-archive rootfs-probe-source+build-tool-source \
-  "$(tar -xOf "$rootfs_probe_archive" rootfs-probe-marker)"
+# Package/image meaning comes from retained artifact bindings plus libpkgimage,
+# not from tar directory scans.  The authority audit opens every reported
+# archive under its exact whole-byte digest, replays one package-specific
+# payload witness, requires build-only authority to stay out of canonical
+# state, and derives the installed audit inventory from the three sealed images.
+run_authority_audit()
+{
+  "$rootfs_authority_audit_fixture" "$state" "$target" \
+    base-files installed \
+      "$base_files_archive" "$base_files_digest" \
+      base-files-marker base-files-source \
+    build-tool build-only \
+      "$build_tool_archive" "$build_tool_digest" \
+      build-tool-token build-tool-source \
+    rootfs-probe installed \
+      "$rootfs_probe_archive" "$rootfs_probe_digest" \
+      rootfs-probe-marker rootfs-probe-source+build-tool-source \
+    runtime-lib installed \
+      "$runtime_lib_archive" "$runtime_lib_digest" \
+      runtime-lib-marker runtime-lib-source
+}
 
 journal=$(sed -n 's/^journal //p' "$root/run.out")
 [ -n "$journal" ] || fail 'terminal report did not expose journal identity'
@@ -409,7 +408,7 @@ require_equal terminal-resume-state "$final_state" \
   "$("$state_inspect_fixture" "$state")"
 
 set +e
-"$rootfs_audit_fixture" "$state" "$target" >"$root/audit-clean.out" 2>"$root/audit-clean.err"
+run_authority_audit >"$root/audit-clean.out" 2>"$root/audit-clean.err"
 audit_status=$?
 set -e
 if [ "$audit_status" -ne 0 ]; then
@@ -419,12 +418,16 @@ if [ "$audit_status" -ne 0 ]; then
 fi
 require_contains clean-audit "$root/audit-clean.out" 'complete yes'
 require_contains clean-audit "$root/audit-clean.out" 'packages 3'
+require_contains clean-audit "$root/audit-clean.out" 'artifacts 4'
+audit_objects=$(sed -n 's/^objects //p' "$root/audit-clean.out")
+[ -n "$audit_objects" ] && [ "$audit_objects" -gt 0 ] || \
+  fail 'independent rootfs image authority produced no expected objects'
 require_contains clean-audit "$root/audit-clean.out" 'findings 0'
 require_contains clean-audit "$root/audit-clean.out" 'failures 0'
 
 rm "$target/runtime-lib-marker"
 set +e
-"$rootfs_audit_fixture" "$state" "$target" >"$root/audit-drift.out" 2>"$root/audit-drift.err"
+run_authority_audit >"$root/audit-drift.out" 2>"$root/audit-drift.err"
 audit_status=$?
 set -e
 [ "$audit_status" -eq 1 ] || {

@@ -13,7 +13,7 @@ base_files="$fixture_root/base-files/recipe.yml"
 runtime_lib="$fixture_root/runtime-lib/recipe.yml"
 rootfs_probe="$fixture_root/rootfs-probe/recipe.yml"
 state_fixture="$srcdir/tests/fixtures/state_fixture.cpp"
-audit_fixture="$srcdir/tests/fixtures/rootfs_audit_fixture.cpp"
+audit_fixture="$srcdir/tests/fixtures/rootfs_authority_audit_fixture.cpp"
 
 fail()
 {
@@ -37,7 +37,7 @@ for required in \
   "'cli-run-rootfs-campaign'" \
   "'integration/cli_run_rootfs_campaign_test.sh'" \
   "'tests/fixtures/collections/rootfs-campaign'" \
-  "'rootfs-audit-fixture'" \
+  "'rootfs-authority-audit-fixture'" \
   "'libpkgaudit'" \
   "suite: 'integration-privileged'"; do
   grep -F -- "$required" "$meson" >/dev/null || \
@@ -74,11 +74,22 @@ for required in \
   'construction-evidence 4' \
   'check-evidence 1' \
   'terminal cleanup retained private realization under $directory' \
-  '"$rootfs_audit_fixture" "$state" "$target"' \
+  'run_authority_audit' \
+  'base-files installed' \
+  'build-tool build-only' \
+  'rootfs-probe installed' \
+  'runtime-lib installed' \
+  'independent rootfs image authority produced no expected objects' \
   'findings 0' \
   'finding missing-object runtime-lib runtime-lib-marker'; do
   grep -F -- "$required" "$test_source" >/dev/null || \
     fail "process proof omits: $required"
+done
+
+for forbidden in 'tar -tf' 'tar -xOf'; do
+  if grep -F -- "$forbidden" "$test_source" >/dev/null; then
+    fail "rootfs campaign regressed to tar as package-image semantic authority: $forbidden"
+  fi
 done
 
 for required in \
@@ -142,12 +153,18 @@ grep -F -- 'canonical_generation_store store(root, binding());' \
   fail 'state fixture no longer uses explicit provider initialization authority'
 
 for required in \
+  'pkgimage::libarchive_backend().inspect' \
+  'pkgimage::entry_selection::from_ids' \
+  'canonical_generation_store::open_existing' \
+  'state.find_package' \
+  'installed->manifest().empty()' \
+  'installed manifest size differs from package image' \
+  'independent installed image authority is vacuous' \
   'pkgaudit::check::object_state' \
   'pkgaudit::check::symlink_resolution' \
   'pkgaudit::check::symlink_ownership' \
   'pkgaudit::auditor().run' \
-  'make_posix_filesystem_backend' \
-  'canonical_generation_store::open_existing'; do
+  'make_posix_filesystem_backend'; do
   grep -F -- "$required" "$audit_fixture" >/dev/null || \
     fail "independent audit oracle omits: $required"
 done
