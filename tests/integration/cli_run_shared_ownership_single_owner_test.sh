@@ -275,7 +275,7 @@ require_equal target-payload shared-authority \
 require_equal target-sha256 \
   6e231219a7f7e1cef0e59ba1184018819a47b4bebafcd5c9d257e0f6f11d2a06 \
   "$(sha256sum "$target/usr/lib/shared-ownership-marker" | awk '{print $1}')"
-require_equal target-metadata "$state_mode $state_uid $state_gid $state_size" \
+require_equal target-metadata "${state_mode#0} $state_uid $state_gid $state_size" \
   "$(stat -c '%a %u %g %s' "$target/usr/lib/shared-ownership-marker")"
 require_equal target-mtime "$state_mtime" \
   "$(stat -c '%Y' "$target/usr/lib/shared-ownership-marker")"
