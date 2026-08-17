@@ -1,0 +1,33 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: runtime-lib
+  version: 1.0
+  release: 1
+  summary: shared ownership restart runtime fixture
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  run:
+    - package: base-files
+
+sources:
+  - path: files/source.txt
+    name: source.txt
+    sha256: a9023aea03b0989693d312a3537d167e44b3f0173a083ca269db8db1f5a9f982
+
+build:
+  language: posix-shell
+  script: |
+    IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
+    [ "$source" = runtime-lib-source ] || exit 1
+    printf '%s\n' "$source" >"$PKG_DESTDIR/runtime-lib-marker" || exit 1
+    mkdir -p "$PKG_DESTDIR/usr/lib" || exit 1
+    printf '%s\n' shared-authority >"$PKG_DESTDIR/usr/lib/shared-ownership-marker" || exit 1
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64

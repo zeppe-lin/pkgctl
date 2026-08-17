@@ -65,6 +65,7 @@ for path in \
   'fixtures/collections/runtime-cohort' \
   'fixtures/collections/rootfs-campaign' \
   'fixtures/collections/shared-ownership-image' \
+  'fixtures/collections/shared-ownership-restart' \
   'fixtures/collections/lifecycle-post-install' \
   'integration/native_root_view_fixture_test.sh' \
   'integration/application_intent_interrupt_fixture_test.sh' \
@@ -84,6 +85,7 @@ for path in \
   'integration/cli_build_shared_ownership_image_test.sh' \
   'integration/cli_run_shared_ownership_single_owner_test.sh' \
   'integration/cli_run_shared_ownership_compatible_owner_test.sh' \
+  'integration/cli_run_shared_ownership_restart_test.sh' \
   'integration/cli_run_rootfs_campaign_test.sh' \
   'integration/cli_run_lease_contention_test.sh' \
   'integration/cli_run_removal_test.sh' \
@@ -103,6 +105,7 @@ for path in \
   'contracts/check_cli_build_shared_ownership_image_contract.sh' \
   'contracts/check_cli_run_shared_ownership_single_owner_contract.sh' \
   'contracts/check_cli_run_shared_ownership_compatible_owner_contract.sh' \
+  'contracts/check_cli_run_shared_ownership_restart_contract.sh' \
   'contracts/check_cli_run_rootfs_campaign_contract.sh' \
   'contracts/check_target_observation_contract.sh' \
   'contracts/check_test_layout_contract.sh' \

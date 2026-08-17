@@ -13,10 +13,12 @@ operation_codec=$root/src/operation_session_codec.cpp
 unit=$root/tests/unit/native_policy_test.cpp
 readonly=$root/tests/integration/cli_readonly_test.sh
 native_construction=$root/tests/integration/cli_run_native_construction_test.sh
+shared_restart=$root/tests/integration/cli_run_shared_ownership_restart_test.sh
 
 for file in \
   "$header" "$source" "$options" "$command" "$operation_header" \
-  "$operation_codec" "$unit" "$readonly" "$native_construction"; do
+  "$operation_codec" "$unit" "$readonly" "$native_construction" \
+  "$shared_restart"; do
   [ -s "$file" ] || {
     echo "missing native operation policy authority file: $file" >&2
     exit 1
@@ -153,6 +155,19 @@ for required in \
   '--operation-policy exact-compatible-sharing'; do
   grep -F -- "$required" "$native_construction" >/dev/null || {
     echo "native restart policy witness omits: $required" >&2
+    exit 1
+  }
+done
+
+
+for required in \
+  '--operation-policy exact-compatible-sharing' \
+  'run_resume()' \
+  'origin resumed' \
+  'origin retained-existing' \
+  'owner.1 runtime-lib '; do
+  grep -F -- "$required" "$shared_restart" >/dev/null || {
+    echo "native retained-policy restart witness omits: $required" >&2
     exit 1
   }
 done

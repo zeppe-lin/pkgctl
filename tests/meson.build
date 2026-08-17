@@ -818,6 +818,38 @@ if not get_option('tests').disabled()
     suite: 'integration-privileged',
   )
 
+  cli_run_shared_ownership_restart_test = find_program(
+    'integration/cli_run_shared_ownership_restart_test.sh',
+  )
+  test(
+    'cli-run-shared-ownership-restart',
+    cli_run_shared_ownership_restart_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_runtime_root_fixture,
+      state_ownership_inspect_fixture,
+      publication_terminal_interrupt_fixture,
+      rootfs_audit_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/shared-ownership-restart',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [
+      native_runtime_root_fixture,
+      publication_terminal_interrupt_fixture,
+      rootfs_audit_fixture,
+      state_ownership_inspect_fixture,
+    ],
+    suite: 'integration-privileged',
+  )
+
   cli_run_rootfs_campaign_test = find_program(
     'integration/cli_run_rootfs_campaign_test.sh',
   )
@@ -1398,6 +1430,16 @@ if not get_option('tests').disabled()
   test(
     'cli-run-shared-ownership-refusal-contract',
     cli_run_shared_ownership_refusal_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_run_shared_ownership_restart_contract = find_program(
+    'contracts/check_cli_run_shared_ownership_restart_contract.sh',
+  )
+  test(
+    'cli-run-shared-ownership-restart-contract',
+    cli_run_shared_ownership_restart_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

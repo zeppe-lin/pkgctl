@@ -1,0 +1,32 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: base-files
+  version: 1.0
+  release: 1
+  summary: shared ownership restart base fixture
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  {}
+
+sources:
+  - path: files/source.txt
+    name: source.txt
+    sha256: cdf7b2588bdd687cf22d352d92de96c277a1e4eb27eb133002a24c63447f06ce
+
+build:
+  language: posix-shell
+  script: |
+    IFS= read -r source <"$PKG_SOURCE_ROOT/source.txt"
+    [ "$source" = base-files-source ] || exit 1
+    printf '%s\n' "$source" >"$PKG_DESTDIR/base-files-marker" || exit 1
+    mkdir -p "$PKG_DESTDIR/usr/lib" || exit 1
+    printf '%s\n' shared-authority >"$PKG_DESTDIR/usr/lib/shared-ownership-marker" || exit 1
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64

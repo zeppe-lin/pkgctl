@@ -108,6 +108,70 @@ Layer 3 is the prerequisite for hostile shared-ownership refusals. Until it is
 green, refusal tests are not allowed to stand in for proof that the compatible
 path works.
 
+## Shared-ownership hostile-refusal qualification
+
+The privileged `cli-run-shared-ownership-refusal` case is Layer 4 of the
+shared-ownership staircase. It qualifies two different planner refusals without
+making pkgctl a second owner of planner vocabulary. One case first proves a
+`runtime-lib` image carries the exact already-qualified shared object, then
+admits `strict-exclusive`; the other proves `runtime-lib-hostile` carries a
+regular 0644 marker with deliberately different authoritative content, then
+admits `exact-compatible-sharing`. Image preflight uses `libpkgimage`, not tar
+or target bytes, so a generic failed operation cannot masquerade as the intended
+hostile input.
+
+Both operations must refuse before mutation or state publication. Canonical
+state and the original `base-files` receipt authority remain unchanged, the
+rejected package remains absent from `libpkgstate`, and a complete metadata plus
+content fingerprint of the managed target remains unchanged. The independent
+audit must still report the one-owner target clean. Target fingerprints are
+hostile non-mutation observations only; ownership truth continues to come from
+the image/state owner APIs.
+
+The CLI reports the controller fact that native operation planning refused. It
+does not publish a local refusal-name dictionary or an unstable foreign enum
+ordinal. Exact refusal-code distinctions remain qualified by `libpkgplan` at
+the planner boundary.
+
+Layer 4 must be green before process-restart qualification is meaningful: a
+restart test is not allowed to explain a refusal by reconstructing planner
+meaning from current state or target residue.
+
+## Shared-ownership retained-policy restart qualification
+
+The privileged `cli-run-shared-ownership-restart` case is Layer 5. A dedicated
+fixture gives `runtime-lib` an explicit run requirement on `base-files`, making
+first-owner completion a transaction edge rather than a package-name or dispatch
+ordering assumption. The run starts once under the complete
+`exact-compatible-sharing` policy and the publication-terminal interruption
+fixture kills the process at the first durable target publication boundary.
+The test proceeds only if public state authority at that cut contains exactly
+`base-files` as sole owner, `runtime-lib` is absent, and the first operation's
+retained effect is at `publication-terminal` with its application evidence,
+transaction evidence, publication receipt, and resulting snapshot correlated
+to the canonical first-owner receipt.
+
+Before the real restart, a fresh CLI invocation attempts to redeclare
+`strict-exclusive`. Resume syntax must reject that current-process policy input
+and leave state plus the whole target fingerprint unchanged. The valid fresh
+resume then supplies only live resume authorities: canonical store, runtime
+roots, interpreter/credential context, nonce, and a finite drive bound. It does
+not redeclare catalog, goals, build policy, or operation policy.
+
+The resumed operation must publish `runtime-lib` with the shared marker origin
+`retained-existing`, preserve `base-files` as `incoming-payload`, produce exactly
+two owners, and leave the already-active shared object's inode/metadata/content
+fingerprint unchanged while installing `runtime-lib`'s unique payload. The
+first operation's publication receipt remains the same when its effect is
+sealed terminal, the final run contains two completed operation dispatches, and
+the independent audit must report the two-package target clean.
+
+This is the semantic proof that restart consumes the retained controller-owned
+complete policy value. The lower unit contract separately rejects an
+operation-session policy identity drift before specification or restart-body
+sources are consulted; the CLI integration therefore does not decode or mutate
+private evidence just to manufacture a policy mismatch.
+
 ## Empty-target rootfs campaign qualification
 
 The privileged `cli-run-rootfs-campaign` vertical is the first whole-root
