@@ -48,6 +48,37 @@ This case is a prerequisite for compatible-ownership planning tests. If it
 fails, the defect is confined to construction/image authority and downstream
 operation tests are not evidence about sharing.
 
+## Shared-ownership single-owner operation qualification
+
+The privileged `cli-run-shared-ownership-single-owner` case is Layer 2 of the
+shared-ownership staircase. It installs only `base-files` from the already
+qualified two-package image collection into an empty target under the complete
+`strict-exclusive` operation policy. No second owner or sharing decision is
+present yet.
+
+The test does not decode private operation-session or effect-body files. It
+uses `inspect-run` only to locate the retained operation effect attempt and
+`inspect-effect` to require completed application evidence, transaction
+evidence, a retained publication request, a published receipt, and the exact
+resulting snapshot identity. A test-only `libpkgstate` reader then opens the
+canonical store through its public provider, requires a non-empty `base-files`
+manifest containing the exact regular `usr/lib/shared-ownership-marker`, and
+requires `base-files` to be its sole owner. The installed receipt's completed
+application and transaction-evidence identities must equal the identities
+reported by the terminal effect, and the effect's resulting snapshot identity
+must equal the current canonical snapshot. This correlates owner-retained
+authority across the composition boundary without inventing a second codec.
+
+Only after state non-vacuity is established does the test observe the managed
+target directly. The marker bytes/digest and target metadata must agree with
+the published state, and the independent `libpkgaudit` backend must report a
+complete clean audit. Generic planner, application, and state-adapter semantics
+remain qualified in their owner libraries; this vertical proves that pkgctl
+composes those qualified links for the exact real package image from Layer 1.
+
+This case is the prerequisite for introducing `runtime-lib` as a compatible
+second owner. If it fails, shared-ownership policy itself is still out of scope.
+
 ## Empty-target rootfs campaign qualification
 
 The privileged `cli-run-rootfs-campaign` vertical is the first whole-root

@@ -214,6 +214,12 @@ if not get_option('tests').disabled()
     dependencies: pkgctl_core_dep,
   )
 
+  state_ownership_inspect_fixture = executable(
+    'state-ownership-inspect-fixture',
+    'fixtures/state_ownership_inspect_fixture.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+
   libpkgaudit_test_dep = dependency(
     'libpkgaudit',
     version: ['>=0.1.0', '<1.0.0'],
@@ -703,6 +709,38 @@ if not get_option('tests').disabled()
       ),
     ],
     depends: [native_runtime_root_fixture, shared_ownership_image_fixture],
+    suite: 'integration-privileged',
+  )
+
+  cli_run_shared_ownership_single_owner_test = find_program(
+    'integration/cli_run_shared_ownership_single_owner_test.sh',
+  )
+  test(
+    'cli-run-shared-ownership-single-owner',
+    cli_run_shared_ownership_single_owner_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      run_evidence_inspect_fixture,
+      native_runtime_root_fixture,
+      state_ownership_inspect_fixture,
+      rootfs_audit_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/shared-ownership-image',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [
+      native_runtime_root_fixture,
+      rootfs_audit_fixture,
+      run_evidence_inspect_fixture,
+      state_ownership_inspect_fixture,
+    ],
     suite: 'integration-privileged',
   )
 
@@ -1256,6 +1294,16 @@ if not get_option('tests').disabled()
   test(
     'cli-process-death-contract',
     cli_process_death_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_run_shared_ownership_single_owner_contract = find_program(
+    'contracts/check_cli_run_shared_ownership_single_owner_contract.sh',
+  )
+  test(
+    'cli-run-shared-ownership-single-owner-contract',
+    cli_run_shared_ownership_single_owner_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

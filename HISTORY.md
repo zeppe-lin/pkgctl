@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Adds the single-owner operation layer of shared-ownership qualification.
+  `base-files` is installed alone into an empty target, terminal run/effect
+  inspection must expose completed application and publication authority, and a
+  public `libpkgstate` reader must prove a non-empty exact marker manifest with
+  exactly one owner. The installed receipt is identity-correlated with retained
+  completed-application/transaction evidence and the published resulting
+  snapshot; only then are target bytes/metadata and independent audit feedback
+  accepted as observations. No private operation/effect body is decoded by the
+  test.
+
 - Adds a pre-operation shared-ownership image qualification layer. Two
   independent build-only fixture packages must seal the same nested regular
   marker with exact normalized metadata, content identity, and replayed bytes

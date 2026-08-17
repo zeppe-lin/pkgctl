@@ -40,6 +40,7 @@ unsafe_fixed_greps=$(
 for path in \
   'unit/construction_test.cpp' \
   'fixtures/state_fixture.cpp' \
+  'fixtures/state_ownership_inspect_fixture.cpp' \
   'fixtures/run_evidence_inspect_fixture.cpp' \
   'fixtures/native_root_view_fixture.sh' \
   'fixtures/native_runtime_root_fixture.cpp' \
@@ -81,6 +82,7 @@ for path in \
   'integration/cli_build_check_authority_refusal_test.sh' \
   'integration/cli_build_process_death_test.sh' \
   'integration/cli_build_shared_ownership_image_test.sh' \
+  'integration/cli_run_shared_ownership_single_owner_test.sh' \
   'integration/cli_run_rootfs_campaign_test.sh' \
   'integration/cli_run_lease_contention_test.sh' \
   'integration/cli_run_removal_test.sh' \
@@ -98,6 +100,7 @@ for path in \
   'contracts/check_cli_runtime_cohort_contract.sh' \
   'contracts/check_cli_process_death_contract.sh' \
   'contracts/check_cli_build_shared_ownership_image_contract.sh' \
+  'contracts/check_cli_run_shared_ownership_single_owner_contract.sh' \
   'contracts/check_cli_run_rootfs_campaign_contract.sh' \
   'contracts/check_target_observation_contract.sh' \
   'contracts/check_test_layout_contract.sh' \
