@@ -79,6 +79,35 @@ composes those qualified links for the exact real package image from Layer 1.
 This case is the prerequisite for introducing `runtime-lib` as a compatible
 second owner. If it fails, shared-ownership policy itself is still out of scope.
 
+## Shared-ownership compatible-owner qualification
+
+The privileged `cli-run-shared-ownership-compatible-owner` case is Layer 3 of
+the shared-ownership staircase. It first establishes the already-qualified
+Layer-2 state with `base-files` as sole owner, then runs only `runtime-lib` under
+the complete `exact-compatible-sharing` operation policy.
+
+The second operation must complete and publish normally. Its installed marker
+entry is inspected only through `libpkgstate` and must be
+`retained-existing`; the original `base-files` entry remains
+`incoming-payload`, and canonical ownership becomes exactly two owners. The
+second package receipt's completed-application and transaction-evidence
+identities must equal the terminal effect identities, while the first package's
+identity and receipt authorities must remain unchanged. This uses the explicit
+state adapter vocabulary rather than decoding planner, application, or pkgctl
+private transports.
+
+The test records the already-active marker's device/inode, object mode, owner,
+size, mtime, and ctime fingerprint plus its digest and bytes before admitting
+the second operation. After publication the same path must have the identical
+fingerprint, digest, and bytes, while `runtime-lib`'s unique payload must be
+newly installed. This is hostile observation proving that compatible ownership
+did not rewrite the retained object; it is not a source of ownership meaning.
+The final two-package state is then checked by the independent audit backend.
+
+Layer 3 is the prerequisite for hostile shared-ownership refusals. Until it is
+green, refusal tests are not allowed to stand in for proof that the compatible
+path works.
+
 ## Empty-target rootfs campaign qualification
 
 The privileged `cli-run-rootfs-campaign` vertical is the first whole-root

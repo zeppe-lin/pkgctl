@@ -744,6 +744,36 @@ if not get_option('tests').disabled()
     suite: 'integration-privileged',
   )
 
+  cli_run_shared_ownership_compatible_owner_test = find_program(
+    'integration/cli_run_shared_ownership_compatible_owner_test.sh',
+  )
+  test(
+    'cli-run-shared-ownership-compatible-owner',
+    cli_run_shared_ownership_compatible_owner_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      native_runtime_root_fixture,
+      state_ownership_inspect_fixture,
+      rootfs_audit_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/shared-ownership-image',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [
+      native_runtime_root_fixture,
+      rootfs_audit_fixture,
+      state_ownership_inspect_fixture,
+    ],
+    suite: 'integration-privileged',
+  )
+
   cli_run_rootfs_campaign_test = find_program(
     'integration/cli_run_rootfs_campaign_test.sh',
   )
@@ -1304,6 +1334,16 @@ if not get_option('tests').disabled()
   test(
     'cli-run-shared-ownership-single-owner-contract',
     cli_run_shared_ownership_single_owner_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_run_shared_ownership_compatible_owner_contract = find_program(
+    'contracts/check_cli_run_shared_ownership_compatible_owner_contract.sh',
+  )
+  test(
+    'cli-run-shared-ownership-compatible-owner-contract',
+    cli_run_shared_ownership_compatible_owner_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )
