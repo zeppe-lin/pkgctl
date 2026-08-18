@@ -299,9 +299,12 @@ construction, check, and effect sessions. It owns deterministic reservation,
 bounded in-flight capacity, caller attempt nonces, and immutable ownership
 records. It must not execute a driver, create a backend, allocate resource paths,
 construct new transaction edges, or infer success from reservation state.
-Check-scoped package inputs require the current `libpkgtransaction >= 4.0.0`
-authority closure so exact source-4 input authority precedes the construction
-that seals it.
+Check-scoped package inputs require transaction authority closure so exact
+source-4 input authority precedes the construction that seals it. The current
+`libpkgtransaction >= 4.1.0` floor additionally guarantees that runtime
+requirements crossing a cyclic cohort are projected over the complete executable
+cohort boundary. pkgctl consumes those transaction-owned edges; it must not
+interpret cohort membership or synthesize ordering itself.
 
 The single-dispatch execution layer may compose the pure dispatch functions with
 explicit run/effect stores and an injected driver. It must commit started

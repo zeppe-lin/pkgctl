@@ -4,7 +4,7 @@
 project(
   'pkgctl',
   'cpp',
-  version: '0.40.0',
+  version: '0.40.1',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.6.0',
   default_options: [
@@ -158,7 +158,7 @@ libpkgstate_apply_dep = dependency(
 )
 libpkgtransaction_dep = dependency(
   'libpkgtransaction',
-  version: ['>=4.0.0', '<5.0.0'],
+  version: ['>=4.1.0', '<5.0.0'],
   required: true,
   static: want_static,
 )

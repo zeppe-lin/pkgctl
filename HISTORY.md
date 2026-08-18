@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.40.1 - 2026-08-18
+
+- Requires libpkgtransaction 4.1.0 so executable runtime requirements crossing a
+  runtime cohort are projected over the complete cohort boundary. This prevents a
+  cohort member from becoming ready before an external prerequisite of another
+  member, or an external consumer from becoming ready before the required cohort
+  has completed. pkgctl continues to consume the transaction-owned executable
+  partial order and does not interpret or reconstruct runtime cohorts itself.
+
 ## 0.40.0 - 2026-08-18
 
 - Makes native target-operation policy one explicit start-only controller

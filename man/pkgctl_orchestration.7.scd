@@ -10,6 +10,11 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+Version 0.40.1 requires libpkgtransaction 4.1.0 because the transaction owner now
+projects external runtime requirements across complete cyclic runtime-cohort
+boundaries. pkgctl consumes those executable edges as-is; it does not interpret
+cohort membership or manufacture derived scheduling authority.
+
 # TARGET-OPERATION POLICY AUTHORITY
 
 Version 0.40.0 makes the native target-operation policy one explicit controller-

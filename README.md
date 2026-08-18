@@ -1,5 +1,10 @@
 # pkgctl
 
+Release 0.40.1 requires `libpkgtransaction >= 4.1.0` so runtime requirements
+that cross a cyclic runtime cohort reach every member of the executable cohort
+boundary. pkgctl still consumes the transaction-owned partial order; it does not
+interpret runtime cohorts or synthesize scheduling edges.
+
 Release 0.40.0 makes target-operation policy explicit durable controller
 authority. `pkgctl run --start` admits one complete named profile:
 `strict-exclusive` or `exact-compatible-sharing`. The selected profile is sealed
@@ -808,7 +813,7 @@ operation; lost-lease and indeterminate-publication evidence remains an active
 observation until authoritative resolution arrives.
 
 The ledger binds exact successful predecessor evidence. Check-scoped package
-inputs are ordered before construction by `libpkgtransaction >= 4.0.0`, then
+inputs are ordered before construction by `libpkgtransaction >= 4.1.0`, then
 verified against the retained build result and artifact before a construction
 session starts. Retained installed inputs must still be the same exact package
 in the current state. Failure containment prevents both new reservations and

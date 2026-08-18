@@ -33,7 +33,7 @@ pkg-config --exists \
   'libpkgapply-posix >= 3.2.1' 'libpkgapply-posix < 4.0.0' \
   'libpkgapply-exec >= 3.0.1' 'libpkgapply-exec < 4.0.0' \
   'libpkgresolve >= 4.0.0' 'libpkgresolve < 5.0.0' \
-  'libpkgtransaction >= 4.0.0' 'libpkgtransaction < 5.0.0' \
+  'libpkgtransaction >= 4.1.0' 'libpkgtransaction < 5.0.0' \
   'libpkgcheck >= 0.3.0' 'libpkgcheck < 1.0.0' \
   'libpkgcheck-exec >= 0.9.0' 'libpkgcheck-exec < 1.0.0' \
   'libpkgreconcile >= 0.3.0' 'libpkgreconcile < 1.0.0' \

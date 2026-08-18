@@ -34,6 +34,11 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
+Version 0.40.1 requires libpkgtransaction 4.1.0 so runtime requirements crossing
+a cyclic runtime cohort are represented by the complete transaction-owned
+executable partial order. pkgctl consumes that order without interpreting cohort
+membership or reconstructing package requirements.
+
 Version 0.40.0 makes native target-operation policy explicit start-only
 controller authority. *run --start* requires one complete named profile:
 *strict-exclusive* forbids shared ownership and *exact-compatible-sharing* permits
