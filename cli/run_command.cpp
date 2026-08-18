@@ -2165,6 +2165,8 @@ std::string_view operation_outcome_name(
       return "lifecycle-failed-before-application";
     case effectful_operation_outcome::application_not_completed:
       return "application-not-completed";
+    case effectful_operation_outcome::application_resolution_required:
+      return "application-resolution-required";
     case effectful_operation_outcome::lifecycle_failed_after_application:
       return "lifecycle-failed-after-application";
     case effectful_operation_outcome::outer_lease_lost:

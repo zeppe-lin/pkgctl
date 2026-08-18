@@ -100,6 +100,8 @@ for required in \
   'retained command evidence recomposes another transaction' \
   'mutation-authority-unavailable' \
   'transaction_run_drive_disposition::mutation_authority_unavailable' \
+  'case effectful_operation_outcome::application_resolution_required:' \
+  'return "application-resolution-required";' \
   'pkgbuild::environment_policy::hermetic(' \
   'pkgbuild::output_layout_kind::package_root' \
   '0022'; do
