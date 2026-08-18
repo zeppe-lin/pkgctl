@@ -197,6 +197,8 @@ std::string_view effect_outcome_text(effectful_operation_outcome outcome)
     case effectful_operation_outcome::state_publication_indeterminate:
       return "state-publication-indeterminate";
     case effectful_operation_outcome::completed: return "completed";
+    case effectful_operation_outcome::application_resolution_required:
+      return "application-resolution-required";
   }
   return "unknown";
 }

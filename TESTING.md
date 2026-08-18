@@ -754,6 +754,22 @@ its private `tmp/home` beneath that parent; no journal/dispatch intermediate
 directory may be required, and reopen must create no additional lifecycle
 scratch.
 
+`pkgctl:package-operation-uncertainty-matrix` also attacks the subordinate
+application/controller seam directly. For each owner-terminal
+`failed_with_partial_effects`, `effects_visible_durability_unconfirmed`, and
+`indeterminate` receipt, the fixture commits an exact `application_terminal`
+effect head without performing target mutation, retains the owner receipt body,
+destroys the runtime, and reopens it. Every case must return
+`external-resolution-required` with zero durable advancement, leave the operation
+node ready rather than failed, preserve target/state, perform no archive
+acquisition or physical continuation, and repeat identically on a second drive.
+The unit matrix separately proves that precondition refusal, failure before target
+mutation, and fully recovered failure remain definitive while those three
+uncertain owner outcomes map only to the controller-owned
+`application_resolution_required` observation. Hostile terminalization of either
+that observation or an uncertain application receipt as
+`application_not_completed` must be rejected by the effect-journal model.
+
 `pkgctl:package-operation-uncertainty-matrix` qualifies non-terminal operation
 uncertainty through the same composition root. It separates a crash at durable
 `publication_intent` from a retained terminal indeterminate publication receipt.

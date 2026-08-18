@@ -31,6 +31,7 @@ bool operation_outcome_is_terminal(
       return true;
     case effectful_operation_outcome::outer_lease_lost:
     case effectful_operation_outcome::state_publication_indeterminate:
+    case effectful_operation_outcome::application_resolution_required:
       return false;
   }
   return false;

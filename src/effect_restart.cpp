@@ -4,6 +4,8 @@
 #include <pkgctl/effect_restart.h>
 #include <pkgctl/error.h>
 
+#include "effect_application_classification.h"
+
 #include <algorithm>
 #include <utility>
 
@@ -128,13 +130,22 @@ effect_restart_assessment assess_effect_restart(
       disposition = effect_restart_disposition::resume_application;
       break;
     case effect_attempt_stage::application_terminal:
-      if (record.application()->outcome() !=
-          pkgapply::application_attempt_outcome::completed)
-        disposition = effect_restart_disposition::seal_terminal;
-      else if (record.after_total() == 0U)
-        disposition = effect_restart_disposition::start_publication;
-      else
-        disposition = effect_restart_disposition::continue_after_application;
+      switch (detail::classify_application_effect(
+          record.application()->outcome()))
+      {
+        case detail::application_effect_classification::definitive_failure:
+          disposition = effect_restart_disposition::seal_terminal;
+          break;
+        case detail::application_effect_classification::
+            external_resolution_required:
+          disposition = effect_restart_disposition::external_resolution_required;
+          break;
+        case detail::application_effect_classification::completed:
+          disposition = record.after_total() == 0U
+              ? effect_restart_disposition::start_publication
+              : effect_restart_disposition::continue_after_application;
+          break;
+      }
       break;
     case effect_attempt_stage::after_lifecycle_intent:
       break;

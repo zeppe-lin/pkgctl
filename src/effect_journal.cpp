@@ -3,6 +3,8 @@
 
 #include <pkgctl/effect_journal.h>
 
+#include "effect_application_classification.h"
+
 #include <algorithm>
 #include <array>
 #include <limits>
@@ -181,6 +183,9 @@ std::uint64_t retained_transition_count(
       return publication_base + 3U;
     case effectful_operation_outcome::completed:
       return publication_base + (publication ? 3U : 2U);
+    case effectful_operation_outcome::application_resolution_required:
+      invalid_record(
+          "application resolution requirement cannot be a terminal journal outcome");
     case effectful_operation_outcome::outer_lease_lost:
       if (publication)
         return publication_base + 3U;
@@ -382,9 +387,14 @@ void validate_record_shape(
           break;
         case effectful_operation_outcome::application_not_completed:
           if (!application || application_complete || !after.empty() ||
-              has_publication_authority)
-            invalid_record("application failure lacks exact terminal evidence");
+              has_publication_authority ||
+              detail::classify_application_effect(application->outcome()) !=
+                  detail::application_effect_classification::definitive_failure)
+            invalid_record("application failure lacks exact definitive evidence");
           break;
+        case effectful_operation_outcome::application_resolution_required:
+          invalid_record(
+              "application resolution requirement cannot be a terminal journal outcome");
         case effectful_operation_outcome::lifecycle_failed_after_application:
           if (!application_complete || after.empty() ||
               after.back().succeeded() || has_publication_authority)
@@ -659,9 +669,16 @@ void validate_effect_successor(
                 "pre-lifecycle failure has the wrong predecessor");
           return;
         case effectful_operation_outcome::application_not_completed:
-          if (previous.stage() != effect_attempt_stage::application_terminal)
+          if (previous.stage() != effect_attempt_stage::application_terminal ||
+              !previous.application() ||
+              detail::classify_application_effect(
+                  previous.application()->outcome()) !=
+                  detail::application_effect_classification::definitive_failure)
             invalid_transition("application failure has the wrong predecessor");
           return;
+        case effectful_operation_outcome::application_resolution_required:
+          invalid_transition(
+              "application resolution requirement cannot seal a terminal journal");
         case effectful_operation_outcome::lifecycle_failed_after_application:
           if (previous.stage() !=
               effect_attempt_stage::after_lifecycle_terminal)
@@ -1069,6 +1086,9 @@ effect_attempt_record effect_attempt_record::seal_terminal(
       unresolved_intent)
     invalid_transition(
         "lease loss cannot resolve an effect with unknown terminal evidence");
+  if (outcome == effectful_operation_outcome::application_resolution_required)
+    invalid_transition(
+        "application resolution requirement cannot seal a terminal journal");
   if (outcome ==
           effectful_operation_outcome::lifecycle_failed_before_application &&
       stage_ != effect_attempt_stage::before_lifecycle_terminal)
@@ -1113,9 +1133,10 @@ effect_attempt_record effect_attempt_record::seal_terminal(
       (before_.empty() || before_.back().succeeded()))
     invalid_transition("pre-lifecycle failure outcome lacks failed evidence");
   if (outcome == effectful_operation_outcome::application_not_completed &&
-      (!application_ || application_->outcome() ==
-                            pkgapply::application_attempt_outcome::completed))
-    invalid_transition("application failure outcome lacks failed evidence");
+      (!application_ ||
+       detail::classify_application_effect(application_->outcome()) !=
+           detail::application_effect_classification::definitive_failure))
+    invalid_transition("application failure outcome lacks definitive evidence");
   if (outcome == effectful_operation_outcome::lifecycle_failed_after_application &&
       (after_.empty() || after_.back().succeeded()))
     invalid_transition("post-lifecycle failure outcome lacks failed evidence");

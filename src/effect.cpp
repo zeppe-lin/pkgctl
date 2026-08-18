@@ -8,6 +8,7 @@
 #include <pkgctl/error.h>
 
 #include "effect_rehydration.h"
+#include "effect_application_classification.h"
 
 #include <libpkgstate/error.h>
 #include <libpkgstate/publication_projection.h>
@@ -522,6 +523,23 @@ session_identity result_identity(
   return make_session_identity("pkgctl/effectful-operation-result/1", fields);
 }
 
+[[nodiscard]] effectful_operation_outcome
+noncompleted_application_outcome(
+    pkgapply::application_attempt_outcome outcome)
+{
+  switch (detail::classify_application_effect(outcome))
+  {
+    case detail::application_effect_classification::definitive_failure:
+      return effectful_operation_outcome::application_not_completed;
+    case detail::application_effect_classification::external_resolution_required:
+      return effectful_operation_outcome::application_resolution_required;
+    case detail::application_effect_classification::completed:
+      break;
+  }
+  throw error(error_code::driver_contract_violation,
+              "completed application was classified as non-completed");
+}
+
 effectful_operation_outcome publication_outcome(
     const pkgstate::state_publication_receipt& receipt)
 {
@@ -973,7 +991,7 @@ effectful_operation_result execute_effectful_operation(
   if (application.outcome() != pkgapply::application_attempt_outcome::completed)
     return effectful_operation_result::seal(
         std::move(session),
-        effectful_operation_outcome::application_not_completed,
+        noncompleted_application_outcome(application.outcome()),
         std::move(before), std::move(application), {}, std::nullopt,
         std::nullopt, std::nullopt);
 
@@ -1117,13 +1135,11 @@ effectful_operation_result execute_effectful_operation_durable(
                           journal.complete_application(application));
   if (application.outcome() != pkgapply::application_attempt_outcome::completed)
   {
-    journal = append_record(
-        journal_store,
-        journal.seal_terminal(
-            effectful_operation_outcome::application_not_completed));
+    const auto outcome = noncompleted_application_outcome(application.outcome());
+    if (outcome == effectful_operation_outcome::application_not_completed)
+      journal = append_record(journal_store, journal.seal_terminal(outcome));
     return effectful_operation_result::seal(
-        std::move(session),
-        effectful_operation_outcome::application_not_completed,
+        std::move(session), outcome,
         std::move(before), std::move(application), {}, std::nullopt,
         std::nullopt, std::nullopt);
   }
@@ -1339,7 +1355,16 @@ effect_restart_result resume_effectful_operation(
         return finish(
             effectful_operation_outcome::lifecycle_failed_before_application);
       case effect_attempt_stage::application_terminal:
-        return finish(effectful_operation_outcome::application_not_completed);
+      {
+        const auto outcome = noncompleted_application_outcome(
+            journal.application()->outcome());
+        if (outcome ==
+            effectful_operation_outcome::application_resolution_required)
+          return effect_restart_result(
+              effect_restart_disposition::external_resolution_required,
+              journal, std::nullopt);
+        return finish(outcome);
+      }
       case effect_attempt_stage::after_lifecycle_terminal:
         return finish(
             effectful_operation_outcome::lifecycle_failed_after_application);
@@ -1456,7 +1481,16 @@ effect_restart_result resume_effectful_operation(
         journal_store, journal.complete_application(*application));
     if (application->outcome() !=
         pkgapply::application_attempt_outcome::completed)
-      return finish(effectful_operation_outcome::application_not_completed);
+    {
+      const auto outcome =
+          noncompleted_application_outcome(application->outcome());
+      if (outcome ==
+          effectful_operation_outcome::application_resolution_required)
+        return effect_restart_result(
+            effect_restart_disposition::external_resolution_required,
+            journal, std::nullopt);
+      return finish(outcome);
+    }
   }
 
   if (!application)
@@ -1480,7 +1514,16 @@ effect_restart_result resume_effectful_operation(
         journal_store, journal.complete_application(*application));
     if (application->outcome() !=
         pkgapply::application_attempt_outcome::completed)
-      return finish(effectful_operation_outcome::application_not_completed);
+    {
+      const auto outcome =
+          noncompleted_application_outcome(application->outcome());
+      if (outcome ==
+          effectful_operation_outcome::application_resolution_required)
+        return effect_restart_result(
+            effect_restart_disposition::external_resolution_required,
+            journal, std::nullopt);
+      return finish(outcome);
+    }
   }
 
   for (std::size_t index = after.size(); index < session.after().size(); ++index)

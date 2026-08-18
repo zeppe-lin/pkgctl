@@ -273,6 +273,15 @@ never starts. Repeated `--resume` after live collection removal must preserve th
 same run/effect heads, perform zero durable advancement, and must not recreate a
 target-lock file. Only the external process actuator and the explicitly faulted
 owner protocol are replaced in the in-process campaign.
+
+Application uncertainty is not terminal failure authority. Owner outcomes that
+prove no residual target ambiguity may retire as `application-not-completed`;
+partial effects, durability-unconfirmed visible effects, and indeterminate
+application truth retain the started operation and report
+`external-resolution-required`. Resume consumes the retained application receipt
+only to explain that block; it does not reapply, publish state, or strengthen the
+owner's uncertainty into controller truth.
+
 This test composition does not make reconciliation a production `pkgctl`
 dependency.
 

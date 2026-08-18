@@ -2266,26 +2266,87 @@ void check_request_refusal()
 
 void check_application_failure()
 {
-  fixture value;
-  auto failed = pkgapply::application_receipt::failed(
-      value.application,
-      apply_identity<pkgapply::application_attempt_identity>(50),
-      value.projection.identity(),
-      pkgapply::application_attempt_outcome::failed_before_target_mutation,
-      pkgapply::application_recovery_state::unchanged,
-      durability(), {}, std::nullopt);
-  const auto session = pkgctl::effectful_operation_session::admit(
-      effect_request(value), value.before, value.after);
-  driver actuator(value.projection, value.outer_lease,
-                  std::move(failed), value.store);
-  const auto result = pkgctl::execute_effectful_operation(session, actuator);
-  CHECK(result.outcome() ==
-        pkgctl::effectful_operation_outcome::application_not_completed);
-  CHECK(!result.succeeded());
-  CHECK(actuator.publication_calls() == 0);
-  CHECK(actuator.trace() == std::vector<std::string>(
-      {"pre-install", "apply"}));
-  CHECK(value.store.read().packages().empty());
+  using application_outcome = pkgapply::application_attempt_outcome;
+  using recovery_state = pkgapply::application_recovery_state;
+  struct case_value final {
+    application_outcome application;
+    recovery_state recovery;
+    pkgctl::effectful_operation_outcome effect;
+    bool journal;
+    bool unconfirmed_durability;
+  };
+  const std::array cases{
+      case_value{application_outcome::precondition_refused,
+                 recovery_state::unchanged,
+                 pkgctl::effectful_operation_outcome::application_not_completed,
+                 false, false},
+      case_value{application_outcome::failed_before_target_mutation,
+                 recovery_state::unchanged,
+                 pkgctl::effectful_operation_outcome::application_not_completed,
+                 false, false},
+      case_value{application_outcome::failed_fully_recovered,
+                 recovery_state::exact_prior_state_restored,
+                 pkgctl::effectful_operation_outcome::application_not_completed,
+                 true, false},
+      case_value{application_outcome::failed_with_partial_effects,
+                 recovery_state::known_residual_effects,
+                 pkgctl::effectful_operation_outcome::
+                     application_resolution_required,
+                 true, false},
+      case_value{application_outcome::effects_visible_durability_unconfirmed,
+                 recovery_state::known_residual_effects,
+                 pkgctl::effectful_operation_outcome::
+                     application_resolution_required,
+                 true, true},
+      case_value{application_outcome::indeterminate,
+                 recovery_state::requires_authoritative_observation,
+                 pkgctl::effectful_operation_outcome::
+                     application_resolution_required,
+                 true, false},
+  };
+
+  std::uint8_t seed = 50U;
+  for (const auto& expected : cases)
+  {
+    fixture value;
+    auto result_durability = durability();
+    if (expected.unconfirmed_durability)
+    {
+      using domain = pkgapply::application_durability_domain;
+      using status = pkgapply::application_durability_status;
+      result_durability = pkgapply::application_durability_profile({
+          {domain::journal, status::confirmed},
+          {domain::incoming_staging, status::confirmed},
+          {domain::recovery_staging, status::confirmed},
+          {domain::active_namespace, status::unconfirmed},
+          {domain::rejected_object_store, status::confirmed},
+          {domain::completed_evidence, status::confirmed},
+      });
+    }
+    const auto journal = expected.journal
+        ? std::optional<pkgapply::application_journal_identity>(
+              apply_identity<pkgapply::application_journal_identity>(seed + 1U))
+        : std::nullopt;
+    auto failed = pkgapply::application_receipt::failed(
+        value.application,
+        apply_identity<pkgapply::application_attempt_identity>(seed),
+        value.projection.identity(), expected.application, expected.recovery,
+        std::move(result_durability), {}, journal);
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    driver actuator(value.projection, value.outer_lease,
+                    std::move(failed), value.store);
+    const auto result = pkgctl::execute_effectful_operation(session, actuator);
+    CHECK(result.outcome() == expected.effect);
+    CHECK(!result.succeeded());
+    CHECK(result.application().has_value());
+    CHECK(!result.publication_request().has_value());
+    CHECK(actuator.publication_calls() == 0U);
+    CHECK(actuator.trace() == std::vector<std::string>(
+        {"pre-install", "apply"}));
+    CHECK(value.store.read().packages().empty());
+    seed = static_cast<std::uint8_t>(seed + 3U);
+  }
 }
 
 void check_lifecycle_failures()
@@ -2436,6 +2497,124 @@ void check_durable_success()
     CHECK(decoded.terminal_outcome() == latest->terminal_outcome());
   }
   CHECK(journal.size(admission.attempt()) == 10U);
+}
+
+void check_durable_application_uncertainty()
+{
+  using application_outcome = pkgapply::application_attempt_outcome;
+  using recovery_state = pkgapply::application_recovery_state;
+  struct case_value final {
+    application_outcome outcome;
+    recovery_state recovery;
+    bool unconfirmed_durability;
+  };
+  const std::array cases{
+      case_value{application_outcome::failed_with_partial_effects,
+                 recovery_state::known_residual_effects, false},
+      case_value{application_outcome::effects_visible_durability_unconfirmed,
+                 recovery_state::known_residual_effects, true},
+      case_value{application_outcome::indeterminate,
+                 recovery_state::requires_authoritative_observation, false},
+  };
+
+  std::uint8_t seed = 70U;
+  for (const auto& expected : cases)
+  {
+    fixture value;
+    auto result_durability = durability();
+    if (expected.unconfirmed_durability)
+    {
+      using domain = pkgapply::application_durability_domain;
+      using status = pkgapply::application_durability_status;
+      result_durability = pkgapply::application_durability_profile({
+          {domain::journal, status::confirmed},
+          {domain::incoming_staging, status::confirmed},
+          {domain::recovery_staging, status::confirmed},
+          {domain::active_namespace, status::unconfirmed},
+          {domain::rejected_object_store, status::confirmed},
+          {domain::completed_evidence, status::confirmed},
+      });
+    }
+    auto failed = pkgapply::application_receipt::failed(
+        value.application,
+        apply_identity<pkgapply::application_attempt_identity>(seed),
+        value.projection.identity(), expected.outcome, expected.recovery,
+        std::move(result_durability), {},
+        apply_identity<pkgapply::application_journal_identity>(seed + 1U));
+    const auto session = pkgctl::effectful_operation_session::admit(
+        effect_request(value), value.before, value.after);
+    driver actuator(value.projection, value.outer_lease,
+                    std::move(failed), value.store);
+    memory_effect_journal_store journal;
+    recording_effect_body_sink bodies;
+    const auto result = pkgctl::execute_effectful_operation_durable(
+        session, effect_nonce(seed), actuator, journal, &bodies);
+    CHECK(result.outcome() ==
+          pkgctl::effectful_operation_outcome::application_resolution_required);
+    CHECK(!result.succeeded());
+    CHECK(result.application().has_value());
+    CHECK(result.after().empty());
+    CHECK(!result.publication_request().has_value());
+    CHECK(actuator.publication_calls() == 0U);
+    CHECK(bodies.applications() == 1U);
+    CHECK(bodies.publication_requests() == 0U);
+    CHECK(bodies.publication_receipts() == 0U);
+
+    const auto admission = pkgctl::effect_attempt_record::admit(
+        session.identity(), session.before().size(), session.after().size(),
+        effect_nonce(seed));
+    const auto latest = journal.load_latest(admission.attempt());
+    CHECK(latest.has_value());
+    CHECK(latest && latest->stage() ==
+                        pkgctl::effect_attempt_stage::application_terminal);
+    CHECK(latest && !latest->terminal_outcome().has_value());
+    CHECK(latest && pkgctl::assess_effect_restart(*latest).disposition() ==
+                        pkgctl::effect_restart_disposition::
+                            external_resolution_required);
+    if (!latest)
+      continue;
+
+    bool definitive_terminalization_refused = false;
+    try
+    {
+      (void)latest->seal_terminal(
+          pkgctl::effectful_operation_outcome::application_not_completed);
+    }
+    catch (const pkgctl::effect_journal_error& problem)
+    {
+      definitive_terminalization_refused =
+          problem.code() == pkgctl::effect_journal_error_code::invalid_transition;
+    }
+    CHECK(definitive_terminalization_refused);
+
+    bool unresolved_terminalization_refused = false;
+    try
+    {
+      (void)latest->seal_terminal(
+          pkgctl::effectful_operation_outcome::application_resolution_required);
+    }
+    catch (const pkgctl::effect_journal_error& problem)
+    {
+      unresolved_terminalization_refused =
+          problem.code() == pkgctl::effect_journal_error_code::invalid_transition;
+    }
+    CHECK(unresolved_terminalization_refused);
+
+    const auto checkpoint = pkgctl::effect_restart_checkpoint::make(
+        session, *latest, result.before(), result.application(), {},
+        std::nullopt, std::nullopt, std::nullopt);
+    const auto retained_size = journal.size(admission.attempt());
+    const auto restarted = pkgctl::resume_effectful_operation(
+        checkpoint, nullptr, nullptr, journal, &bodies);
+    CHECK(restarted.external_resolution_required());
+    CHECK(!restarted.terminal());
+    CHECK(!restarted.operation().has_value());
+    CHECK(restarted.journal().identity() == latest->identity());
+    CHECK(journal.size(admission.attempt()) == retained_size);
+    CHECK(actuator.resume_calls() == 0U);
+    CHECK(actuator.publication_calls() == 0U);
+    seed = static_cast<std::uint8_t>(seed + 3U);
+  }
 }
 
 void check_operation_progress_rehydration()
@@ -6007,6 +6186,7 @@ int main()
   check_publication_failures();
   check_lease_loss();
   check_durable_success();
+  check_durable_application_uncertainty();
   check_operation_progress_rehydration();
   check_restart_boundaries();
   check_publication_retry();

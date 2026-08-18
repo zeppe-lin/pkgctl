@@ -6,6 +6,7 @@ set -eu
 srcdir=${1:-.}
 header="$srcdir/include/pkgctl/effect.h"
 source="$srcdir/src/effect.cpp"
+classification="$srcdir/src/effect_application_classification.h"
 
 [ -s "$header" ] || {
   echo 'missing effect-session public header' >&2
@@ -13,6 +14,10 @@ source="$srcdir/src/effect.cpp"
 }
 [ -s "$source" ] || {
   echo 'missing effect-session implementation' >&2
+  exit 1
+}
+[ -s "$classification" ] || {
+  echo 'missing application/effect classification boundary' >&2
   exit 1
 }
 
@@ -30,12 +35,36 @@ for required in \
   'driver.apply_application' \
   'driver.publish_state' \
   'pkgctl/transaction-evidence/1' \
-  'state_publication_indeterminate'; do
+  'state_publication_indeterminate' \
+  'application_resolution_required'; do
   grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing effect authority contract: $required" >&2
     exit 1
   }
 done
+
+for owner_outcome in \
+  'precondition_refused' \
+  'failed_before_target_mutation' \
+  'failed_fully_recovered' \
+  'failed_with_partial_effects' \
+  'effects_visible_durability_unconfirmed' \
+  'indeterminate'; do
+  grep -F -- "$owner_outcome" "$classification" >/dev/null || {
+    echo "missing owner application classification: $owner_outcome" >&2
+    exit 1
+  }
+done
+
+[ "$(grep -F -c 'case pkgapply::application_attempt_outcome::' "$classification")" -eq 7 ] || {
+  echo 'application/effect classification does not cover the exact owner vocabulary' >&2
+  exit 1
+}
+
+[ "$(grep -R -F -l --exclude='report.cpp' 'failed_with_partial_effects' "$srcdir/src" | wc -l)" -eq 1 ] || {
+  echo 'owner application uncertainty classification is duplicated across controller sources' >&2
+  exit 1
+}
 
 held_checks=$(grep -F -c 'driver.lease().held()' "$source")
 [ "$held_checks" -ge 5 ] || {

@@ -87,6 +87,14 @@ for evidence in \
   'effect_store.append(' \
   'pkgctl::effect_attempt_stage::before_lifecycle_intent' \
   'pkgctl::transaction_run_drive_disposition::external_resolution_required' \
+  'check_native_runtime_application_terminal_external_resolution' \
+  'pkgapply::application_attempt_outcome::failed_with_partial_effects' \
+  'effects_visible_durability_unconfirmed' \
+  'pkgapply::application_attempt_outcome::indeterminate' \
+  'pkgctl::effect_attempt_stage::application_terminal' \
+  'pkgctl::effect_restart_disposition::external_resolution_required' \
+  '!unresolved.run().progress().failed()' \
+  'operations.archive_calls() == archive_calls' \
   'unresolved.durable_step_count() == 0U' \
   'check_native_runtime_publication_intent_uncertainty' \
   'check_native_runtime_terminal_indeterminate_publication' \

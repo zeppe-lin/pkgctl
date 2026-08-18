@@ -168,6 +168,17 @@ successor, reserve replacement work, reacquire a mutation lease, or recreate the
 missing lock pathname. Delete the live collection before resume to keep the
 retained-command-evidence guarantee in the same proof.
 
+Do not collapse subordinate application uncertainty into definitive controller
+failure. The only owner outcomes eligible for `application_not_completed` are
+precondition refusal, failure before target mutation, and fully recovered
+failure. Partial effects, visible-but-unconfirmed durability, and indeterminate
+application truth must remain a non-retiring `application_resolution_required`
+observation. Its durable effect head stays at `application_terminal`; restart is
+`external-resolution-required` and must acquire no continuation, archive, target,
+or publication authority. Keep this classification in one private controller
+adapter; do not duplicate the libpkgapply outcome switch across effect, journal,
+and restart code.
+
 A resumed command must not carry a second semantic transaction request merely so
 the CLI can prove equality with itself. The one current private command-evidence
 format retains every start-only transaction input, the exact admitted interpreter

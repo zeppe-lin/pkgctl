@@ -247,7 +247,7 @@ private:
   pkgstate::canonical_store& state_store_;
 };
 
-/*! \brief Terminal controller knowledge for one effectful operation attempt. */
+/*! \brief Controller knowledge for one effectful operation attempt. */
 enum class effectful_operation_outcome {
   lifecycle_failed_before_application,
   application_not_completed,
@@ -256,6 +256,7 @@ enum class effectful_operation_outcome {
   state_publication_not_completed,
   state_publication_indeterminate,
   completed,
+  application_resolution_required,
 };
 
 class effectful_operation_result final {

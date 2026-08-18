@@ -2304,17 +2304,27 @@ does not silently promote a publication completed after lease loss.
 The effect result distinguishes:
 
 - lifecycle failure before application;
-- application not completed;
+- definitive application non-completion;
+- application state requiring external resolution;
 - lifecycle failure after application;
 - outer lease loss;
 - state publication not completed;
 - state publication indeterminate;
 - completed publication.
 
-These are controller observations, not rollback claims. A post-action lifecycle
+These are controller observations, not rollback claims. The application owner
+keeps its richer physical outcome vocabulary. `precondition_refused`,
+`failed_before_target_mutation`, and `failed_fully_recovered` may become the
+definitive controller outcome `application_not_completed`;
+`failed_with_partial_effects`, `effects_visible_durability_unconfirmed`, and
+`indeterminate` instead become the non-retiring controller observation
+`application_resolution_required`. The controller journal remains at the exact
+owner-terminal `application_terminal` boundary and restart returns
+`external-resolution-required` without another application, archive acquisition,
+target mutation, state publication, or terminal seal. A post-action lifecycle
 failure can occur after the package filesystem transition completed. An
-indeterminate publication requires authoritative rereading of installed state.
-Arbitrary lifecycle side effects are never claimed reversible.
+indeterminate publication likewise requires authoritative rereading of installed
+state. Arbitrary lifecycle side effects are never claimed reversible.
 
 ## Release 0.2.0 read-only boundary
 

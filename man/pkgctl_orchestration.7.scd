@@ -1141,10 +1141,16 @@ through state publication. The controller observes it before every stage and
 after publication.
 
 The result distinguishes lifecycle failure before or after application,
-incomplete application, outer-lease loss, non-completed state publication,
-indeterminate publication, and completion. These outcomes retain available
-subordinate evidence but do not claim rollback of lifecycle side effects or
-transaction-wide filesystem/state atomicity.
+definitive application non-completion, application state requiring external
+resolution, outer-lease loss, non-completed state publication, indeterminate
+publication, and completion. Owner application outcomes that prove no residual
+target ambiguity may retire as *application-not-completed*. Partial effects,
+visible-but-unconfirmed durability, and indeterminate application truth remain a
+non-retiring *application-resolution-required* observation and drive the run to
+*external-resolution-required*. Resume does not reapply or publish state merely to
+replace that owner uncertainty with controller truth. These outcomes retain
+available subordinate evidence but do not claim rollback of lifecycle side
+effects or transaction-wide filesystem/state atomicity.
 
 # TRANSACTION PROVENANCE
 
