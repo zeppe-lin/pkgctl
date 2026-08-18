@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.40.3 - 2026-08-18
+
+- Preserves subordinate application uncertainty instead of collapsing every
+  non-completed `libpkgapply` receipt into definitive transaction failure.
+  Precondition refusal, failure before target mutation, and fully recovered
+  failure remain terminal `application_not_completed` controller evidence.
+  Partial effects, visible-but-unconfirmed durability, and indeterminate target
+  truth now produce the non-retiring `application_resolution_required`
+  observation, leave the durable effect head at `application_terminal`, and
+  require external resolution on restart without another application, archive
+  acquisition, target mutation, state publication, or terminal seal. The owner
+  outcome classification is centralized in one private controller adapter and
+  qualified across direct effect, hostile journal, and runtime restart matrices.
+
 ## 0.40.2 - 2026-08-18
 
 - Requires libpkgapply-posix 3.2.2 so retained old-object capture authority no

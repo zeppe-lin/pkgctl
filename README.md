@@ -1,5 +1,11 @@
 # pkgctl
 
+Release 0.40.3 preserves `libpkgapply` uncertainty as uncertainty. Definitive
+owner failures may retire the operation, while partial effects,
+visible-but-unconfirmed durability, and indeterminate application truth remain
+`application-resolution-required` and force explicit external resolution without
+reapplication or state publication.
+
 Release 0.40.2 requires `libpkgapply-posix >= 3.2.2` so native application can
 retain many old-object capture authorities without consuming one live
 attempt-directory descriptor per captured object. Descriptor-anchored capture

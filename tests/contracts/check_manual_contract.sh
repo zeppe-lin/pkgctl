@@ -42,6 +42,7 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
+grep -F 'Version 0.40.3' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.2' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.1' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
@@ -53,6 +54,8 @@ grep -F '# RUN AND BUILD OPTIONS' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *build* _package_ [*--check*]' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--artifact-root* _path_' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--operation-policy* _profile_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.40.3 preserves subordinate application uncertainty' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.40.2 requires libpkgapply-posix 3.2.2' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.40.1 requires libpkgtransaction 4.1.0' \

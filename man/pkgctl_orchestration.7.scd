@@ -10,6 +10,13 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+Version 0.40.3 preserves subordinate application uncertainty instead of
+strengthening it into definitive controller failure. Only owner outcomes that
+prove no residual target ambiguity may retire as application non-completion.
+Partial effects, visible-but-unconfirmed durability, and indeterminate target
+truth remain a non-retiring controller observation and require external
+resolution without another physical application or publication attempt.
+
 Version 0.40.2 requires libpkgapply-posix 3.2.2 because native application may
 retain many old-object capture authorities concurrently. The provider bounds live
 attempt-directory descriptor cardinality by capture attempt rather than captured

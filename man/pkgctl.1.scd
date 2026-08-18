@@ -34,6 +34,12 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
+Version 0.40.3 preserves application-owner uncertainty at the controller
+boundary. Definitive non-completion may retire an operation; partial effects,
+visible-but-unconfirmed durability, and indeterminate application truth remain
+*application-resolution-required* and force *external-resolution-required*
+without reapplication or state publication.
+
 Version 0.40.2 requires libpkgapply-posix 3.2.2 so native application may retain
 many old-object capture authorities without one live attempt-directory descriptor
 per captured object. Descriptor-anchored capture remains POSIX-provider authority;
