@@ -1,5 +1,11 @@
 # pkgctl
 
+Release 0.40.4 requires `libpkgapply-posix >= 3.2.3` so active-namespace
+durability remains bounded by touched filesystem rather than mutated path. The
+POSIX provider owns filesystem durability authority; pkgctl neither retains
+per-path durability descriptors nor reconstructs that authority from target
+pathnames.
+
 Release 0.40.3 preserves `libpkgapply` uncertainty as uncertainty. Definitive
 owner failures may retire the operation, while partial effects,
 visible-but-unconfirmed durability, and indeterminate application truth remain

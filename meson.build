@@ -4,7 +4,7 @@
 project(
   'pkgctl',
   'cpp',
-  version: '0.40.3',
+  version: '0.40.4',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.6.0',
   default_options: [
@@ -140,7 +140,7 @@ libpkgapply_dep = dependency(
 )
 libpkgapply_posix_dep = dependency(
   'libpkgapply-posix',
-  version: ['>=3.2.2', '<4.0.0'],
+  version: ['>=3.2.3', '<4.0.0'],
   required: true,
   static: want_static,
 )

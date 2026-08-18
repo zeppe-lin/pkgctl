@@ -594,6 +594,7 @@ for documented in \
   'Release 0.35.0 closes the functional package-management chain' \
   'Release 0.35.0 bounded native command boundary' \
   'Release 0.35.0 bounded native command qualification' \
+  'Version 0.40.4 requires libpkgapply-posix 3.2.3' \
   'Version 0.40.3 preserves subordinate application uncertainty' \
   'Version 0.40.2 requires libpkgapply-posix 3.2.2' \
   'Version 0.40.1 requires libpkgtransaction 4.1.0' \

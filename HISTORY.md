@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.40.4 - 2026-08-18
+
+- Requires libpkgapply-posix 3.2.3 so active-namespace durability no longer
+  retains one live descriptor per mutated path until the final durability
+  boundary. The provider now retains at most one representative descriptor per
+  touched filesystem and performs one filesystem durability barrier per retained
+  authority, preserving exact retry semantics without reopening current package
+  paths as durability truth. pkgctl consumes that provider guarantee and does not
+  add descriptor budgeting or filesystem-reconstruction policy of its own.
+
 ## 0.40.3 - 2026-08-18
 
 - Preserves subordinate application uncertainty instead of collapsing every

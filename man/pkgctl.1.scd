@@ -34,6 +34,11 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
+Version 0.40.4 requires libpkgapply-posix 3.2.3 so active-namespace
+durability retains at most one representative descriptor per touched filesystem
+rather than one descriptor per mutated path. Filesystem durability remains
+POSIX-provider authority; pkgctl does not reconstruct it from target pathnames.
+
 Version 0.40.3 preserves application-owner uncertainty at the controller
 boundary. Definitive non-completion may retire an operation; partial effects,
 visible-but-unconfirmed durability, and indeterminate application truth remain

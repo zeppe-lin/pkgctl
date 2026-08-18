@@ -10,6 +10,13 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+Version 0.40.4 requires libpkgapply-posix 3.2.3 because real package
+application may mutate thousands of active paths before the selected durability
+boundary. The provider retains one representative descriptor per touched
+filesystem and owns the filesystem barriers; pkgctl consumes that mechanism
+contract without adding descriptor budgets, retries, or pathname-derived
+durability authority.
+
 Version 0.40.3 preserves subordinate application uncertainty instead of
 strengthening it into definitive controller failure. Only owner outcomes that
 prove no residual target ambiguity may retire as application non-completion.

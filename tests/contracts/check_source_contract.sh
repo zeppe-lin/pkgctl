@@ -113,7 +113,7 @@ for constraint in \
   'libpkgexec >= 2.2.0' 'libpkgexec < 3.0.0' \
   'libpkgexec-linux >= 0.7.1' 'libpkgexec-linux < 1.0.0' \
   'libpkgapply >= 3.0.1' 'libpkgapply < 4.0.0' \
-  'libpkgapply-posix >= 3.2.2' 'libpkgapply-posix < 4.0.0' \
+  'libpkgapply-posix >= 3.2.3' 'libpkgapply-posix < 4.0.0' \
   'libpkgapply-exec >= 3.0.1' 'libpkgapply-exec < 4.0.0' \
   'libpkgcheck-exec >= 0.9.0' 'libpkgcheck-exec < 1.0.0'; do
   grep -F "'$constraint'" "$direct_build" >/dev/null || {

@@ -4,8 +4,8 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.40.3
-latest_release=0.40.3
+version=0.40.4
+latest_release=0.40.4
 
 require_line()
 {
@@ -24,9 +24,9 @@ require_line "$srcdir/include/pkgctl/version.h" \
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_minor = 40;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_patch = 3;'
+  'inline constexpr unsigned version_patch = 4;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.40.3";'
+  'inline constexpr const char* version_string = "0.40.4";'
 require_line "$srcdir/src/core.cpp" \
   'static_assert(pkgctl::version_minor == 40);'
 
@@ -64,10 +64,11 @@ require_dependency_range libpkgcheck-exec '>=0.9.0' '<1.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
 require_dependency_range libpkgexec '>=2.2.0' '<3.0.0'
 require_dependency_range libpkgapply '>=3.0.1' '<4.0.0'
-require_dependency_range libpkgapply-posix '>=3.2.2' '<4.0.0'
+require_dependency_range libpkgapply-posix '>=3.2.3' '<4.0.0'
 require_dependency_range libpkgapply-exec '>=3.0.1' '<4.0.0'
 require_dependency_range libpkgexec-linux '>=0.7.1' '<1.0.0'
 
+grep -F '## 0.40.4 - 2026-08-18' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.40.3 - 2026-08-18' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.40.2 - 2026-08-18' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.40.1 - 2026-08-18' "$srcdir/HISTORY.md" >/dev/null
@@ -82,6 +83,7 @@ grep -F '`Unreleased` does not predict the next version number or release class.
 grep -F '## 0.36.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.35.1 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.35.0 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
+grep -F 'Release 0.40.4' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.40.3' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.40.2' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.40.1' "$srcdir/README.md" >/dev/null
@@ -91,6 +93,7 @@ grep -F 'Release 0.38.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.37.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.36.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.40.4' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.3' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.2' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.1' "$srcdir/man/pkgctl.1.scd" >/dev/null
@@ -107,7 +110,7 @@ grep -F 'Version 0.35.0 exposes *pkgctl run*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 temporary=${TMPDIR:-/tmp}/pkgctl-release-contract.$$
-trap 'rm -f "$temporary.current" "$temporary.deps" "$temporary.027" "$temporary.unreleased" "$temporary.0403" "$temporary.0402" "$temporary.0401" "$temporary.040" "$temporary.039"' EXIT HUP INT TERM
+trap 'rm -f "$temporary.current" "$temporary.deps" "$temporary.027" "$temporary.unreleased" "$temporary.0404" "$temporary.0403" "$temporary.0402" "$temporary.0401" "$temporary.040" "$temporary.039"' EXIT HUP INT TERM
 
 awk '
   /^## 0\.35\.0 / { current = 1; next }
@@ -198,6 +201,25 @@ if grep -q '[^[:space:]]' "$temporary.unreleased"; then
   echo 'release commit must leave a new empty Unreleased section' >&2
   exit 1
 fi
+
+awk '
+  /^## 0\.40\.4 / { current = 1; next }
+  /^## / && current { exit }
+  current { print }
+' "$srcdir/HISTORY.md" > "$temporary.0404"
+
+grep -F 'Requires libpkgapply-posix 3.2.3' "$temporary.0404" >/dev/null || {
+  echo '0.40.4 history omits the libpkgapply-posix 3.2.3 floor' >&2
+  exit 1
+}
+grep -F 'one representative descriptor per' "$temporary.0404" >/dev/null || {
+  echo '0.40.4 history omits bounded active-durability authority' >&2
+  exit 1
+}
+grep -F 'without reopening current package' "$temporary.0404" >/dev/null || {
+  echo '0.40.4 history omits owner-side durability authority' >&2
+  exit 1
+}
 
 awk '
   /^## 0\.40\.3 / { current = 1; next }
