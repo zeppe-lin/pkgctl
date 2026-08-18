@@ -1,5 +1,11 @@
 # pkgctl
 
+Release 0.40.2 requires `libpkgapply-posix >= 3.2.2` so native application can
+retain many old-object capture authorities without consuming one live
+attempt-directory descriptor per captured object. Descriptor-anchored capture
+remains owned by the POSIX provider; pkgctl neither reconstructs capture state nor
+interprets descriptor-pressure failures.
+
 Release 0.40.1 requires `libpkgtransaction >= 4.1.0` so runtime requirements
 that cross a cyclic runtime cohort reach every member of the executable cohort
 boundary. pkgctl still consumes the transaction-owned partial order; it does not

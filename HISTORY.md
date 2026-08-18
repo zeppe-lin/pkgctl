@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.40.2 - 2026-08-18
+
+- Requires libpkgapply-posix 3.2.2 so retained old-object capture authority no
+  longer consumes one live attempt-directory descriptor per captured object.
+  Native application may keep many capture authorities alive while applying a
+  real package; the 3.2.2 provider bounds descriptor cardinality by live capture
+  attempt rather than object count without weakening descriptor-anchored capture
+  or reopening authority by pathname. pkgctl continues to consume the provider
+  contract and does not infer descriptor pressure or reconstruct capture state.
+
 ## 0.40.1 - 2026-08-18
 
 - Requires libpkgtransaction 4.1.0 so executable runtime requirements crossing a

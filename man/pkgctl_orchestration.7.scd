@@ -10,6 +10,13 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+Version 0.40.2 requires libpkgapply-posix 3.2.2 because native application may
+retain many old-object capture authorities concurrently. The provider bounds live
+attempt-directory descriptor cardinality by capture attempt rather than captured
+object while preserving descriptor-anchored authority. pkgctl consumes that
+mechanism contract and does not reconstruct capture state or add descriptor
+management policy of its own.
+
 Version 0.40.1 requires libpkgtransaction 4.1.0 because the transaction owner now
 projects external runtime requirements across complete cyclic runtime-cohort
 boundaries. pkgctl consumes those executable edges as-is; it does not interpret
