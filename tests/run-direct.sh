@@ -26,7 +26,7 @@ pkg-config --exists \
   'libpkgbuild-image >= 1.0.1' 'libpkgbuild-image < 2.0.0' \
   'libpkgimage-exec >= 0.1.0' 'libpkgimage-exec < 1.0.0' \
   'libpkgbuild-plan >= 1.1.0' 'libpkgbuild-plan < 2.0.0' \
-  'libpkgstate-apply >= 3.1.2' 'libpkgstate-apply < 4.0.0' \
+  'libpkgstate-apply >= 3.1.3' 'libpkgstate-apply < 4.0.0' \
   'libpkgexec >= 2.2.0' 'libpkgexec < 3.0.0' \
   'libpkgexec-linux >= 0.7.1' 'libpkgexec-linux < 1.0.0' \
   'libpkgapply >= 4.0.1' 'libpkgapply < 5.0.0' \

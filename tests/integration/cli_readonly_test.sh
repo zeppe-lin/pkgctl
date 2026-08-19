@@ -88,6 +88,9 @@ require_help_text 'pkgctl run --canonical-store PATH --resume SHA256 RUN-AUTHORI
 require_help_text 'pkgctl build PACKAGE [--check] OPTIONS --start SHA256 BUILD-AUTHORITY'
 require_help_text 'pkgctl build --canonical-store PATH --resume SHA256 BUILD-AUTHORITY'
 require_help_text '--artifact-root PATH'
+require_help_text '--build-root-view SHA256'
+require_help_text '--lifecycle-root-view SHA256'
+require_help_text 'execution root-view identity options are start-only'
 require_help_text '--build-parallelism N'
 require_help_text '--build-source-date-epoch N'
 require_help_text '--operation-policy PROFILE'
@@ -131,6 +134,62 @@ grep -F 'native execution authority options are valid only for run or build' \
 [ ! -e "$root/ignored" ]
 
 build_nonce=$(printf '%064d' 9)
+build_root_view=$(printf '%064d' 81)
+lifecycle_root_view=$(printf '%064d' 82)
+
+# Construction/check and lifecycle execution roots are semantic start authority
+# distinct from the target binding. Missing identities fail before physical
+# runtime coordinates are touched.
+# shellcheck disable=SC2086
+if $pkgctl build app \
+    --collection "core=$collection" \
+    --canonical-store "$state" $binding \
+    --build-architecture x86_64 --target-architecture x86_64 \
+    --start "$build_nonce" \
+    --build-parallelism 1 --build-source-date-epoch 0 \
+    --runtime-root "$root/missing-build-root-view-runtime" \
+    --build-root "$root/missing-build-root-view-build" \
+    --artifact-root "$root/missing-build-root-view-artifacts" \
+    --interpreter /bin/false \
+    --build-user-id 0 --build-group-id 0 --max-steps 1 \
+    >"$root/missing-build-root-view.out" \
+    2>"$root/missing-build-root-view.err"; then
+  echo 'build unexpectedly accepted missing construction root-view authority' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F 'build --start requires construction/check root-view authority' \
+  "$root/missing-build-root-view.err" >/dev/null
+[ ! -e "$root/missing-build-root-view-runtime" ]
+
+# shellcheck disable=SC2086
+if $pkgctl run \
+    --collection "core=$collection" \
+    --canonical-store "$state" $binding \
+    --build-architecture x86_64 --target-architecture x86_64 \
+    --goal 'run=@base' \
+    --start "$(printf '%064d' 18)" \
+    --build-root-view "$build_root_view" \
+    --build-parallelism 1 --build-source-date-epoch 0 \
+    --operation-policy strict-exclusive \
+    --runtime-root "$root/missing-lifecycle-root-view-runtime" \
+    --build-root "$root/missing-lifecycle-root-view-build" \
+    --lifecycle-root "$root/missing-lifecycle-root-view-lifecycle" \
+    --target-root "$root/missing-lifecycle-root-view-target" \
+    --interpreter /bin/false \
+    --build-user-id 0 --build-group-id 0 \
+    --lifecycle-user-id 0 --lifecycle-group-id 0 --max-steps 1 \
+    >"$root/missing-lifecycle-root-view.out" \
+    2>"$root/missing-lifecycle-root-view.err"; then
+  echo 'run unexpectedly accepted missing lifecycle root-view authority' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F 'run --start requires construction/check and lifecycle root-view authority' \
+  "$root/missing-lifecycle-root-view.err" >/dev/null
+[ ! -e "$root/missing-lifecycle-root-view-runtime" ]
 assert_incomplete_build_policy_refused()
 {
   label=$1
@@ -144,6 +203,7 @@ assert_incomplete_build_policy_refused()
       --canonical-store "$state" $binding \
       --build-architecture x86_64 --target-architecture x86_64 \
       --start "$build_nonce" \
+      --build-root-view "$build_root_view" \
       "$@" \
       --runtime-root "$runtime" \
       --build-root "$build_root" \
@@ -179,6 +239,8 @@ if $pkgctl run \
     --build-architecture x86_64 --target-architecture x86_64 \
     --goal 'run=@base' \
     --start "$run_policy_nonce" \
+    --build-root-view "$build_root_view" \
+    --lifecycle-root-view "$lifecycle_root_view" \
     --build-parallelism 1 --build-source-date-epoch 0 \
     --runtime-root "$root/missing-operation-policy-runtime" \
     --build-root "$root/missing-operation-policy-build" \
@@ -216,6 +278,7 @@ if $pkgctl build app \
     --canonical-store "$state" $binding \
     --build-architecture x86_64 --target-architecture x86_64 \
     --start "$build_nonce" \
+    --build-root-view "$build_root_view" \
     --build-parallelism 1 --build-source-date-epoch 0 \
     --operation-policy strict-exclusive \
     --runtime-root "$root/build-operation-policy-runtime" \
@@ -255,6 +318,7 @@ if $pkgctl build app \
     --build-architecture x86_64 --target-architecture x86_64 \
     --goal 'build=app' \
     --start "$build_nonce" \
+    --build-root-view "$build_root_view" \
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
     --runtime-root "$root/build-policy-runtime" \
@@ -282,6 +346,7 @@ if $pkgctl build app \
     --canonical-store "$state" $binding \
     --build-architecture x86_64 --target-architecture x86_64 \
     --start "$build_nonce" \
+    --build-root-view "$build_root_view" \
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
     --runtime-root "$root/build-target-runtime" \
@@ -311,6 +376,27 @@ else
 fi
 grep -F -- '--resume uses retained transaction semantics' \
   "$root/build-resume-policy.err" >/dev/null
+
+# Resume consumes retained execution-root identities and refuses caller
+# re-declaration before opening any runtime coordinate.
+if $pkgctl run --canonical-store "$state" --resume "$run_policy_nonce" \
+    --build-root-view "$build_root_view" \
+    --runtime-root "$root/resume-root-view-runtime" \
+    --build-root "$root/resume-root-view-build" \
+    --lifecycle-root "$root/resume-root-view-lifecycle" \
+    --target-root "$root/resume-root-view-target" \
+    --interpreter /bin/false \
+    --build-user-id 0 --build-group-id 0 \
+    --lifecycle-user-id 0 --lifecycle-group-id 0 --max-steps 1 \
+    >"$root/resume-root-view.out" 2>"$root/resume-root-view.err"; then
+  echo 'run resume unexpectedly accepted execution-root re-declaration' >&2
+  exit 1
+else
+  [ "$?" -eq 2 ]
+fi
+grep -F 'run --resume refuses execution root-view re-declaration' \
+  "$root/resume-root-view.err" >/dev/null
+[ ! -e "$root/resume-root-view-runtime" ]
 
 invalid_collection=$root/invalid-collection
 mkdir -p "$invalid_collection/broken"

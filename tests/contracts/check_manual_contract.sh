@@ -42,7 +42,7 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
-grep -F 'Version 0.41.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.42.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.4' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.3' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.2' "$srcdir/man/pkgctl.1.scd" >/dev/null
@@ -55,7 +55,11 @@ grep -F '*pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_' 
 grep -F '# RUN AND BUILD OPTIONS' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *build* _package_ [*--check*]' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--artifact-root* _path_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '*--build-root-view* _sha256_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '*--lifecycle-root-view* _sha256_' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--operation-policy* _profile_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.42.0 separates execution-root identity from managed-target identity' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.41.0 separates application mutation mechanism' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.40.4 requires libpkgapply-posix 3.2.3' \

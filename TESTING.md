@@ -549,7 +549,9 @@ The native runtime suite must prove:
   Normalized overlaps and descriptor-selected aliases are refused by
   path/device-inode authority respectively;
 - construction/check and lifecycle execution retain independent typed
-  root-view authority; a deliberately shared path requires one identity, while
+  root-view authority supplied separately from target-state root-view authority;
+  admission retains those execution identities and resume refuses re-declaration;
+  a deliberately shared path requires one identity, while
   build/check writable roots remain disjoint from lifecycle execution, target,
   and lifecycle-session domains;
 - launch requires an explicit durable run-intent nonce and remains bounded by
@@ -645,6 +647,9 @@ The native locator suite must prove:
   projection;
 - locating a session creates, removes, scans, stats, chmods, materializes,
   executes, journals, or advances nothing;
+- CLI admission refuses missing construction/check or lifecycle root-view identity,
+  and resume refuses execution-root identity re-declaration before opening runtime
+  coordinates;
 - configuration rejects overlapping writable and root-view domains; and
 - no command surface or backend composition is introduced.
 

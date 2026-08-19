@@ -1,5 +1,13 @@
 # pkgctl
 
+Release 0.42.0 makes execution-root identity explicit controller authority.
+Construction/check and lifecycle root-view identities are admitted independently
+from the managed target binding, retained in command evidence, and never
+redeclared by resume. Physical root paths remain current realization coordinates.
+This lets a controller execute against a qualified construction root while
+mutating or inspecting a different managed target without borrowing the target
+root-view identity as historical execution truth.
+
 Release 0.41.0 binds native application to the generation-4 owner journal
 protocol. The POSIX journal store is a separate runtime authority beside the
 mutation backend; application restart is addressed by immutable declaration

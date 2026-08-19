@@ -170,6 +170,7 @@ set -- build tool --check \
   --start "$probe_nonce" \
   --build-parallelism 1 \
   --build-source-date-epoch 0 \
+  --build-root-view "$(printf '%064d' 81)" \
   --runtime-root "$probe_runtime" \
   --build-root "$probe_build" \
   --artifact-root "$probe_artifacts" \
@@ -218,6 +219,7 @@ set -- build tool --check \
   --start "$nonce" \
   --build-parallelism 1 \
   --build-source-date-epoch 0 \
+  --build-root-view "$(printf '%064d' 81)" \
   --runtime-root "$runtime" \
   --build-root "$build" \
   --artifact-root "$artifacts" \

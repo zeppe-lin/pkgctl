@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.42.0 - 2026-08-19
+
+### Explicit execution-root authority
+
+- Added start-only construction/check and lifecycle root-view identities instead
+  of deriving execution-root identity from the managed target binding.
+- Retain those semantic identities in command evidence. Resume reuses retained
+  identity authority while caller-supplied physical root paths remain current
+  realization coordinates.
+- Bind lifecycle executor identity to the admitted lifecycle root-view identity,
+  so a lifecycle mechanism cannot silently inherit target-root semantics.
+- The private command-evidence body now retains those root-view identities.
+  Incompatible older private bytes fail closed; no compatibility decoder or
+  migration path is introduced.
+- Keep BUILD and CHECK on one admitted construction root with independent
+  phase-local sessions/evidence; no target observation or seed-specific handoff
+  policy enters the controller.
+
 ## 0.41.0 - 2026-08-19
 
 - Migrates native application orchestration to libpkgapply generation 4. Fresh

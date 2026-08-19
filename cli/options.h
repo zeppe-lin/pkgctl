@@ -55,8 +55,10 @@ struct transaction_run_command final {
   transaction_run_nonce nonce;
   std::filesystem::path runtime_root;
   std::filesystem::path build_root;
+  std::optional<pkgexec::root_view_identity> build_root_view;
   std::filesystem::path artifact_root;
   std::optional<std::filesystem::path> lifecycle_root;
+  std::optional<pkgexec::root_view_identity> lifecycle_root_view;
   std::optional<std::filesystem::path> target_root;
   std::filesystem::path interpreter;
   pkgexec::credential_policy build_credentials;

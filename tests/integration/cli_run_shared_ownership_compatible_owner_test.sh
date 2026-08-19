@@ -152,6 +152,8 @@ run_package()
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
     --operation-policy "$policy" \
+    --build-root-view "$(printf '%064d' 81)" \
+    --lifecycle-root-view "$(printf '%064d' 82)" \
     --runtime-root "$runtime" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \

@@ -34,7 +34,7 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
-Version 0.41.0 uses libpkgapply 4.0.1 and libpkgapply-posix 4.0.0. Application
+Version 0.42.0 separates execution-root identity from managed-target identity while continuing to use libpkgapply 4.0.1 and libpkgapply-posix 4.0.0. Application
 journal persistence is a separate owner-wired runtime authority, and restart
 uses an immutable declaration address plus libpkgapply-owned rehydration of the
 append-only history. pkgctl does not persist complete application journals or
@@ -347,8 +347,14 @@ The following construction/check authorities are required by both frontends:
 	children. *build* does not create or open those target-operation namespaces.
 
 *--build-root* _path_
-	Existing construction/check execution root view. The command never creates or
-	populates it.
+	Existing construction/check execution root-view path. The command never creates
+	or populates it. The path is current realization authority and is supplied again
+	on resume.
+
+*--build-root-view* _sha256_
+	Exact construction/check root-view identity. Required only by *--start* and
+	retained in command evidence. It is independent from the managed target
+	*--root-view* identity and is not redeclared by *--resume*.
 
 *--artifact-root* _path_
 	Required only by *build*. Name the existing absolute normalized public package-artifact root. It
@@ -360,9 +366,15 @@ The following target-operation authorities are required by *run* and invalid for
 *build*:
 
 *--lifecycle-root* _path_
-	Existing lifecycle execution root view. It is independent from the
+	Existing lifecycle execution root-view path. It is independent from the
 	construction/check root; supplying the same physical root is an explicit
-	caller policy, not a controller assumption.
+	caller policy, not a controller assumption. The path is current realization
+	authority and is supplied again on resume.
+
+*--lifecycle-root-view* _sha256_
+	Exact lifecycle execution root-view identity. Required only by *run --start*
+	and retained in command evidence. It is independent from both the managed
+	target *--root-view* and the construction/check root-view identity.
 
 *--target-root* _path_
 	Existing managed target root.

@@ -86,6 +86,7 @@ for required in \
   '--artifact-root "$runtime/content"' \
   'build artifact root must be disjoint from private runtime root' \
   '--artifact-root "$artifacts"' \
+  '--build-root-view' \
   '--artifact-root "$wrong_artifacts"' \
   'current artifact root differs from admitted command authority' \
   'disposition step-limit-reached' \
@@ -110,6 +111,7 @@ done
 
 for forbidden in \
   '--lifecycle-root' \
+  '--lifecycle-root-view' \
   '--target-root' \
   '--lifecycle-user-id' \
   '--lifecycle-group-id'; do

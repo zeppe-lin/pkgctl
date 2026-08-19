@@ -45,6 +45,8 @@ groups=$(id -G | tr ' ' '\n' | sort -nu)
 build_uid=$uid
 build_gid=$gid
 build_groups=$groups
+build_root_view=$(printf '%064d' 81)
+lifecycle_root_view=$(printf '%064d' 82)
 
 invoke_pkgctl()
 {
@@ -73,7 +75,9 @@ run_command()
     set -- "$@" \
       --build-parallelism 1 \
       --build-source-date-epoch 0 \
-      --operation-policy strict-exclusive
+      --operation-policy strict-exclusive \
+      --build-root-view "$build_root_view" \
+      --lifecycle-root-view "$lifecycle_root_view"
   elif [ "$inject_resume_semantics" = yes ]; then
     set -- "$@" --goal 'run=@base'
   fi
@@ -312,6 +316,15 @@ journal=$(sed -n 's/^journal //p' "$root/start.out")
   fail "start: transaction identity has length ${#transaction}, expected 64"
 [ "${#journal}" -eq 64 ] || \
   fail "start: journal identity has length ${#journal}, expected 64"
+
+command_evidence=$(find "$runtime/command-evidence" -maxdepth 1 -type f \
+  -name 'command-*.pce' -print)
+[ "$(printf '%s\n' "$command_evidence" | awk 'NF { count += 1 } END { print count + 0 }')" -eq 1 ] || \
+  fail 'start: expected exactly one retained command-evidence body'
+grep -a -F -- "$build_root_view" "$command_evidence" >/dev/null || \
+  fail 'start: command evidence omitted admitted construction/check root-view identity'
+grep -a -F -- "$lifecycle_root_view" "$command_evidence" >/dev/null || \
+  fail 'start: command evidence omitted admitted lifecycle root-view identity'
 
 state_after_construction=$($state_inspect_fixture "$state")
 require_equal construction-state "$initial_state" "$state_after_construction"

@@ -151,6 +151,8 @@ run_package_success()
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
     --operation-policy "$policy" \
+    --build-root-view "$(printf '%064d' 81)" \
+    --lifecycle-root-view "$(printf '%064d' 82)" \
     --runtime-root "$runtime" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
@@ -211,6 +213,8 @@ run_package_refusal()
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
     --operation-policy "$policy" \
+    --build-root-view "$(printf '%064d' 81)" \
+    --lifecycle-root-view "$(printf '%064d' 82)" \
     --runtime-root "$runtime" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
@@ -258,6 +262,7 @@ build_qualified_image()
     --start "$(printf '%064d' "$nonce")" \
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
+    --build-root-view "$(printf '%064d' 81)" \
     --runtime-root "$runtime" \
     --build-root "$build" \
     --artifact-root "$qualified_artifacts" \

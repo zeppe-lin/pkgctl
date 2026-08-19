@@ -55,8 +55,10 @@ struct raw_options final {
   std::optional<std::string> run_nonce;
   std::optional<std::string> runtime_root;
   std::optional<std::string> build_root_path;
+  std::optional<std::string> build_root_view;
   std::optional<std::string> artifact_root_path;
   std::optional<std::string> lifecycle_root_path;
+  std::optional<std::string> lifecycle_root_view;
   std::optional<std::string> target_root_path;
   std::optional<std::string> interpreter;
   std::optional<std::uint64_t> build_user_id;
@@ -445,6 +447,12 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
                require_value(argc, argv, index, argument), argument);
       continue;
     }
+    if (argument == "--build-root-view")
+    {
+      set_once(parsed.build_root_view,
+               require_value(argc, argv, index, argument), argument);
+      continue;
+    }
     if (argument == "--artifact-root")
     {
       set_once(parsed.artifact_root_path,
@@ -454,6 +462,12 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
     if (argument == "--lifecycle-root")
     {
       set_once(parsed.lifecycle_root_path,
+               require_value(argc, argv, index, argument), argument);
+      continue;
+    }
+    if (argument == "--lifecycle-root-view")
+    {
+      set_once(parsed.lifecycle_root_view,
                require_value(argc, argv, index, argument), argument);
       continue;
     }
@@ -646,8 +660,9 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
   }
 
   const bool has_native_execution_options = parsed.run_intent || parsed.run_nonce ||
-      parsed.runtime_root || parsed.build_root_path || parsed.artifact_root_path ||
-      parsed.lifecycle_root_path || parsed.target_root_path ||
+      parsed.runtime_root || parsed.build_root_path || parsed.build_root_view ||
+      parsed.artifact_root_path || parsed.lifecycle_root_path ||
+      parsed.lifecycle_root_view || parsed.target_root_path ||
       parsed.interpreter || parsed.build_user_id || parsed.build_group_id ||
       !parsed.build_supplementary_groups.empty() || parsed.lifecycle_user_id ||
       parsed.lifecycle_group_id ||
@@ -666,6 +681,10 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
         !parsed.lifecycle_user_id.has_value() ||
         !parsed.lifecycle_group_id.has_value() || !parsed.maximum_steps)
       fail("run requires roots, interpreter, build/lifecycle credentials, and bound");
+    if (!resume && (!parsed.build_root_view || !parsed.lifecycle_root_view))
+      fail("run --start requires construction/check and lifecycle root-view authority");
+    if (resume && (parsed.build_root_view || parsed.lifecycle_root_view))
+      fail("run --resume refuses execution root-view re-declaration");
     if (!resume &&
         (!parsed.build_parallelism || !parsed.build_source_date_epoch))
       fail("run --start requires complete build policy authority");
@@ -682,13 +701,19 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
       fail("build requires runtime/build/artifact roots, interpreter, build "
            "credentials, and bound");
     }
+    if (!resume && !parsed.build_root_view)
+      fail("build --start requires construction/check root-view authority");
+    if (resume && parsed.build_root_view)
+      fail("build --resume refuses execution root-view re-declaration");
+    if (parsed.lifecycle_root_view)
+      fail("--lifecycle-root-view is valid only for run --start");
     if (!resume &&
         (!parsed.build_parallelism || !parsed.build_source_date_epoch))
       fail("build --start requires complete build policy authority");
     if (parsed.operation_policy)
       fail("--operation-policy is valid only for run --start");
-    if (parsed.lifecycle_root_path || parsed.target_root_path ||
-        parsed.lifecycle_user_id || parsed.lifecycle_group_id ||
+    if (parsed.lifecycle_root_path || parsed.lifecycle_root_view ||
+        parsed.target_root_path || parsed.lifecycle_user_id || parsed.lifecycle_group_id ||
         !parsed.lifecycle_supplementary_groups.empty())
     {
       fail("target-operation authority options are invalid for build");
@@ -798,10 +823,20 @@ transaction_run_command transaction_run_from(
       *parsed.run_intent,
       transaction_run_nonce::from_hex(std::move(*parsed.run_nonce)),
       std::move(runtime_root), std::move(*parsed.build_root_path),
+      parsed.build_root_view
+          ? std::optional<pkgexec::root_view_identity>(
+                pkgexec::root_view_identity::from_sha256(
+                    std::move(*parsed.build_root_view)))
+          : std::nullopt,
       std::move(artifact_root),
       parsed.lifecycle_root_path
           ? std::optional<std::filesystem::path>(
                 std::move(*parsed.lifecycle_root_path))
+          : std::nullopt,
+      parsed.lifecycle_root_view
+          ? std::optional<pkgexec::root_view_identity>(
+                pkgexec::root_view_identity::from_sha256(
+                    std::move(*parsed.lifecycle_root_view)))
           : std::nullopt,
       parsed.target_root_path
           ? std::optional<std::filesystem::path>(
@@ -961,9 +996,9 @@ Run/build intent:
   --resume SHA256                 resume retained semantic request and intent
 
 Catalog acquisition, target-binding, architecture, goal, build subject/check,
-resolution-policy, convergence, build-policy, and operation-policy options are
-start-only. Resume refuses their re-declaration and uses command-evidence retained
-at admission.
+resolution-policy, convergence, build-policy, operation-policy, and execution
+root-view identity options are start-only. Resume refuses their re-declaration
+and uses command-evidence retained at admission.
 --canonical-store remains live resume authority naming the existing physical
 canonical state store.
 
@@ -985,7 +1020,8 @@ redeclared on --resume.
 
 Shared native execution authority:
   --runtime-root PATH             existing private runtime hierarchy
-  --build-root PATH               existing construction/check root view
+  --build-root PATH               existing construction/check root view path
+  --build-root-view SHA256        admitted construction/check root-view identity; start-only
   --interpreter PATH              interpreter coordinate; inspected when executable work remains
   --build-user-id N               construction/check execution user id
   --build-group-id N              construction/check execution group id
@@ -999,7 +1035,8 @@ Build-only authority:
                                   the private runtime hierarchy
 
 Additional run authority for target operations:
-  --lifecycle-root PATH           existing lifecycle execution root view
+  --lifecycle-root PATH           existing lifecycle execution root view path
+  --lifecycle-root-view SHA256    admitted lifecycle root-view identity; start-only
   --target-root PATH              existing managed target root
   --lifecycle-user-id N           lifecycle execution user id
   --lifecycle-group-id N          lifecycle execution group id

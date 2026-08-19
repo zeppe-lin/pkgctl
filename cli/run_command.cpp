@@ -762,6 +762,8 @@ struct retained_command_evidence final {
   pkgcatalog::catalog_snapshot catalog;
   pkgstate::snapshot state;
   pkgexec::interpreter_identity interpreter;
+  pkgexec::root_view_identity build_root_view;
+  std::optional<pkgexec::root_view_identity> lifecycle_root_view;
   pkgbuild::build_policy build_policy;
   std::optional<native_operation_policy> operation_policy;
   retained_native_execution_profiles execution_profiles;
@@ -780,6 +782,8 @@ public:
       const std::filesystem::path& artifact_root,
       const transaction_session& transaction,
       const pkgexec::interpreter_identity& interpreter,
+      const pkgexec::root_view_identity& build_root_view,
+      const std::optional<pkgexec::root_view_identity>& lifecycle_root_view,
       const pkgbuild::build_policy& build_policy,
       const std::optional<native_operation_policy>& operation_policy,
       const retained_native_execution_profiles& execution_profiles)
@@ -799,6 +803,10 @@ public:
     append_bytes(bytes, state);
     append_bytes(bytes, request);
     append_text(bytes, interpreter.hex());
+    append_text(bytes, build_root_view.hex());
+    append_u64(bytes, lifecycle_root_view ? 1U : 0U);
+    if (lifecycle_root_view)
+      append_text(bytes, lifecycle_root_view->hex());
     append_build_policy(bytes, build_policy);
     append_u64(bytes, operation_policy ? 1U : 0U);
     if (operation_policy)
@@ -830,6 +838,16 @@ public:
     const auto request_encoding = read_bytes(bytes, offset);
     auto interpreter = pkgexec::interpreter_identity::from_sha256(
         read_text(bytes, offset));
+    auto build_root_view = pkgexec::root_view_identity::from_sha256(
+        read_text(bytes, offset));
+    const auto lifecycle_root_view_present = read_u64(bytes, offset);
+    if (lifecycle_root_view_present > 1U)
+      throw std::runtime_error(
+          "command evidence lifecycle root-view presence is invalid");
+    std::optional<pkgexec::root_view_identity> lifecycle_root_view;
+    if (lifecycle_root_view_present != 0U)
+      lifecycle_root_view.emplace(
+          pkgexec::root_view_identity::from_sha256(read_text(bytes, offset)));
     auto build_policy = read_build_policy(bytes, offset);
     const auto operation_policy_present = read_u64(bytes, offset);
     if (operation_policy_present > 1U)
@@ -868,6 +886,7 @@ public:
       throw std::runtime_error("command evidence request has trailing bytes");
     return {frontend, artifact_root, transaction, std::move(request),
             std::move(catalog), std::move(state), std::move(interpreter),
+            std::move(build_root_view), std::move(lifecycle_root_view),
             std::move(build_policy), std::move(operation_policy),
             std::move(execution_profiles)};
   }
@@ -1952,16 +1971,6 @@ template<typename Destination, typename Source>
   return Destination::parse(source.string());
 }
 
-[[nodiscard]] pkgexec::root_view_identity execution_root_identity(
-    const pkgstate::state_target_binding& binding)
-{
-  const auto text = binding.root_view().string();
-  static constexpr std::string_view prefix = "v1:sha256:";
-  if (text.compare(0U, prefix.size(), prefix) != 0)
-    throw std::runtime_error("state root-view identity is not sha256-v1");
-  return pkgexec::root_view_identity::from_sha256(text.substr(prefix.size()));
-}
-
 void require_operation_command_authority(
     const transaction_run_command& command)
 {
@@ -1978,6 +1987,7 @@ void require_operation_command_authority(
     const transaction_session& transaction,
     const pkgstate::state_target_binding& binding,
     const pkgexec::interpreter_identity& interpreter,
+    const pkgexec::root_view_identity& lifecycle_root_view,
     const pkgexec::backend_capability_profile& execution_capabilities)
 {
   require_operation_command_authority(command);
@@ -2036,8 +2046,8 @@ void require_operation_command_authority(
             transaction.identity().hex(), interpreter.hex(),
             std::to_string(lifecycle_credentials.user_id()),
             std::to_string(lifecycle_credentials.group_id()),
-            lifecycle_root.string(), target_root.string(),
-            execution_capabilities.identity().hex()};
+            lifecycle_root_view.hex(), lifecycle_root.string(),
+            target_root.string(), execution_capabilities.identity().hex()};
         for (const auto group : lifecycle_credentials.supplementary_groups())
           lifecycle_fields.push_back("supplementary:" + std::to_string(group));
         return derived_digest_identity<pkgapply::lifecycle_executor_identity>(
@@ -2047,7 +2057,7 @@ void require_operation_command_authority(
 
 [[nodiscard]] native_transaction_session_configuration command_sessions(
     const transaction_run_command& command,
-    const pkgstate::state_target_binding& binding,
+    const pkgexec::root_view_identity& build_root_view,
     const pkgexec::interpreter_identity& interpreter,
     const pkgbuild::build_policy& build_policy)
 {
@@ -2059,7 +2069,7 @@ void require_operation_command_authority(
           command.artifact_root,
           runtime_path(command, "check-resources"),
           runtime_path(command, "check-temporary"),
-          execution_root_identity(binding),
+          build_root_view,
           command.build_root,
       },
       {
@@ -2079,7 +2089,7 @@ void require_operation_command_authority(
 [[nodiscard]] native_transaction_operation_configuration command_operations(
     const transaction_run_command& command,
     const transaction_session& transaction,
-    const pkgstate::state_target_binding& binding,
+    const pkgexec::root_view_identity& lifecycle_root_view,
     const pkgexec::interpreter_identity& interpreter,
     pkgplan::package_policy_snapshot policy)
 {
@@ -2088,7 +2098,7 @@ void require_operation_command_authority(
   return native_transaction_operation_configuration::make(
       transaction, std::move(policy),
       {
-          execution_root_identity(binding),
+          lifecycle_root_view,
           *command.lifecycle_root,
           *command.target_root,
           runtime_path(command, "lifecycle-sessions"),
@@ -2539,6 +2549,33 @@ int execute_transaction_run(transaction_run_command command)
   const auto admitted_interpreter = retained_evidence
       ? retained_evidence->interpreter
       : current_interpreter->identity();
+  if (retained_evidence &&
+      (command.build_root_view || command.lifecycle_root_view))
+  {
+    throw std::runtime_error(
+        "resumed run carries duplicate execution root-view authority");
+  }
+  if (!retained_evidence && !command.build_root_view)
+    throw std::runtime_error(
+        "fresh run lacks explicit construction/check root-view authority");
+  const pkgexec::root_view_identity& admitted_build_root_view = retained_evidence
+      ? retained_evidence->build_root_view
+      : *command.build_root_view;
+  const std::optional<pkgexec::root_view_identity> admitted_lifecycle_root_view =
+      retained_evidence ? retained_evidence->lifecycle_root_view
+                        : command.lifecycle_root_view;
+  if (command.frontend == transaction_run_command_frontend::run &&
+      !admitted_lifecycle_root_view)
+  {
+    throw std::runtime_error(
+        "run frontend lacks explicit lifecycle root-view authority");
+  }
+  if (command.frontend == transaction_run_command_frontend::build &&
+      admitted_lifecycle_root_view)
+  {
+    throw std::runtime_error(
+        "build frontend carries surplus lifecycle root-view authority");
+  }
   if (retained_evidence && command.build_policy)
     throw std::runtime_error(
         "resumed run carries duplicate build policy authority");
@@ -2564,7 +2601,8 @@ int execute_transaction_run(transaction_run_command command)
       retained_evidence ? retained_evidence->operation_policy
                         : command.operation_policy;
   auto session_configuration = command_sessions(
-      command, binding, admitted_interpreter, admitted_build_policy);
+      command, admitted_build_root_view, admitted_interpreter,
+      admitted_build_policy);
   const auto cleanup_configuration = session_configuration;
 
   if (current_execution_backend)
@@ -2590,7 +2628,8 @@ int execute_transaction_run(transaction_run_command command)
   {
     command_evidence.retain(
         command.nonce, command.frontend, command.artifact_root, transaction,
-        admitted_interpreter, admitted_build_policy,
+        admitted_interpreter, admitted_build_root_view,
+        admitted_lifecycle_root_view, admitted_build_policy,
         admitted_operation_policy, admitted_execution_profiles);
   }
 
@@ -2647,7 +2686,7 @@ int execute_transaction_run(transaction_run_command command)
 
     auto application_target = command_application_target(
         command, transaction, binding, admitted_interpreter,
-        admitted_execution_profiles.lifecycle);
+        *admitted_lifecycle_root_view, admitted_execution_profiles.lifecycle);
     auto target_observer =
         pkgapply::posix::application_target_observer::from_directory_fd(
             target_root.get());
@@ -2674,8 +2713,8 @@ int execute_transaction_run(transaction_run_command command)
     auto configuration = native_transaction_run_runtime_configuration::make(
         transaction, std::move(session_configuration),
         command_operations(
-            command, transaction, binding, admitted_interpreter,
-            admitted_operation_policy->snapshot()),
+            command, transaction, *admitted_lifecycle_root_view,
+            admitted_interpreter, admitted_operation_policy->snapshot()),
         {});
     auto runtime = native_posix_transaction_run_runtime::from_directory_fds(
         run_store.get(), evidence_store.get(), effect_store.get(),

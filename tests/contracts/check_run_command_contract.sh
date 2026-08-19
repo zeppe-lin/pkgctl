@@ -61,8 +61,16 @@ for required in \
   'return "command-" + nonce.hex() + ".pce";' \
   'struct retained_native_execution_profiles final' \
   'pkgexec::interpreter_identity interpreter' \
+  'pkgexec::root_view_identity build_root_view' \
+  'std::optional<pkgexec::root_view_identity> lifecycle_root_view' \
   'append_text(bytes, interpreter.hex())' \
+  'append_text(bytes, build_root_view.hex())' \
+  'command evidence lifecycle root-view presence is invalid' \
   'retained_evidence->interpreter' \
+  'retained_evidence->build_root_view' \
+  'retained_evidence->lifecycle_root_view' \
+  'fresh run lacks explicit construction/check root-view authority' \
+  'resumed run carries duplicate execution root-view authority' \
   'current_execution_backend.get()' \
   'require_native_execution_credentials(' \
   'current interpreter differs from admitted run authority' \
@@ -335,7 +343,9 @@ grep -F 'PKGCTL_REQUIRE_NATIVE_INTEGRATION' "$integration" >/dev/null || {
 }
 for authority in \
   '--build-root' \
+  '--build-root-view' \
   '--lifecycle-root' \
+  '--lifecycle-root-view' \
   '--build-user-id' \
   '--build-group-id' \
   '--build-supplementary-group' \
@@ -353,6 +363,19 @@ for obsolete in '--user-id' '--group-id' '--supplementary-group'; do
     echo "obsolete shared execution authority remains: $obsolete" >&2
     exit 1
   fi
+done
+if grep -F 'execution_root_identity(binding)' "$command" >/dev/null 2>&1; then
+  echo 'execution root-view authority is still inferred from target binding' >&2
+  exit 1
+fi
+for separated_root_contract in \
+  'command, admitted_build_root_view, admitted_interpreter' \
+  '*admitted_lifecycle_root_view, admitted_execution_profiles.lifecycle' \
+  'lifecycle_root_view.hex(), lifecycle_root.string()'; do
+  grep -F -- "$separated_root_contract" "$command" >/dev/null || {
+    echo "missing separated execution-root authority: $separated_root_contract" >&2
+    exit 1
+  }
 done
 grep -F 'construction/check credentials must match the native supervisor' \
     "$command" "$integration" >/dev/null || {
@@ -431,6 +454,17 @@ retain_line=$(grep -n -F 'command_evidence.retain(' \
   echo 'native execution preflight does not precede command-evidence retention' >&2
   exit 1
 }
+for root_authority_witness in \
+  'command evidence omitted admitted construction/check root-view identity' \
+  'command evidence omitted admitted lifecycle root-view identity' \
+  'run --start requires construction/check and lifecycle root-view authority' \
+  'run --resume refuses execution root-view re-declaration'; do
+  grep -F -- "$root_authority_witness" "$integration" "$readonly_integration" >/dev/null || {
+    echo "missing execution-root authority witness: $root_authority_witness" >&2
+    exit 1
+  }
+done
+
 for retained_resume_contract in \
   'inject_resume_semantics' \
   '--resume uses retained transaction semantics' \
@@ -619,7 +653,7 @@ for documented in \
   'Release 0.35.0 closes the functional package-management chain' \
   'Release 0.35.0 bounded native command boundary' \
   'Release 0.35.0 bounded native command qualification' \
-  'Version 0.41.0 uses libpkgapply 4.0.1 and libpkgapply-posix 4.0.0' \
+  'Version 0.42.0 separates execution-root identity from managed-target identity' \
   'Version 0.40.4 requires libpkgapply-posix 3.2.3' \
   'Version 0.40.3 preserves subordinate application uncertainty' \
   'Version 0.40.2 requires libpkgapply-posix 3.2.2' \

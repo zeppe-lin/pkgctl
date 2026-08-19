@@ -76,7 +76,8 @@ set_command()
       --start "$(printf '%064d' 71)"
     set -- "$@" \
       --build-parallelism 1 \
-      --build-source-date-epoch 0
+      --build-source-date-epoch 0 \
+      --build-root-view "$(printf '%064d' 81)"
   else
     set -- build \
       --canonical-store "$state" \
@@ -204,6 +205,7 @@ set -- build cohort-probe --check \
   --build-architecture x86_64 --target-architecture x86_64 --start "$nonce2" \
   --build-parallelism 1 \
   --build-source-date-epoch 0 \
+  --build-root-view "$(printf '%064d' 81)" \
   --runtime-root "$runtime2" --build-root "$build2" --artifact-root "$artifacts2" \
   --interpreter "$interpreter2" --build-user-id "$uid" --build-group-id "$gid" \
   --max-steps 7

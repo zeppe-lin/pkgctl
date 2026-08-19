@@ -422,13 +422,22 @@ construction/check profiles stay inside their durable attempt evidence and are n
 wrapped as executable backend objects.
 
 Construction/check execution and lifecycle execution remain separate command
-authority domains. The CLI therefore accepts distinct existing root views and
-distinct explicit numeric credential sets for them; choosing the same values is
-a caller decision rather than controller policy. The current native Linux
+authority domains. Fresh admission requires explicit semantic root-view identities
+for both domains instead of deriving either identity from the managed target
+binding. Those identities are retained in command evidence. The private evidence body is
+current-format authority only; incompatible earlier bytes fail closed instead of
+being reinterpreted or migrated. Resume reuses the retained semantic identities
+while the caller supplies current physical root paths
+as realization coordinates; it cannot redeclare root-view identity. BUILD and
+CHECK intentionally share the admitted construction root identity/path while
+retaining independent phase-local session/evidence authority. Lifecycle execution
+retains its own root identity/path and the lifecycle executor identity binds that
+root-view identity explicitly. Choosing equal construction and lifecycle authority
+is a caller decision rather than controller policy. The current native Linux
 backend admits only the supervisor's current credentials, so preflight refuses
 a transaction whose relevant explicit credential set differs. `pkgctl` does not
-claim fakeroot, logical ownership virtualization, or a credential transition
-that the build/package owners do not model.
+claim fakeroot, logical ownership virtualization, target-derived execution truth,
+or a credential transition that the build/package owners do not model.
 
 The command-private body store implements both restart-body source and durable
 body sink. Each lifecycle result, application receipt, publication request, and

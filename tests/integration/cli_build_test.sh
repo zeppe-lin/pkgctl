@@ -125,6 +125,7 @@ set -- build tool --check \
   --start "$nonce" \
   --build-parallelism 1 \
   --build-source-date-epoch 0 \
+  --build-root-view "$(printf '%064d' 81)" \
   --runtime-root "$runtime" \
   --build-root "$build" \
   --artifact-root "$runtime/content" \
@@ -159,6 +160,7 @@ set -- build tool --check \
   --start "$nonce" \
   --build-parallelism 1 \
   --build-source-date-epoch 0 \
+  --build-root-view "$(printf '%064d' 81)" \
   --runtime-root "$runtime" \
   --build-root "$build" \
   --artifact-root "$artifacts" \

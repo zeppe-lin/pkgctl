@@ -10,6 +10,7 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+Version 0.42.0 separates execution-root identity from managed-target identity.
 Version 0.41.0 separates application mutation mechanism from application
 journal persistence. The controller retains an exact declaration address and
 uses libpkgapply 4.0.1 to rehydrate owner-authored declaration/step/cursor
@@ -211,8 +212,12 @@ cohort representation. Application mutation/observation identities remain
 separate from lifecycle process-execution capability identity.
 
 Construction/check execution and lifecycle execution also remain separate
-command authority domains. Their existing root views and explicit numeric
-credential sets are supplied independently. The current native Linux backend
+command authority domains. Their semantic root-view identities, existing physical
+root paths, and explicit numeric credential sets are supplied independently. The
+identities are admitted at start and retained in command evidence; resume may
+re-supply the physical realization paths but does not redeclare semantic root-view
+authority. Neither execution identity is derived from the managed target binding.
+The current native Linux backend
 admits only the invoking supervisor's credentials; a relevant mismatch is
 control-plane refusal before run admission. No fakeroot, logical ownership
 virtualization, or implicit credential transition is provided.
@@ -255,8 +260,9 @@ identity. No store or directory is initialized, discovered, scanned, or
 created.
 
 Construction/check and lifecycle execution retain separate typed root-view
-authorities. If they deliberately name the same host path, their identities
-must agree. Build/check writable roots must not overlap lifecycle execution,
+authorities, each independent from the target-state root-view identity. If they
+deliberately name the same host path, their identities must agree. Build/check
+writable roots must not overlap lifecycle execution,
 target, or lifecycle session authority. Fresh construction/check sessions depend on exact semantic progress rather than
 caller run intent. Once an attempt starts, its admitted controller session is
 retained with durable evidence; progress/restart rehydration decodes that exact

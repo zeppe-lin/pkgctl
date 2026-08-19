@@ -140,7 +140,9 @@ run_command()
     set -- "$@" \
       --build-parallelism 1 \
       --build-source-date-epoch 0 \
-      --operation-policy strict-exclusive
+      --operation-policy strict-exclusive \
+      --build-root-view "$(printf '%064d' 81)" \
+      --lifecycle-root-view "$(printf '%064d' 82)"
   fi
   set -- "$@" \
     "$intent" "$nonce" \
