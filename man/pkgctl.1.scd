@@ -34,6 +34,12 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
+Version 0.41.0 uses libpkgapply 4.0.1 and libpkgapply-posix 4.0.0. Application
+journal persistence is a separate owner-wired runtime authority, and restart
+uses an immutable declaration address plus libpkgapply-owned rehydration of the
+append-only history. pkgctl does not persist complete application journals or
+provider restart checkpoints.
+
 Version 0.40.4 requires libpkgapply-posix 3.2.3 so active-namespace
 durability retains at most one representative descriptor per touched filesystem
 rather than one descriptor per mutated path. Filesystem durability remains
@@ -123,8 +129,9 @@ exact admitted controller session plus owner-encoded fetch/build evidence, while
 a started check retains its exact admitted controller session plus owner-encoded
 check evidence. Restart decodes those retained sessions without reconsulting the
 fresh session locator, current construction/check configuration, or retained-
-installed-package lookup. Interrupted application
-recovery uses the direct *libpkgapply-posix* active-request index.
+installed-package lookup. Interrupted application recovery uses the direct *libpkgapply-posix*
+active-request index to locate one immutable declaration and libpkgapply-owned
+history rehydration to classify it.
 
 Version 0.21.0 introduced the exact durable effect-attempt inspection command
 alongside the existing run-inspection command; both remain read-only sensors.

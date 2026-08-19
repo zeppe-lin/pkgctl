@@ -169,7 +169,7 @@ if grep -F 'retained_execution_profile' "$test_source" >/dev/null 2>&1; then
   echo 'package-pipeline still injects command-level historical execution-profile authority' >&2
   exit 1
 fi
-grep -F '{nullptr, nullptr, *application.backend, nullptr, store,' \
+grep -F '{nullptr, nullptr, *application.backend, *application.journals,' \
   "$test_source" >/dev/null || {
   echo 'package-pipeline completed reopen still supplies unused live process backends' >&2
   exit 1

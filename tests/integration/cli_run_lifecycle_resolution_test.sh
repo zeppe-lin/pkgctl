@@ -162,8 +162,7 @@ initialize_case()
     effects \
     target-locks \
     application-journals \
-    application-checkpoints \
-    payload \
+      payload \
     capture \
     rejected \
     completed \

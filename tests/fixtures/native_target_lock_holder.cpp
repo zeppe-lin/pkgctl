@@ -65,7 +65,7 @@ template<typename Identity>
       std::string(target_binding),
       target_root.string(),
       runtime_root.string(),
-      "libpkgapply-posix/3.1",
+      "libpkgapply-posix/4.0",
       lock_root.string(),
   };
   return pkgapply::mutation_exclusion_domain_identity::parse(

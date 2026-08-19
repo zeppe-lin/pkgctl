@@ -46,7 +46,7 @@ done
 for required in \
   'target_mutation_lease::acquire' \
   'pkgctl/native-command-mutation-domain/1' \
-  'libpkgapply-posix/3.1'; do
+  'libpkgapply-posix/4.0'; do
   grep -F -- "$required" "$fixture" >/dev/null || {
     echo "native lock holder omits recovery contention mechanism: $required" >&2
     exit 1

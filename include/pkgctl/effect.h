@@ -166,7 +166,7 @@ public:
   [[nodiscard]] virtual pkgapply::application_receipt
   resume_application(
       const pkgapply::package_application_request& request,
-      const pkgapply::application_journal_record& journal);
+      const pkgapply::application_journal_declaration_identity& declaration);
 };
 
 /*! \brief Read-only canonical-state authority under one target-scoped lease. */
@@ -195,6 +195,7 @@ public:
       const pkgapply::lease_bound_state_projection& state,
       pkgapply::target_mutation_lease& lease,
       pkgapply::application_backend& application_backend,
+      pkgapply::application_journal_store& application_journal_store,
       const pkgimage::package_archive* incoming_archive,
       pkgexec::execution_backend& lifecycle_backend,
       pkgstate::canonical_store& state_store,
@@ -217,12 +218,13 @@ public:
   [[nodiscard]] pkgapply::application_receipt
   resume_application(
       const pkgapply::package_application_request& request,
-      const pkgapply::application_journal_record& journal) override;
+      const pkgapply::application_journal_declaration_identity& declaration) override;
 
 private:
   const pkgapply::lease_bound_state_projection& state_;
   pkgapply::target_mutation_lease& lease_;
   pkgapply::application_backend& application_backend_;
+  pkgapply::application_journal_store& application_journal_store_;
   const pkgimage::package_archive* incoming_archive_;
   pkgexec::execution_backend& lifecycle_backend_;
   pkgstate::canonical_store& state_store_;

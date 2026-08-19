@@ -226,7 +226,6 @@ require_absent target-root "$target"
 for directory in \
   target-locks \
   application-journals \
-  application-checkpoints \
   payload \
   capture \
   rejected \

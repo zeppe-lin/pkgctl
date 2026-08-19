@@ -186,7 +186,10 @@ struct transaction_effect_restart_bodies final {
   std::vector<pkgapply_exec::lifecycle_execution_result> after;
   std::optional<pkgstate::state_publication_request> publication_request;
   std::optional<pkgstate::state_publication_receipt> publication_receipt;
-  /*! \brief Restart authority only for an unresolved application intent. */
+  /*! \brief Ephemeral immutable application declaration loaded for restart. */
+  std::optional<pkgapply::application_journal_declaration>
+      application_declaration;
+  /*! \brief Ephemeral owner-rehydrated projection used only for classification. */
   std::optional<pkgapply::application_journal_record> application_journal;
 };
 

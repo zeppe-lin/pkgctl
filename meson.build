@@ -4,7 +4,7 @@
 project(
   'pkgctl',
   'cpp',
-  version: '0.40.4',
+  version: '0.41.0',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.6.0',
   default_options: [
@@ -134,25 +134,25 @@ libpkgexec_linux_dep = dependency(
 )
 libpkgapply_dep = dependency(
   'libpkgapply',
-  version: ['>=3.0.1', '<4.0.0'],
+  version: ['>=4.0.1', '<5.0.0'],
   required: true,
   static: want_static,
 )
 libpkgapply_posix_dep = dependency(
   'libpkgapply-posix',
-  version: ['>=3.2.3', '<4.0.0'],
+  version: ['>=4.0.0', '<5.0.0'],
   required: true,
   static: want_static,
 )
 libpkgapply_exec_dep = dependency(
   'libpkgapply-exec',
-  version: ['>=3.0.1', '<4.0.0'],
+  version: ['>=3.0.2', '<4.0.0'],
   required: true,
   static: want_static,
 )
 libpkgstate_apply_dep = dependency(
   'libpkgstate-apply',
-  version: ['>=3.1.1', '<4.0.0'],
+  version: ['>=3.1.2', '<4.0.0'],
   required: true,
   static: want_static,
 )

@@ -437,6 +437,7 @@ public:
       pkgexec::execution_backend& construction_backend,
       pkgexec::execution_backend& check_backend,
       pkgapply::application_backend* application_backend,
+      pkgapply::application_journal_store* application_journal_store,
       pkgexec::execution_backend* lifecycle_backend,
       pkgstate::canonical_store* state_backend,
       transaction_effect_body_sink* effect_bodies)
@@ -455,12 +456,12 @@ public:
   {
     const bool any_operation_mechanism =
         target_lock_directory_fd.has_value() || archives != nullptr ||
-        application_backend != nullptr || lifecycle_backend != nullptr ||
-        state_backend != nullptr;
+        application_backend != nullptr || application_journal_store != nullptr ||
+        lifecycle_backend != nullptr || state_backend != nullptr;
     const bool complete_operation_mechanism =
         target_lock_directory_fd.has_value() && archives != nullptr &&
-        application_backend != nullptr && lifecycle_backend != nullptr &&
-        state_backend != nullptr;
+        application_backend != nullptr && application_journal_store != nullptr &&
+        lifecycle_backend != nullptr && state_backend != nullptr;
     if (any_operation_mechanism != complete_operation_mechanism)
       runtime_failure(
           native_transaction_run_runtime_error_code::invalid_configuration,
@@ -469,7 +470,8 @@ public:
       operation_ =
           posix_transaction_effect_driver_source::from_lock_directory_fd(
               *target_lock_directory_fd, *application_backend,
-              *lifecycle_backend, *state_backend, *archives, effect_bodies);
+              *application_journal_store, *lifecycle_backend, *state_backend,
+              *archives, effect_bodies);
   }
 
   transaction_run_launch_result launch(
@@ -788,7 +790,8 @@ native_transaction_run_runtime_backends::native_transaction_run_runtime_backends
     pkgexec::execution_backend* check_value,
     pkgimage::archive_backend& archive_value)
     : construction(construction_value), check(check_value), application(nullptr),
-      lifecycle(nullptr), state(nullptr), archive(archive_value)
+      application_journal(nullptr), lifecycle(nullptr), state(nullptr),
+      archive(archive_value)
 {
 }
 
@@ -796,12 +799,13 @@ native_transaction_run_runtime_backends::native_transaction_run_runtime_backends
     pkgexec::execution_backend* construction_value,
     pkgexec::execution_backend* check_value,
     pkgapply::application_backend& application_value,
+    pkgapply::application_journal_store& application_journal_value,
     pkgexec::execution_backend* lifecycle_value,
     pkgstate::canonical_store& state_value,
     pkgimage::archive_backend& archive_value)
     : construction(construction_value), check(check_value),
-      application(&application_value), lifecycle(lifecycle_value),
-      state(&state_value), archive(archive_value)
+      application(&application_value), application_journal(&application_journal_value),
+      lifecycle(lifecycle_value), state(&state_value), archive(archive_value)
 {
 }
 
@@ -826,7 +830,8 @@ public:
             authorities_.progress, authorities_.sessions,
             &authorities_.operation_execution, &authorities_.operation_recovery,
             &authorities_.archives, backends.construction, backends.check,
-            &backends.application, &backends.lifecycle, &backends.state, nullptr)
+            &backends.application, &backends.application_journal,
+            &backends.lifecycle, &backends.state, nullptr)
   {
   }
 
@@ -1010,7 +1015,7 @@ public:
                 ? *backends.check
                 : static_cast<pkgexec::execution_backend&>(
                       unavailable_execution_backend_),
-            backends.application,
+            backends.application, backends.application_journal,
             configuration_.operations() != nullptr
                 ? (backends.lifecycle != nullptr
                           ? backends.lifecycle

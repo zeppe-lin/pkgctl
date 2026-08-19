@@ -250,7 +250,6 @@ for directory in \
   effects \
   target-locks \
   application-journals \
-  application-checkpoints \
   payload \
   capture \
   rejected \
@@ -372,9 +371,19 @@ esac
 [ "${#application_journal_hex}" -eq 64 ] &&
   ! printf '%s\n' "$application_journal_hex" | grep -E '[^0-9a-f]' >/dev/null ||
   fail "active application journal has invalid identity: $application_journal"
-application_snapshot=$runtime/application-journals/journal-v1-sha256-$application_journal_hex.bin
-[ -s "$application_snapshot" ] || \
-  fail 'active application-request index names no durable journal snapshot'
+application_journal_directory=$runtime/application-journals/journal-v1-sha256-$application_journal_hex
+[ -d "$application_journal_directory" ] || \
+  fail 'active application-request index names no durable journal namespace'
+[ -s "$application_journal_directory/declaration.bin" ] || \
+  fail 'active application journal lacks immutable declaration'
+[ -s "$application_journal_directory/cursor.bin" ] || \
+  fail 'active application journal lacks bounded cursor'
+[ -d "$application_journal_directory/steps" ] || \
+  fail 'active application journal lacks immutable step namespace'
+if find "$runtime/application-journals" -maxdepth 1 -type f \
+    -name 'journal-*.bin' -print -quit | grep . >/dev/null; then
+  fail 'complete application journal snapshot survived generation-4 migration'
+fi
 
 session_body=$(single_file retained-operation-session \
   "$runtime/effect-bodies" 'operation-session-*.bin')
@@ -471,8 +480,12 @@ require_contains final-state "$root/final-state.out" 'package fixture 1.0-1'
 require_contains resumed-effect "$root/resumed-effect.out" 'effect.stage=terminal'
 require_contains resumed-effect "$root/resumed-effect.out" \
   'effect.application-outcome=completed'
-require_contains resumed-effect "$root/resumed-effect.out" \
-  "effect.application-journal=$application_journal"
+effect_application_journal=$(sed -n \
+  's/^effect.application-journal=//p' "$root/resumed-effect.out")
+case $effect_application_journal in
+  v1:sha256:*) ;;
+  *) fail "terminal application receipt has invalid journal identity: $effect_application_journal" ;;
+esac
 require_contains resumed-effect "$root/resumed-effect.out" \
   'effect.application-completed-evidence='
 require_contains resumed-effect "$root/resumed-effect.out" \

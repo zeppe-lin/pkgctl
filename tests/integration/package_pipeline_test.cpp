@@ -705,6 +705,7 @@ struct application_environment final {
   fs::path rejected_store_root;
   fs::path effect_journal_root;
   std::unique_ptr<pkgapply::posix::application_posix_backend> backend;
+  std::unique_ptr<pkgapply::posix::application_journal_store> journals;
   std::unique_ptr<pkgapply::posix::target_mutation_lease> lease;
 };
 
@@ -714,7 +715,6 @@ application_environment prepare_application_environment(
 {
   const fs::path target_root = root / "target";
   const fs::path journal = root / "application-journal";
-  const fs::path checkpoint = root / "application-checkpoint";
   const fs::path payload = root / "incoming-payload";
   const fs::path capture = root / "old-object-capture";
   const fs::path rejected = root / "rejected-object";
@@ -722,28 +722,29 @@ application_environment prepare_application_environment(
   const fs::path locks = root / "target-locks";
   const fs::path effect_journal = root / "controller-effect-journal";
 
-  for (const auto& path : {target_root, journal, checkpoint, payload, capture,
-                           rejected, completed, locks, effect_journal})
+  for (const auto& path : {target_root, journal, payload, capture, rejected,
+                           completed, locks, effect_journal})
     fs::create_directories(path);
 
   directory_fd target_fd(target_root);
   directory_fd journal_fd(journal);
-  directory_fd checkpoint_fd(checkpoint);
   directory_fd payload_fd(payload);
   directory_fd capture_fd(capture);
   directory_fd rejected_fd(rejected);
   directory_fd completed_fd(completed);
   directory_fd lock_fd(locks);
 
+  auto journals =
+      pkgapply::posix::application_journal_store::from_directory_fd(
+          journal_fd.get());
   auto backend = pkgapply::posix::application_posix_backend::from_directory_fds(
-      target, target_fd.get(), journal_fd.get(), checkpoint_fd.get(),
-      payload_fd.get(), capture_fd.get(), rejected_fd.get(),
-      completed_fd.get());
+      target, target_fd.get(), payload_fd.get(), capture_fd.get(),
+      rejected_fd.get(), completed_fd.get());
   auto lease = pkgapply::posix::target_mutation_lease::acquire(
       target, lock_fd.get());
   return {
       target_root, journal, locks, rejected, effect_journal,
-      std::move(backend), std::move(lease)};
+      std::move(backend), std::move(journals), std::move(lease)};
 }
 
 
@@ -926,18 +927,6 @@ public:
     return delegate_->attempt_nonce();
   }
 
-  std::optional<pkgapply::application_journal_record_identity>
-  resumed_journal() const noexcept override
-  {
-    return delegate_->resumed_journal();
-  }
-
-  pkgapply::application_restart_checkpoint restart_checkpoint(
-      const pkgapply::application_journal_record& journal) override
-  {
-    return delegate_->restart_checkpoint(journal);
-  }
-
   pkgapply::backend_observation_batch observe(
       const std::vector<pkgplan::package_path>& paths) override
   {
@@ -991,12 +980,6 @@ public:
       pkgapply::application_durability_domain domain) override
   {
     return delegate_->synchronize(domain);
-  }
-
-  pkgapply::application_journal_record publish_journal(
-      const pkgapply::application_journal_record& record) override
-  {
-    return delegate_->publish_journal(record);
   }
 
 private:
@@ -1055,12 +1038,12 @@ public:
   resume_with_incoming_image(
       const pkgapply::package_application_request& request,
       pkgapply::target_mutation_lease& lease,
-      const pkgapply::application_journal_record& journal,
+      const pkgapply::application_restart_view& restart,
       const pkgimage::package_image& image) override
   {
     ++resume_calls_;
     return std::make_unique<faulting_application_transaction>(
-        delegate_.resume_with_incoming_image(request, lease, journal, image),
+        delegate_.resume_with_incoming_image(request, lease, restart, image),
         active_calls_);
   }
 
@@ -1068,11 +1051,11 @@ public:
   resume_without_incoming_image(
       const pkgapply::package_application_request& request,
       pkgapply::target_mutation_lease& lease,
-      const pkgapply::application_journal_record& journal) override
+      const pkgapply::application_restart_view& restart) override
   {
     ++resume_calls_;
     return std::make_unique<faulting_application_transaction>(
-        delegate_.resume_without_incoming_image(request, lease, journal),
+        delegate_.resume_without_incoming_image(request, lease, restart),
         active_calls_);
   }
 
@@ -1481,10 +1464,10 @@ public:
 
   pkgapply::application_receipt resume_application(
       const pkgapply::package_application_request& request,
-      const pkgapply::application_journal_record& journal) override
+      const pkgapply::application_journal_declaration_identity& declaration) override
   {
     ++application_resume_calls_;
-    return delegate_.resume_application(request, journal);
+    return delegate_.resume_application(request, declaration);
   }
 
   std::size_t lifecycle_calls() const noexcept { return lifecycle_calls_; }
@@ -1551,9 +1534,9 @@ public:
 
   pkgapply::application_receipt resume_application(
       const pkgapply::package_application_request& request,
-      const pkgapply::application_journal_record& journal) override
+      const pkgapply::application_journal_declaration_identity& declaration) override
   {
-    return delegate_.resume_application(request, journal);
+    return delegate_.resume_application(request, declaration);
   }
 
   std::size_t publication_calls() const noexcept { return publication_calls_; }
@@ -1945,7 +1928,7 @@ void check_package_pipeline()
   {
     pkgctl::native_transaction_effect_driver native_effect_driver(
         projected.projection(), *application.lease, *application.backend,
-        archive.get(), backend, store);
+        *application.journals, archive.get(), backend, store);
     counting_effect_driver effect_driver(native_effect_driver);
     pkgctl::native_transaction_effect_publication_driver state_observer(
         *application.lease, store);
@@ -2195,7 +2178,8 @@ void check_package_pipeline()
   {
     pkgctl::native_transaction_effect_driver native_upgrade_driver(
         upgrade_projected.projection(), *application.lease,
-        *application.backend, upgrade_archive.get(), backend, store);
+        *application.backend, *application.journals, upgrade_archive.get(),
+        backend, store);
     counting_effect_driver upgrade_driver(native_upgrade_driver);
     pkgctl::native_transaction_effect_publication_driver upgrade_state_observer(
         *application.lease, store);
@@ -2256,24 +2240,34 @@ void check_package_pipeline()
   auto application_journal_store =
       pkgapply::posix::application_journal_store::open(
           application.application_journal_root.string());
-  const auto upgrade_application_journal =
-      application_journal_store.load_active(
+  const auto upgrade_application_declaration_id =
+      application_journal_store->load_active_declaration(
           prepared_upgrade.application()->identity());
-  CHECK(upgrade_application_journal.has_value());
-  if (!upgrade_application_journal)
+  CHECK(upgrade_application_declaration_id.has_value());
+  if (!upgrade_application_declaration_id)
     throw std::runtime_error(
-        "pipeline upgrade restart lacks application journal");
+        "pipeline upgrade restart lacks application declaration");
+  const auto upgrade_application_declaration =
+      application_journal_store->load_declaration(
+          *upgrade_application_declaration_id);
+  CHECK(upgrade_application_declaration.has_value());
+  if (!upgrade_application_declaration)
+    throw std::runtime_error(
+        "pipeline upgrade restart declaration is missing");
+  const auto upgrade_application_journal =
+      pkgapply::rehydrate_application_journal(
+          *application_journal_store, *upgrade_application_declaration_id);
 
   auto upgrade_effect_checkpoint = pkgctl::effect_restart_checkpoint::make(
       upgrade_effect_session, *upgrade_effect_record, {},
-      upgrade_bodies.application(), {},
-      std::nullopt, std::nullopt, *upgrade_application_journal);
+      upgrade_bodies.application(), {}, std::nullopt, std::nullopt,
+      *upgrade_application_declaration, upgrade_application_journal);
 
   reacquire_application_lease(application, target);
   auto resumed_upgrade_projection = pkgstate::apply_adapter::read_application_state(
       *prepared_upgrade.application(), *application.lease, store);
   const auto& historical_upgrade_projection =
-      upgrade_application_journal->header().admitted_state_projection();
+      upgrade_application_journal.header().admitted_state_projection();
   CHECK(historical_upgrade_projection.identity() == upgrade_admitted_projection);
   CHECK(historical_upgrade_projection.lease() == upgrade_admitted_lease);
   CHECK(resumed_upgrade_projection.projection().lease() ==
@@ -2282,8 +2276,8 @@ void check_package_pipeline()
         historical_upgrade_projection.identity());
   pkgctl::native_transaction_effect_driver native_resumed_upgrade_driver(
       resumed_upgrade_projection.projection(), *application.lease,
-      *application.backend, upgrade_archive.get(), backend, store,
-      &historical_upgrade_projection);
+      *application.backend, *application_journal_store, upgrade_archive.get(),
+      backend, store, &historical_upgrade_projection);
   counting_effect_driver resumed_upgrade_driver(native_resumed_upgrade_driver);
   pkgctl::native_transaction_effect_publication_driver
       resumed_upgrade_state_observer(*application.lease, store);
@@ -2517,7 +2511,7 @@ void check_package_pipeline()
   {
     pkgctl::native_transaction_effect_driver native_removal_driver(
         removal_projected.projection(), *application.lease,
-        *application.backend, nullptr, backend, store);
+        *application.backend, *application.journals, nullptr, backend, store);
     counting_effect_driver removal_driver(native_removal_driver);
     pkgctl::native_transaction_effect_publication_driver removal_state_observer(
         *application.lease, store);
@@ -2576,24 +2570,34 @@ void check_package_pipeline()
   CHECK(pkgctl::assess_effect_restart(*removal_effect_record).disposition() ==
         pkgctl::effect_restart_disposition::resume_application);
 
-  const auto removal_application_journal =
-      application_journal_store.load_active(
+  const auto removal_application_declaration_id =
+      application_journal_store->load_active_declaration(
           prepared_removal.application()->identity());
-  CHECK(removal_application_journal.has_value());
-  if (!removal_application_journal)
+  CHECK(removal_application_declaration_id.has_value());
+  if (!removal_application_declaration_id)
     throw std::runtime_error(
-        "pipeline removal restart lacks application journal");
+        "pipeline removal restart lacks application declaration");
+  const auto removal_application_declaration =
+      application_journal_store->load_declaration(
+          *removal_application_declaration_id);
+  CHECK(removal_application_declaration.has_value());
+  if (!removal_application_declaration)
+    throw std::runtime_error(
+        "pipeline removal restart declaration is missing");
+  const auto removal_application_journal =
+      pkgapply::rehydrate_application_journal(
+          *application_journal_store, *removal_application_declaration_id);
 
   auto removal_effect_checkpoint = pkgctl::effect_restart_checkpoint::make(
       removal_effect_session, *removal_effect_record, {},
-      removal_bodies.application(), {},
-      std::nullopt, std::nullopt, *removal_application_journal);
+      removal_bodies.application(), {}, std::nullopt, std::nullopt,
+      *removal_application_declaration, removal_application_journal);
 
   reacquire_application_lease(application, target);
   auto resumed_removal_projection = pkgstate::apply_adapter::read_application_state(
       *prepared_removal.application(), *application.lease, store);
   const auto& historical_removal_projection =
-      removal_application_journal->header().admitted_state_projection();
+      removal_application_journal.header().admitted_state_projection();
   CHECK(historical_removal_projection.identity() == removal_admitted_projection);
   CHECK(historical_removal_projection.lease() == removal_admitted_lease);
   CHECK(resumed_removal_projection.projection().lease() ==
@@ -2602,7 +2606,7 @@ void check_package_pipeline()
         historical_removal_projection.identity());
   pkgctl::native_transaction_effect_driver native_resumed_removal_driver(
       resumed_removal_projection.projection(), *application.lease,
-      *application.backend, nullptr, backend, store,
+      *application.backend, *application_journal_store, nullptr, backend, store,
       &historical_removal_projection);
   counting_effect_driver resumed_removal_driver(native_resumed_removal_driver);
   pkgctl::native_transaction_effect_publication_driver
@@ -2728,8 +2732,8 @@ void check_native_runtime_package_pipeline()
       make_runtime_configuration(),
       {installed_packages, operations, effect_bodies, &operations,
        &effect_bodies, &operations},
-      {&backend, &backend, *application.backend, &backend, store,
-       archive_backend});
+      {&backend, &backend, *application.backend, *application.journals,
+       &backend, store, archive_backend});
 
   const auto launched = runtime->launch(
       pkgctl::transaction_dispatch_policy::make(1U, 1U), journal_nonce(80U),
@@ -2787,8 +2791,8 @@ void check_native_runtime_package_pipeline()
       make_runtime_configuration(),
       {installed_packages, operations, effect_bodies, &operations,
        &effect_bodies, &operations},
-      {nullptr, nullptr, *application.backend, nullptr, store,
-       archive_backend});
+      {nullptr, nullptr, *application.backend, *application.journals,
+       nullptr, store, archive_backend});
   const auto reopened = runtime->drive(
       journal, pkgctl::transaction_run_drive_policy::make(1U));
   CHECK(reopened.disposition() ==
@@ -2884,8 +2888,8 @@ void check_native_runtime_pre_operation_failure(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {&backend, &backend, *application.backend, &backend, store,
-         archive_backend});
+        {&backend, &backend, *application.backend, *application.journals,
+         &backend, store, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -3106,8 +3110,8 @@ void check_native_runtime_operation_failure(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {&backend, &backend, *application_backend, &backend, *state_store,
-         archive_backend});
+        {&backend, &backend, *application_backend, *application.journals,
+         &backend, *state_store, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -3391,8 +3395,8 @@ void check_native_runtime_fresh_lease_contention(std::uint8_t nonce_marker)
         runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {&backend, &backend, *application.backend, &backend, store,
-         archive_backend});
+        {&backend, &backend, *application.backend, *application.journals,
+         &backend, store, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -3543,8 +3547,8 @@ void check_native_runtime_recovery_lease_contention(std::uint8_t nonce_marker)
         runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {&backend, &backend, *application.backend, &backend, store,
-         archive_backend});
+        {&backend, &backend, *application.backend, *application.journals,
+         &backend, store, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -3757,8 +3761,8 @@ void check_native_runtime_outer_lease_loss(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {&backend, &backend, *application.backend, lifecycle_driver, state_store,
-         archive_backend});
+        {&backend, &backend, *application.backend, *application.journals,
+         lifecycle_driver, state_store, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -3990,8 +3994,8 @@ void check_native_runtime_publication_intent_uncertainty(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {&backend, &backend, *application.backend, &backend, state_store,
-         archive_backend});
+        {&backend, &backend, *application.backend, *application.journals,
+         &backend, state_store, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -4044,7 +4048,7 @@ void check_native_runtime_publication_intent_uncertainty(
   CHECK(archive != nullptr);
   pkgctl::native_transaction_effect_driver native_effect_driver(
       projected.projection(), *application.lease, *application.backend,
-      archive.get(), backend, state_store);
+      *application.journals, archive.get(), backend, state_store);
   pkgctl::native_transaction_effect_publication_driver state_observer(
       *application.lease, state_store);
 
@@ -4228,8 +4232,8 @@ void check_native_runtime_terminal_indeterminate_publication(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {&backend, &backend, *application.backend, &backend, state_store,
-         archive_backend});
+        {&backend, &backend, *application.backend, *application.journals,
+         &backend, state_store, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -4406,8 +4410,8 @@ void check_native_runtime_application_terminal_external_resolution(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {&backend, &backend, *application.backend, &backend, store,
-         archive_backend});
+        {&backend, &backend, *application.backend, *application.journals,
+         &backend, store, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -4635,8 +4639,8 @@ void check_native_runtime_lifecycle_intent_external_resolution(
         make_runtime_configuration(),
         {installed_packages, operations, effect_bodies, &operations,
          &effect_bodies, &operations},
-        {&backend, &backend, *application.backend, &backend, store,
-         archive_backend});
+        {&backend, &backend, *application.backend, *application.journals,
+         &backend, store, archive_backend});
   };
 
   auto runtime = open_runtime();

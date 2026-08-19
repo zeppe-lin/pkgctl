@@ -48,9 +48,9 @@ done
 
 for required in \
   "'libpkgapply-posix'" \
-  "version: ['>=3.0.0', '<4.0.0']" \
+  "version: ['>=4.0.0', '<5.0.0']" \
   "'libpkgstate-apply'" \
-  "version: ['>=3.1.1', '<4.0.0']"; do
+  "version: ['>=3.1.2', '<4.0.0']"; do
   grep -F -- "$required" "$meson" >/dev/null || {
     echo "missing native effect-runtime dependency floor: $required" >&2
     exit 1

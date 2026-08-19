@@ -38,6 +38,7 @@ struct transaction_run_runtime_backends final {
   pkgexec::execution_backend& construction;
   pkgexec::execution_backend& check;
   pkgapply::application_backend& application;
+  pkgapply::application_journal_store& application_journal;
   pkgexec::execution_backend& lifecycle;
   pkgstate::canonical_store& state;
 };
@@ -275,6 +276,7 @@ struct native_transaction_run_runtime_backends final {
       pkgexec::execution_backend* construction,
       pkgexec::execution_backend* check,
       pkgapply::application_backend& application,
+      pkgapply::application_journal_store& application_journal,
       pkgexec::execution_backend* lifecycle,
       pkgstate::canonical_store& state,
       pkgimage::archive_backend& archive);
@@ -282,6 +284,7 @@ struct native_transaction_run_runtime_backends final {
   pkgexec::execution_backend* construction;
   pkgexec::execution_backend* check;
   pkgapply::application_backend* application;
+  pkgapply::application_journal_store* application_journal;
   pkgexec::execution_backend* lifecycle;
   pkgstate::canonical_store* state;
   pkgimage::archive_backend& archive;

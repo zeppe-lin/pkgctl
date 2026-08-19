@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.41.0 - 2026-08-19
+
+- Migrates native application orchestration to libpkgapply generation 4. Fresh
+  application receives the separate owner journal store beside the mutation
+  backend; the backend identity no longer absorbs journal storage, and the
+  retired application-checkpoint namespace is not opened or retained.
+- Application-intent restart retains only the exact immutable declaration
+  address as durable restart location. The restart body source loads that
+  declaration and asks libpkgapply 4.0.1 to rehydrate and validate the exact
+  append-only declaration/step/cursor history, including the single crash
+  orphan permitted by the owner protocol. The derived complete journal is
+  in-memory classification material only and is never persisted by pkgctl.
+- Preserves the terminal-ahead crash seam: a terminal application receipt
+  retained before the controller commits its application-terminal fact can be
+  validated against owner-rehydrated history and adopted without reapplying the
+  package. Missing, contradictory, or nonterminal authority still fails closed
+  or requires external resolution according to the application owner.
+
 ## 0.40.4 - 2026-08-18
 
 - Requires libpkgapply-posix 3.2.3 so active-namespace durability no longer

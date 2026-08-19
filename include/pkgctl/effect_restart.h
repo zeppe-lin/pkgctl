@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <libpkgapply/journal.h>
+#include <libpkgapply/journal_transport.h>
 
 #include <pkgctl/effect.h>
 #include <pkgctl/effect_journal.h>
@@ -64,6 +65,8 @@ public:
       std::vector<pkgapply_exec::lifecycle_execution_result> after,
       std::optional<pkgstate::state_publication_request> publication_request,
       std::optional<pkgstate::state_publication_receipt> publication_receipt,
+      std::optional<pkgapply::application_journal_declaration>
+          application_declaration = std::nullopt,
       std::optional<pkgapply::application_journal_record> application_journal =
           std::nullopt);
 
@@ -79,6 +82,9 @@ public:
   publication_request() const noexcept;
   [[nodiscard]] const std::optional<pkgstate::state_publication_receipt>&
   publication_receipt() const noexcept;
+  [[nodiscard]] const std::optional<pkgapply::application_journal_declaration>&
+  application_declaration() const noexcept;
+  /*! \brief Return owner-rehydrated application history projection, if any. */
   [[nodiscard]] const std::optional<pkgapply::application_journal_record>&
   application_journal() const noexcept;
 private:
@@ -90,6 +96,8 @@ private:
       std::vector<pkgapply_exec::lifecycle_execution_result> after,
       std::optional<pkgstate::state_publication_request> publication_request,
       std::optional<pkgstate::state_publication_receipt> publication_receipt,
+      std::optional<pkgapply::application_journal_declaration>
+          application_declaration,
       std::optional<pkgapply::application_journal_record> application_journal);
 
   effectful_operation_session session_;
@@ -99,6 +107,9 @@ private:
   std::vector<pkgapply_exec::lifecycle_execution_result> after_;
   std::optional<pkgstate::state_publication_request> publication_request_;
   std::optional<pkgstate::state_publication_receipt> publication_receipt_;
+  std::optional<pkgapply::application_journal_declaration>
+      application_declaration_;
+  // Ephemeral owner-rehydrated projection; never persisted by pkgctl.
   std::optional<pkgapply::application_journal_record> application_journal_;
 };
 

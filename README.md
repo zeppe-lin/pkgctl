@@ -1,5 +1,12 @@
 # pkgctl
 
+Release 0.41.0 binds native application to the generation-4 owner journal
+protocol. The POSIX journal store is a separate runtime authority beside the
+mutation backend; application restart is addressed by immutable declaration
+identity and classified only after libpkgapply rehydrates the append-only
+history. pkgctl does not persist a complete application journal or a provider
+restart checkpoint.
+
 Release 0.40.4 requires `libpkgapply-posix >= 3.2.3` so active-namespace
 durability remains bounded by touched filesystem rather than mutated path. The
 POSIX provider owns filesystem durability authority; pkgctl neither retains

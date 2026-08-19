@@ -19,7 +19,7 @@ done
 
 for required in \
   'pkgctl/native-command-mutation-domain/1' \
-  'libpkgapply-posix/3.1' \
+  'libpkgapply-posix/4.0' \
   '"mutation-domain"' \
   'target_mutation_lease::acquire'; do
   grep -F -- "$required" "$fixture" >/dev/null || {
@@ -30,7 +30,7 @@ done
 
 for required in \
   'pkgctl/native-command-mutation-domain/1' \
-  'libpkgapply-posix/3.1' \
+  'libpkgapply-posix/4.0' \
   'fields("mutation-domain", runtime_path(command, "target-locks"))'; do
   grep -F -- "$required" "$command" >/dev/null || {
     echo "run command omits mutation-domain derivation: $required" >&2

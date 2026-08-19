@@ -10,6 +10,12 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+Version 0.41.0 separates application mutation mechanism from application
+journal persistence. The controller retains an exact declaration address and
+uses libpkgapply 4.0.1 to rehydrate owner-authored declaration/step/cursor
+history before classifying a restart. Any complete journal used by controller
+restart is an ephemeral derived projection, never durable pkgctl authority.
+
 Version 0.40.4 requires libpkgapply-posix 3.2.3 because real package
 application may mutate thousands of active paths before the selected durability
 boundary. The provider retains one representative descriptor per touched
@@ -189,8 +195,9 @@ encoded check evidence. Restart validates and decodes those sessions under the
 retained transaction/progress/node authority without reconsulting the current
 session locator, construction/check configuration, or installed-package resource
 source. Application-intent restart uses the direct
-*libpkgapply-posix* active-request index; no directory scan or controller-owned
-application-journal format is introduced.
+*libpkgapply-posix* active-request index to locate one immutable declaration,
+then asks libpkgapply to rehydrate the committed append-only history. No
+directory scan or controller-owned application-journal format is introduced.
 
 Target observations are acquired only for the current operation dispatch. Before
 a started operation can be named durably, the command retains its complete admitted

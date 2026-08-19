@@ -1237,10 +1237,71 @@ public:
     throw std::runtime_error("unexpected native removal execution");
   }
 
+  std::unique_ptr<pkgapply::application_backend_transaction>
+  resume_with_incoming_image(
+      const pkgapply::package_application_request&,
+      pkgapply::target_mutation_lease&,
+      const pkgapply::application_restart_view&,
+      const pkgimage::package_image&) override
+  {
+    throw std::runtime_error("unexpected native application restart");
+  }
+
+  std::unique_ptr<pkgapply::application_backend_transaction>
+  resume_without_incoming_image(
+      const pkgapply::package_application_request&,
+      pkgapply::target_mutation_lease&,
+      const pkgapply::application_restart_view&) override
+  {
+    throw std::runtime_error("unexpected native removal restart");
+  }
+
 private:
   pkgapply::mutation_backend_identity mutation_;
   pkgapply::observation_backend_identity observation_;
   pkgapply::execution_capability_profile_identity capabilities_;
+};
+
+class unreachable_application_journal_store final
+    : public pkgapply::application_journal_store {
+public:
+  pkgapply::application_journal_declaration publish_declaration(
+      const pkgapply::application_journal_declaration&) override
+  {
+    throw std::runtime_error("unexpected application declaration publication");
+  }
+
+  pkgapply::application_journal_step publish_step(
+      const pkgapply::application_journal_step&) override
+  {
+    throw std::runtime_error("unexpected application step publication");
+  }
+
+  pkgapply::application_journal_cursor compare_and_publish_cursor(
+      const std::optional<pkgapply::application_journal_cursor_identity>&,
+      const pkgapply::application_journal_cursor&) override
+  {
+    throw std::runtime_error("unexpected application cursor publication");
+  }
+
+  std::optional<pkgapply::application_journal_declaration> load_declaration(
+      const pkgapply::application_journal_declaration_identity&) override
+  {
+    throw std::runtime_error("unexpected application declaration load");
+  }
+
+  std::optional<pkgapply::application_journal_cursor> load_cursor(
+      const pkgapply::application_journal_declaration_identity&) override
+  {
+    throw std::runtime_error("unexpected application cursor load");
+  }
+
+  std::optional<pkgapply::application_journal_step> load_step(
+      const pkgapply::application_journal_declaration_identity&,
+      std::uint64_t) override
+  {
+    throw std::runtime_error("unexpected application step load");
+  }
 };
 
 class fixed_package_archive final : public pkgimage::package_archive {
@@ -1619,7 +1680,7 @@ public:
   }
   pkgapply::application_receipt resume_application(
       const pkgapply::package_application_request&,
-      const pkgapply::application_journal_record&) override
+      const pkgapply::application_journal_declaration_identity&) override
   {
     trace_.push_back("resume-apply");
     ++resume_calls_;
@@ -1740,7 +1801,12 @@ struct fixture final {
   }
 };
 
-pkgapply::application_journal_record
+struct application_restart_projection final {
+  pkgapply::application_journal_declaration declaration;
+  pkgapply::application_journal_record journal;
+};
+
+application_restart_projection
 application_restart_journal(const fixture& value)
 {
   pkgapply::application_attempt_nonce::byte_array nonce_bytes{};
@@ -1754,11 +1820,15 @@ application_restart_journal(const fixture& value)
       value.application.plan().identity(), attempt, value.target.identity(),
       value.application.control().identity(), value.projection,
       value.outer_lease.identity(), value.target.mutation_backend());
-  return pkgapply::application_journal_record::make(
+  auto declaration = pkgapply::application_journal_declaration::make(
+      header, {});
+  auto journal = pkgapply::application_journal_record::make(
       header, pkgapply::application_journal_state::preparing, {}, {});
+  return {std::move(declaration), std::move(journal)};
 }
 
 struct completed_application_restart final {
+  pkgapply::application_journal_declaration declaration;
   pkgapply::application_journal_record journal;
   pkgapply::application_receipt receipt;
 };
@@ -1783,10 +1853,12 @@ completed_application_restart_journal(const fixture& value)
       value.evidence.backend_evidence());
   const auto receipt = pkgapply::application_receipt::completed(
       evidence, pkgapply::application_recovery_state::unchanged);
+  auto declaration = pkgapply::application_journal_declaration::make(
+      header, {});
   auto journal = pkgapply::application_journal_record::make(
       header, pkgapply::application_journal_state::application_completed, {}, {},
       receipt.identity(), evidence.identity());
-  return {std::move(journal), receipt};
+  return {std::move(declaration), std::move(journal), receipt};
 }
 
 struct upgrade_fixture final {
@@ -2748,9 +2820,11 @@ void check_restart_boundaries()
     CHECK(!unresolved.operation());
     CHECK(actuator.resume_calls() == 0U);
 
+    const auto application_restart = application_restart_journal(value);
     const auto checkpoint = pkgctl::effect_restart_checkpoint::make(
         session, *latest, actuator.lifecycle_results(), std::nullopt, {},
-        std::nullopt, std::nullopt, application_restart_journal(value));
+        std::nullopt, std::nullopt, application_restart.declaration,
+        application_restart.journal);
     const auto restarted = pkgctl::resume_effectful_operation(
         checkpoint, &actuator, nullptr, journal);
     CHECK(!restarted.external_resolution_required());
@@ -2787,7 +2861,7 @@ void check_restart_boundaries()
     const auto completed = completed_application_restart_journal(value);
     const auto checkpoint = pkgctl::effect_restart_checkpoint::make(
         session, *latest, actuator.lifecycle_results(), completed.receipt, {},
-        std::nullopt, std::nullopt, completed.journal);
+        std::nullopt, std::nullopt, completed.declaration, completed.journal);
     const auto restarted = pkgctl::resume_effectful_operation(
         checkpoint, &actuator, nullptr, journal);
     CHECK(!restarted.external_resolution_required());
@@ -2827,13 +2901,15 @@ void check_restart_boundaries()
     CHECK(actuator.lifecycle_results().size() == 1U);
     if (latest && actuator.lifecycle_results().size() == 1U)
     {
+      const auto application_restart = application_restart_journal(value);
       bool refused_historical_application_journal = false;
       try
       {
         (void)pkgctl::effect_restart_checkpoint::make(
             session, *latest,
             {actuator.lifecycle_results().front()}, value.receipt, {},
-            std::nullopt, std::nullopt, application_restart_journal(value));
+            std::nullopt, std::nullopt, application_restart.declaration,
+            application_restart.journal);
       }
       catch (const pkgctl::error& failure)
       {
@@ -3356,10 +3432,10 @@ public:
 
   pkgapply::application_receipt resume_application(
       const pkgapply::package_application_request& request,
-      const pkgapply::application_journal_record& journal) override
+      const pkgapply::application_journal_declaration_identity& declaration) override
   {
     mark_driver();
-    return driver_.resume_application(request, journal);
+    return driver_.resume_application(request, declaration);
   }
 
 
@@ -3707,12 +3783,13 @@ void check_native_effect_driver_source()
   std::filesystem::create_directory(locks);
   const int lock_fd = open_directory(locks);
   unreachable_application_backend application_backend;
+  unreachable_application_journal_store application_journals;
   scripted_execution_backend lifecycle_backend;
   forbidden_effect_archive_source archives;
   auto source =
       pkgctl::posix_transaction_effect_driver_source::from_lock_directory_fd(
-          lock_fd, application_backend, lifecycle_backend,
-          value.store, archives);
+          lock_fd, application_backend, application_journals,
+          lifecycle_backend, value.store, archives);
   CHECK(::close(lock_fd) == 0);
 
   auto drivers = source->acquire_execution_drivers(handoff);
@@ -3772,8 +3849,8 @@ void check_native_effect_driver_source()
   {
     (void)pkgctl::posix_transaction_effect_driver_source::
         from_lock_directory_fd(
-            -1, application_backend, lifecycle_backend,
-            value.store, archives);
+            -1, application_backend, application_journals,
+            lifecycle_backend, value.store, archives);
   }
   catch (const pkgctl::native_effect_source_error& problem)
   {
@@ -3789,6 +3866,7 @@ void check_native_effect_recovery_source()
   const auto session = pkgctl::effectful_operation_session::admit(
       effect_request(value), value.before, value.after);
   unreachable_application_backend application_backend;
+  unreachable_application_journal_store application_journals;
   scripted_execution_backend lifecycle_backend;
   forbidden_effect_archive_source archives;
   const auto locks = value.temp.path() / "native-recovery-locks";
@@ -3796,8 +3874,8 @@ void check_native_effect_recovery_source()
   const int lock_fd = open_directory(locks);
   auto source =
       pkgctl::posix_transaction_effect_driver_source::from_lock_directory_fd(
-          lock_fd, application_backend, lifecycle_backend,
-          value.store, archives);
+          lock_fd, application_backend, application_journals,
+          lifecycle_backend, value.store, archives);
   CHECK(::close(lock_fd) == 0);
 
   const auto admission = pkgctl::effect_attempt_record::admit(
@@ -3895,8 +3973,9 @@ void check_native_effect_recovery_source()
     auto publication_source =
         pkgctl::posix_transaction_effect_driver_source::
             from_lock_directory_fd(
-                publication_fd, application_backend, lifecycle_backend,
-                publication_value.store, publication_archives);
+                publication_fd, application_backend, application_journals,
+                lifecycle_backend, publication_value.store,
+                publication_archives);
     CHECK(::close(publication_fd) == 0);
     auto publication =
         publication_source->acquire_recovery_drivers(publication_handoff);

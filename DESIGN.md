@@ -434,8 +434,10 @@ The command-private body store implements both restart-body source and durable
 body sink. Each lifecycle result, application receipt, publication request, and
 publication receipt is owner-encoded and immutably retained before the effect
 journal records its identity. Application intent uses the direct
-`libpkgapply-posix` active-request index, so recovery needs no directory scan or
-controller-owned application format. Read-only reopening of private journal
+`libpkgapply-posix` active-request index to obtain one immutable declaration
+address, then asks libpkgapply to rehydrate and validate the exact append-only
+history. Recovery needs no directory scan or controller-owned application
+format. Read-only reopening of private journal
 locks, heads, snapshots, evidence indexes, and evidence bodies is nonblocking
 before regular-file validation. A corrupted special-file slot therefore cannot
 turn retained authority into an unbounded wait.
@@ -2212,10 +2214,12 @@ snapshot. Automatic continuation is conservative:
 - admission or completed pre-lifecycle evidence may continue normally;
 - lifecycle intent without terminal execution evidence requires external
   resolution because lifecycle programs may be non-idempotent;
-- application intent requires the caller to supply the exact durable
-  `libpkgapply::application_journal_record` belonging to the request;
+- application intent requires one exact immutable application declaration plus
+  the owner-rehydrated in-memory journal projection derived from that
+  declaration's committed append-only history;
 - completed application evidence permits continuation into post lifecycle and
-  the receipt-named historical application journal is not restart authority;
+  neither the receipt-named journal identity nor a reconstructed complete
+  journal is durable controller restart authority;
 - publication intent requires authoritative installed-state rereading;
 - an exact prior state permits retry of the retained publication request;
 - an exact resulting state permits terminal reconciliation without a second
@@ -2223,8 +2227,9 @@ snapshot. Automatic continuation is conservative:
 - contradictory state, missing subordinate authority, or mismatched evidence
   requires external resolution.
 
-`pkgctl` does not scan for an application journal, infer it from filenames, or
-claim that the lease held before a crash survived. `resume_effectful_operation()`
+`pkgctl` does not scan for an application journal, infer semantic history from
+filenames, persist a complete application journal, or claim that the lease held
+before a crash survived. `resume_effectful_operation()`
 requires a newly held physical target-mutation lease and revalidates every
 supplied subordinate result against the durable controller record.
 

@@ -51,6 +51,32 @@ void validate_application_journal(
         "application journal belongs to another effect authority universe");
 }
 
+void validate_application_declaration_projection(
+    const effectful_operation_session& session,
+    const pkgapply::application_journal_declaration& declaration,
+    const pkgapply::application_journal_record& journal)
+{
+  const auto& request = session.request().application();
+  const auto& header = declaration.header();
+  if (header.request() != request.identity() ||
+      header.plan() != request.plan() ||
+      header.kind() != request.kind() ||
+      header.target() != request.target().identity() ||
+      header.control() != request.control().identity())
+    invalid_checkpoint(
+        "application declaration belongs to another effect authority universe");
+  if (header.identity() != journal.header().identity() ||
+      declaration.effects().size() != journal.effects().size())
+    invalid_checkpoint(
+        "application declaration disagrees with owner journal projection");
+  for (std::size_t index = 0U; index < declaration.effects().size(); ++index) {
+    if (declaration.effects()[index].identity() !=
+        journal.effects()[index].identity())
+      invalid_checkpoint(
+          "application declaration effect graph differs from owner projection");
+  }
+}
+
 void validate_ahead_application_receipt(
     const effectful_operation_session& session,
     const pkgapply::application_receipt& receipt,
@@ -189,7 +215,8 @@ bool effect_restart_requires_continuation_driver(
     case effect_restart_disposition::terminal:
       return false;
     case effect_restart_disposition::resume_application:
-      return checkpoint.application_journal().has_value();
+      return checkpoint.application_declaration().has_value() &&
+          checkpoint.application_journal().has_value();
     case effect_restart_disposition::continue_before_lifecycle:
     case effect_restart_disposition::start_application:
     case effect_restart_disposition::continue_after_application:
@@ -215,12 +242,15 @@ effect_restart_checkpoint::effect_restart_checkpoint(
     std::vector<pkgapply_exec::lifecycle_execution_result> after,
     std::optional<pkgstate::state_publication_request> publication_request,
     std::optional<pkgstate::state_publication_receipt> publication_receipt,
+    std::optional<pkgapply::application_journal_declaration>
+        application_declaration,
     std::optional<pkgapply::application_journal_record> application_journal)
     : session_(std::move(session)), record_(std::move(record)),
       before_(std::move(before)), application_(std::move(application)),
       after_(std::move(after)),
       publication_request_(std::move(publication_request)),
       publication_receipt_(std::move(publication_receipt)),
+      application_declaration_(std::move(application_declaration)),
       application_journal_(std::move(application_journal))
 {
 }
@@ -233,12 +263,21 @@ effect_restart_checkpoint effect_restart_checkpoint::make(
     std::vector<pkgapply_exec::lifecycle_execution_result> after,
     std::optional<pkgstate::state_publication_request> publication_request,
     std::optional<pkgstate::state_publication_receipt> publication_receipt,
+    std::optional<pkgapply::application_journal_declaration>
+        application_declaration,
     std::optional<pkgapply::application_journal_record> application_journal)
 {
   if (record.session() != session.identity() ||
       record.before_total() != session.before().size() ||
       record.after_total() != session.after().size())
     invalid_checkpoint("controller journal belongs to another effect session");
+
+  if (application_declaration.has_value() != application_journal.has_value())
+    invalid_checkpoint(
+        "application restart declaration and owner projection disagree");
+  if (application_declaration)
+    validate_application_declaration_projection(
+        session, *application_declaration, *application_journal);
 
   if (before.size() != record.before().size())
     invalid_checkpoint("pre-lifecycle checkpoint evidence is incomplete");
@@ -253,7 +292,7 @@ effect_restart_checkpoint effect_restart_checkpoint::make(
   const bool ahead_application =
       application.has_value() && !record.application().has_value() &&
       record.stage() == effect_attempt_stage::application_intent &&
-      application_journal.has_value();
+      application_declaration.has_value() && application_journal.has_value();
   if (application.has_value() != record.application().has_value() &&
       !ahead_application)
     invalid_checkpoint("application checkpoint presence differs from journal");
@@ -322,7 +361,7 @@ effect_restart_checkpoint effect_restart_checkpoint::make(
       std::move(session), std::move(record), std::move(before),
       std::move(application), std::move(after),
       std::move(publication_request), std::move(publication_receipt),
-      std::move(application_journal));
+      std::move(application_declaration), std::move(application_journal));
 }
 
 const effectful_operation_session&
@@ -341,6 +380,9 @@ effect_restart_checkpoint::publication_request() const noexcept
 const std::optional<pkgstate::state_publication_receipt>&
 effect_restart_checkpoint::publication_receipt() const noexcept
 { return publication_receipt_; }
+const std::optional<pkgapply::application_journal_declaration>&
+effect_restart_checkpoint::application_declaration() const noexcept
+{ return application_declaration_; }
 const std::optional<pkgapply::application_journal_record>&
 effect_restart_checkpoint::application_journal() const noexcept
 { return application_journal_; }

@@ -12,6 +12,7 @@
 #include <string>
 
 #include <libpkgapply/backend.h>
+#include <libpkgapply/journal_transport.h>
 #include <libpkgimage/package_archive.h>
 #include <libpkgexec/backend.h>
 #include <libpkgstate/canonical_store.h>
@@ -89,6 +90,7 @@ public:
   from_lock_directory_fd(
       int lock_directory_fd,
       pkgapply::application_backend& application_backend,
+      pkgapply::application_journal_store& application_journal_store,
       pkgexec::execution_backend& lifecycle_backend,
       pkgstate::canonical_store& state_store,
       transaction_effect_archive_source& archives,

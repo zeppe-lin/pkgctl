@@ -855,10 +855,56 @@ public:
         "construction runtime reached removal application authority");
   }
 
+  std::unique_ptr<pkgapply::application_backend_transaction>
+  resume_with_incoming_image(
+      const pkgapply::package_application_request&,
+      pkgapply::target_mutation_lease&,
+      const pkgapply::application_restart_view&,
+      const pkgimage::package_image&) override
+  {
+    throw std::runtime_error(
+        "construction runtime reached incoming application restart");
+  }
+
+  std::unique_ptr<pkgapply::application_backend_transaction>
+  resume_without_incoming_image(
+      const pkgapply::package_application_request&,
+      pkgapply::target_mutation_lease&,
+      const pkgapply::application_restart_view&) override
+  {
+    throw std::runtime_error(
+        "construction runtime reached removal application restart");
+  }
+
 private:
   pkgapply::mutation_backend_identity mutation_;
   pkgapply::observation_backend_identity observation_;
   pkgapply::execution_capability_profile_identity capabilities_;
+};
+
+class unreachable_runtime_application_journal_store final
+    : public pkgapply::application_journal_store {
+public:
+  pkgapply::application_journal_declaration publish_declaration(
+      const pkgapply::application_journal_declaration&) override
+  { throw std::runtime_error("construction runtime reached journal publication"); }
+  pkgapply::application_journal_step publish_step(
+      const pkgapply::application_journal_step&) override
+  { throw std::runtime_error("construction runtime reached journal publication"); }
+  pkgapply::application_journal_cursor compare_and_publish_cursor(
+      const std::optional<pkgapply::application_journal_cursor_identity>&,
+      const pkgapply::application_journal_cursor&) override
+  { throw std::runtime_error("construction runtime reached cursor publication"); }
+  std::optional<pkgapply::application_journal_declaration> load_declaration(
+      const pkgapply::application_journal_declaration_identity&) override
+  { throw std::runtime_error("construction runtime reached journal load"); }
+  std::optional<pkgapply::application_journal_cursor> load_cursor(
+      const pkgapply::application_journal_declaration_identity&) override
+  { throw std::runtime_error("construction runtime reached cursor load"); }
+  std::optional<pkgapply::application_journal_step> load_step(
+      const pkgapply::application_journal_declaration_identity&,
+      std::uint64_t) override
+  { throw std::runtime_error("construction runtime reached journal load"); }
 };
 
 class forbidden_recovery_execution_backend final
@@ -2977,6 +3023,7 @@ void check_posix_transaction_run_runtime_recovery()
   unreachable_operation_recovery_context_source operation_recovery;
   forbidden_runtime_archive_source archives;
   unreachable_runtime_application_backend application_backend;
+  unreachable_runtime_application_journal_store application_journals;
   forbidden_recovery_execution_backend recovery_backend;
 
   const int run_fd = open_runtime_directory(run_path);
@@ -2988,7 +3035,7 @@ void check_posix_transaction_run_runtime_recovery()
       {progress_source, execution, operation_execution, operation_recovery,
        archives},
       {recovery_backend, recovery_backend, application_backend,
-       recovery_backend, state_store});
+       application_journals, recovery_backend, state_store});
   CHECK(::close(run_fd) == 0);
   CHECK(::close(evidence_fd) == 0);
   CHECK(::close(effect_fd) == 0);
@@ -3041,6 +3088,7 @@ void check_posix_transaction_run_runtime()
   forbidden_runtime_archive_source archives;
   fixture_backend execution_backend(backend_mode::succeed);
   unreachable_runtime_application_backend application_backend;
+  unreachable_runtime_application_journal_store application_journals;
 
   const auto run_path = temporary.path() / "run-store";
   const auto selected_run_path = temporary.path() / "run-store-selected";
@@ -3063,7 +3111,7 @@ void check_posix_transaction_run_runtime()
       {progress_source, execution, operation_execution, operation_recovery,
        archives},
       {execution_backend, execution_backend, application_backend,
-       execution_backend, state_store});
+       application_journals, execution_backend, state_store});
   CHECK(::close(run_fd) == 0);
   CHECK(::close(evidence_fd) == 0);
   CHECK(::close(effect_fd) == 0);
@@ -3125,7 +3173,7 @@ void check_posix_transaction_run_runtime()
           {progress_source, execution, operation_execution,
            operation_recovery, archives},
           {execution_backend, execution_backend, application_backend,
-           execution_backend, state_store});
+           application_journals, execution_backend, state_store});
     }
     catch (...)
     {
@@ -3262,6 +3310,7 @@ void check_native_posix_transaction_run_runtime()
   unreachable_native_effect_restart_body_source effect_restart_bodies;
   fixture_backend execution_backend(backend_mode::succeed);
   unreachable_runtime_application_backend application_backend;
+  unreachable_runtime_application_journal_store application_journals;
   pkgimage::libarchive_backend archive_backend;
 
   const auto run_path = root / "run-store";
@@ -3284,7 +3333,7 @@ void check_native_posix_transaction_run_runtime()
         operation_runtime_configuration,
         {installed_packages, operation_specifications, effect_restart_bodies},
         {&execution_backend, &execution_backend, application_backend,
-         &execution_backend, state_store, archive_backend});
+         application_journals, &execution_backend, state_store, archive_backend});
   }
   catch (const pkgctl::native_transaction_run_runtime_error& problem)
   {

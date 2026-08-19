@@ -271,7 +271,6 @@ require_absent private-artifact-root "$runtime/artifacts"
 for directory in \
   target-locks \
   application-journals \
-  application-checkpoints \
   payload \
   capture \
   rejected \

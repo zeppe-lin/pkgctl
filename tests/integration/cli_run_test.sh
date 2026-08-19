@@ -221,7 +221,6 @@ for directory in \
   effects \
   target-locks \
   application-journals \
-  application-checkpoints \
   payload \
   capture \
   rejected \

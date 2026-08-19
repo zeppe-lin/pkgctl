@@ -1206,12 +1206,21 @@ public:
 
     if (record.stage() == effect_attempt_stage::application_intent)
     {
-      result.application_journal = application_journals_.load_active(
-          session.request().application().identity());
-      if (!result.application_journal)
+      const auto active_declaration =
+          application_journals_.load_active_declaration(
+              session.request().application().identity());
+      if (!active_declaration)
         throw std::runtime_error(
-            "interrupted application intent has no active application journal");
+            "interrupted application intent has no active application declaration");
+      result.application_declaration =
+          application_journals_.load_declaration(*active_declaration);
+      if (!result.application_declaration ||
+          result.application_declaration->identity() != *active_declaration)
+        throw std::runtime_error(
+            "active application declaration is missing or changed");
 
+      result.application_journal = pkgapply::rehydrate_application_journal(
+          application_journals_, *active_declaration);
       const auto application_restart = pkgapply::assess_application_restart(
           *result.application_journal);
       if (application_restart.disposition() ==
@@ -1978,7 +1987,7 @@ void require_operation_command_authority(
   const std::vector<std::string> common{
       transaction.identity().hex(), binding.identity().string(),
       target_root.string(), command.runtime_root.string(),
-      "libpkgapply-posix/3.1"};
+      "libpkgapply-posix/4.0"};
   auto fields = [&](std::string role, std::filesystem::path path = {}) {
     auto result = common;
     result.insert(result.begin(), std::move(role));
@@ -1999,8 +2008,7 @@ void require_operation_command_authority(
       [&]() {
         auto mutation_fields = fields("mutation", target_root);
         for (const auto* name : {
-                 "application-journals", "application-checkpoints", "payload",
-                 "capture", "rejected", "completed"})
+                 "payload", "capture", "rejected", "completed"})
           mutation_fields.push_back(runtime_path(command, name).string());
         return derived_digest_identity<pkgapply::mutation_backend_identity>(
             "pkgctl/native-command-mutation-backend/1", mutation_fields);
@@ -2632,8 +2640,6 @@ int execute_transaction_run(transaction_run_command command)
     auto target_locks = open_directory(runtime_path(command, "target-locks"));
     auto application_journal_directory = open_directory(
         runtime_path(command, "application-journals"));
-    auto application_checkpoint_directory = open_directory(
-        runtime_path(command, "application-checkpoints"));
     auto payload_directory = open_directory(runtime_path(command, "payload"));
     auto capture_directory = open_directory(runtime_path(command, "capture"));
     auto rejected_directory = open_directory(runtime_path(command, "rejected"));
@@ -2649,12 +2655,10 @@ int execute_transaction_run(transaction_run_command command)
         pkgapply::posix::application_journal_store::from_directory_fd(
             application_journal_directory.get());
     private_effect_body_store effect_bodies(
-        runtime_path(command, "effect-bodies"), application_journals);
+        runtime_path(command, "effect-bodies"), *application_journals);
     auto application_backend =
         pkgapply::posix::application_posix_backend::from_directory_fds(
-            application_target, target_root.get(),
-            application_journal_directory.get(),
-            application_checkpoint_directory.get(), payload_directory.get(),
+            application_target, target_root.get(), payload_directory.get(),
             capture_directory.get(), rejected_directory.get(),
             completed_directory.get());
     auto state_store =
@@ -2679,8 +2683,8 @@ int execute_transaction_run(transaction_run_command command)
         {installed_packages, operation_authority, effect_bodies,
          &operation_authority, &effect_bodies, &operation_authority},
         {current_execution_backend.get(), current_execution_backend.get(),
-         *application_backend, current_execution_backend.get(), state_store,
-         archive_backend});
+         *application_backend, *application_journals,
+         current_execution_backend.get(), state_store, archive_backend});
     return drive_runtime(*runtime);
   }
 }

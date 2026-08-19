@@ -127,11 +127,13 @@ struct continuation_runtime final {
           publication_state_value,
       std::unique_ptr<pkgimage::package_archive> archive_value,
       pkgapply::application_backend& application_value,
+      pkgapply::application_journal_store& application_journal_value,
       pkgexec::execution_backend& lifecycle_value,
       pkgstate::canonical_store& store_value)
       : lease(std::move(lease_value)), state(std::move(state_value)),
         publication_state(std::move(publication_state_value)),
         archive(std::move(archive_value)), application(application_value),
+        application_journal(application_journal_value),
         lifecycle(lifecycle_value), store(store_value)
   {
   }
@@ -141,6 +143,7 @@ struct continuation_runtime final {
   std::optional<pkgapply::lease_bound_state_projection> publication_state;
   std::unique_ptr<pkgimage::package_archive> archive;
   pkgapply::application_backend& application;
+  pkgapply::application_journal_store& application_journal;
   pkgexec::execution_backend& lifecycle;
   pkgstate::canonical_store& store;
 };
@@ -151,7 +154,8 @@ public:
       std::shared_ptr<continuation_runtime> runtime)
       : runtime_(std::move(runtime)), driver_(
             runtime_->state.projection(), *runtime_->lease,
-            runtime_->application, runtime_->archive.get(),
+            runtime_->application, runtime_->application_journal,
+            runtime_->archive.get(),
             runtime_->lifecycle, runtime_->store,
             runtime_->publication_state ? &*runtime_->publication_state : nullptr)
   {
@@ -194,9 +198,9 @@ public:
 
   pkgapply::application_receipt resume_application(
       const pkgapply::package_application_request& request,
-      const pkgapply::application_journal_record& journal) override
+      const pkgapply::application_journal_declaration_identity& declaration) override
   {
-    return driver_.resume_application(request, journal);
+    return driver_.resume_application(request, declaration);
   }
 
 private:
@@ -335,12 +339,14 @@ public:
   implementation(
       int lock_directory_fd,
       pkgapply::application_backend& application_backend,
+      pkgapply::application_journal_store& application_journal_store,
       pkgexec::execution_backend& lifecycle_backend,
       pkgstate::canonical_store& state_store,
       transaction_effect_archive_source& archives,
       transaction_effect_body_sink* bodies)
       : lock_directory_fd_(lock_directory_fd),
         application_backend_(application_backend),
+        application_journal_store_(application_journal_store),
         lifecycle_backend_(lifecycle_backend), state_store_(state_store),
         archives_(archives), bodies_(bodies)
   {
@@ -366,8 +372,8 @@ public:
       publication_state = historical->admitted_state_projection();
     return std::make_shared<continuation_runtime>(
         std::move(lease), std::move(state), std::move(publication_state),
-        std::move(archive), application_backend_, lifecycle_backend_,
-        state_store_);
+        std::move(archive), application_backend_, application_journal_store_,
+        lifecycle_backend_, state_store_);
   }
 
   transaction_effect_body_sink* bodies() const noexcept
@@ -387,6 +393,7 @@ public:
 private:
   int lock_directory_fd_;
   pkgapply::application_backend& application_backend_;
+  pkgapply::application_journal_store& application_journal_store_;
   pkgexec::execution_backend& lifecycle_backend_;
   pkgstate::canonical_store& state_store_;
   transaction_effect_archive_source& archives_;
@@ -397,6 +404,7 @@ std::unique_ptr<posix_transaction_effect_driver_source>
 posix_transaction_effect_driver_source::from_lock_directory_fd(
     int lock_directory_fd,
     pkgapply::application_backend& application_backend,
+    pkgapply::application_journal_store& application_journal_store,
     pkgexec::execution_backend& lifecycle_backend,
     pkgstate::canonical_store& state_store,
     transaction_effect_archive_source& archives,
@@ -404,8 +412,8 @@ posix_transaction_effect_driver_source::from_lock_directory_fd(
 {
   fd_owner retained(duplicate_lock_directory(lock_directory_fd));
   auto state = std::make_unique<implementation>(
-      retained.release(), application_backend, lifecycle_backend,
-      state_store, archives, bodies);
+      retained.release(), application_backend, application_journal_store,
+      lifecycle_backend, state_store, archives, bodies);
   return std::unique_ptr<posix_transaction_effect_driver_source>(
       new posix_transaction_effect_driver_source(std::move(state)));
 }

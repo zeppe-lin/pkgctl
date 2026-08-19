@@ -83,7 +83,9 @@ for required in \
   'operation-session' \
   'operation-archive' \
   'record.stage() == effect_attempt_stage::application_intent' \
-  'application_journals_.load_active(' \
+  'application_journals_.load_active_declaration(' \
+  'pkgapply::rehydrate_application_journal(' \
+  'application_journals_.load_declaration(' \
   'result.application_journal->receipt()' \
   'read_optional(' \
   'result.application = std::move(body)' \
@@ -498,7 +500,11 @@ for required_restart_test in \
   'started operation lacks retained session authority' \
   'missing-session-run-record' \
   'missing-archive-run-record' \
-  'effect.application-journal=$application_journal' \
+  'effect_application_journal=$(sed -n' \
+  'declaration.bin' \
+  'cursor.bin' \
+  'journal-*.bin' \
+  'complete application journal snapshot survived generation-4 migration' \
   'not-an-application-journal-identity' \
   'durable-steps 0'; do
   grep -F -- "$required_restart_test" "$restart_integration" >/dev/null || {
@@ -589,11 +595,28 @@ if grep -R -F 'PTRACE_' "$srcdir/cli" "$srcdir/src" "$srcdir/include" \
   exit 1
 fi
 
+if grep -R -F 'application-checkpoints' "$srcdir/cli" "$srcdir/src" \
+    "$srcdir/include" >/dev/null 2>&1; then
+  echo 'production controller retains retired application checkpoint namespace' >&2
+  exit 1
+fi
+
+for forbidden_application_snapshot in \
+  'encode_application_journal(' \
+  'decode_application_journal('; do
+  if grep -R -F "$forbidden_application_snapshot" \
+      "$srcdir/cli" "$srcdir/src" "$srcdir/include" >/dev/null 2>&1; then
+    echo "production controller persists or decodes complete application journal snapshots: $forbidden_application_snapshot" >&2
+    exit 1
+  fi
+done
+
 
 for documented in \
   'Release 0.35.0 closes the functional package-management chain' \
   'Release 0.35.0 bounded native command boundary' \
   'Release 0.35.0 bounded native command qualification' \
+  'Version 0.41.0 uses libpkgapply 4.0.1 and libpkgapply-posix 4.0.0' \
   'Version 0.40.4 requires libpkgapply-posix 3.2.3' \
   'Version 0.40.3 preserves subordinate application uncertainty' \
   'Version 0.40.2 requires libpkgapply-posix 3.2.2' \

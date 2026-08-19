@@ -466,9 +466,10 @@ The final command suite must prove:
   completed and externally blocked resumes are separately exercised under a supervisor that
   cannot traverse the original build-tree interpreter pathname;
 - effect bodies are durably retained through owner codecs before journal records
-  name them, interrupted application recovery uses direct active-request lookup
-  rather than enumeration, and later application/terminal replay does not feed
-  a receipt-named historical application journal back into the restart checkpoint;
+  name them; interrupted application recovery uses direct active-request
+  declaration lookup followed by libpkgapply-owned history rehydration rather
+  than enumeration, while later application/terminal replay does not treat a
+  receipt-named historical application journal as restart authority;
 - runtime namespaces are existing-only and no parse refusal creates runtime,
   build, or target paths; a malformed caller-owned execution root is retained
   as terminal construction evidence and the command surfaces its durable backend
@@ -937,12 +938,13 @@ reference but die before its post-sync marker.
 The restarted command must first refuse when the exact retained operation
 observation body is temporarily absent, without advancing either run or effect
 journal. Restoring those immutable bytes must let the same nonce resume after
-the live collection is removed, consume the exact pre-crash application journal,
-complete target mutation and state publication, and retain that journal identity
-in terminal effect evidence. Finally, corrupting the active application-journal
+the live collection is removed, reopen the exact pre-crash application
+declaration, rehydrate its append-only owner history, complete target mutation
+and state publication, and retain the application receipt's journal identity in
+terminal effect evidence. Finally, corrupting the active application-declaration
 locator after terminal completion must not affect a repeated zero-step resume;
-subordinate application-journal authority is consulted only while the owning
-effect stage is `application_intent`.
+subordinate application history is consulted only while the owning effect stage
+is `application_intent`.
 
 `pkgctl:cli-run-publication-restart` qualifies the next recoverable effect
 boundary. Its test-only ptrace supervisor recognizes only the canonical POSIX

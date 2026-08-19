@@ -753,7 +753,7 @@ transaction_effect_driver::publication_state_projection() const noexcept
 
 pkgapply::application_receipt transaction_effect_driver::resume_application(
     const pkgapply::package_application_request&,
-    const pkgapply::application_journal_record&)
+    const pkgapply::application_journal_declaration_identity&)
 {
   throw error(error_code::invalid_effect_session,
               "effect driver does not support application restart");
@@ -763,11 +763,13 @@ native_transaction_effect_driver::native_transaction_effect_driver(
     const pkgapply::lease_bound_state_projection& state,
     pkgapply::target_mutation_lease& lease,
     pkgapply::application_backend& application_backend,
+    pkgapply::application_journal_store& application_journal_store,
     const pkgimage::package_archive* incoming_archive,
     pkgexec::execution_backend& lifecycle_backend,
     pkgstate::canonical_store& state_store,
     const pkgapply::lease_bound_state_projection* publication_state)
     : state_(state), lease_(lease), application_backend_(application_backend),
+      application_journal_store_(application_journal_store),
       incoming_archive_(incoming_archive), lifecycle_backend_(lifecycle_backend),
       state_store_(state_store),
       publication_state_(publication_state != nullptr ? publication_state : &state)
@@ -800,7 +802,8 @@ native_transaction_effect_driver::apply_application(
       throw error(error_code::invalid_effect_session,
                   "installation effect lacks incoming archive authority");
     return pkgapply::apply(
-        *value, state_, lease_, application_backend_, *incoming_archive_);
+        *value, state_, lease_, application_backend_,
+        application_journal_store_, *incoming_archive_);
   }
   if (const auto* value = request.upgrade())
   {
@@ -808,10 +811,12 @@ native_transaction_effect_driver::apply_application(
       throw error(error_code::invalid_effect_session,
                   "upgrade effect lacks incoming archive authority");
     return pkgapply::apply(
-        *value, state_, lease_, application_backend_, *incoming_archive_);
+        *value, state_, lease_, application_backend_,
+        application_journal_store_, *incoming_archive_);
   }
   if (const auto* value = request.removal())
-    return pkgapply::apply(*value, state_, lease_, application_backend_);
+    return pkgapply::apply(
+        *value, state_, lease_, application_backend_, application_journal_store_);
   throw error(error_code::invalid_effect_session,
               "application request has no operation body");
 }
@@ -819,7 +824,7 @@ native_transaction_effect_driver::apply_application(
 pkgapply::application_receipt
 native_transaction_effect_driver::resume_application(
     const pkgapply::package_application_request& request,
-    const pkgapply::application_journal_record& journal)
+    const pkgapply::application_journal_declaration_identity& declaration)
 {
   if (const auto* value = request.installation())
   {
@@ -827,8 +832,8 @@ native_transaction_effect_driver::resume_application(
       throw error(error_code::invalid_effect_session,
                   "installation restart lacks incoming archive authority");
     return pkgapply::resume_application(
-        *value, state_, lease_, application_backend_, journal,
-        *incoming_archive_);
+        *value, state_, lease_, application_backend_, application_journal_store_,
+        declaration, *incoming_archive_);
   }
   if (const auto* value = request.upgrade())
   {
@@ -836,12 +841,13 @@ native_transaction_effect_driver::resume_application(
       throw error(error_code::invalid_effect_session,
                   "upgrade restart lacks incoming archive authority");
     return pkgapply::resume_application(
-        *value, state_, lease_, application_backend_, journal,
-        *incoming_archive_);
+        *value, state_, lease_, application_backend_, application_journal_store_,
+        declaration, *incoming_archive_);
   }
   if (const auto* value = request.removal())
     return pkgapply::resume_application(
-        *value, state_, lease_, application_backend_, journal);
+        *value, state_, lease_, application_backend_, application_journal_store_,
+        declaration);
   throw error(error_code::invalid_effect_session,
               "application restart request has no operation body");
 }
@@ -1314,7 +1320,8 @@ effect_restart_result resume_effectful_operation(
     return effect_restart_result(assessment.disposition(), journal, std::nullopt);
   if (assessment.disposition() ==
           effect_restart_disposition::resume_application &&
-      !checkpoint.application_journal())
+      (!checkpoint.application_declaration() ||
+       !checkpoint.application_journal()))
     return effect_restart_result(
         effect_restart_disposition::external_resolution_required,
         journal, std::nullopt);
@@ -1501,8 +1508,12 @@ effect_restart_result resume_effectful_operation(
       journal = append_record(journal_store, journal.begin_application());
     if (assessment.disposition() == effect_restart_disposition::resume_application)
     {
+      if (!checkpoint.application_declaration())
+        throw error(
+            error_code::invalid_effect_session,
+            "application restart lacks exact declaration authority");
       application = physical.resume_application(
-          request.application(), *checkpoint.application_journal());
+          request.application(), checkpoint.application_declaration()->identity());
     }
     else
       application = physical.apply_application(request.application());

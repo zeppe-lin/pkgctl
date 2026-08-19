@@ -4,8 +4,8 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.40.4
-latest_release=0.40.4
+version=0.41.0
+latest_release=0.41.0
 
 require_line()
 {
@@ -22,13 +22,13 @@ require_line "$srcdir/meson.build" "  meson_version: '>=1.6.0',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 40;'
+  'inline constexpr unsigned version_minor = 41;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_patch = 4;'
+  'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.40.4";'
+  'inline constexpr const char* version_string = "0.41.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 40);'
+  'static_assert(pkgctl::version_minor == 41);'
 
 require_dependency_range()
 {
@@ -49,7 +49,7 @@ require_dependency_range libpkgcatalog '>=4.0.0' '<5.0.0'
 require_dependency_range libpkgcatalog-codec '>=4.0.0' '<5.0.0'
 require_dependency_range libpkgcatalog-acquire '>=4.0.0' '<5.0.0'
 require_dependency_range libpkgstate '>=3.1.0' '<4.0.0'
-require_dependency_range libpkgstate-apply '>=3.1.1' '<4.0.0'
+require_dependency_range libpkgstate-apply '>=3.1.2' '<4.0.0'
 require_dependency_range libpkgfetch '>=3.0.0' '<4.0.0'
 require_dependency_range libpkgsource-exec '>=0.1.0' '<1.0.0'
 require_dependency_range libpkgbuild '>=3.0.2' '<4.0.0'
@@ -63,11 +63,12 @@ require_dependency_range libpkgcheck '>=0.3.0' '<1.0.0'
 require_dependency_range libpkgcheck-exec '>=0.9.0' '<1.0.0'
 require_dependency_range libpkgplan '>=0.3.0' '<1.0.0'
 require_dependency_range libpkgexec '>=2.2.0' '<3.0.0'
-require_dependency_range libpkgapply '>=3.0.1' '<4.0.0'
-require_dependency_range libpkgapply-posix '>=3.2.3' '<4.0.0'
-require_dependency_range libpkgapply-exec '>=3.0.1' '<4.0.0'
+require_dependency_range libpkgapply '>=4.0.1' '<5.0.0'
+require_dependency_range libpkgapply-posix '>=4.0.0' '<5.0.0'
+require_dependency_range libpkgapply-exec '>=3.0.2' '<4.0.0'
 require_dependency_range libpkgexec-linux '>=0.7.1' '<1.0.0'
 
+grep -F '## 0.41.0 - 2026-08-19' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.40.4 - 2026-08-18' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.40.3 - 2026-08-18' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.40.2 - 2026-08-18' "$srcdir/HISTORY.md" >/dev/null
@@ -83,6 +84,7 @@ grep -F '`Unreleased` does not predict the next version number or release class.
 grep -F '## 0.36.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.35.1 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.35.0 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
+grep -F 'Release 0.41.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.40.4' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.40.3' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.40.2' "$srcdir/README.md" >/dev/null
@@ -93,6 +95,7 @@ grep -F 'Release 0.38.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.37.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.36.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.41.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.4' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.3' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.2' "$srcdir/man/pkgctl.1.scd" >/dev/null

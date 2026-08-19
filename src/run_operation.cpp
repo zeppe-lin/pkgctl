@@ -633,6 +633,7 @@ native_transaction_operation_authority_source::checkpoint(
         std::move(bodies.application), std::move(bodies.after),
         std::move(bodies.publication_request),
         std::move(bodies.publication_receipt),
+        std::move(bodies.application_declaration),
         std::move(bodies.application_journal));
   }
   catch (const native_operation_authority_error&)

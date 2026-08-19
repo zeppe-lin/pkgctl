@@ -20,7 +20,8 @@ for evidence in \
   'pkgctl::transaction_run_restart_checkpoint::make' \
   'pkgctl::reconcile_operation_dispatch_durable' \
   'pkgapply::posix::application_journal_store::open' \
-  '.load_active(' \
+  'load_active_declaration(' \
+  'pkgapply::rehydrate_application_journal(' \
   'pkgctl::effect_attempt_stage::publication_terminal' \
   'pkgctl::effect_attempt_stage::application_terminal' \
   'application_resume_calls()' \
