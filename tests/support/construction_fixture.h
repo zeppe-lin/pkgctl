@@ -178,6 +178,10 @@ inline pkgsource::source_snapshot package_source_with_requirements(
             origin, "requirements.check[" + std::to_string(index) + "]",
             20 + static_cast<std::uint32_t>(index), 5));
   }
+  std::optional<program> check_program;
+  if (!check_dependencies.empty())
+    check_program = program(program_language::posix_shell, "true\n");
+
   return seal_source(
       source_origin(origin),
       recipe_declaration(
@@ -189,7 +193,8 @@ inline pkgsource::source_snapshot package_source_with_requirements(
           architecture_requirements(
               {architecture_reference("x86_64")},
               {architecture_reference("x86_64")}),
-          declaration_provenance(origin, "$", 1, 1)),
+          declaration_provenance(origin, "$", 1, 1),
+          std::move(check_program)),
       profile_catalog::seal({}));
 }
 
