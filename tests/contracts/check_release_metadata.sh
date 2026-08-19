@@ -203,10 +203,26 @@ awk '
   current { print }
 ' "$srcdir/HISTORY.md" > "$temporary.unreleased"
 
-if grep -q '[^[:space:]]' "$temporary.unreleased"; then
-  echo 'release commit must leave a new empty Unreleased section' >&2
+grep -F 'Corrects build-frontend authority so the exact BUILD/CHECK subject remains' \
+  "$temporary.unreleased" >/dev/null || {
+  echo 'Unreleased history omits direct build-subject authority correction' >&2
   exit 1
-fi
+}
+grep -F '`pkgctl build` no longer manufactures global `prefer-catalog`' \
+  "$temporary.unreleased" >/dev/null || {
+  echo 'Unreleased history omits dependency-preference authority correction' >&2
+  exit 1
+}
+grep -F 'artifact import, cache discovery, dependency reconstruction, or a resolver API.' \
+  "$temporary.unreleased" >/dev/null || {
+  echo 'Unreleased history omits the negative reuse boundary' >&2
+  exit 1
+}
+grep -F 'Old private build command evidence carrying the surplus global preference is' \
+  "$temporary.unreleased" >/dev/null || {
+  echo 'Unreleased history omits fail-closed old build-evidence behavior' >&2
+  exit 1
+}
 
 awk '
   /^## 0\.42\.1 / { current = 1; next }
