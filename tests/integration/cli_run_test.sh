@@ -298,6 +298,9 @@ require_contains malformed-root-stderr "$root/malformed-root.err" \
 require_equal malformed-root-state "$initial_state" \
   "$($state_inspect_fixture "$state")"
 require_absent malformed-root-target "$target/usr/bin/pkgctl-fixture"
+malformed_command_evidence="$runtime/command-evidence/command-$broken_nonce.pce"
+[ -s "$malformed_command_evidence" ] || \
+  fail 'malformed-root: admitted failed run omitted command evidence'
 
 build=$root/build
 "$root_view_fixture" "$build"
@@ -317,10 +320,11 @@ journal=$(sed -n 's/^journal //p' "$root/start.out")
 [ "${#journal}" -eq 64 ] || \
   fail "start: journal identity has length ${#journal}, expected 64"
 
-command_evidence=$(find "$runtime/command-evidence" -maxdepth 1 -type f \
-  -name 'command-*.pce' -print)
-[ "$(printf '%s\n' "$command_evidence" | awk 'NF { count += 1 } END { print count + 0 }')" -eq 1 ] || \
-  fail 'start: expected exactly one retained command-evidence body'
+command_evidence="$runtime/command-evidence/command-$run_nonce.pce"
+[ -s "$command_evidence" ] || \
+  fail 'start: exact retained command-evidence body is absent'
+[ -s "$malformed_command_evidence" ] || \
+  fail 'start: erased retained command evidence from earlier failed run'
 grep -a -F -- "$build_root_view" "$command_evidence" >/dev/null || \
   fail 'start: command evidence omitted admitted construction/check root-view identity'
 grep -a -F -- "$lifecycle_root_view" "$command_evidence" >/dev/null || \

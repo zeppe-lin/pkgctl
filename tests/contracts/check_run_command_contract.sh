@@ -675,6 +675,16 @@ for documented in \
   }
 done
 
+for command_evidence_addressing_proof in \
+  'malformed_command_evidence="$runtime/command-evidence/command-$broken_nonce.pce"' \
+  'command_evidence="$runtime/command-evidence/command-$run_nonce.pce"' \
+  'start: erased retained command evidence from earlier failed run'; do
+  grep -F -- "$command_evidence_addressing_proof" "$integration" >/dev/null || {
+    echo "missing exact command-evidence addressing proof: $command_evidence_addressing_proof" >&2
+    exit 1
+  }
+done
+
 for interpreter_recovery_proof in \
   'interpreter_override=/bin/false' \
   'current interpreter differs from admitted run authority' \
