@@ -21,7 +21,7 @@ pkg-config --exists \
   'libpkgcatalog-acquire >= 4.0.0' 'libpkgcatalog-acquire < 5.0.0' \
   'libpkgfetch >= 3.0.0' 'libpkgfetch < 4.0.0' \
   'libpkgsource-exec >= 0.1.0' 'libpkgsource-exec < 1.0.0' \
-  'libpkgbuild >= 3.0.2' 'libpkgbuild < 4.0.0' \
+  'libpkgbuild >= 3.0.3' 'libpkgbuild < 4.0.0' \
   'libpkgbuild-exec >= 3.3.1' 'libpkgbuild-exec < 4.0.0' \
   'libpkgbuild-image >= 1.0.1' 'libpkgbuild-image < 2.0.0' \
   'libpkgimage-exec >= 0.1.0' 'libpkgimage-exec < 1.0.0' \

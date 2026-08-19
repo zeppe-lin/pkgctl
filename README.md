@@ -1,5 +1,11 @@
 # pkgctl
 
+Release 0.42.1 requires `libpkgbuild >= 3.0.3` so CHECK input authority is
+activated by exact CHECK-goal membership rather than by the mere presence of a
+CHECK declaration in a transitive BUILD-only recipe. pkgctl consumes that sealed
+resolver/build boundary; it does not synthesize CHECK edges for packages that are
+only being built.
+
 Release 0.42.0 makes execution-root identity explicit controller authority.
 Construction/check and lifecycle root-view identities are admitted independently
 from the managed target binding, retained in command evidence, and never

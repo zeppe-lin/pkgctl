@@ -152,6 +152,47 @@ inline pkgsource::source_snapshot package_source(
       profile_catalog::seal({}));
 }
 
+inline pkgsource::source_snapshot package_source_with_requirements(
+    std::string name,
+    std::vector<std::string> build_dependencies,
+    std::vector<std::string> check_dependencies)
+{
+  using namespace pkgsource;
+  const auto origin = name + "/recipe.yml";
+  std::vector<requirement_declaration> requirements;
+  for (std::size_t index = 0; index < build_dependencies.size(); ++index)
+  {
+    requirements.emplace_back(
+        requirement_scope::build(),
+        requirement_subject(package_reference(build_dependencies[index])),
+        declaration_provenance(
+            origin, "requirements.build[" + std::to_string(index) + "]",
+            10 + static_cast<std::uint32_t>(index), 5));
+  }
+  for (std::size_t index = 0; index < check_dependencies.size(); ++index)
+  {
+    requirements.emplace_back(
+        requirement_scope::check(),
+        requirement_subject(package_reference(check_dependencies[index])),
+        declaration_provenance(
+            origin, "requirements.check[" + std::to_string(index) + "]",
+            20 + static_cast<std::uint32_t>(index), 5));
+  }
+  return seal_source(
+      source_origin(origin),
+      recipe_declaration(
+          package_release(package_reference(name), "1.0", 1),
+          package_metadata(
+              name, std::nullopt, std::nullopt, {"GPL-3.0-or-later"}),
+          {}, program(program_language::posix_shell, "true\n"),
+          std::move(requirements), {},
+          architecture_requirements(
+              {architecture_reference("x86_64")},
+              {architecture_reference("x86_64")}),
+          declaration_provenance(origin, "$", 1, 1)),
+      profile_catalog::seal({}));
+}
+
 inline pkgsource::source_snapshot dependency_source()
 {
   return package_source("dep");
@@ -375,13 +416,15 @@ inline pkgctl::transaction_session transaction_session(
 }
 
 inline const pkgtransaction::transaction_node& build_node(
-    const pkgctl::transaction_session& session)
+    const pkgctl::transaction_session& session,
+    std::string_view package = "tool")
 {
   for (const auto& node : session.program().nodes())
     if (node.action() == pkgtransaction::transaction_action_kind::build &&
-        node.package().name() == "tool")
+        node.package().name() == package)
       return node;
-  throw std::runtime_error("transaction fixture lacks build node");
+  throw std::runtime_error(
+      "transaction fixture lacks build node for " + std::string(package));
 }
 
 inline const pkgtransaction::transaction_node& install_node(

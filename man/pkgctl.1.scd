@@ -34,6 +34,11 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
+Version 0.42.1 requires libpkgbuild 3.0.3 so CHECK input authority follows
+exact CHECK-goal membership. A transitive BUILD-only package may declare CHECK
+requirements without causing pkgctl to invent CHECK resolution authority for that
+package.
+
 Version 0.42.0 separates execution-root identity from managed-target identity while continuing to use libpkgapply 4.0.1 and libpkgapply-posix 4.0.0. Application
 journal persistence is a separate owner-wired runtime authority, and restart
 uses an immutable declaration address plus libpkgapply-owned rehydration of the

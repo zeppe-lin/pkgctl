@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.42.1 - 2026-08-19
+
+- Requires libpkgbuild 3.0.3 so source-declared CHECK requirements become
+  construction authority only for exact selections admitted by CHECK goals.
+  Transitive BUILD-only selections may declare dormant CHECK requirements
+  without pkgctl manufacturing CHECK resolver authority or weakening missing
+  active-edge refusal.
+- Qualifies that boundary through controller construction of a transitive
+  BUILD-only package whose recipe declares both BUILD and CHECK requirements.
+
 ## 0.42.0 - 2026-08-19
 
 ### Explicit execution-root authority

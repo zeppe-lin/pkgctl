@@ -10,6 +10,11 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+Version 0.42.1 requires libpkgbuild 3.0.3 so declared CHECK requirements
+remain dormant for transitive BUILD-only selections and activate only when the
+resolver seals that exact selection as a CHECK-goal member. pkgctl neither
+manufactures CHECK edges nor treats source declaration as execution authority.
+
 Version 0.42.0 separates execution-root identity from managed-target identity.
 Version 0.41.0 separates application mutation mechanism from application
 journal persistence. The controller retains an exact declaration address and

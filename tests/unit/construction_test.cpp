@@ -1267,6 +1267,44 @@ void check_failed_build()
   CHECK(!fs::exists(session.paths().build.artifact_path));
 }
 
+void check_transitive_build_only_check_authority()
+{
+  test_support::temporary_directory temporary;
+  test_support::initialize_state(temporary.path() / "state");
+  pkgstate::posix::canonical_generation_store store(
+      temporary.path() / "state", test_support::binding());
+
+  tool_source_options options;
+  options.check_program = pkgsource::program(
+      pkgsource::program_language::posix_shell, "true\n");
+  const auto source = tool_source(sha256_text("root payload\n"),
+                                  std::move(options));
+  const auto dependency = package_source_with_requirements(
+      "dep", {"helper"}, {"helper"});
+  const auto helper = package_source("helper");
+  auto transaction = transaction_session(
+      source, {dependency, helper}, store.read(), temporary.path() / "state",
+      false, false, true);
+
+  bool dependency_check = false;
+  for (const auto& node : transaction.program().nodes())
+  {
+    if (node.action() == pkgtransaction::transaction_action_kind::check &&
+        node.package().name() == "dep")
+      dependency_check = true;
+  }
+  CHECK(!dependency_check);
+
+  const auto request = pkgctl::construction_request::make(
+      transaction, build_node(transaction, "dep").identity(),
+      pkgbuild::build_policy::make(
+          pkgbuild::environment_policy::hermetic(1, 0022, std::nullopt)));
+  CHECK(request.inputs().size() == 1U);
+  CHECK(request.inputs().front().scope() == pkgbuild::input_scope::build);
+  CHECK(request.inputs().front().package().name() == "helper");
+  CHECK(request.build().inputs().for_scope(pkgbuild::input_scope::check).empty());
+}
+
 void check_admission()
 {
   test_support::temporary_directory temporary;
@@ -4029,6 +4067,7 @@ int main()
     check_check_progression();
     check_failed_progression();
     check_failed_build();
+    check_transitive_build_only_check_authority();
     check_admission();
     check_identity_and_driver_contract();
     check_durable_dispatch_execution();
