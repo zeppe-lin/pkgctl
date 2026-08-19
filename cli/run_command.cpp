@@ -929,10 +929,10 @@ private:
   const auto& resolution_request =
       transaction.resolution().resolution().request();
   if (resolution_request.policy().preference() !=
-      pkgresolve::installed_preference::prefer_catalog)
+      pkgresolve::installed_preference::retain_compatible)
   {
     throw std::runtime_error(
-        "build frontend transaction lacks catalog preference authority");
+        "build frontend transaction carries global catalog preference authority");
   }
   if (transaction.request().convergence().mode() !=
       pkgtransaction::convergence_mode::preserve_unselected)

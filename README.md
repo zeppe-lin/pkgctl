@@ -84,12 +84,14 @@ resume to complete.
 
 Release 0.37.0 adds `pkgctl build PACKAGE`, the first package-artifact
 frontend. It is a constrained caller of the same sealed transaction and durable
-native run kernel as `pkgctl run`: the exact package becomes a build goal,
-`--check` adds its check goal, catalog authority is preferred, and the composed
-transaction must contain a catalog-backed build node for that exact package (plus
-its check node when requested). Installed authority therefore cannot silently
-satisfy a build request without construction. The frontend carries no lifecycle
-root, managed target root, lifecycle credentials,
+native run kernel as `pkgctl run`: the exact package becomes a build goal and
+`--check` adds its check goal.
+Those direct resolver goals require catalog candidates, while compatible
+dependency selections retain exact installed authority by default. The composed
+transaction must contain a catalog-backed build node for the exact requested
+package (plus its check node when requested), so installed authority cannot
+silently satisfy the direct build subject without construction. The frontend
+carries no lifecycle root, managed target root, lifecycle credentials,
 state-publication backend, target lock, or convergence policy.
 
 The frontend admits recipe syntax through `libpkgsource-yaml` 1.1.x and requires

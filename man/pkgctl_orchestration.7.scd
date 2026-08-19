@@ -114,12 +114,15 @@ completed.
 Version 0.37.0 exposes *pkgctl build package* as a constrained frontend over
 the existing transaction/run composition. It does not call construction
 adapters directly or introduce another scheduler. Fresh admission synthesizes
-the exact package build goal, optionally the exact package check goal, and
-selects catalog preference. The resulting transaction is admitted as build
-frontend authority only when the direct subject has a catalog-backed build node
-and, when requested, its check node. Compatible installed authority therefore
-cannot silently satisfy the build verb. Generic goal, convergence, lifecycle,
-target, and publication policy remain outside the frontend.
+the exact package build goal and optionally the exact package check goal. Those
+direct goals require catalog candidates, while the resolver retains compatible
+installed authority for flexible dependencies. The resulting transaction is
+admitted as build frontend authority only when the direct subject has a
+catalog-backed build node and, when requested, its check node. Compatible
+installed authority therefore cannot silently satisfy the direct build subject,
+and global catalog preference is not frontend authority. Generic goal,
+convergence, lifecycle, target, and publication policy remain outside the
+frontend.
 
 The caller supplies one existing public artifact root in addition to the private
 runtime and construction/check roots. Native session qualification keeps those

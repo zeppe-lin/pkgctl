@@ -172,13 +172,16 @@ owners.
 `pkgctl build PACKAGE` is not a second construction orchestrator. It constructs
 one ordinary transaction request and enters the same durable transaction-run
 kernel used by `pkgctl run`. The frontend owns only policy that belongs to its
-public verb: the exact package is a build goal, `--check` adds the corresponding
-check goal, and catalog authority is preferred. The composed transaction is then
-validated as frontend authority: it must retain exactly that package build goal,
-optional same-package check goal, preserve-unselected convergence, and a
-catalog-backed build node for the direct subject (plus its check node when
-requested). Installed state therefore cannot silently satisfy the public build
-verb without construction. Caller-supplied goals, convergence policy, and
+public verb: the exact package is a build goal and `--check` adds the corresponding
+check goal. The resolver requires catalog candidates for those direct
+BUILD/CHECK roots, while flexible dependency selection remains
+`retain_compatible`. The composed transaction is then validated as frontend
+authority: it must retain exactly that package build goal, optional same-package
+check goal, preserve-unselected convergence, retain-compatible resolution policy,
+and a catalog-backed build node for the direct subject (plus its check node when
+requested). Installed state therefore cannot silently satisfy the direct public
+build subject, while compatible installed dependencies remain valid exact input
+authority. Caller-supplied goals, convergence policy, and
 target-operation authority are invalid. A direct package goal is resolver-
 target-qualified even when its scope is `build`; only dependencies admitted by
 that scope are build-environment selections. Frontend validation therefore binds

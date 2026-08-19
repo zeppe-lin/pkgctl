@@ -644,7 +644,7 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
         if (!parsed.goals.empty())
           fail("build owns its build/check goals; --goal is invalid");
         if (parsed.prefer_catalog)
-          fail("build already requires catalog authority; --prefer-catalog is invalid");
+          fail("build owns direct-subject catalog authority; global --prefer-catalog is invalid");
         if (parsed.converge_exact)
           fail("--converge-exact is invalid for build");
       }
@@ -910,7 +910,6 @@ command parse_command(int argc, char** argv)
             "<command-line>:" +
                 std::to_string(*parsed.build_check_argument_index));
       }
-      parsed.prefer_catalog = true;
     }
     catch (const std::exception& problem)
     {
@@ -983,9 +982,10 @@ name or authoritative @profile. ACTION is pre-install, post-install,
 pre-remove, or post-remove.
 
 Build start owns its resolution goals. PACKAGE becomes an exact build goal;
---check adds the exact check goal, and catalog construction authority is
-preferred over an already installed package. --goal, --prefer-catalog, and
---converge-exact are therefore invalid for build.
+--check adds the exact check goal. Those direct build/check goals require the
+catalog candidate, while compatible dependency authority remains retained by
+the resolver. --goal, global --prefer-catalog, and --converge-exact are
+therefore invalid for build.
 
 Transaction options:
   --converge-exact                remove installed packages outside the exact

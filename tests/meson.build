@@ -37,6 +37,13 @@ if not get_option('tests').disabled()
   )
   test('cli-execution-report', cli_execution_report_test, suite: 'unit')
 
+  cli_options_test = executable(
+    'cli-options-test',
+    ['unit/cli_options_test.cpp', '../cli/options.cpp'],
+    dependencies: pkgctl_core_dep,
+  )
+  test('cli-options', cli_options_test, suite: 'unit')
+
   dispatch_test = executable(
     'dispatch-test',
     'unit/dispatch_test.cpp',
@@ -112,6 +119,17 @@ if not get_option('tests').disabled()
       static: want_static,
     ),
   ]
+  build_frontend_selection_test = executable(
+    'build-frontend-selection-test',
+    'integration/build_frontend_selection_test.cpp',
+    dependencies: pkgctl_core_dep,
+  )
+  test(
+    'build-frontend-selection',
+    build_frontend_selection_test,
+    suite: 'integration',
+  )
+
   package_pipeline_test = executable(
     'package-pipeline-test',
     'integration/package_pipeline_test.cpp',

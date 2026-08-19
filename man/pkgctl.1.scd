@@ -102,10 +102,12 @@ rerunning construction.
 Version 0.37.0 retains the native catalog, resolution, transaction, exact
 durable run/effect inspection, and bounded *run* command, and adds the
 construction-only *build* frontend. *build package* owns the exact package build
-goal; *--check* adds its exact check goal, and catalog authority is preferred so
-compatible installed state cannot satisfy a build request without producing an
-archive. The command enters through the same sealed transaction and durable native
-run kernel as *run* but carries no lifecycle root, target root, lifecycle
+goal and *--check* adds its exact check goal. Direct BUILD/CHECK roots require
+catalog candidates, while compatible dependency selections may retain exact
+installed authority. The direct package therefore cannot be silently satisfied by
+installed state without producing an archive. The command enters through the same
+sealed transaction and durable native run kernel as *run* but carries no lifecycle
+root, target root, lifecycle
 credentials, target-lock, application, or canonical-state publication authority.
 Its explicit existing *--artifact-root* is public package-output authority and is
 retained with the frontend kind in immutable command evidence; resume cannot
@@ -215,9 +217,11 @@ and the read-only command surface is unchanged.
 *build*
 	Start or resume one exact construction/check transaction through that same
 	native runtime. Fresh start takes one exact package subject; *--check* adds
-	its check action. The frontend owns catalog preference and cannot receive
-	target-operation or convergence authority. Immutable package archives are
-	published only beneath the explicit *--artifact-root*.
+	its check action. Direct build/check subjects require catalog candidates,
+	while compatible dependencies retain installed authority. The frontend cannot
+	receive global catalog preference, target-operation, or convergence authority.
+	Immutable package archives are published only beneath the explicit
+	*--artifact-root*.
 
 *inspect-run*
 	Open one explicitly named existing POSIX transaction-run store, inspect one
@@ -289,11 +293,13 @@ recovered from retained command evidence.
 
 _package_
 	Fresh *build* accepts exactly one package name. The frontend converts it to
-	an exact build-scope resolver goal and always prefers catalog authority. The
-	composed transaction must contain catalog-backed construction for that exact
-	package; installed authority cannot silently satisfy the build verb.
-	Caller-supplied *--goal*, *--prefer-catalog*, and *--converge-exact* policy
-	are invalid for this command. Resume does not repeat the package subject.
+	an exact build-scope resolver goal, which requires the catalog candidate for
+	that direct subject. Flexible dependencies retain compatible installed
+	authority by default. The composed transaction must contain catalog-backed
+	construction for the exact requested package; installed authority cannot
+	silently satisfy that direct subject. Caller-supplied *--goal*, global
+	*--prefer-catalog*, and *--converge-exact* policy are invalid for this command.
+	Resume does not repeat the package subject.
 
 *--check*
 	Fresh *build* also admits the exact package check-scope goal. Build and check

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Corrects build-frontend authority so the exact BUILD/CHECK subject remains
+  catalog-required while flexible dependencies retain compatible installed
+  authority. `pkgctl build` no longer manufactures global `prefer-catalog`
+  resolution policy merely to force its direct subject to construct; frontend
+  admission instead requires retain-compatible policy and independently proves
+  that the direct subject has the exact catalog-backed build/check nodes.
+- This reaches the existing retained-installed-package input path without adding
+  artifact import, cache discovery, dependency reconstruction, or a resolver API.
+  Old private build command evidence carrying the surplus global preference is
+  rejected by the corrected frontend contract rather than translated.
+
 ## 0.42.1 - 2026-08-19
 
 - Requires libpkgbuild 3.0.3 so source-declared CHECK requirements become

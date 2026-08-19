@@ -259,11 +259,16 @@ command/session/evidence authority, not live catalog reconstruction, is sufficie
 to explain completed build output.
 
 The source contract additionally pins that `build` synthesizes its own build and
-optional check goals, implies catalog preference, rejects generic resolution or
-convergence overrides, validates that the composed direct subject has
-catalog-backed construction (and a check node when requested), carries no
-target-operation command authority, binds the frontend and artifact root into
-command evidence, and uses the shared native run runtime. The direct package
+optional check goals, retains compatible dependency authority instead of
+manufacturing global catalog preference, rejects generic resolution or convergence
+overrides, validates that the composed direct subject has catalog-backed
+construction (and a check node when requested), carries no target-operation
+command authority, binds the frontend and artifact root into command evidence,
+and uses the shared native run runtime. A model integration case seals exact
+installed authority for both the direct subject and one dependency: the direct
+subject must still resolve to catalog-backed construction, while BUILD and CHECK
+inputs retain the installed dependency without a dependency construction node.
+The direct package
 selection is resolver-target-qualified by design, while requirements expanded by
 a build/check scope are build-environment selections. The frontend contract pins
 exact resolved goal-member selection identity when locating the direct build/check
