@@ -502,6 +502,9 @@ for required_restart_test in \
   'missing-archive-run-record' \
   'effect_application_journal=$(sed -n' \
   'declaration.bin' \
+  'application-intent interruption crossed initial cursor publication' \
+  'application-intent interruption retained an impossible pre-cursor step' \
+  'owner rehydration did not establish the bounded application cursor' \
   'cursor.bin' \
   'journal-*.bin' \
   'complete application journal snapshot survived generation-4 migration' \

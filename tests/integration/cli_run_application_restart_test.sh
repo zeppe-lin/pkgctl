@@ -376,10 +376,14 @@ application_journal_directory=$runtime/application-journals/journal-v1-sha256-$a
   fail 'active application-request index names no durable journal namespace'
 [ -s "$application_journal_directory/declaration.bin" ] || \
   fail 'active application journal lacks immutable declaration'
-[ -s "$application_journal_directory/cursor.bin" ] || \
-  fail 'active application journal lacks bounded cursor'
+[ ! -e "$application_journal_directory/cursor.bin" ] || \
+  fail 'application-intent interruption crossed initial cursor publication'
 [ -d "$application_journal_directory/steps" ] || \
   fail 'active application journal lacks immutable step namespace'
+if find "$application_journal_directory/steps" -maxdepth 1 -type f \
+    -name '*.bin' -print -quit | grep . >/dev/null; then
+  fail 'application-intent interruption retained an impossible pre-cursor step'
+fi
 if find "$runtime/application-journals" -maxdepth 1 -type f \
     -name 'journal-*.bin' -print -quit | grep . >/dev/null; then
   fail 'complete application journal snapshot survived generation-4 migration'
@@ -499,6 +503,8 @@ require_equal retained-session-after-resume "$session_digest" \
   "$(sha256sum "$session_body")"
 require_equal retained-archive-after-resume "$archive_digest" \
   "$(sha256sum "$archive_body")"
+[ -s "$application_journal_directory/cursor.bin" ] || \
+  fail 'owner rehydration did not establish the bounded application cursor'
 
 # Terminal replay must not consult the historical active application-journal
 # locator. Poisoning it after completion makes any out-of-scope load explicit.
