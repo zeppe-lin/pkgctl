@@ -996,9 +996,9 @@ Run/build intent:
   --resume SHA256                 resume retained semantic request and intent
 
 Catalog acquisition, target-binding, architecture, goal, build subject/check,
-resolution-policy, convergence, build-policy, operation-policy, and execution
-root-view identity options are start-only. Resume refuses their re-declaration
-and uses command-evidence retained at admission.
+resolution-policy, convergence, build-policy, operation-policy, and
+execution root-view identity options are start-only. Resume refuses their
+re-declaration and uses command-evidence retained at admission.
 --canonical-store remains live resume authority naming the existing physical
 canonical state store.
 
