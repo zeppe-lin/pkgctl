@@ -64,6 +64,7 @@ require "$source" 'roots.construction_session_root'
 require "$source" 'roots.package_output_root'
 require "$source" 'roots.check_resource_root'
 require "$source" 'roots.check_temporary_root'
+require "$source" 'roots.installed_resource_root'
 
 # The mechanism is descriptor anchored and must refuse path substitution rather
 # than following attacker-selected links out of private authority.
@@ -105,6 +106,8 @@ for text in \
   'unknown cleanup failure' \
   'fs::create_directory_symlink(external, hostile_target.path())' \
   'fs::perms::owner_read | fs::perms::owner_exec' \
+  'installed_resources == 2U' \
+  'transaction_run_private_realization_kind::installed_resource' \
   'not-authorized'; do
   require "$unit" "$text"
 done
@@ -163,3 +166,7 @@ require "$readme" 'Released reservations own no disposable'
 require "$history" 'released-unstarted reservations authorize no deletion'
 require "$manual" '*check-resources*'
 require "$manual" 'failure is an operational warning rather than rewritten transaction truth.'
+
+# Durable package objects are outside the terminal private-realization plan.
+forbid "$source" 'package_object_store'
+forbid "$source" 'pkgobject::store'

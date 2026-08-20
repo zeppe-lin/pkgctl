@@ -136,6 +136,7 @@ set -- run --canonical-store "$state" \
   --build-root-view "$(printf '%064d' 81)" \
   --lifecycle-root-view "$(printf '%064d' 82)" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --lifecycle-root "$lifecycle" \
   --target-root "$target" \

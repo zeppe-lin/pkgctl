@@ -32,6 +32,14 @@ _build-authority_
 
 # DESCRIPTION
 
+Current unreleased native execution obtains installed BUILD/CHECK package bytes
+from an explicit *libpkgobject* reservoir. Canonical state retains which exact
+artifact-content and artifact-image authority was admitted; the reservoir answers
+only whether those exact bytes are currently available. *libpkgimage-exec*
+verifies/replays them into a call-scoped private tree before the pure session
+locator binds execution paths. Missing or corrupt objects never cause target or
+history discovery, re-resolution, or catalog substitution.
+
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
 Version 0.42.2 separates direct build-subject necessity from flexible dependency
@@ -351,9 +359,10 @@ The following construction/check authorities are required by both frontends:
 
 *--runtime-root* _path_
 	Existing absolute private runtime hierarchy. Construction/check execution
-	requires pre-created *run*, *evidence*, *effects*, *command-evidence*,
-	*content*, *construction-sessions*, *package-outputs*, *check-resources*, and
-	*check-temporary* children. The hierarchy roots remain caller-owned; after
+	opens *run*, *evidence*, *effects*, and *command-evidence* as existing
+	directories and uses private *content*, *construction-sessions*, *package-outputs*,
+	*installed-resources*, *check-resources*, and *check-temporary* realization
+	children. The hierarchy roots remain caller-owned; after
 	successful terminal completion the frontend may prune only exact private
 	dispatch leaves authorized by the durable run head and then a now-empty private
 	journal container. Read-only private realization directories may be made
@@ -443,10 +452,22 @@ retained complete policy from command evidence.
 	Positive maximum number of controller advances in this invocation. Reaching
 	the bound is successful and the same nonce may later be resumed.
 
-*--installed-tree* _package=resource,path_
-	Bind one exact retained installed-package identity and logical resource
-	identity to an absolute package tree. May be repeated. No installed tree is
-	discovered by scanning the target.
+*--package-object-store* _path_
+	Use the absolute durable package-object reservoir at _path_ as current
+	present-tense byte-provider authority. *build* requires the option. *run* may
+	omit it when no fresh construction or installed-input CHECK requires package
+	bytes. Fresh construction always requires the provider so its sealed archive can
+	be admitted before retirement; CHECK requires it only for sealed installed
+	inputs. Installed-input-free CHECK and operation-only or terminal recovery do
+	not borrow unused package-byte authority. Installed BUILD/CHECK inputs are
+	required by their exact state-retained artifact-content identity and verified
+	against the
+	retained artifact-image identity before private realization. The store
+	coordinate is not retained as historical command semantics and may not overlap
+	canonical state, private runtime, construction/check, artifact, lifecycle, or
+	managed-target roots. Missing/corrupt exact objects are resource failures;
+	*pkgctl* does not search the target or history, re-resolve, or substitute a
+	catalog package.
 
 # RUN INSPECTION OPTIONS
 

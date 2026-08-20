@@ -14,6 +14,10 @@
 
 #include <pkgctl/session.h>
 
+namespace pkgobject {
+class store;
+}
+
 namespace pkgctl {
 
 struct detail_run_recovery_access;
@@ -121,6 +125,10 @@ public:
 class native_construction_driver final : public construction_driver {
 public:
   explicit native_construction_driver(pkgexec::execution_backend& backend);
+  native_construction_driver(
+      pkgexec::execution_backend& backend,
+      pkgobject::store* package_objects,
+      bool require_package_object_publication);
 
   [[nodiscard]] pkgfetch::source_materialization materialize_source(
       const pkgfetch::materialization_request& request) override;
@@ -134,6 +142,8 @@ public:
 
 private:
   pkgexec::execution_backend& backend_;
+  pkgobject::store* package_objects_;
+  bool require_package_object_publication_;
 };
 
 enum class construction_outcome {

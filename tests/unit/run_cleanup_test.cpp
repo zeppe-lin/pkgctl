@@ -68,6 +68,7 @@ pkgctl::native_transaction_session_configuration configuration(
           root / "construction-sessions",
           root / "package-outputs",
           root / "artifacts",
+          root / "installed-resources",
           root / "check-resources",
           root / "check-temporary",
           pkgexec::root_view_identity::from_sha256(std::string(64U, '8')),
@@ -439,10 +440,12 @@ void check_cleanup_authority_and_failure_containment()
   CHECK(completed.eligible());
   CHECK(completed.journal() == value.completed.journal());
   CHECK(completed.record() == value.completed.identity());
-  CHECK(completed.targets().size() == 2U);
+  CHECK(completed.targets().size() == 3U);
   CHECK(completed.targets()[0].kind() ==
-        pkgctl::transaction_run_private_realization_kind::construction_session);
+        pkgctl::transaction_run_private_realization_kind::installed_resource);
   CHECK(completed.targets()[1].kind() ==
+        pkgctl::transaction_run_private_realization_kind::construction_session);
+  CHECK(completed.targets()[2].kind() ==
         pkgctl::transaction_run_private_realization_kind::package_output);
   for (const auto& target : completed.targets())
   {
@@ -466,8 +469,8 @@ void check_cleanup_authority_and_failure_containment()
   auto result = pkgctl::cleanup_transaction_run_private_realizations(
       std::move(completed), refusing);
   CHECK(result.plan().record() == expected_record);
-  CHECK(refusing.paths().size() == 2U);
-  CHECK(result.cleaned() == 1U);
+  CHECK(refusing.paths().size() == 3U);
+  CHECK(result.cleaned() == 2U);
   CHECK(result.failures().size() == 1U);
   CHECK(result.failures().front().problem == "injected cleanup refusal");
   CHECK(!result.complete());
@@ -476,8 +479,8 @@ void check_cleanup_authority_and_failure_containment()
   auto unknown_result = pkgctl::cleanup_transaction_run_private_realizations(
       pkgctl::transaction_run_cleanup_plan::make(value.completed, config),
       unknown);
-  CHECK(unknown.paths().size() == 2U);
-  CHECK(unknown_result.cleaned() == 1U);
+  CHECK(unknown.paths().size() == 3U);
+  CHECK(unknown_result.cleaned() == 2U);
   CHECK(unknown_result.failures().size() == 1U);
   CHECK(unknown_result.failures().front().problem == "unknown cleanup failure");
   CHECK(!unknown_result.complete());
@@ -496,7 +499,7 @@ void check_released_reservation_is_not_cleanup_authority()
 
   auto plan = pkgctl::transaction_run_cleanup_plan::make(completed, config);
   CHECK(plan.eligible());
-  CHECK(plan.targets().size() == 2U);
+  CHECK(plan.targets().size() == 3U);
   for (const auto& target : plan.targets())
     CHECK(target.dispatch() == completed.dispatches()[1].dispatch().identity());
 }
@@ -527,9 +530,10 @@ void check_build_and_check_stage_authority()
   const auto completed = pkgctl::transaction_run_cleanup_plan::make(
       value.completed, config);
   CHECK(completed.eligible());
-  CHECK(completed.targets().size() == 4U);
+  CHECK(completed.targets().size() == 6U);
   std::size_t constructions = 0U;
   std::size_t package_outputs = 0U;
+  std::size_t installed_resources = 0U;
   std::size_t check_resources = 0U;
   std::size_t check_temporaries = 0U;
   for (const auto& target : completed.targets())
@@ -544,6 +548,9 @@ void check_build_and_check_stage_authority()
       case pkgctl::transaction_run_private_realization_kind::package_output:
         ++package_outputs;
         break;
+      case pkgctl::transaction_run_private_realization_kind::installed_resource:
+        ++installed_resources;
+        break;
       case pkgctl::transaction_run_private_realization_kind::check_resource:
         ++check_resources;
         break;
@@ -554,6 +561,7 @@ void check_build_and_check_stage_authority()
   }
   CHECK(constructions == 1U);
   CHECK(package_outputs == 1U);
+  CHECK(installed_resources == 2U);
   CHECK(check_resources == 1U);
   CHECK(check_temporaries == 1U);
 }
@@ -565,7 +573,7 @@ void check_posix_cleanup_never_discovers_foreign_siblings()
   auto value = records(temporary.path());
   auto config = configuration(temporary.path() / "runtime");
   auto plan = pkgctl::transaction_run_cleanup_plan::make(value.completed, config);
-  CHECK(plan.targets().size() == 2U);
+  CHECK(plan.targets().size() == 3U);
 
   const auto external = temporary.path() / "external-sentinel";
   fs::create_directories(external);
@@ -600,7 +608,7 @@ void check_posix_cleanup_refuses_ancestor_substitution()
     auto config = configuration(temporary.path() / "runtime");
     auto plan = pkgctl::transaction_run_cleanup_plan::make(
         value.completed, config);
-    CHECK(plan.targets().size() == 2U);
+    CHECK(plan.targets().size() == 3U);
 
     const auto external = temporary.path() / "root-external";
     fs::create_directories(external);
@@ -613,7 +621,7 @@ void check_posix_cleanup_refuses_ancestor_substitution()
     auto result = pkgctl::cleanup_transaction_run_private_realizations(
         plan, cleaner);
     CHECK(!result.complete());
-    CHECK(result.cleaned() == 1U);
+    CHECK(result.cleaned() == 2U);
     CHECK(result.failures().size() == 1U);
     CHECK(fs::is_symlink(plan.targets().front().root()));
     CHECK(read_text(external / "keep") == "root-outside\n");
@@ -626,7 +634,7 @@ void check_posix_cleanup_refuses_ancestor_substitution()
     auto config = configuration(temporary.path() / "runtime");
     auto plan = pkgctl::transaction_run_cleanup_plan::make(
         value.completed, config);
-    CHECK(plan.targets().size() == 2U);
+    CHECK(plan.targets().size() == 3U);
 
     const auto external = temporary.path() / "journal-external";
     fs::create_directories(external);
@@ -641,7 +649,7 @@ void check_posix_cleanup_refuses_ancestor_substitution()
     auto result = pkgctl::cleanup_transaction_run_private_realizations(
         plan, cleaner);
     CHECK(!result.complete());
-    CHECK(result.cleaned() == 1U);
+    CHECK(result.cleaned() == 2U);
     CHECK(result.failures().size() == 1U);
     CHECK(fs::is_symlink(
         hostile.root() / value.completed.journal().hex()));
@@ -658,7 +666,7 @@ void check_posix_cleanup_removes_sealed_owner_directories()
   auto config = configuration(temporary.path() / "runtime");
   auto plan = pkgctl::transaction_run_cleanup_plan::make(
       value.completed, config);
-  CHECK(plan.targets().size() == 2U);
+  CHECK(plan.targets().size() == 3U);
 
   const auto external = temporary.path() / "sealed-external-sentinel";
   fs::create_directories(external);
@@ -703,7 +711,7 @@ void check_posix_cleanup_is_idempotent_and_nofollow()
   auto value = records(temporary.path());
   auto config = configuration(temporary.path() / "runtime");
   auto plan = pkgctl::transaction_run_cleanup_plan::make(value.completed, config);
-  CHECK(plan.targets().size() == 2U);
+  CHECK(plan.targets().size() == 3U);
 
   const auto external = temporary.path() / "external-sentinel";
   fs::create_directories(external);
@@ -738,7 +746,7 @@ void check_posix_cleanup_is_idempotent_and_nofollow()
   auto hostile = pkgctl::cleanup_transaction_run_private_realizations(
       plan, cleaner);
   CHECK(!hostile.complete());
-  CHECK(hostile.cleaned() == 1U);
+  CHECK(hostile.cleaned() == 2U);
   CHECK(hostile.failures().size() == 1U);
   CHECK(hostile.failures().front().target.path() == hostile_target.path());
   CHECK(fs::is_symlink(hostile_target.path()));

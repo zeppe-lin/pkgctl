@@ -73,6 +73,8 @@ using directory_owner = std::unique_ptr<DIR, directory_closer>;
       return "construction session";
     case transaction_run_private_realization_kind::package_output:
       return "package output";
+    case transaction_run_private_realization_kind::installed_resource:
+      return "installed resource";
     case transaction_run_private_realization_kind::check_resource:
       return "check resource";
     case transaction_run_private_realization_kind::check_temporary:
@@ -336,6 +338,11 @@ transaction_run_cleanup_plan transaction_run_cleanup_plan::make(
       const auto& dispatch = dispatch_record.dispatch();
       const auto relative = std::filesystem::path(record.journal().hex()) /
           dispatch.identity().hex();
+      if (dispatch.unit().kind() == transaction_unit_kind::construction ||
+          dispatch.unit().kind() == transaction_unit_kind::check)
+        targets.push_back(transaction_run_private_realization(
+            transaction_run_private_realization_kind::installed_resource,
+            dispatch.identity(), roots.installed_resource_root, relative));
       switch (dispatch.unit().kind())
       {
         case transaction_unit_kind::construction:

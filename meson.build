@@ -186,6 +186,12 @@ libpkgimage_exec_dep = dependency(
   required: true,
   static: want_static,
 )
+libpkgobject_dep = dependency(
+  'libpkgobject',
+  version: ['>=0.1.0', '<1.0.0'],
+  required: true,
+  static: want_static,
+)
 
 pkgctl_core_authority_deps = [
   libcrypto_dep,
@@ -214,6 +220,7 @@ pkgctl_core_authority_deps = [
   libpkgcheck_exec_dep,
   libpkgsource_exec_dep,
   libpkgimage_exec_dep,
+  libpkgobject_dep,
 ]
 
 subdir('src')

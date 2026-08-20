@@ -40,6 +40,19 @@ if grep -E -n   'create_directories|remove_all|directory_iterator|recursive_dire
   exit 1
 fi
 
+# Present package-byte acquisition and image replay belong to the effectful
+# resource adapter, never this pure locator.
+for forbidden_resource in \
+  'libpkgobject' \
+  'pkgobject::' \
+  'libpkgimage-exec' \
+  'pkgimage_exec::'; do
+  if grep -F -- "$forbidden_resource" "$header" "$source" >/dev/null 2>&1; then
+    echo "native locator imported installed-resource authority: $forbidden_resource" >&2
+    exit 1
+  fi
+done
+
 # The locator remains controller-private and the CLI remains read-only.
 ! grep -R -q 'run_locator' "$root/cli"
 ! grep -E -q '(^|[[:space:]])(run|apply|install|upgrade|remove)([[:space:]]|$)'   "$root/cli/main.cpp"

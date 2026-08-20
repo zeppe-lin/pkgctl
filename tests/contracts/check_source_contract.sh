@@ -48,7 +48,7 @@ cli_modules=$(sed -n "s/^cli_modules='\(.*\)'$/\1/p" "$direct_build")
   exit 1
 }
 
-reviewed_core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgsource-exec libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgimage-exec libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
+reviewed_core_modules='libcrypto libpkgsource libpkgcatalog libpkgcatalog-acquire libpkgstate libpkgstate-posix libpkgstate-plan libpkgstate-apply libpkgfetch libpkgsource-exec libpkgbuild libpkgbuild-exec libpkgbuild-image libpkgsource-plan libpkgbuild-plan libpkgimage libpkgimage-exec libpkgobject libpkgplan libpkgexec libpkgapply libpkgapply-posix libpkgapply-exec libpkgresolve libpkgtransaction libpkgcheck libpkgcheck-exec'
 
 if grep -R -n 'ZEPPE_LIN_CHECK_' \
     "$srcdir/tests/fixtures" "$srcdir/tests/integration" "$srcdir/README.md" \
@@ -105,6 +105,7 @@ for constraint in \
   'libpkgbuild-exec >= 3.3.1' 'libpkgbuild-exec < 4.0.0' \
   'libpkgbuild-image >= 1.0.1' 'libpkgbuild-image < 2.0.0' \
   'libpkgimage-exec >= 0.1.0' 'libpkgimage-exec < 1.0.0' \
+  'libpkgobject >= 0.1.0' 'libpkgobject < 1.0.0' \
   'libpkgbuild-plan >= 1.1.0' 'libpkgbuild-plan < 2.0.0' \
   'libpkgstate-apply >= 3.1.3' 'libpkgstate-apply < 4.0.0' \
   'libpkgresolve >= 4.0.0' 'libpkgresolve < 5.0.0' \
@@ -165,6 +166,7 @@ for required in \
   'libpkgbuild-image' \
   'libpkgbuild-plan' \
   'libpkgimage' \
+  'libpkgobject' \
   'libpkgplan' \
   'libpkgexec' \
   'libpkgapply' \

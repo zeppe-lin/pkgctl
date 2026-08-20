@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- Adds the native installed-package resource plane. Fresh BUILD/CHECK dispatch
+  preparation now consumes the exact artifact-content and artifact-image
+  authority already retained by canonical installed state, requires those exact
+  package bytes from `libpkgobject`, and delegates image verification/replay to
+  `libpkgimage-exec` before the existing pure session locator binds execution
+  resources. Missing or corrupt objects fail as present-tense resource
+  unavailability; pkgctl does not scan the target or transaction history,
+  re-resolve, or substitute a catalog candidate.
+- Successful native construction now admits its exact sealed public archive into
+  the explicit package-object reservoir after public artifact projection. Durable
+  terminal construction authority therefore permits idempotent publication/store
+  replay without rebuilding, while the reservoir remains byte availability rather
+  than build, state, or image semantic authority.
+- Replaces caller-supplied `--installed-tree` mappings with the explicit current
+  `--package-object-store` provider namespace. `build` requires the provider;
+  `run` may omit it when no fresh construction or installed-input CHECK needs
+  package bytes. Installed-input-free CHECK, operation-only work, and terminal
+  recovery do not borrow unused package-byte authority. The store is current
+  physical authority rather than retained command semantics
+  and, when selected, must remain disjoint from
+  state/runtime/execution/target roots, and does not mint installed-package
+  selection authority. Completed construction/check cleanup also disposes the
+  dispatch-scoped installed-resource realization as ephemeral private state.
+
 ## 0.42.2 - 2026-08-20
 
 - Corrects build-frontend authority so the exact BUILD/CHECK subject remains

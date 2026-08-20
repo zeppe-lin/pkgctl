@@ -57,6 +57,7 @@ grep -F '*pkgctl* *run* _catalog-options_ _state-options_ _resolution-options_' 
 grep -F '# RUN AND BUILD OPTIONS' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*pkgctl* *build* _package_ [*--check*]' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--artifact-root* _path_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F '*--package-object-store* _path_' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--build-root-view* _sha256_' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--lifecycle-root-view* _sha256_' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--operation-policy* _profile_' "$srcdir/man/pkgctl.1.scd" >/dev/null
@@ -250,5 +251,16 @@ done
 
 if grep -nE '^[1-9][0-9]*\. ' "$srcdir"/man/*.scd >/dev/null 2>&1; then
   echo 'ordered scdoc lists must use dot-item markup' >&2
+  exit 1
+fi
+
+# Installed package bytes are present resource authority, not caller-authored
+# tree mappings or a reason to rediscover package semantics.
+grep -F 'INSTALLED PACKAGE RESOURCE PREPARATION' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+grep -F 'Missing or corrupt exact' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
+if grep -F -x -- '*--installed-tree* _package=resource,path_' "$srcdir/man/pkgctl.1.scd" >/dev/null 2>&1; then
+  echo 'manual still advertises caller-authored installed-tree authority' >&2
   exit 1
 fi

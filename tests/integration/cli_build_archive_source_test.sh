@@ -106,6 +106,7 @@ set -- build archive-probe --check \
   --build-source-date-epoch 0 \
   --build-root-view "$(printf '%064d' 81)" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --artifact-root "$artifacts" \
   --interpreter "$interpreter" \
@@ -162,6 +163,7 @@ set -- build \
   --canonical-store "$state" \
   --resume "$nonce" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --artifact-root "$artifacts" \
   --interpreter "$interpreter" \

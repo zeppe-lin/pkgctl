@@ -121,6 +121,7 @@ for required in \
   '--artifact-root "$runtime/content"' \
   'build artifact root must be disjoint from private runtime root' \
   '--artifact-root "$artifacts"' \
+  '--package-object-store "$root/package-objects"' \
   '--build-root-view' \
   '--artifact-root "$wrong_artifacts"' \
   'current artifact root differs from admitted command authority' \
@@ -133,6 +134,9 @@ for required in \
   'private-artifact-root "$runtime/artifacts"' \
   'dependency-payload dependency-source' \
   'tool-payload tool-source+dependency-source' \
+  'build retained $package_object_count durable package objects, expected 2' \
+  'package-object-cleanup' \
+  'installed-resources' \
   '"$run_evidence_inspect_fixture"' \
   'construction-evidence 2' \
   'check-evidence 1' \

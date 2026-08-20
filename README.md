@@ -1,5 +1,21 @@
 # pkgctl
 
+Current unreleased native execution closes the installed-package resource side
+plane. Canonical state remains authority for which exact package artifact was
+admitted; `libpkgobject` supplies only present exact archive bytes, and
+`libpkgimage-exec` verifies/replays those bytes against the retained image
+identity into a fresh dispatch-scoped tree before the pure session locator runs.
+Successful native construction populates the same reservoir from its sealed
+public archive. Missing/corrupt objects are resource failures, never prompts to
+scan target/history residue, re-resolve, or substitute another package. Native
+`build` therefore requires one explicit `--package-object-store` namespace.
+`run` accepts that current mechanism when fresh work may need it. Fresh
+construction always requires the provider so its sealed archive can enter the
+reservoir; CHECK requires it only for sealed installed inputs.
+Installed-input-free CHECK, operation-only work, and already-terminal run
+recovery do not borrow unused package-byte authority. Caller-authored
+installed-tree mappings are unsupported.
+
 Release 0.42.2 separates direct build-subject necessity from flexible dependency
 preference. `pkgctl build PACKAGE` retains the resolver's compatible-installed
 preference for dependencies while its exact BUILD/CHECK roots still require

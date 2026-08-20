@@ -101,7 +101,7 @@ detached-mount propagation before attachment.
 
 Version 0.38.0 gives durably started construction and check dispatches exact
 write-ahead attempt authority. The immutable attempt record is published before
-the `started` run record. Recovery prefers terminal result evidence when present;
+the *started* run record. Recovery prefers terminal result evidence when present;
 otherwise it decodes and replays the exact retained attempt session. Missing both
 records fails closed. Fresh collection, current session-locator, configuration,
 and retained-installed-package lookup are not historical recovery authority.
@@ -752,6 +752,49 @@ remains the responsibility of a later caller-owned recovery provider.
 This boundary performs no record discovery, semantic reconstruction, resource
 realization, backend selection, process adoption, retry policy, scheduling,
 cleanup, compaction, garbage collection, or command action.
+
+# INSTALLED PACKAGE RESOURCE PREPARATION
+
+Current unreleased native execution separates installed-package semantic authority
+from present package-byte availability. Canonical installed state names the exact
+artifact-content and artifact-image identities already admitted for one package.
+*libpkgobject* answers only whether the exact archive bytes for that content
+identity are currently available. *libpkgimage-exec* verifies those bytes and the
+retained normalized image identity while replaying a fresh private tree.
+
+Before one fresh construction/check session is located, the native resource
+source takes only the installed inputs already selected by the sealed transaction.
+Each required object is realized beneath the configured *installed-resources*
+root in a journal/dispatch/resource-specific directory. The concrete resource
+identity binds the journal, dispatch, installed-package identity, artifact-content
+identity, and artifact-image identity. Only after every installed input has been
+prepared is the resulting in-memory mapping passed to the native session locator.
+
+This preparation is effectful but not policy-bearing. Missing or corrupt exact
+objects fail before the construction/check backend is called. The source does not
+invoke resolution or catalog authority, inspect the managed target, scan
+transaction history, or search old construction output. Resource failure therefore
+cannot silently replace the sealed installed selection with another package.
+
+Successful native construction admits its exact sealed public archive into the
+package-object reservoir before the construction dispatch can retire. If public
+projection or package-object admission fails after terminal construction evidence
+is durable, restart repeats publication/admission from that exact evidence without
+rerunning the build. The durable object is not a private realization and is never
+a terminal cleanup target; the dispatch-scoped installed tree is disposable after
+successful terminal completion.
+
+*pkgctl build* requires *--package-object-store* as a current physical provider
+coordinate. *pkgctl run* may omit the provider for installed-input-free CHECK,
+operation-only work, or terminal recovery. Fresh construction always requires it
+because the sealed archive must enter the reservoir before retirement; CHECK
+requires it only when one of its sealed inputs is an installed package. Missing
+required authority fails at resource preparation/publication rather than retaining
+a surplus provider or silently proceeding. A supplied pathname is not retained as
+historical command meaning and must be disjoint from canonical state, private
+runtime, construction/check
+execution, public artifact, lifecycle, and managed-target roots. Caller-authored
+*--installed-tree* mappings are not accepted.
 
 # NATIVE CONSTRUCTION AND CHECK SESSION LOCATION
 

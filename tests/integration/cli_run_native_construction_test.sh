@@ -128,6 +128,7 @@ set -- run --canonical-store "$state" \
   --build-root-view "$(printf '%064d' 81)" \
   --lifecycle-root-view "$(printf '%064d' 82)" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --lifecycle-root "$lifecycle" \
   --target-root "$target" \
@@ -189,6 +190,7 @@ require_contains bounded-evidence "$root/bounded-evidence.out" 'checks 0'
 set -- run --canonical-store "$state" \
   --resume "$nonce" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --lifecycle-root "$lifecycle" \
   --target-root "$target" \
@@ -292,6 +294,7 @@ capture_policy_redeclaration()
     --resume "$nonce" \
     "$option" "$value" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
     --target-root "$target" \

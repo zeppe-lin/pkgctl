@@ -85,6 +85,7 @@ set_command()
   fi
   set -- "$@" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --artifact-root "$artifacts" \
     --interpreter "$interpreter" \
@@ -207,6 +208,7 @@ set -- build cohort-probe --check \
   --build-source-date-epoch 0 \
   --build-root-view "$(printf '%064d' 81)" \
   --runtime-root "$runtime2" --build-root "$build2" --artifact-root "$artifacts2" \
+  --package-object-store "$root/package-objects" \
   --interpreter "$interpreter2" --build-user-id "$uid" --build-group-id "$gid" \
   --max-steps 7
 for group in $groups; do [ "$group" = "$gid" ] || set -- "$@" --build-supplementary-group "$group"; done
@@ -248,6 +250,7 @@ set_hostile_resume()
 {
   set -- build --canonical-store "$state2" --resume "$nonce2" \
     --runtime-root "$runtime2" --build-root "$build2" --artifact-root "$artifacts2" \
+    --package-object-store "$root/package-objects" \
     --interpreter "$interpreter2" --build-user-id "$uid" --build-group-id "$gid" \
     --max-steps 1
   for group in $groups; do

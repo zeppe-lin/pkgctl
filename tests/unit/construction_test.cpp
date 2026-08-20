@@ -4,6 +4,8 @@
 #include "support/construction_fixture.h"
 #include "support/run_execute_support.h"
 
+#include <libpkgobject/libpkgobject.h>
+
 #include <pkgctl/run_admit.h>
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_advance.h>
@@ -759,6 +761,7 @@ native_runtime_session_configuration(const std::filesystem::path& root)
           root / "construction-sessions",
           root / "package-outputs",
           root / "artifacts",
+          root / "installed-resources",
           root / "check-resources",
           root / "check-temporary",
           pkgexec::root_view_identity::from_sha256(std::string(64U, '5')),
@@ -3343,7 +3346,8 @@ void check_native_posix_transaction_run_runtime()
       pkgctl::native_transaction_run_runtime_configuration::make(
           transaction, session_configuration);
 
-  refusing_native_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   unreachable_native_operation_specification_source operation_specifications;
   unreachable_native_effect_restart_body_source effect_restart_bodies;
   fixture_backend execution_backend(backend_mode::succeed);
@@ -3363,15 +3367,96 @@ void check_native_posix_transaction_run_runtime()
   std::filesystem::create_directory(effect_path);
   std::filesystem::create_directory(operation_lock_path);
 
+  const auto missing_object_run_path = root / "missing-object-run-store";
+  const auto missing_object_evidence_path = root / "missing-object-evidence-store";
+  const auto missing_object_effect_path = root / "missing-object-effect-store";
+  std::filesystem::create_directory(missing_object_run_path);
+  std::filesystem::create_directory(missing_object_evidence_path);
+  std::filesystem::create_directory(missing_object_effect_path);
+  bool missing_package_object_authority_refused = false;
+  try
+  {
+    auto missing_object_configuration =
+        pkgctl::native_transaction_run_runtime_configuration::make(
+            transaction, session_configuration);
+    auto missing_object_runtime =
+        pkgctl::native_posix_transaction_run_runtime::open(
+            {missing_object_run_path, missing_object_evidence_path,
+             missing_object_effect_path},
+            std::move(missing_object_configuration), {},
+            {&execution_backend, &execution_backend, nullptr, archive_backend});
+    (void)missing_object_runtime->launch(
+        pkgctl::transaction_dispatch_policy::make(1U, 1U),
+        journal_nonce(210U), pkgctl::transaction_run_drive_policy::make(1U));
+  }
+  catch (const std::runtime_error& problem)
+  {
+    missing_package_object_authority_refused =
+        std::string(problem.what()) ==
+        "native package-object authority is unavailable for fresh construction";
+  }
+  CHECK(missing_package_object_authority_refused);
+
+  bool package_object_session_overlap_refused = false;
+  {
+    auto overlapping_sessions = native_runtime_session_configuration(
+        authority_root / "package-object-session-overlap");
+    auto overlapping_configuration =
+        pkgctl::native_transaction_run_runtime_configuration::make(
+            transaction, overlapping_sessions);
+    auto overlapping_objects = pkgobject::store::open_or_create(
+        overlapping_sessions.roots().installed_resource_root);
+    try
+    {
+      (void)pkgctl::native_posix_transaction_run_runtime::open(
+          {run_path, evidence_path, effect_path},
+          std::move(overlapping_configuration), {},
+          {&execution_backend, &execution_backend, &overlapping_objects,
+           archive_backend});
+    }
+    catch (const pkgctl::native_transaction_run_runtime_error& problem)
+    {
+      package_object_session_overlap_refused = problem.code() ==
+          pkgctl::native_transaction_run_runtime_error_code::
+              invalid_configuration;
+    }
+  }
+  CHECK(package_object_session_overlap_refused);
+
+  bool package_object_runtime_overlap_refused = false;
+  {
+    const auto overlap_path = root / "package-object-run-overlap";
+    std::filesystem::create_directory(overlap_path);
+    auto overlapping_objects = pkgobject::store::open_or_create(overlap_path);
+    auto overlapping_configuration =
+        pkgctl::native_transaction_run_runtime_configuration::make(
+            transaction, session_configuration);
+    try
+    {
+      (void)pkgctl::native_posix_transaction_run_runtime::open(
+          {overlap_path, evidence_path, effect_path},
+          std::move(overlapping_configuration), {},
+          {&execution_backend, &execution_backend, &overlapping_objects,
+           archive_backend});
+    }
+    catch (const pkgctl::native_transaction_run_runtime_error& problem)
+    {
+      package_object_runtime_overlap_refused = problem.code() ==
+          pkgctl::native_transaction_run_runtime_error_code::directory_overlap;
+    }
+  }
+  CHECK(package_object_runtime_overlap_refused);
+
   bool overlap_refused = false;
   try
   {
     (void)pkgctl::native_posix_transaction_run_runtime::open(
         {run_path, run_path, effect_path, operation_lock_path},
         operation_runtime_configuration,
-        {installed_packages, operation_specifications, effect_restart_bodies},
+        {operation_specifications, effect_restart_bodies},
         {&execution_backend, &execution_backend, application_backend,
-         application_journals, &execution_backend, state_store, archive_backend});
+         application_journals, &execution_backend, state_store, &package_objects,
+         archive_backend});
   }
   catch (const pkgctl::native_transaction_run_runtime_error& problem)
   {
@@ -3386,8 +3471,8 @@ void check_native_posix_transaction_run_runtime()
   try
   {
     (void)pkgctl::native_posix_transaction_run_runtime::from_directory_fds(
-        run_fd, run_fd, effect_fd, configuration, {installed_packages},
-        {&execution_backend, &execution_backend, archive_backend});
+        run_fd, run_fd, effect_fd, configuration, {},
+        {&execution_backend, &execution_backend, &package_objects, archive_backend});
   }
   catch (const pkgctl::native_transaction_run_runtime_error& problem)
   {
@@ -3403,8 +3488,8 @@ void check_native_posix_transaction_run_runtime()
   {
     (void)pkgctl::native_posix_transaction_run_runtime::open(
         {run_path, evidence_path, effect_path, operation_lock_path},
-        configuration, {installed_packages},
-        {&execution_backend, &execution_backend, archive_backend});
+        configuration, {},
+        {&execution_backend, &execution_backend, &package_objects, archive_backend});
   }
   catch (const pkgctl::native_transaction_run_runtime_error& problem)
   {
@@ -3416,8 +3501,8 @@ void check_native_posix_transaction_run_runtime()
 
   auto runtime = pkgctl::native_posix_transaction_run_runtime::open(
       {run_path, evidence_path, effect_path}, std::move(configuration),
-      {installed_packages},
-      {&execution_backend, &execution_backend, archive_backend});
+      {},
+      {&execution_backend, &execution_backend, &package_objects, archive_backend});
 
   std::filesystem::rename(run_path, selected_run_path);
   std::filesystem::create_directory(run_path);
@@ -3437,7 +3522,6 @@ void check_native_posix_transaction_run_runtime()
   CHECK(result.drive().steps().size() == 1U);
   CHECK(result.drive().steps().front().disposition() ==
         pkgctl::transaction_run_advance_disposition::executed_construction);
-  CHECK(installed_packages.calls() == 0U);
   CHECK(operation_specifications.calls() == 0U);
   CHECK(effect_restart_bodies.calls() == 0U);
   CHECK(directory_entry_count(selected_run_path) >= 4U);
@@ -3455,6 +3539,24 @@ void check_native_posix_transaction_run_runtime()
       ++artifacts;
   CHECK(artifacts == 1U);
 
+  // Successful native construction is not complete until the exact sealed
+  // archive is durably available from the package-object provider.
+  const auto* completed_construction =
+      result.drive().steps().front().construction();
+  CHECK(completed_construction != nullptr);
+  if (completed_construction != nullptr)
+  {
+    const auto& artifact =
+        *completed_construction->build().build().artifact();
+    const auto content = pkgimage::complete_archive_digest::parse(
+        "v1:sha256:" + artifact.complete_digest().hex());
+    const auto retained = package_objects.require(content);
+    CHECK(retained.content() == content);
+    CHECK(retained.byte_count() == artifact.byte_count());
+    CHECK(retained.path() !=
+          completed_construction->session().paths().build.artifact_path);
+  }
+
   const auto completed = runtime->drive(
       result.record().journal(),
       pkgctl::transaction_run_drive_policy::make(1U));
@@ -3466,9 +3568,27 @@ void check_native_posix_transaction_run_runtime()
   CHECK(completed.record().identity() == result.record().identity());
   CHECK(completed.run().progress().identity() ==
         result.run().progress().identity());
-  CHECK(installed_packages.calls() == 0U);
   CHECK(operation_specifications.calls() == 0U);
   CHECK(effect_restart_bodies.calls() == 0U);
+
+  runtime.reset();
+  auto terminal_configuration =
+      pkgctl::native_transaction_run_runtime_configuration::make(
+          transaction, session_configuration);
+  auto terminal_without_package_objects =
+      pkgctl::native_posix_transaction_run_runtime::open(
+          {selected_run_path, selected_evidence_path, effect_path},
+          std::move(terminal_configuration), {},
+          {nullptr, nullptr, nullptr, archive_backend});
+  const auto terminal_without_resource_authority =
+      terminal_without_package_objects->drive(
+          result.record().journal(),
+          pkgctl::transaction_run_drive_policy::make(1U));
+  CHECK(terminal_without_resource_authority.disposition() ==
+        pkgctl::transaction_run_drive_disposition::completed);
+  CHECK(terminal_without_resource_authority.steps().size() == 1U);
+  CHECK(terminal_without_resource_authority.steps().front().disposition() ==
+        pkgctl::transaction_run_advance_disposition::quiescent);
 }
 
 

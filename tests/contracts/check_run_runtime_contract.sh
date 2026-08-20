@@ -51,6 +51,7 @@ for required in \
   'struct native_transaction_run_runtime_backends final' \
   'pkgexec::execution_backend* construction;' \
   'pkgexec::execution_backend* check;' \
+  'pkgobject::store* package_objects;' \
   'pkgapply::application_backend* application;' \
   'pkgexec::execution_backend* lifecycle;' \
   'pkgstate::canonical_store* state;' \
@@ -68,7 +69,7 @@ for required in \
   'construction/check-only transaction refuses target-operation ' \
   'one execution-root path names contradictory root-view identities' \
   'native construction/check storage overlaps lifecycle execution' \
-  'native_transaction_dispatch_session_source sessions_' \
+  'native_transaction_resource_session_source sessions_' \
   'std::unique_ptr<native_transaction_operation_authority_source> operations_' \
   'std::unique_ptr<explicit_transaction_effect_archive_source> owned_archives_' \
   'transaction_effect_archive_source* archives_' \
@@ -94,7 +95,7 @@ for token in \
   'runs_(posix_transaction_run_journal_store::from_directory_fd' \
   'evidence_(posix_transaction_run_evidence_store::from_directory_fd' \
   'effects_(posix_effect_journal_store::from_directory_fd' \
-  'sessions_(configuration_.sessions(), authorities.installed_packages)' \
+  'sessions_(configuration_.sessions(), backends.package_objects)' \
   'operations_(' \
   'owned_archives_(' \
   'archives_(' \
@@ -130,13 +131,16 @@ for required_test in \
   'native_posix_transaction_run_runtime::open' \
   'native_transaction_run_runtime_error_code::directory_overlap' \
   'journal_nonce(212U)' \
-  'installed_packages.calls() == 0U' \
+  'package_objects = pkgobject::store::open_or_create' \
   'operation_specifications.calls() == 0U' \
   'effect_restart_bodies.calls() == 0U' \
   'forbidden_recovery_execution_backend' \
   'recovery_backend.capability_calls() == 0U' \
   'recovery_backend.execution_calls() == 0U' \
-  'artifacts == 1U'; do
+  'artifacts == 1U' \
+  'missing_package_object_authority_refused' \
+  'terminal_without_package_objects' \
+  '{nullptr, nullptr, nullptr, archive_backend}'; do
   grep -F -- "$required_test" "$test_source" >/dev/null || {
     echo "missing transaction-run runtime test: $required_test" >&2
     exit 1

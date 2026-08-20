@@ -154,6 +154,7 @@ run_package_success()
     --build-root-view "$(printf '%064d' 81)" \
     --lifecycle-root-view "$(printf '%064d' 82)" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
     --target-root "$target" \
@@ -216,6 +217,7 @@ run_package_refusal()
     --build-root-view "$(printf '%064d' 81)" \
     --lifecycle-root-view "$(printf '%064d' 82)" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
     --target-root "$target" \
@@ -264,6 +266,7 @@ build_qualified_image()
     --build-source-date-epoch 0 \
     --build-root-view "$(printf '%064d' 81)" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --artifact-root "$qualified_artifacts" \
     --interpreter "$interpreter" \

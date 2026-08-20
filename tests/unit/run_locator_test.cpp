@@ -5,6 +5,7 @@
 
 #include <pkgctl/construction_codec.h>
 #include <pkgctl/run_locator.h>
+#include <pkgctl/run_resource.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -118,6 +119,7 @@ pkgctl::native_transaction_session_configuration configuration(
           root / "construction-sessions",
           root / "package-outputs",
           root / "artifacts",
+          root / "installed-resources",
           root / "check-resources",
           root / "check-temporary",
           pkgexec::root_view_identity::from_sha256(std::string(64U, '8')),
@@ -293,6 +295,16 @@ void check_native_locator()
 
   auto check_session = locator.check(
       reserved_check_record, check_reservation.run.progress(), check_dispatch);
+
+  // CHECK with no installed package input does not borrow present package-byte
+  // authority. Candidate/source resources remain owned by their existing
+  // construction/check preparation boundaries.
+  pkgctl::native_transaction_resource_session_source resource_sessions(
+      configuration(root / "resource-runtime"), nullptr);
+  auto resource_only_check = resource_sessions.check(
+      reserved_check_record, check_reservation.run.progress(), check_dispatch);
+  CHECK(resource_only_check.execution_session().inputs().size() == 1U);
+
   auto repeated_check = locator.check(
       reserved_check_record, check_reservation.run.progress(), check_dispatch);
   CHECK(check_session.identity() == repeated_check.identity());
@@ -494,6 +506,7 @@ void check_configuration_rejection()
             root / "shared" / "sessions",
             root / "packages",
             root / "artifacts",
+            root / "installed-resources",
             root / "check-resources",
             root / "checks",
             pkgexec::root_view_identity::from_sha256(std::string(64U, 'd')),

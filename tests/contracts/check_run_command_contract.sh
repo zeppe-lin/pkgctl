@@ -47,6 +47,8 @@ for required in \
   '--max-steps N' \
   '--build-parallelism N' \
   '--build-source-date-epoch N' \
+  '--package-object-store PATH' \
+  'std::optional<std::filesystem::path> package_object_store' \
   'std::optional<pkgbuild::build_policy> build_policy' \
   'class command_evidence_store final' \
   'pkgbuild::build_policy build_policy' \
@@ -105,6 +107,8 @@ for required in \
   'transaction_run_drive_policy::make(command.maximum_steps)' \
   'runtime_path(command, "command-evidence")' \
   'runtime_path(command, "effect-bodies")' \
+  'require_package_object_store_separation(command);' \
+  'pkgobject::store::open_or_create(' \
   'exact transaction run is already admitted; use --resume' \
   'exact transaction run is not admitted; use --start' \
   'retained command evidence recomposes another transaction' \
@@ -137,6 +141,17 @@ for forbidden in \
     exit 1
   fi
 done
+
+if grep -F -- '--installed-tree' "$srcdir/cli/options.h" "$options" "$command" >/dev/null 2>&1; then
+  echo 'bounded transaction command retains caller-authored installed-tree authority' >&2
+  exit 1
+fi
+
+retained_evidence=$(sed -n '/^struct retained_command_evidence final {$/,/^};$/p' "$command")
+printf '%s\n' "$retained_evidence" | grep -F -- 'package_object_store' >/dev/null 2>&1 && {
+  echo 'current package-object store location leaked into retained command evidence' >&2
+  exit 1
+}
 
 for required in \
   'failure=' \
@@ -219,6 +234,17 @@ grep -F "'cli-run'" "$tests_meson" >/dev/null || {
 }
 grep -F "'cli-run-construction-only'" "$tests_meson" >/dev/null || {
   echo 'construction-only run has no process-level authority-minimization test' >&2
+  exit 1
+}
+
+grep -F -- 'package-object store must be disjoint from private runtime root' \
+  "$readonly_integration" >/dev/null || {
+  echo 'CLI does not qualify package-object/private-runtime separation' >&2
+  exit 1
+}
+grep -F -- '[ ! -e "$overlap_runtime/package-objects" ]' \
+  "$readonly_integration" >/dev/null || {
+  echo 'CLI overlap refusal does not prove provider namespace stayed unopened' >&2
   exit 1
 }
 

@@ -26,6 +26,7 @@
 #include <libpkgapply-posix/mutation_lease.h>
 #include <libpkgimage/package_path.h>
 #include <libpkgimage/libpkgimage.h>
+#include <libpkgobject/libpkgobject.h>
 #include <libpkgstate-apply/state_projection.h>
 #include <libpkgreconcile-apply/adapter.h>
 #include <libpkgreconcile-apply-posix/publication.h>
@@ -135,6 +136,79 @@ std::string pipeline_recipe(
          "    - x86_64\n"
          "  target:\n"
          "    - x86_64\n";
+}
+
+std::string installed_consumer_recipe(std::string_view source_digest)
+{
+  return "format: zeppe-lin.recipe/1\n"
+         "\n"
+         "package:\n"
+         "  name: consumer\n"
+         "  version: 1.0\n"
+         "  release: 1\n"
+         "  summary: consumer package\n"
+         "  licenses:\n"
+         "    - GPL-3.0-or-later\n"
+         "\n"
+         "requirements:\n"
+         "  build:\n"
+         "    - package: tool\n"
+         "  check:\n"
+         "    - package: tool\n"
+         "\n"
+         "sources:\n"
+         "  - path: files/source.txt\n"
+         "    name: source.txt\n"
+         "    sha256: " + std::string(source_digest) + "\n"
+         "\n"
+         "build:\n"
+         "  language: posix-shell\n"
+         "  script: |\n"
+         "    consumer-build\n"
+         "\n"
+         "check:\n"
+         "  language: posix-shell\n"
+         "  script: |\n"
+         "    consumer-check\n"
+         "\n"
+         "architectures:\n"
+         "  build:\n"
+         "    - x86_64\n"
+         "  target:\n"
+         "    - x86_64\n";
+}
+
+void add_installed_consumer(const fs::path& root)
+{
+  const std::string source = "consumer source\n";
+  test_support::write(
+      root / "consumer" / "recipe.yml",
+      installed_consumer_recipe(sha256_text(source)));
+  test_support::write(root / "consumer" / "files/source.txt", source);
+}
+
+pkgctl::resolution_request installed_consumer_resolution_request(
+    const fs::path& collection,
+    const fs::path& state)
+{
+  std::vector<pkgresolve::resolution_goal> goals;
+  goals.emplace_back(
+      pkgsource::requirement_scope::build(),
+      pkgsource::requirement_subject(pkgsource::package_reference("consumer")),
+      "<installed-resource-build>");
+  goals.emplace_back(
+      pkgsource::requirement_scope::check(),
+      pkgsource::requirement_subject(pkgsource::package_reference("consumer")),
+      "<installed-resource-check>");
+  return pkgctl::resolution_request::make(
+      test_support::catalog_request(collection),
+      pkgctl::state_location::make(state, test_support::binding()),
+      pkgresolve::architecture_context(
+          pkgsource::architecture_reference("x86_64"),
+          pkgsource::architecture_reference("x86_64")),
+      std::move(goals),
+      pkgresolve::resolution_policy(
+          pkgresolve::installed_preference::retain_compatible));
 }
 
 void create_pipeline_collection(
@@ -400,6 +474,7 @@ pkgctl::native_transaction_session_configuration configuration(
           root / "construction-sessions",
           root / "package-outputs",
           root / "artifacts",
+          root / "installed-resources",
           root / "check-resources",
           root / "check-temporary",
           pkgexec::root_view_identity::from_sha256(std::string(64U, '8')),
@@ -505,20 +580,38 @@ public:
     const std::string source = read_text(source_root / "source.txt");
 
     if (check) {
-      if (request.program().material() != "tool-check\n" ||
-          (source != "tool source v1\n" && source != "tool source v2\n"))
-        throw std::runtime_error("pipeline check authority changed");
+      const auto program = request.program().material();
       const auto package_slot = pkgexec::resource_slot::singleton(
           pkgexec::resource_role::package_tree);
       const auto& package_binding = request.resources().binding(package_slot);
       const fs::path package =
           resources.materialization(package_binding.resource()).host_path();
-      const std::string expected_tool = source == "tool source v1\n"
-          ? "constructed tool v1\n"
-          : "constructed tool v2\n";
-      if (read_text(package / "usr/bin/tool") != expected_tool)
-        throw std::runtime_error(
-            "pipeline check did not receive the constructed package tree");
+      if (program == "tool-check\n") {
+        if (source != "tool source v1\n" && source != "tool source v2\n")
+          throw std::runtime_error("pipeline check authority changed");
+        const std::string expected_tool = source == "tool source v1\n"
+            ? "constructed tool v1\n"
+            : "constructed tool v2\n";
+        if (read_text(package / "usr/bin/tool") != expected_tool)
+          throw std::runtime_error(
+              "pipeline check did not receive the constructed package tree");
+      } else if (program == "consumer-check\n") {
+        if (source != "consumer source\n" ||
+            read_text(package / "usr/bin/consumer") !=
+                "constructed consumer\n")
+          throw std::runtime_error("consumer check authority changed");
+        const auto input_slot = pkgexec::resource_slot::named(
+            pkgexec::resource_role::check_input_tree, "tool");
+        const auto& input_binding = request.resources().binding(input_slot);
+        const fs::path installed_tool =
+            resources.materialization(input_binding.resource()).host_path();
+        if (read_text(installed_tool / "usr/bin/tool") !=
+            "constructed tool v1\n")
+          throw std::runtime_error(
+              "consumer check did not receive installed tool resource");
+      } else {
+        throw std::runtime_error("pipeline check authority changed");
+      }
       if (fault_ == pipeline_execution_fault::package_check) {
         return pkgexec::execution_result::failed_after_start(
             request, capabilities(), request.interpreter(),
@@ -575,6 +668,21 @@ public:
           version_two ? "default config v2\n" : "default config v1\n");
       if (::chmod((output / "usr/bin/tool").c_str(), 0755) != 0)
         throw std::runtime_error("cannot chmod pipeline tool payload");
+    } else if (program == "consumer-build\n") {
+      if (source != "consumer source\n")
+        throw std::runtime_error("consumer source materialization changed");
+      const auto input_slot = pkgexec::resource_slot::named(
+          pkgexec::resource_role::build_input_tree, "tool");
+      const auto& input_binding = request.resources().binding(input_slot);
+      const fs::path installed_tool =
+          resources.materialization(input_binding.resource()).host_path();
+      if (read_text(installed_tool / "usr/bin/tool") !=
+          "constructed tool v1\n")
+        throw std::runtime_error(
+            "consumer build did not receive installed tool resource");
+      fs::create_directories(output / "usr/bin");
+      test_support::write(
+          output / "usr/bin/consumer", "constructed consumer\n");
     } else {
       throw std::runtime_error("pipeline backend received unknown build program");
     }
@@ -2700,7 +2808,8 @@ void check_native_runtime_package_pipeline()
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system);
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   pipeline_backend backend;
 
   const fs::path authority_root = root / "runtime-authority";
@@ -2730,10 +2839,10 @@ void check_native_runtime_package_pipeline()
       {run_store, evidence_store, application.effect_journal_root,
        application.lock_root},
       make_runtime_configuration(),
-      {installed_packages, operations, effect_bodies, &operations,
+      {operations, effect_bodies, &operations,
        &effect_bodies, &operations},
       {&backend, &backend, *application.backend, *application.journals,
-       &backend, store, archive_backend});
+       &backend, store, &package_objects, archive_backend});
 
   const auto launched = runtime->launch(
       pkgctl::transaction_dispatch_policy::make(1U, 1U), journal_nonce(80U),
@@ -2770,7 +2879,6 @@ void check_native_runtime_package_pipeline()
   CHECK(effect_bodies.publication_request().has_value());
   CHECK(effect_bodies.publication_receipt().has_value());
   CHECK(effect_bodies.load_count() == 0U);
-  CHECK(installed_packages.locate_calls() == 0U);
 
   const auto installed = store.read();
   const auto* installed_tool = installed.find_package("tool");
@@ -2782,6 +2890,132 @@ void check_native_runtime_package_pipeline()
   CHECK(read_text(application.target_root / "etc/tool.conf") ==
         "default config v1\n");
 
+  // Successful native construction must retain exact reusable package bytes.
+  // Installed state supplies only the durable content/image authority; the
+  // reservoir independently answers whether those exact bytes remain present.
+  pkgimage::complete_archive_digest installed_tool_content =
+      pkgimage::complete_archive_digest::parse(std::string(
+          "v1:sha256:" + std::string(64U, '0')));
+  const pkgctl::construction_result* completed_tool_construction = nullptr;
+  if (installed_tool != nullptr) {
+    installed_tool_content = pkgimage::complete_archive_digest::parse(
+        installed_tool->control().build().artifact_content().string());
+    const auto retained_tool = package_objects.require(installed_tool_content);
+    CHECK(fs::is_regular_file(retained_tool.path()));
+
+    completed_tool_construction =
+        launched.run().progress().construction(tool_build.identity());
+    CHECK(completed_tool_construction != nullptr);
+    if (completed_tool_construction != nullptr) {
+      CHECK(retained_tool.path() !=
+            completed_tool_construction->session().paths().build.artifact_path);
+    }
+  }
+
+  // Resolve one new package whose BUILD and CHECK both retain the compatible
+  // installed tool. No package-object path participates in this selection.
+  add_installed_consumer(collection);
+  auto consumer_resolution_request =
+      installed_consumer_resolution_request(collection, state);
+  auto consumer_transaction = pkgctl::compose_transaction(
+      pkgctl::transaction_request::make(
+          std::move(consumer_resolution_request)));
+  const auto& consumer_build = node_for(
+      consumer_transaction, pkgtransaction::transaction_action_kind::build,
+      "consumer");
+  const auto& consumer_check = node_for(
+      consumer_transaction, pkgtransaction::transaction_action_kind::check,
+      "consumer");
+  bool retained_installed_tool = false;
+  for (const auto& selection :
+       consumer_transaction.resolution().resolution().selections()) {
+    if (selection.package().name() == "tool" &&
+        selection.installed() != nullptr)
+      retained_installed_tool = true;
+  }
+  CHECK(retained_installed_tool);
+
+  const auto run_consumer = [&](
+      const fs::path& consumer_root,
+      std::uint8_t nonce_marker) {
+    const auto consumer_sessions = configuration(consumer_root / "sessions");
+    for (const auto& path :
+         {consumer_root / "run-store", consumer_root / "evidence-store",
+          consumer_root / "effect-store"})
+      fs::create_directories(path);
+    auto consumer_runtime = pkgctl::native_posix_transaction_run_runtime::open(
+        {consumer_root / "run-store", consumer_root / "evidence-store",
+         consumer_root / "effect-store"},
+        pkgctl::native_transaction_run_runtime_configuration::make(
+            consumer_transaction, consumer_sessions),
+        {},
+        {&backend, &backend, &package_objects, archive_backend});
+    return consumer_runtime->launch(
+        pkgctl::transaction_dispatch_policy::make(1U, 1U),
+        journal_nonce(nonce_marker),
+        pkgctl::transaction_run_drive_policy::make(2U));
+  };
+
+  const auto build_calls_before_consumer = backend.build_calls();
+  const auto check_calls_before_consumer = backend.check_calls();
+  const auto consumer_run =
+      run_consumer(authority_root / "installed-consumer", 81U);
+  CHECK(consumer_run.drive().disposition() ==
+        pkgctl::transaction_run_drive_disposition::completed);
+  CHECK(consumer_run.run().progress().status(consumer_build.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  CHECK(consumer_run.run().progress().status(consumer_check.identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  CHECK(backend.build_calls() == build_calls_before_consumer + 1U);
+  CHECK(backend.check_calls() == check_calls_before_consumer + 1U);
+
+  // Loss of the exact retained object is a resource failure. The sealed
+  // transaction still selects the installed tool, and the old construction
+  // artifact is deliberately still present, but runtime composition must not
+  // scan history or substitute catalog authority.
+  if (installed_tool != nullptr && completed_tool_construction != nullptr) {
+    const auto retained_tool = package_objects.require(installed_tool_content);
+    CHECK(fs::remove(retained_tool.path()));
+    CHECK(fs::is_regular_file(
+        completed_tool_construction->session().paths().build.artifact_path));
+
+    const auto build_calls_before_missing = backend.build_calls();
+    const auto check_calls_before_missing = backend.check_calls();
+    bool missing_refused = false;
+    try {
+      (void)run_consumer(authority_root / "installed-consumer-missing", 82U);
+    } catch (const pkgobject::error& error) {
+      missing_refused =
+          error.code() == pkgobject::error_code::object_unavailable;
+    }
+    CHECK(missing_refused);
+    CHECK(backend.build_calls() == build_calls_before_missing);
+    CHECK(backend.check_calls() == check_calls_before_missing);
+
+    const auto& artifact =
+        *completed_tool_construction->build().build().artifact();
+    (void)package_objects.admit({
+        completed_tool_construction->session().paths().build.artifact_path,
+        installed_tool_content, artifact.byte_count()});
+    auto corrupt_tool = package_objects.require(installed_tool_content);
+    fs::permissions(
+        corrupt_tool.path(), fs::perms::owner_write, fs::perm_options::add);
+    test_support::write(corrupt_tool.path(), "corrupt retained package\n");
+
+    const auto build_calls_before_corrupt = backend.build_calls();
+    const auto check_calls_before_corrupt = backend.check_calls();
+    bool corruption_refused = false;
+    try {
+      (void)run_consumer(authority_root / "installed-consumer-corrupt", 83U);
+    } catch (const pkgobject::error& error) {
+      corruption_refused =
+          error.code() == pkgobject::error_code::corrupt_object;
+    }
+    CHECK(corruption_refused);
+    CHECK(backend.build_calls() == build_calls_before_corrupt);
+    CHECK(backend.check_calls() == check_calls_before_corrupt);
+  }
+
   const auto journal = launched.record().journal();
   const auto completed_record = launched.record().identity();
   runtime.reset();
@@ -2789,10 +3023,10 @@ void check_native_runtime_package_pipeline()
       {run_store, evidence_store, application.effect_journal_root,
        application.lock_root},
       make_runtime_configuration(),
-      {installed_packages, operations, effect_bodies, &operations,
+      {operations, effect_bodies, &operations,
        &effect_bodies, &operations},
       {nullptr, nullptr, *application.backend, *application.journals,
-       nullptr, store, archive_backend});
+       nullptr, store, &package_objects, archive_backend});
   const auto reopened = runtime->drive(
       journal, pkgctl::transaction_run_drive_policy::make(1U));
   CHECK(reopened.disposition() ==
@@ -2855,7 +3089,8 @@ void check_native_runtime_pre_operation_failure(
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system);
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   pipeline_backend backend(fault);
 
   const fs::path authority_root = root / "runtime-authority";
@@ -2886,10 +3121,10 @@ void check_native_runtime_pre_operation_failure(
         {run_store, evidence_store, application.effect_journal_root,
          application.lock_root},
         make_runtime_configuration(),
-        {installed_packages, operations, effect_bodies, &operations,
+        {operations, effect_bodies, &operations,
          &effect_bodies, &operations},
         {&backend, &backend, *application.backend, *application.journals,
-         &backend, store, archive_backend});
+         &backend, store, &package_objects, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -2948,7 +3183,6 @@ void check_native_runtime_pre_operation_failure(
   CHECK(!effect_bodies.publication_request().has_value());
   CHECK(!effect_bodies.publication_receipt().has_value());
   CHECK(effect_bodies.load_count() == 0U);
-  CHECK(installed_packages.locate_calls() == 0U);
   CHECK(store.read().identity() == initial_state.identity());
   CHECK(!fs::exists(application.target_root / "usr/bin/tool"));
   CHECK(!fs::exists(application.target_root / "etc/tool.conf"));
@@ -3048,7 +3282,8 @@ void check_native_runtime_operation_failure(
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system, std::move(lifecycle));
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
 
   pipeline_execution_fault execution_fault = pipeline_execution_fault::none;
   if (failure == runtime_operation_failure::pre_install_lifecycle)
@@ -3108,10 +3343,10 @@ void check_native_runtime_operation_failure(
         {run_store, evidence_store, application.effect_journal_root,
          application.lock_root},
         make_runtime_configuration(),
-        {installed_packages, operations, effect_bodies, &operations,
+        {operations, effect_bodies, &operations,
          &effect_bodies, &operations},
         {&backend, &backend, *application_backend, *application.journals,
-         &backend, *state_store, archive_backend});
+         &backend, *state_store, &package_objects, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -3152,7 +3387,6 @@ void check_native_runtime_operation_failure(
   CHECK(operations.session_load_calls() == 0U);
   CHECK(operations.retain_calls() == 1U);
   CHECK(operations.archive_calls() == 1U);
-  CHECK(installed_packages.locate_calls() == 0U);
 
   const auto* effect = launched.run().progress().effect(tool_install.identity());
   CHECK(effect != nullptr);
@@ -3361,7 +3595,8 @@ void check_native_runtime_fresh_lease_contention(std::uint8_t nonce_marker)
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system);
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   pipeline_backend backend;
 
   const fs::path authority_root = root / "runtime-authority";
@@ -3393,10 +3628,10 @@ void check_native_runtime_fresh_lease_contention(std::uint8_t nonce_marker)
         {run_store, evidence_store, application.effect_journal_root,
          application.lock_root},
         runtime_configuration(),
-        {installed_packages, operations, effect_bodies, &operations,
+        {operations, effect_bodies, &operations,
          &effect_bodies, &operations},
         {&backend, &backend, *application.backend, *application.journals,
-         &backend, store, archive_backend});
+         &backend, store, &package_objects, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -3514,7 +3749,8 @@ void check_native_runtime_recovery_lease_contention(std::uint8_t nonce_marker)
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system);
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   pipeline_backend backend;
 
   const fs::path authority_root = root / "runtime-authority";
@@ -3545,10 +3781,10 @@ void check_native_runtime_recovery_lease_contention(std::uint8_t nonce_marker)
         {run_store_path, evidence_store, application.effect_journal_root,
          application.lock_root},
         runtime_configuration(),
-        {installed_packages, operations, effect_bodies, &operations,
+        {operations, effect_bodies, &operations,
          &effect_bodies, &operations},
         {&backend, &backend, *application.backend, *application.journals,
-         &backend, store, archive_backend});
+         &backend, store, &package_objects, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -3718,7 +3954,8 @@ void check_native_runtime_outer_lease_loss(
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system, std::move(lifecycle));
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   pipeline_backend backend;
   lease_losing_lifecycle_backend lifecycle_backend(
       backend, application.lock_root);
@@ -3759,10 +3996,10 @@ void check_native_runtime_outer_lease_loss(
         {run_store, evidence_store, application.effect_journal_root,
          application.lock_root},
         make_runtime_configuration(),
-        {installed_packages, operations, effect_bodies, &operations,
+        {operations, effect_bodies, &operations,
          &effect_bodies, &operations},
         {&backend, &backend, *application.backend, *application.journals,
-         lifecycle_driver, state_store, archive_backend});
+         lifecycle_driver, state_store, &package_objects, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -3960,7 +4197,8 @@ void check_native_runtime_publication_intent_uncertainty(
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system);
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   pipeline_backend backend;
 
   const fs::path authority_root = root / "runtime-authority";
@@ -3992,10 +4230,10 @@ void check_native_runtime_publication_intent_uncertainty(
         {run_store_path, evidence_store, application.effect_journal_root,
          application.lock_root},
         make_runtime_configuration(),
-        {installed_packages, operations, effect_bodies, &operations,
+        {operations, effect_bodies, &operations,
          &effect_bodies, &operations},
         {&backend, &backend, *application.backend, *application.journals,
-         &backend, state_store, archive_backend});
+         &backend, state_store, &package_objects, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -4199,7 +4437,8 @@ void check_native_runtime_terminal_indeterminate_publication(
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system);
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   pipeline_backend backend;
 
   const fs::path authority_root = root / "runtime-authority";
@@ -4230,10 +4469,10 @@ void check_native_runtime_terminal_indeterminate_publication(
         {run_store, evidence_store, application.effect_journal_root,
          application.lock_root},
         make_runtime_configuration(),
-        {installed_packages, operations, effect_bodies, &operations,
+        {operations, effect_bodies, &operations,
          &effect_bodies, &operations},
         {&backend, &backend, *application.backend, *application.journals,
-         &backend, state_store, archive_backend});
+         &backend, state_store, &package_objects, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -4376,7 +4615,8 @@ void check_native_runtime_application_terminal_external_resolution(
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system);
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   pipeline_backend backend;
 
   const fs::path authority_root = root / "runtime-authority";
@@ -4408,10 +4648,10 @@ void check_native_runtime_application_terminal_external_resolution(
         {run_store_path, evidence_store, application.effect_journal_root,
          application.lock_root},
         make_runtime_configuration(),
-        {installed_packages, operations, effect_bodies, &operations,
+        {operations, effect_bodies, &operations,
          &effect_bodies, &operations},
         {&backend, &backend, *application.backend, *application.journals,
-         &backend, store, archive_backend});
+         &backend, store, &package_objects, archive_backend});
   };
 
   auto runtime = open_runtime();
@@ -4596,7 +4836,8 @@ void check_native_runtime_lifecycle_intent_external_resolution(
       transaction, tool_build.identity(), tool_install.identity(), observer,
       archive_backend, target, target_system, std::move(lifecycle));
   recording_effect_body_store effect_bodies;
-  refusing_installed_package_source installed_packages;
+  auto package_objects = pkgobject::store::open_or_create(
+      root / "package-objects");
   pipeline_backend backend;
 
   const fs::path authority_root = root / "runtime-authority";
@@ -4637,10 +4878,10 @@ void check_native_runtime_lifecycle_intent_external_resolution(
         {run_store_path, evidence_store, application.effect_journal_root,
          application.lock_root},
         make_runtime_configuration(),
-        {installed_packages, operations, effect_bodies, &operations,
+        {operations, effect_bodies, &operations,
          &effect_bodies, &operations},
         {&backend, &backend, *application.backend, *application.journals,
-         &backend, store, archive_backend});
+         &backend, store, &package_objects, archive_backend});
   };
 
   auto runtime = open_runtime();

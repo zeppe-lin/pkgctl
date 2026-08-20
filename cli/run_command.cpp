@@ -23,6 +23,7 @@
 #include <libpkgcatalog-codec/codec.h>
 #include <libpkgexec-linux/libpkgexec-linux.h>
 #include <libpkgimage/libarchive_backend.h>
+#include <libpkgobject/libpkgobject.h>
 #include <libpkgresolve/resolver.h>
 #include <libpkgstate/generation_codec.h>
 #include <libpkgstate/publication_codec.h>
@@ -118,6 +119,37 @@ private:
     const std::filesystem::path& second)
 {
   return path_prefix(first, second) || path_prefix(second, first);
+}
+
+void require_package_object_store_separation(
+    const transaction_run_command& command)
+{
+  if (!command.package_object_store)
+    return;
+  const auto& store = *command.package_object_store;
+  if (store.empty() || !store.is_absolute() ||
+      store != store.lexically_normal() || store == store.root_path())
+  {
+    throw std::invalid_argument(
+        "package-object store must be an absolute normalized non-root path");
+  }
+
+  const auto refuse_overlap = [&](
+      const std::filesystem::path& root, const char* description) {
+    if (paths_overlap(store, root))
+      throw std::runtime_error(
+          "package-object store must be disjoint from " +
+          std::string(description));
+  };
+
+  refuse_overlap(command.canonical_store, "canonical state store");
+  refuse_overlap(command.runtime_root, "private runtime root");
+  refuse_overlap(command.build_root, "construction/check execution root");
+  refuse_overlap(command.artifact_root, "public artifact root");
+  if (command.lifecycle_root)
+    refuse_overlap(*command.lifecycle_root, "lifecycle execution root");
+  if (command.target_root)
+    refuse_overlap(*command.target_root, "managed target root");
 }
 
 [[nodiscard]] fd_guard open_directory(const std::filesystem::path& path)
@@ -1724,43 +1756,6 @@ private:
   std::optional<std::filesystem::path> pending_archive_;
 };
 
-class explicit_installed_package_source final
-    : public retained_installed_package_tree_source {
-public:
-  explicit explicit_installed_package_source(
-      std::vector<installed_tree_option> entries)
-  {
-    for (auto& entry : entries)
-    {
-      if (!entry.path.is_absolute() || entry.path.empty() ||
-          entry.path != entry.path.lexically_normal())
-        throw std::invalid_argument(
-            "installed package tree path must be absolute and normalized");
-      const auto key = entry.package.string();
-      if (!entries_.emplace(
-              key, retained_installed_package_tree{
-                       std::move(entry.package), std::move(entry.resource),
-                       std::move(entry.path)}).second)
-        throw std::invalid_argument(
-            "installed package tree supplied more than once: " + key);
-    }
-  }
-
-  retained_installed_package_tree locate(
-      const pkgstate::installed_package& package) override
-  {
-    const auto found = entries_.find(package.identity().string());
-    if (found == entries_.end())
-      throw std::runtime_error(
-          "no retained package tree for installed package " +
-          package.identity().string());
-    return found->second;
-  }
-
-private:
-  std::map<std::string, retained_installed_package_tree> entries_;
-};
-
 [[nodiscard]] std::filesystem::path runtime_path(
     const transaction_run_command& command,
     std::string_view name)
@@ -2067,6 +2062,7 @@ void require_operation_command_authority(
           runtime_path(command, "construction-sessions"),
           runtime_path(command, "package-outputs"),
           command.artifact_root,
+          runtime_path(command, "installed-resources"),
           runtime_path(command, "check-resources"),
           runtime_path(command, "check-temporary"),
           build_root_view,
@@ -2441,6 +2437,7 @@ int execute_transaction_run(transaction_run_command command)
   (void)open_directory(command.runtime_root);
   (void)open_directory(command.build_root);
   (void)open_directory(command.artifact_root);
+  require_package_object_store_separation(command);
   if (command.frontend == transaction_run_command_frontend::build &&
       paths_overlap(command.runtime_root, command.artifact_root))
   {
@@ -2621,8 +2618,12 @@ int execute_transaction_run(transaction_run_command command)
   }
 
   pkgimage::libarchive_backend archive_backend;
-  explicit_installed_package_source installed_packages(
-      std::move(command.installed_trees));
+  std::optional<pkgobject::store> package_objects;
+  if (command.package_object_store)
+    package_objects.emplace(pkgobject::store::open_or_create(
+        *command.package_object_store));
+  pkgobject::store* package_object_authority =
+      package_objects ? &*package_objects : nullptr;
 
   if (command.intent == transaction_run_command_intent::start)
   {
@@ -2666,9 +2667,9 @@ int execute_transaction_run(transaction_run_command command)
         transaction, std::move(session_configuration));
     auto runtime = native_posix_transaction_run_runtime::from_directory_fds(
         run_store.get(), evidence_store.get(), effect_store.get(),
-        std::move(configuration), {installed_packages},
+        std::move(configuration), {},
         {current_execution_backend.get(), current_execution_backend.get(),
-         archive_backend});
+         package_object_authority, archive_backend});
     return drive_runtime(*runtime);
   }
   else
@@ -2719,11 +2720,12 @@ int execute_transaction_run(transaction_run_command command)
     auto runtime = native_posix_transaction_run_runtime::from_directory_fds(
         run_store.get(), evidence_store.get(), effect_store.get(),
         target_locks.get(), std::move(configuration),
-        {installed_packages, operation_authority, effect_bodies,
-         &operation_authority, &effect_bodies, &operation_authority},
+        {operation_authority, effect_bodies, &operation_authority,
+         &effect_bodies, &operation_authority},
         {current_execution_backend.get(), current_execution_backend.get(),
          *application_backend, *application_journals,
-         current_execution_backend.get(), state_store, archive_backend});
+         current_execution_backend.get(), state_store, package_object_authority,
+         archive_backend});
     return drive_runtime(*runtime);
   }
 }

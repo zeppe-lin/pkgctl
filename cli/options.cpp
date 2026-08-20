@@ -71,7 +71,7 @@ struct raw_options final {
   std::optional<std::uint64_t> build_source_date_epoch;
   std::optional<native_operation_policy_profile> operation_policy;
   std::optional<std::uint64_t> maximum_steps;
-  std::vector<installed_tree_option> installed_trees;
+  std::optional<std::string> package_object_store;
   std::optional<std::string> build_subject;
   std::optional<int> build_subject_argument_index;
   bool build_check = false;
@@ -264,28 +264,6 @@ effect_inspection_command parse_effect_inspection(int argc, char** argv)
   catch (const pkgctl::error& problem)
   {
     fail(std::string("invalid --attempt: ") + problem.what());
-  }
-}
-
-installed_tree_option installed_tree(std::string value)
-{
-  const auto [package_text, resource_and_path] = assignment(
-      std::move(value), "--installed-tree");
-  const std::size_t comma = resource_and_path.find(',');
-  if (comma == std::string::npos || comma == 0U ||
-      comma + 1U == resource_and_path.size())
-    fail("--installed-tree requires PACKAGE_ID=RESOURCE_SHA256,PATH");
-  try
-  {
-    return installed_tree_option{
-        pkgstate::installed_package_identity::parse(package_text),
-        pkgexec::resource_identity::from_sha256(
-            resource_and_path.substr(0U, comma)),
-        resource_and_path.substr(comma + 1U)};
-  }
-  catch (const std::exception& problem)
-  {
-    fail(std::string("invalid --installed-tree: ") + problem.what());
   }
 }
 
@@ -561,10 +539,11 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
           require_value(argc, argv, index, argument), "maximum step count");
       continue;
     }
-    if (argument == "--installed-tree")
+    if (argument == "--package-object-store")
     {
-      parsed.installed_trees.push_back(installed_tree(
-          require_value(argc, argv, index, argument)));
+      set_once(
+          parsed.package_object_store,
+          require_value(argc, argv, index, argument), argument);
       continue;
     }
     fail("unknown option: " + argument);
@@ -669,7 +648,8 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
       !parsed.lifecycle_supplementary_groups.empty() ||
       parsed.build_parallelism || parsed.build_source_date_epoch ||
       parsed.operation_policy || parsed.maximum_steps ||
-      !parsed.installed_trees.empty();
+      parsed.package_object_store;
+
   if (kind == command_kind::run)
   {
     if (parsed.artifact_root_path)
@@ -693,6 +673,8 @@ raw_options parse_raw(command_kind kind, int argc, char** argv)
   }
   else if (kind == command_kind::build)
   {
+    if (!parsed.package_object_store)
+      fail("build requires explicit --package-object-store authority");
     if (!parsed.runtime_root || !parsed.build_root_path ||
         !parsed.artifact_root_path || !parsed.interpreter ||
         !parsed.build_user_id.has_value() || !parsed.build_group_id.has_value() ||
@@ -818,6 +800,10 @@ transaction_run_command transaction_run_from(
           native_operation_policy::seal(*parsed.operation_policy));
   }
 
+  std::optional<std::filesystem::path> package_object_store;
+  if (parsed.package_object_store)
+    package_object_store.emplace(std::move(*parsed.package_object_store));
+
   return transaction_run_command{
       frontend, std::move(transaction), std::move(canonical_store),
       *parsed.run_intent,
@@ -849,7 +835,7 @@ transaction_run_command transaction_run_from(
       std::move(lifecycle_credentials), std::move(admitted_build_policy),
       std::move(admitted_operation_policy),
       static_cast<std::size_t>(*parsed.maximum_steps),
-      std::move(parsed.installed_trees)};
+      std::move(package_object_store)};
 }
 
 } // namespace
@@ -1027,7 +1013,7 @@ Shared native execution authority:
   --build-group-id N              construction/check execution group id
   --build-supplementary-group N   repeatable construction/check group id
   --max-steps N                   positive bound for this invocation
-  --installed-tree P=R,PATH       retained installed package/resource tree
+  --package-object-store PATH     durable exact package-object reservoir (required by build)
 
 Build-only authority:
   --artifact-root PATH            existing absolute public artifact hierarchy; retained

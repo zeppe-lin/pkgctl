@@ -10,6 +10,35 @@ Controller-owned policy must remain visibly separate from authority results.
 Defaults that can remove packages, mutate filesystems, initialize state, or
 publish state are prohibited.
 
+## Installed-package resource authority
+
+Treat installed selection, durable package bytes, normalized package-image
+semantics, and call-scoped execution trees as four different authorities.
+Canonical state owns which exact artifact content/image was admitted.
+`libpkgobject` owns only whether the exact archive bytes are currently available.
+`libpkgimage-exec` owns verification/replay of those exact bytes and image
+identity. pkgctl may compose them into a private execution tree, but that tree or
+its path must never become installed-state or restart truth.
+
+Fresh installed-resource preparation belongs before pure session admission. It
+may consume the sealed installed package and present object provider; it must not
+consult resolver/catalog authority, transaction history, target observations, or
+ambient directory contents. A missing/corrupt object is an explicit resource
+failure. Do not add fallback to historical construction artifacts, target bytes,
+or a same-name catalog candidate. `run_locator` must remain filesystem- and
+provider-observation free.
+
+Successful native construction must populate the caller-selected package-object
+reservoir from the exact sealed public artifact before the construction dispatch
+retires. Keep that admission replayable from terminal construction evidence; do
+not move it into canonical state publication or infer it later from transaction
+history. The package-object store is current physical authority, so its path is
+not retained in command evidence and must remain disjoint from state, runtime,
+execution, artifact, lifecycle, and target roots. Do not make that mechanism
+mandatory for operation-only or already-terminal native run recovery: fresh
+construction/check work must refuse an absent provider, but unrelated dispatches
+must not retain surplus package-byte authority.
+
 ## Pre-frontend vertical qualification
 
 A new effect-implying frontend must not be the first integration test of an

@@ -3,9 +3,6 @@
 
 #include <pkgctl/run_locator.h>
 
-#include <libpkgimage-exec/libpkgimage-exec.h>
-#include <libpkgsource-exec/libpkgsource-exec.h>
-
 #include <algorithm>
 #include <array>
 #include <optional>
@@ -103,11 +100,12 @@ bool paths_overlap(const fs::path& first, const fs::path& second)
 void require_disjoint_configuration_roots(
     const native_transaction_session_roots& roots)
 {
-  const std::array<std::pair<const fs::path*, const char*>, 7> values{{
+  const std::array<std::pair<const fs::path*, const char*>, 8> values{{
       {&roots.content_store_root, "content store root"},
       {&roots.construction_session_root, "construction session root"},
       {&roots.package_output_root, "package output root"},
       {&roots.artifact_root, "artifact root"},
+      {&roots.installed_resource_root, "installed resource root"},
       {&roots.check_resource_root, "check resource root"},
       {&roots.check_temporary_root, "check temporary root"},
       {&roots.root_view_path, "root view"},
@@ -360,6 +358,8 @@ native_transaction_session_configuration::make(
       std::move(roots.package_output_root), "package output root");
   roots.artifact_root = normalize_absolute_path(
       std::move(roots.artifact_root), "artifact root");
+  roots.installed_resource_root = normalize_absolute_path(
+      std::move(roots.installed_resource_root), "installed resource root");
   roots.check_resource_root = normalize_absolute_path(
       std::move(roots.check_resource_root), "check resource root");
   roots.check_temporary_root = normalize_absolute_path(

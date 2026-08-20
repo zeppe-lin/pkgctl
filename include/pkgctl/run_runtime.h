@@ -15,7 +15,7 @@
 #include <vector>
 
 #include <pkgctl/run_launch.h>
-#include <pkgctl/run_locator.h>
+#include <pkgctl/run_resource.h>
 #include <pkgctl/run_operation.h>
 #include <pkgctl/run_progress.h>
 #include <pkgctl/run_recovery.h>
@@ -240,18 +240,15 @@ private:
  * fresh-dispatch only.
  */
 struct native_transaction_run_runtime_authorities final {
-  native_transaction_run_runtime_authorities(
-      retained_installed_package_tree_source& installed_packages);
+  native_transaction_run_runtime_authorities();
 
   native_transaction_run_runtime_authorities(
-      retained_installed_package_tree_source& installed_packages,
       transaction_operation_specification_source& operation_specifications,
       transaction_effect_restart_body_source& effect_restart_bodies,
       transaction_effect_archive_source* archives = nullptr,
       transaction_effect_body_sink* effect_bodies = nullptr,
       transaction_operation_session_store* operation_sessions = nullptr);
 
-  retained_installed_package_tree_source& installed_packages;
   transaction_operation_specification_source* operation_specifications;
   transaction_effect_restart_body_source* effect_restart_bodies;
   transaction_effect_archive_source* archives;
@@ -270,6 +267,7 @@ struct native_transaction_run_runtime_backends final {
   native_transaction_run_runtime_backends(
       pkgexec::execution_backend* construction,
       pkgexec::execution_backend* check,
+      pkgobject::store* package_objects,
       pkgimage::archive_backend& archive);
 
   native_transaction_run_runtime_backends(
@@ -279,6 +277,7 @@ struct native_transaction_run_runtime_backends final {
       pkgapply::application_journal_store& application_journal,
       pkgexec::execution_backend* lifecycle,
       pkgstate::canonical_store& state,
+      pkgobject::store* package_objects,
       pkgimage::archive_backend& archive);
 
   pkgexec::execution_backend* construction;
@@ -287,6 +286,7 @@ struct native_transaction_run_runtime_backends final {
   pkgapply::application_journal_store* application_journal;
   pkgexec::execution_backend* lifecycle;
   pkgstate::canonical_store* state;
+  pkgobject::store* package_objects;
   pkgimage::archive_backend& archive;
 };
 

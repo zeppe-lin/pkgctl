@@ -3,6 +3,8 @@
 
 #include <pkgctl/construction.h>
 
+#include <libpkgobject/libpkgobject.h>
+
 #include <pkgctl/error.h>
 
 #include <algorithm>
@@ -416,7 +418,16 @@ const session_identity& construction_session::identity() const noexcept
 
 native_construction_driver::native_construction_driver(
     pkgexec::execution_backend& backend)
-    : backend_(backend)
+    : native_construction_driver(backend, nullptr, false)
+{
+}
+
+native_construction_driver::native_construction_driver(
+    pkgexec::execution_backend& backend,
+    pkgobject::store* package_objects,
+    bool require_package_object_publication)
+    : backend_(backend), package_objects_(package_objects),
+      require_package_object_publication_(require_package_object_publication)
 {
 }
 
@@ -439,6 +450,19 @@ void native_construction_driver::publish_build(
     const pkgbuild_exec::build_execution_result& result)
 {
   pkgbuild_exec::publish_sealed_artifact(session, result);
+  if (package_objects_ == nullptr)
+  {
+    if (require_package_object_publication_)
+      throw std::runtime_error(
+          "native construction package-object authority is unavailable");
+    return;
+  }
+
+  const auto& artifact = *result.build().artifact();
+  const auto content = pkgimage::complete_archive_digest::parse(
+      "v1:sha256:" + artifact.complete_digest().hex());
+  (void)package_objects_->admit(
+      {session.paths().artifact_path, content, artifact.byte_count()});
 }
 
 construction_result::construction_result(

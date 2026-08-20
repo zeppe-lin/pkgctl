@@ -84,6 +84,7 @@ run_command()
   set -- "$@" \
     "$intent" "$nonce" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
     --target-root "$target" \

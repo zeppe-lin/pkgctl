@@ -199,3 +199,22 @@ for forbidden in 'pkgctl_exe' 'std::system(' '::execv(' '::execve('; do
     exit 1
   fi
 done
+
+# Installed dependency reuse is a real resource-plane vertical: resolution stays
+# sealed while exact object loss/corruption fails before BUILD/CHECK execution.
+for resource_fact in \
+  'installed_consumer_resolution_request' \
+  'CHECK(retained_installed_tool);' \
+  'consumer build did not receive installed tool resource' \
+  'consumer check did not receive installed tool resource' \
+  'package_objects.require(installed_tool_content)' \
+  'pkgobject::error_code::object_unavailable' \
+  'pkgobject::error_code::corrupt_object' \
+  'completed_tool_construction->session().paths().build.artifact_path' \
+  'backend.build_calls() == build_calls_before_missing' \
+  'backend.check_calls() == check_calls_before_corrupt'; do
+  grep -F -- "$resource_fact" "$test_source" >/dev/null || {
+    echo "package-pipeline omits installed-resource qualification: $resource_fact" >&2
+    exit 1
+  }
+done

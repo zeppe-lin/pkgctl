@@ -95,6 +95,7 @@ for path in \
   'integration/cli_run_lifecycle_resolution_test.sh' \
   'contracts/check_package_pipeline_contract.sh' \
   'contracts/check_run_cleanup_contract.sh' \
+  'contracts/check_run_resource_contract.sh' \
   'contracts/check_package_fault_matrix_contract.sh' \
   'contracts/check_cli_lease_contention_contract.sh' \
   'contracts/check_cli_native_construction_contract.sh' \
@@ -109,7 +110,8 @@ for path in \
   'contracts/check_cli_run_rootfs_campaign_contract.sh' \
   'contracts/check_target_observation_contract.sh' \
   'contracts/check_test_layout_contract.sh' \
-  'contracts/check_fetch_generation_contract.sh'; do
+  'contracts/check_fetch_generation_contract.sh' \
+  'contracts/check_object_generation_contract.sh'; do
   grep -F -- "$path" "$meson" "$srcdir/tests/run-direct.sh" >/dev/null || {
     echo "qualification wiring omits categorized test source: $path" >&2
     exit 1

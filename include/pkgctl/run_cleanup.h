@@ -22,8 +22,9 @@ namespace pkgctl {
 enum class transaction_run_private_realization_kind : std::uint8_t {
   construction_session = 1,
   package_output = 2,
-  check_resource = 3,
-  check_temporary = 4,
+  installed_resource = 3,
+  check_resource = 4,
+  check_temporary = 5,
 };
 
 /*! \brief One exact disposable leaf derived from durable run authority. */

@@ -94,6 +94,7 @@ require_help_text 'execution root-view identity options are start-only'
 require_help_text '--build-parallelism N'
 require_help_text '--build-source-date-epoch N'
 require_help_text '--operation-policy PROFILE'
+require_help_text '--package-object-store PATH'
 require_help_text 'strict-exclusive | exact-compatible-sharing'
 require_help_text 'one complete immutable pkgctl policy value'
 require_help_text 'complete build policy is retained at admission'
@@ -114,6 +115,7 @@ for forbidden in \
   --build-home; do
   require_help_absent "$forbidden"
 done
+require_help_absent '--installed-tree'
 require_help_text 'performs at most --max-steps controller advances'
 require_help_text 'pkgctl inspect-run --run-store PATH --journal SHA256'
 require_help_text 'pkgctl inspect-effect --effect-store PATH --attempt SHA256'
@@ -137,6 +139,37 @@ build_nonce=$(printf '%064d' 9)
 build_root_view=$(printf '%064d' 81)
 lifecycle_root_view=$(printf '%064d' 82)
 
+# The package-object reservoir is current durable resource authority, not a
+# private run/build/artifact namespace. Refuse lexical overlap before opening or
+# initializing the provider so a bad coordinate cannot mutate either plane.
+overlap_runtime=$root/object-overlap-runtime
+overlap_build=$root/object-overlap-build
+overlap_artifacts=$root/object-overlap-artifacts
+mkdir -p "$overlap_runtime" "$overlap_build" "$overlap_artifacts"
+# shellcheck disable=SC2086
+if $pkgctl build app \
+    --collection "core=$collection" \
+    --canonical-store "$state" $binding \
+    --build-architecture x86_64 --target-architecture x86_64 \
+    --start "$(printf '%064d' 8)" \
+    --build-root-view "$build_root_view" \
+    --build-parallelism 1 --build-source-date-epoch 0 \
+    --runtime-root "$overlap_runtime" \
+    --package-object-store "$overlap_runtime/package-objects" \
+    --build-root "$overlap_build" \
+    --artifact-root "$overlap_artifacts" \
+    --interpreter /bin/false \
+    --build-user-id 0 --build-group-id 0 --max-steps 1 \
+    >"$root/object-overlap.out" 2>"$root/object-overlap.err"; then
+  echo 'build unexpectedly accepted package-object/runtime overlap' >&2
+  exit 1
+else
+  [ "$?" -eq 1 ]
+fi
+grep -F 'package-object store must be disjoint from private runtime root' \
+  "$root/object-overlap.err" >/dev/null
+[ ! -e "$overlap_runtime/package-objects" ]
+
 # Construction/check and lifecycle execution roots are semantic start authority
 # distinct from the target binding. Missing identities fail before physical
 # runtime coordinates are touched.
@@ -148,6 +181,7 @@ if $pkgctl build app \
     --start "$build_nonce" \
     --build-parallelism 1 --build-source-date-epoch 0 \
     --runtime-root "$root/missing-build-root-view-runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$root/missing-build-root-view-build" \
     --artifact-root "$root/missing-build-root-view-artifacts" \
     --interpreter /bin/false \
@@ -174,6 +208,7 @@ if $pkgctl run \
     --build-parallelism 1 --build-source-date-epoch 0 \
     --operation-policy strict-exclusive \
     --runtime-root "$root/missing-lifecycle-root-view-runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$root/missing-lifecycle-root-view-build" \
     --lifecycle-root "$root/missing-lifecycle-root-view-lifecycle" \
     --target-root "$root/missing-lifecycle-root-view-target" \
@@ -206,6 +241,7 @@ assert_incomplete_build_policy_refused()
       --build-root-view "$build_root_view" \
       "$@" \
       --runtime-root "$runtime" \
+      --package-object-store "$root/package-objects" \
       --build-root "$build_root" \
       --artifact-root "$artifacts" \
       --interpreter /bin/false \
@@ -243,6 +279,7 @@ if $pkgctl run \
     --lifecycle-root-view "$lifecycle_root_view" \
     --build-parallelism 1 --build-source-date-epoch 0 \
     --runtime-root "$root/missing-operation-policy-runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$root/missing-operation-policy-build" \
     --lifecycle-root "$root/missing-operation-policy-lifecycle" \
     --target-root "$root/missing-operation-policy-target" \
@@ -282,6 +319,7 @@ if $pkgctl build app \
     --build-parallelism 1 --build-source-date-epoch 0 \
     --operation-policy strict-exclusive \
     --runtime-root "$root/build-operation-policy-runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$root/build-operation-policy-root" \
     --artifact-root "$root/build-operation-policy-artifacts" \
     --interpreter /bin/false \
@@ -322,6 +360,7 @@ if $pkgctl build app \
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
     --runtime-root "$root/build-policy-runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$root/build-policy-root" \
     --artifact-root "$root/build-policy-artifacts" \
     --interpreter /bin/false \
@@ -350,6 +389,7 @@ if $pkgctl build app \
     --build-parallelism 1 \
     --build-source-date-epoch 0 \
     --runtime-root "$root/build-target-runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$root/build-target-root" \
     --artifact-root "$root/build-target-artifacts" \
     --target-root "$root/build-forbidden-target" \
@@ -382,6 +422,7 @@ grep -F -- '--resume uses retained transaction semantics' \
 if $pkgctl run --canonical-store "$state" --resume "$run_policy_nonce" \
     --build-root-view "$build_root_view" \
     --runtime-root "$root/resume-root-view-runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$root/resume-root-view-build" \
     --lifecycle-root "$root/resume-root-view-lifecycle" \
     --target-root "$root/resume-root-view-target" \

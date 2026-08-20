@@ -22,6 +22,55 @@ paths, names, or stale evidence. In particular, CHECK may realize fresh source,
 package, and dependency trees from retained exact authority, but it may not
 rediscover why those resources belong to the check.
 
+## Current installed-package resource boundary
+
+Installed-package selection and present package bytes are deliberately different
+authorities. Canonical installed state retains the exact admitted
+`artifact_content` and `artifact_image` identities. It does not promise that the
+archive bytes are currently available. `libpkgobject` is the durable present-byte
+provider keyed only by exact complete-archive digest; it owns neither package
+selection nor normalized image semantics.
+
+Fresh native construction/check preparation consumes those already-sealed state
+identities, requires the exact object from `libpkgobject`, and asks
+`libpkgimage-exec` to verify/replay the exact archive and retained package-image
+identity into a dispatch-scoped private tree. Only after all installed inputs are
+realized does the existing `native_transaction_dispatch_session_source` map the
+prepared package/resource/path tuples into construction or check execution. That
+locator remains observation-free: it cannot open the object store, realize an
+archive, scan a target, inspect history, or invoke resolution/catalog authority.
+
+The concrete execution resource identity is call-scoped and binds the run
+journal, dispatch, installed-package identity, artifact-content identity, and
+artifact-image identity. It does not become durable package truth. The private
+realization is disposable execution state and terminal cleanup derives its exact
+leaf from durable run/dispatch authority. Resource realization is replayable: the
+`libpkgimage-exec` owner replaces residue at the exact private destination rather
+than interpreting that residue as evidence.
+
+Successful native construction populates the reservoir only after
+`libpkgbuild-exec` has projected the exact sealed artifact to its admitted public
+artifact path. If reservoir admission fails, the dispatch cannot retire. Recovery
+can retry public projection and object admission from retained terminal
+construction evidence without rebuilding. Package-object retention is therefore
+not state publication, transaction history, or a second package-image codec.
+
+`pkgctl build` requires one explicit `--package-object-store` namespace.
+`pkgctl run` accepts that current mechanism when fresh work may need it and
+otherwise need not retain unused package-byte authority. Fresh construction
+always requires the provider because its sealed archive must be admitted before
+the dispatch can retire; fresh CHECK requires it only when the sealed CHECK
+inputs include an installed package. An installed-input-free CHECK,
+operation-only run, or already-terminal recovery does not borrow that authority.
+The coordinate is not
+retained as historical command semantics and, when supplied, must be disjoint
+from canonical state, runtime/evidence/effect stores, construction/check roots,
+public artifacts, lifecycle roots, and the managed target. Caller-authored
+`--installed-tree` mappings are unsupported. A missing or corrupt required object
+fails at resource acquisition; pkgctl does not
+search old construction artifacts, inspect the target, re-resolve, or substitute
+a catalog candidate.
+
 ## Current target-operation policy boundary
 
 Native target-operation policy is controller configuration, not package-source,
@@ -53,9 +102,9 @@ native session roots:
 ```text
 successful terminal run record
         |
-        +-- completed construction dispatch -> construction-session + package-output leaf
+        +-- completed construction dispatch -> installed-resource + construction-session + package-output leaf
         |
-        `-- completed check dispatch        -> check-resource + check-temporary leaf
+        `-- completed check dispatch        -> installed-resource + check-resource + check-temporary leaf
 ```
 
 Incomplete, failure-contained, and externally unresolved runs project no cleanup

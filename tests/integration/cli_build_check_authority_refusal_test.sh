@@ -72,6 +72,7 @@ run_scenario()
     --build-source-date-epoch 0 \
     --build-root-view "$(printf '%064d' 81)" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --artifact-root "$artifacts" \
     --interpreter "$interpreter" \
@@ -163,6 +164,7 @@ run_scenario()
     --canonical-store "$state" \
     --resume "$nonce" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --artifact-root "$artifacts" \
     --interpreter "$interpreter" \

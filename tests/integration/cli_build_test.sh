@@ -89,6 +89,8 @@ for directory in \
   content \
   construction-sessions \
   package-outputs \
+  installed-resources \
+  check-resources \
   check-temporary; do
   mkdir "$runtime/$directory"
 done
@@ -127,6 +129,7 @@ set -- build tool --check \
   --build-source-date-epoch 0 \
   --build-root-view "$(printf '%064d' 81)" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --artifact-root "$runtime/content" \
   --interpreter "$interpreter" \
@@ -162,6 +165,7 @@ set -- build tool --check \
   --build-source-date-epoch 0 \
   --build-root-view "$(printf '%064d' 81)" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --artifact-root "$artifacts" \
   --interpreter "$interpreter" \
@@ -212,6 +216,7 @@ set -- build \
   --canonical-store "$state" \
   --resume "$nonce" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --artifact-root "$wrong_artifacts" \
   --interpreter "$interpreter" \
@@ -239,6 +244,7 @@ set -- build \
   --canonical-store "$state" \
   --resume "$nonce" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --artifact-root "$artifacts" \
   --interpreter "$interpreter" \
@@ -322,6 +328,12 @@ require_equal dependency-payload dependency-source \
 require_equal tool-payload tool-source+dependency-source \
   "$(tar -xOf "$tool_archive" tool-token)"
 
+package_object_list=$root/package-objects.list
+find "$root/package-objects/sha256" -type f | sort >"$package_object_list"
+package_object_count=$(wc -l <"$package_object_list")
+[ "$package_object_count" -eq 2 ] || \
+  fail "build retained $package_object_count durable package objects, expected 2"
+
 journal=$(sed -n 's/^journal //p' "$root/resume.out")
 [ -n "$journal" ] || fail 'terminal report did not expose journal identity'
 "$run_evidence_inspect_fixture" \
@@ -339,12 +351,16 @@ require_contains terminal-evidence "$root/terminal-evidence.out" \
 require_contains terminal-evidence "$root/terminal-evidence.out" \
   'check-evidence 1'
 
-for directory in construction-sessions package-outputs check-resources check-temporary; do
+for directory in construction-sessions package-outputs installed-resources check-resources check-temporary; do
   if [ -d "$runtime/$directory" ] && \
       find "$runtime/$directory" -mindepth 1 -print -quit | grep . >/dev/null; then
     fail "terminal cleanup retained private realization under $directory"
   fi
 done
+
+post_cleanup_object_count=$(find "$root/package-objects/sha256" -type f | wc -l)
+require_equal package-object-cleanup "$package_object_count" \
+  "$post_cleanup_object_count"
 
 # Terminal replay is driven entirely by retained authority. The live catalog is
 # deliberately gone, and no durable work may be repeated.
@@ -353,6 +369,7 @@ set -- build \
   --canonical-store "$state" \
   --resume "$nonce" \
   --runtime-root "$runtime" \
+  --package-object-store "$root/package-objects" \
   --build-root "$build" \
   --artifact-root "$artifacts" \
   --interpreter "$interpreter" \

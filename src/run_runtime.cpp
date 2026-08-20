@@ -3,6 +3,8 @@
 
 #include <pkgctl/run_runtime.h>
 
+#include <libpkgobject/libpkgobject.h>
+
 #include "run_recovery_detail.h"
 
 #include <algorithm>
@@ -188,7 +190,8 @@ void validate_distinct_runtime_directories(
     int run_store_directory_fd,
     int evidence_store_directory_fd,
     int effect_store_directory_fd,
-    std::optional<int> target_lock_directory_fd)
+    std::optional<int> target_lock_directory_fd,
+    std::optional<int> package_object_store_directory_fd)
 {
   std::vector<std::pair<directory_authority, const char*>> selected{
       {inspect_runtime_directory(
@@ -205,6 +208,11 @@ void validate_distinct_runtime_directories(
     selected.push_back(
         {inspect_runtime_directory(*target_lock_directory_fd, "target lock store"),
          "target lock store"});
+  if (package_object_store_directory_fd)
+    selected.push_back(
+        {inspect_runtime_directory(
+             *package_object_store_directory_fd, "package-object store"),
+         "package-object store"});
   for (std::size_t first = 0U; first < selected.size(); ++first)
     for (std::size_t second = first + 1U; second < selected.size(); ++second)
       if (selected[first].first.device == selected[second].first.device &&
@@ -213,6 +221,69 @@ void validate_distinct_runtime_directories(
             native_transaction_run_runtime_error_code::directory_overlap,
             std::string(selected[first].second) + " and " +
                 selected[second].second + " name the same directory");
+}
+
+void validate_package_object_session_separation(
+    const native_transaction_run_runtime_configuration& configuration,
+    const pkgobject::store* package_objects)
+{
+  if (package_objects == nullptr)
+    return;
+  const auto& object_root = package_objects->root();
+  const auto& roots = configuration.sessions().roots();
+  const std::array<std::pair<const std::filesystem::path*, const char*>, 8>
+      session_roots{{
+          {&roots.content_store_root, "content store root"},
+          {&roots.construction_session_root, "construction session root"},
+          {&roots.package_output_root, "package output root"},
+          {&roots.artifact_root, "artifact root"},
+          {&roots.installed_resource_root, "installed resource root"},
+          {&roots.check_resource_root, "check resource root"},
+          {&roots.check_temporary_root, "check temporary root"},
+          {&roots.root_view_path, "construction/check root view"},
+      }};
+  for (const auto& [root, description] : session_roots)
+    if (paths_overlap(object_root, *root))
+      runtime_failure(
+          native_transaction_run_runtime_error_code::invalid_configuration,
+          "package-object store overlaps " + std::string(description));
+
+  const auto* operations = configuration.operations();
+  if (operations == nullptr)
+    return;
+  const auto& lifecycle = operations->lifecycle();
+  const std::array<std::pair<const std::filesystem::path*, const char*>, 3>
+      operation_roots{{
+          {&lifecycle.execution_root_path, "lifecycle execution root"},
+          {&lifecycle.target_root_path, "managed target root"},
+          {&lifecycle.session_root, "lifecycle session root"},
+      }};
+  for (const auto& [root, description] : operation_roots)
+    if (paths_overlap(object_root, *root))
+      runtime_failure(
+          native_transaction_run_runtime_error_code::invalid_configuration,
+          "package-object store overlaps " + std::string(description));
+}
+
+void validate_package_object_runtime_path_separation(
+    const native_transaction_run_runtime_paths& paths,
+    const pkgobject::store* package_objects)
+{
+  if (package_objects == nullptr)
+    return;
+  const auto& object_root = package_objects->root();
+  std::vector<std::pair<const std::filesystem::path*, const char*>> roots{
+      {&paths.run_store, "transaction-run store"},
+      {&paths.evidence_store, "transaction evidence store"},
+      {&paths.effect_store, "effect journal store"},
+  };
+  if (paths.target_lock_store)
+    roots.push_back({&*paths.target_lock_store, "target lock store"});
+  for (const auto& [root, description] : roots)
+    if (paths_overlap(object_root, *root))
+      runtime_failure(
+          native_transaction_run_runtime_error_code::directory_overlap,
+          "package-object store overlaps " + std::string(description));
 }
 
 void validate_native_configuration(
@@ -248,11 +319,12 @@ void validate_native_configuration(
         "construction/check root-view authority overlaps target or lifecycle "
         "session authority");
 
-  const std::array<const std::filesystem::path*, 6> mutable_roots{{
+  const std::array<const std::filesystem::path*, 7> mutable_roots{{
       &session_roots.content_store_root,
       &session_roots.construction_session_root,
       &session_roots.package_output_root,
       &session_roots.artifact_root,
+      &session_roots.installed_resource_root,
       &session_roots.check_resource_root,
       &session_roots.check_temporary_root,
   }};
@@ -431,6 +503,8 @@ public:
       std::optional<int> target_lock_directory_fd,
       transaction_progress_rehydration_source& progress,
       transaction_dispatch_session_source& sessions,
+      pkgobject::store* package_objects,
+      bool require_package_object_publication,
       transaction_operation_execution_authority_source* operation_execution,
       transaction_operation_recovery_authority_source* operation_recovery,
       transaction_effect_archive_source* archives,
@@ -452,7 +526,8 @@ public:
                       *operation_recovery)
                 : native_transaction_dispatch_recovery_context_source()),
         recovery_(evidence_, recovery_context_),
-        construction_(construction_backend), check_(check_backend)
+        construction_(construction_backend, package_objects,
+                      require_package_object_publication), check_(check_backend)
   {
     const bool any_operation_mechanism =
         target_lock_directory_fd.has_value() || archives != nullptr ||
@@ -761,24 +836,20 @@ native_transaction_run_runtime_configuration::archives() const noexcept
 }
 
 native_transaction_run_runtime_authorities::
-native_transaction_run_runtime_authorities(
-    retained_installed_package_tree_source& installed_packages_value)
-    : installed_packages(installed_packages_value),
-      operation_specifications(nullptr), effect_restart_bodies(nullptr),
+native_transaction_run_runtime_authorities()
+    : operation_specifications(nullptr), effect_restart_bodies(nullptr),
       archives(nullptr), effect_bodies(nullptr), operation_sessions(nullptr)
 {
 }
 
 native_transaction_run_runtime_authorities::
 native_transaction_run_runtime_authorities(
-    retained_installed_package_tree_source& installed_packages_value,
     transaction_operation_specification_source& operation_specifications_value,
     transaction_effect_restart_body_source& effect_restart_bodies_value,
     transaction_effect_archive_source* archives_value,
     transaction_effect_body_sink* effect_bodies_value,
     transaction_operation_session_store* operation_sessions_value)
-    : installed_packages(installed_packages_value),
-      operation_specifications(&operation_specifications_value),
+    : operation_specifications(&operation_specifications_value),
       effect_restart_bodies(&effect_restart_bodies_value),
       archives(archives_value), effect_bodies(effect_bodies_value),
       operation_sessions(operation_sessions_value)
@@ -788,10 +859,11 @@ native_transaction_run_runtime_authorities(
 native_transaction_run_runtime_backends::native_transaction_run_runtime_backends(
     pkgexec::execution_backend* construction_value,
     pkgexec::execution_backend* check_value,
+    pkgobject::store* package_objects_value,
     pkgimage::archive_backend& archive_value)
     : construction(construction_value), check(check_value), application(nullptr),
       application_journal(nullptr), lifecycle(nullptr), state(nullptr),
-      archive(archive_value)
+      package_objects(package_objects_value), archive(archive_value)
 {
 }
 
@@ -802,10 +874,12 @@ native_transaction_run_runtime_backends::native_transaction_run_runtime_backends
     pkgapply::application_journal_store& application_journal_value,
     pkgexec::execution_backend* lifecycle_value,
     pkgstate::canonical_store& state_value,
+    pkgobject::store* package_objects_value,
     pkgimage::archive_backend& archive_value)
     : construction(construction_value), check(check_value),
       application(&application_value), application_journal(&application_journal_value),
-      lifecycle(lifecycle_value), state(&state_value), archive(archive_value)
+      lifecycle(lifecycle_value), state(&state_value),
+      package_objects(package_objects_value), archive(archive_value)
 {
 }
 
@@ -827,7 +901,7 @@ public:
             effect_store_directory_fd)),
         engine_(
             runs_, evidence_, effects_, target_lock_directory_fd,
-            authorities_.progress, authorities_.sessions,
+            authorities_.progress, authorities_.sessions, nullptr, false,
             &authorities_.operation_execution, &authorities_.operation_recovery,
             &authorities_.archives, backends.construction, backends.check,
             &backends.application, &backends.application_journal,
@@ -910,6 +984,8 @@ void validate_native_runtime_composition(
     const native_transaction_run_runtime_backends& backends,
     bool has_target_lock_authority)
 {
+  validate_package_object_session_separation(
+      configuration, backends.package_objects);
   const bool operation_capable = configuration.operations() != nullptr;
   if (operation_capable)
   {
@@ -980,7 +1056,7 @@ public:
             evidence_store_directory_fd)),
         effects_(posix_effect_journal_store::from_directory_fd(
             effect_store_directory_fd)),
-        sessions_(configuration_.sessions(), authorities.installed_packages),
+        sessions_(configuration_.sessions(), backends.package_objects),
         operations_(configuration_.operations() != nullptr
                 ? std::make_unique<native_transaction_operation_authority_source>(
                       *configuration_.operations(),
@@ -1006,7 +1082,8 @@ public:
         unavailable_execution_backend_(),
         engine_(
             runs_, evidence_, effects_, target_lock_directory_fd, progress_,
-            sessions_, operations_.get(), operations_.get(), archives_,
+            sessions_, backends.package_objects, true, operations_.get(),
+            operations_.get(), archives_,
             backends.construction != nullptr
                 ? *backends.construction
                 : static_cast<pkgexec::execution_backend&>(
@@ -1049,7 +1126,7 @@ private:
   posix_transaction_run_journal_store runs_;
   posix_transaction_run_evidence_store evidence_;
   posix_effect_journal_store effects_;
-  native_transaction_dispatch_session_source sessions_;
+  native_transaction_resource_session_source sessions_;
   std::unique_ptr<native_transaction_operation_authority_source> operations_;
   std::unique_ptr<explicit_transaction_effect_archive_source> owned_archives_;
   transaction_effect_archive_source* archives_;
@@ -1067,6 +1144,7 @@ native_posix_transaction_run_runtime::open(
     native_transaction_run_runtime_backends backends)
 {
   validate_runtime_paths(paths);
+  validate_package_object_runtime_path_separation(paths, backends.package_objects);
   validate_native_runtime_composition(
       configuration, authorities, backends, paths.target_lock_store.has_value());
   auto runs = open_runtime_directory(paths.run_store, "transaction-run store");
@@ -1096,9 +1174,16 @@ native_posix_transaction_run_runtime::from_directory_fds(
 {
   validate_native_runtime_composition(
       configuration, authorities, backends, false);
+  std::optional<fd_owner> package_objects;
+  if (backends.package_objects != nullptr)
+    package_objects.emplace(open_runtime_directory(
+        backends.package_objects->root(), "package-object store"));
   validate_distinct_runtime_directories(
       run_store_directory_fd, evidence_store_directory_fd,
-      effect_store_directory_fd, std::nullopt);
+      effect_store_directory_fd, std::nullopt,
+      package_objects
+          ? std::optional<int>(package_objects->get())
+          : std::nullopt);
   auto state = std::make_unique<implementation>(
       run_store_directory_fd, evidence_store_directory_fd,
       effect_store_directory_fd, std::nullopt,
@@ -1119,9 +1204,16 @@ native_posix_transaction_run_runtime::from_directory_fds(
 {
   validate_native_runtime_composition(
       configuration, authorities, backends, true);
+  std::optional<fd_owner> package_objects;
+  if (backends.package_objects != nullptr)
+    package_objects.emplace(open_runtime_directory(
+        backends.package_objects->root(), "package-object store"));
   validate_distinct_runtime_directories(
       run_store_directory_fd, evidence_store_directory_fd,
-      effect_store_directory_fd, target_lock_directory_fd);
+      effect_store_directory_fd, target_lock_directory_fd,
+      package_objects
+          ? std::optional<int>(package_objects->get())
+          : std::nullopt);
   auto state = std::make_unique<implementation>(
       run_store_directory_fd, evidence_store_directory_fd,
       effect_store_directory_fd, target_lock_directory_fd,

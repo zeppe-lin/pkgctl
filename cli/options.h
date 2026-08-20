@@ -41,12 +41,6 @@ enum class transaction_run_command_frontend {
   build,
 };
 
-struct installed_tree_option final {
-  pkgstate::installed_package_identity package;
-  pkgexec::resource_identity resource;
-  std::filesystem::path path;
-};
-
 struct transaction_run_command final {
   transaction_run_command_frontend frontend;
   std::optional<transaction_request> transaction;
@@ -66,7 +60,7 @@ struct transaction_run_command final {
   std::optional<pkgbuild::build_policy> build_policy;
   std::optional<native_operation_policy> operation_policy;
   std::size_t maximum_steps;
-  std::vector<installed_tree_option> installed_trees;
+  std::optional<std::filesystem::path> package_object_store;
 };
 
 using command = std::variant<catalog_request,

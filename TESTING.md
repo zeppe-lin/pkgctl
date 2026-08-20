@@ -1,5 +1,37 @@
 # pkgctl testing
 
+## Current installed-resource qualification
+
+The resource-plane vertical first completes a real native `tool` package
+construction and install, then requires the construction path to have admitted
+the exact sealed archive into `libpkgobject`. A second sealed transaction builds
+and checks `consumer` while resolution deliberately retains the compatible
+installed `tool`; its injected execution backend must read the exact
+`usr/bin/tool` payload through the prepared BUILD and CHECK resource bindings.
+No object-store coordinate participates in selection.
+
+The hostile half removes the exact retained object while leaving the historical
+construction artifact present. Re-executing the already-sealed consumer
+transaction must fail with `object_unavailable` before either build or check
+backend executes. The object is then restored from the exact terminal
+construction artifact, deliberately corrupted in place, and the same sealed
+transaction must fail with `corrupt_object`, again before process execution.
+These cases prove that resource loss/corruption creates no policy-feedback edge:
+no target scan, construction-history fallback, re-resolution, or catalog
+substitution is permitted.
+
+Source contracts separately require `run_resource` to consume only retained
+installed artifact content/image plus `libpkgobject`/`libpkgimage-exec`, forbid
+resolver/catalog/history/target-discovery APIs there, and forbid all object-store
+or image-realization authority from `run_locator`. CLI construction/check integration fixtures supply an explicit package-object
+store. CLI option qualification permits native `run` to omit it; the resource
+session unit proves installed-input-free CHECK succeeds with a null provider, and
+the native runtime recovery unit proves an already-terminal journal remains
+quiescent with no package-object provider or process backend. The read-only
+campaign proves a supplied store namespace overlap is refused before the
+overlapping provider path can be created. Terminal cleanup tests include the dispatch-scoped installed-resource
+leaf as private realization rather than durable evidence.
+
 ## Current process-death qualification
 
 The privileged build process-death gate kills `pkgctl` at durable construction

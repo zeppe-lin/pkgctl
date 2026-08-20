@@ -56,6 +56,7 @@ require_dependency_range libpkgbuild '>=3.0.3' '<4.0.0'
 require_dependency_range libpkgbuild-exec '>=3.3.1' '<4.0.0'
 require_dependency_range libpkgbuild-image '>=1.0.1' '<2.0.0'
 require_dependency_range libpkgimage-exec '>=0.1.0' '<1.0.0'
+require_dependency_range libpkgobject '>=0.1.0' '<1.0.0'
 require_dependency_range libpkgbuild-plan '>=1.1.0' '<2.0.0'
 require_dependency_range libpkgresolve '>=4.0.0' '<5.0.0'
 require_dependency_range libpkgtransaction '>=4.1.0' '<5.0.0'
@@ -206,10 +207,15 @@ awk '
   current { print }
 ' "$srcdir/HISTORY.md" > "$temporary.unreleased"
 
-if grep -q '[^[:space:]]' "$temporary.unreleased"; then
-  echo 'release commit must leave a new empty Unreleased section' >&2
-  exit 1
-fi
+for unreleased_fact in \
+  'Adds the native installed-package resource plane.' \
+  'Successful native construction now admits its exact sealed public archive into' \
+  'Replaces caller-supplied `--installed-tree` mappings with the explicit current'; do
+  grep -F -- "$unreleased_fact" "$temporary.unreleased" >/dev/null || {
+    echo "Unreleased history omits resource-plane fact: $unreleased_fact" >&2
+    exit 1
+  }
+done
 
 awk '
   /^## 0\.42\.2 / { current = 1; next }

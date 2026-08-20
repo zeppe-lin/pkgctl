@@ -151,6 +151,7 @@ run_command()
   set -- "$@" \
     "$intent" "$nonce" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
     --target-root "$target" \
@@ -198,6 +199,7 @@ run_interrupted_command()
     --build-root-view "$(printf '%064d' 81)" \
     --lifecycle-root-view "$(printf '%064d' 82)" \
     --runtime-root "$runtime" \
+    --package-object-store "$root/package-objects" \
     --build-root "$build" \
     --lifecycle-root "$lifecycle" \
     --target-root "$target" \

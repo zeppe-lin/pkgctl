@@ -1160,6 +1160,7 @@ if not get_option('tests').disabled()
     'run_operation.h',
     'run_reconcile.h',
     'run_recovery.h',
+    'run_resource.h',
     'run_progress.h',
     'run_commit.h',
     'run_cleanup.h',
@@ -1287,6 +1288,14 @@ if not get_option('tests').disabled()
   test(
     'run-locator-contract',
     run_locator_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  run_resource_contract = find_program('contracts/check_run_resource_contract.sh')
+  test(
+    'run-resource-contract',
+    run_resource_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )
@@ -1595,6 +1604,16 @@ if not get_option('tests').disabled()
     test(
       'fetch-generation-contract',
       fetch_generation_contract,
+      args: [pkgctl_exe],
+      suite: 'contract',
+    )
+
+    object_generation_contract = find_program(
+      'contracts/check_object_generation_contract.sh',
+    )
+    test(
+      'object-generation-contract',
+      object_generation_contract,
       args: [pkgctl_exe],
       suite: 'contract',
     )

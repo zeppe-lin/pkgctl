@@ -50,10 +50,16 @@ effect restart authority, and leave the committed run unchanged when external
 resolution is required. Never turn a journal identity into semantic evidence or
 rerun a terminal effect merely because its final run append was lost. Native
 runtime-composition changes must keep wiring separate from semantic ownership:
-live operation observations, retained installed resources, restart bodies,
-selected backends, and explicit run intent remain caller authority. Do not
-cache target facts across operations, infer paths or credentials, initialize
-stores, or add command policy while changing the composition root.
+live operation observations, retained installed-package identity/image authority,
+restart bodies, selected backends, and explicit run intent remain caller
+authority. Present installed package bytes come only from the explicit
+`libpkgobject` provider and image replay remains owned by `libpkgimage-exec`; the
+call-scoped realized tree is disposable execution state. Missing/corrupt object
+bytes must not trigger target/history discovery, re-resolution, or catalog
+substitution, and the pure session locator must not acquire provider authority.
+Do not cache target facts across operations, infer paths or credentials,
+initialize unrelated stores, or add command policy while changing the
+composition root.
 
 Use SPDX headers:
 

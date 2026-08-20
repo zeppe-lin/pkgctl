@@ -37,6 +37,7 @@
 #include <pkgctl/run_reconcile.h>
 #include <pkgctl/run_recovery.h>
 #include <pkgctl/run_progress.h>
+#include <pkgctl/run_resource.h>
 #include <pkgctl/run_authority.h>
 #include <pkgctl/run_admit.h>
 #include <pkgctl/run_advance.h>
