@@ -769,10 +769,14 @@ void validate_retained_input(
     const pkgtransaction::transaction_node& predecessor,
     const pkgbuild::build_input& input)
 {
-  const auto* installed = predecessor.installed();
+  validate_selected_input_authority(predecessor, input);
+
+  const auto* selection = predecessor.selection();
+  const auto* installed =
+      selection == nullptr ? nullptr : selection->installed();
   if (installed == nullptr)
     throw error(error_code::invalid_dispatch,
-                "retained construction input lacks installed authority");
+                "retained construction input lacks installed selection authority");
 
   const auto* current = progress.current_state().find_package(
       installed->release().name());
@@ -780,7 +784,6 @@ void validate_retained_input(
     throw error(error_code::invalid_dispatch,
                 "retained construction input is stale in current state");
 
-  validate_selected_input_authority(predecessor, input);
   const auto* selected_installed = input.selection().installed();
   if (selected_installed == nullptr ||
       selected_installed->identity() != installed->identity())

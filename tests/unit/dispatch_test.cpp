@@ -508,6 +508,62 @@ void check_foreign_dispatch_is_rejected()
   }));
 }
 
+void check_retained_installed_input_binding()
+{
+  test_support::temporary_directory temporary;
+  const auto binding = test_support::binding();
+  const auto dependency = dependency_source();
+  const auto retained_dependency = installed_package(dependency, binding);
+  const auto installed = pkgstate::snapshot::make(
+      binding, {retained_dependency});
+  const std::string payload = "source payload\n";
+  const auto source = tool_source(sha256_text(payload), tool_source_options{});
+  const auto transaction = transaction_session(
+      source, dependency, installed, temporary.path() / "state",
+      false, false, false, "/collection",
+      pkgresolve::resolution_policy(
+          pkgresolve::installed_preference::retain_compatible));
+
+  const pkgtransaction::transaction_node* retained = nullptr;
+  for (const auto& node : transaction.program().nodes())
+  {
+    if (node.action() == pkgtransaction::transaction_action_kind::retain &&
+        node.package().name() == "dep")
+      retained = &node;
+  }
+  CHECK(retained != nullptr);
+  if (retained == nullptr)
+    return;
+  CHECK(retained->installed() == nullptr);
+  CHECK(retained->selection() != nullptr);
+  CHECK(retained->selection() &&
+        retained->selection()->installed() != nullptr);
+  CHECK(retained->selection() && retained->selection()->installed() &&
+        retained->selection()->installed()->identity() ==
+            retained_dependency.identity());
+
+  auto progress = pkgctl::transaction_progress::begin(transaction);
+  CHECK(progress.status(retained->identity()) ==
+        pkgctl::transaction_node_status::satisfied);
+  auto run = pkgctl::transaction_run::begin(
+      progress, pkgctl::transaction_dispatch_policy::make(1U, 1U));
+  auto reservation = pkgctl::reserve_next(run, nonce(9U));
+  CHECK(reservation.dispatch.has_value());
+  if (!reservation.dispatch)
+    return;
+  CHECK(reservation.dispatch->unit().kind() ==
+        pkgctl::transaction_unit_kind::construction);
+  CHECK(reservation.dispatch->unit().primary_node() ==
+        build_node_for(transaction, "tool").identity());
+
+  auto session = construction_session_for(
+      transaction, temporary.path() / "tool-build", "tool");
+  auto started = pkgctl::start_construction_dispatch(
+      reservation.run, *reservation.dispatch, session);
+  CHECK(started.records().back().state() ==
+        pkgctl::transaction_dispatch_state::started);
+}
+
 void check_construction_completion_and_failure_containment()
 {
   two_build_fixture fixture;
@@ -919,6 +975,7 @@ int main()
     check_policy_and_nonce_validation();
     check_deterministic_reservation_and_capacity();
     check_foreign_dispatch_is_rejected();
+    check_retained_installed_input_binding();
     check_construction_completion_and_failure_containment();
     check_failure_stops_unstarted_reservations();
     check_construction_binds_exact_predecessor_evidence();

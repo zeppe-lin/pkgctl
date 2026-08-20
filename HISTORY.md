@@ -15,6 +15,11 @@
   terminal construction authority therefore permits idempotent publication/store
   replay without rebuilding, while the reservoir remains byte availability rather
   than build, state, or image semantic authority.
+- Corrects retained-input dispatch validation to follow transaction authority
+  through the retain node's resolver selection and its installed-package
+  authority. Retain nodes intentionally do not carry direct installed-package
+  node authority, so valid installed BUILD inputs are no longer rejected during
+  construction session admission.
 - Replaces caller-supplied `--installed-tree` mappings with the explicit current
   `--package-object-store` provider namespace. `build` requires the provider;
   `run` may omit it when no fresh construction or installed-input CHECK needs
