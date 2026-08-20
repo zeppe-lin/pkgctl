@@ -7,6 +7,7 @@
 #include <pkgctl/run_locator.h>
 #include <pkgctl/run_resource.h>
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
@@ -498,42 +499,101 @@ void check_configuration_rejection()
 {
   test_support::temporary_directory temporary;
   const auto root = temporary.path();
-  bool rejected = false;
-  try {
-    auto ignored = pkgctl::native_transaction_session_configuration::make(
+
+  const auto roots = [&]() {
+    return pkgctl::native_transaction_session_roots{
+        root / "content",
+        root / "construction-sessions",
+        root / "package-outputs",
+        root / "artifacts",
+        root / "installed-resources",
+        root / "check-resources",
+        root / "check-temporary",
+        pkgexec::root_view_identity::from_sha256(std::string(64U, 'd')),
+        root / "root-view",
+    };
+  };
+  const auto policy = []() {
+    return pkgctl::native_transaction_session_policy{
+        pkgbuild::build_policy::make(
+            pkgbuild::environment_policy::hermetic(
+                1, 0022, 1700000000)),
+        pkgfetch::acquisition_policy::defaults(),
         {
-            root / "shared",
-            root / "shared" / "sessions",
-            root / "packages",
-            root / "artifacts",
-            root / "installed-resources",
-            root / "check-resources",
-            root / "checks",
-            pkgexec::root_view_identity::from_sha256(std::string(64U, 'd')),
-            root / "root-view",
+            pkgexec::interpreter_identity::from_sha256(
+                std::string(64U, 'e')),
+            0, 0, {},
         },
         {
-            pkgbuild::build_policy::make(
-                pkgbuild::environment_policy::hermetic(
-                    1, 0022, 1700000000)),
-            pkgfetch::acquisition_policy::defaults(),
-            {
-                pkgexec::interpreter_identity::from_sha256(
-                    std::string(64U, 'e')),
-                0, 0, {},
-            },
-            {
-                pkgexec::interpreter_identity::from_sha256(
-                    std::string(64U, 'f')),
-                0, 0, {},
-            },
-        });
-    (void)ignored;
-  } catch (const pkgctl::native_session_locator_error& problem) {
-    rejected = problem.code() ==
-        pkgctl::native_session_locator_error_code::invalid_configuration;
+            pkgexec::interpreter_identity::from_sha256(
+                std::string(64U, 'f')),
+            0, 0, {},
+        },
+    };
+  };
+  const auto slots = [](pkgctl::native_transaction_session_roots& value) {
+    return std::array<fs::path*, 8>{
+        &value.content_store_root,
+        &value.construction_session_root,
+        &value.package_output_root,
+        &value.artifact_root,
+        &value.installed_resource_root,
+        &value.check_resource_root,
+        &value.check_temporary_root,
+        &value.root_view_path,
+    };
+  };
+  const std::array<const char*, 8> names{
+      "content", "construction-session", "package-output", "artifact",
+      "installed-resource", "check-resource", "check-temporary", "root-view",
+  };
+
+  // The baseline proves the matrix is not vacuously rejecting every
+  // configuration before the pairwise mutations below.
+  auto accepted = pkgctl::native_transaction_session_configuration::make(
+      roots(), policy());
+  CHECK(accepted.roots().artifact_root == root / "artifacts");
+
+  const auto rejected = [&](pkgctl::native_transaction_session_roots value) {
+    try {
+      auto ignored = pkgctl::native_transaction_session_configuration::make(
+          std::move(value), policy());
+      (void)ignored;
+    } catch (const pkgctl::native_session_locator_error& problem) {
+      return problem.code() ==
+          pkgctl::native_session_locator_error_code::invalid_configuration;
+    }
+    return false;
+  };
+
+  std::size_t cases = 0U;
+  for (std::size_t first = 0U; first < names.size(); ++first) {
+    for (std::size_t second = first + 1U; second < names.size(); ++second) {
+      const auto qualify = [&](std::string_view relation, auto mutate) {
+        auto value = roots();
+        auto paths = slots(value);
+        mutate(*paths[first], *paths[second]);
+        ++cases;
+        if (!rejected(std::move(value))) {
+          std::cerr << "configuration overlap matrix accepted "
+                    << names[first] << ' ' << relation << ' '
+                    << names[second] << '\n';
+          ++failures;
+        }
+      };
+
+      qualify("aliases", [](fs::path& first_path, fs::path& second_path) {
+        second_path = first_path;
+      });
+      qualify("contains", [](fs::path& first_path, fs::path& second_path) {
+        second_path = first_path / "nested";
+      });
+      qualify("is-contained-by", [](fs::path& first_path, fs::path& second_path) {
+        first_path = second_path / "nested";
+      });
+    }
   }
-  CHECK(rejected);
+  CHECK(cases == 84U);
 }
 
 } // namespace

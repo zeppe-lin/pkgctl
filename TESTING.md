@@ -306,6 +306,72 @@ a build/check scope are build-environment selections. The frontend contract pins
 exact resolved goal-member selection identity when locating the direct build/check
 nodes; it must not infer construction authority from the environment label.
 
+## BUILD/CHECK/lifecycle × host-root authority matrix
+
+The privileged `cli-run-root-authority-matrix` campaign is a behavioral 3×3
+execution-isolation test, not a source-shape assertion. A real transaction runs
+one BUILD, one CHECK, and one post-install lifecycle program through the native
+Linux backend. Before admission, the harness plants independent read and write
+sentinels in the private runtime root, construction/check build root, and run
+artifact root.
+It writes the exact three host root pathnames into both execution root views so
+the programs know precisely where the controller's physical coordinates are.
+
+Each of BUILD, CHECK, and lifecycle then attempts to read the read sentinel and
+overwrite the distinct write sentinel beneath all three exact host roots.
+Observing the exact host read sentinel is an immediate phase failure. After
+terminal success the harness independently requires all six host sentinels to
+remain byte-for-byte unchanged, so read failure cannot mask a mutation leak.
+Positive controls prevent absence from pleasing the test: BUILD and CHECK must
+observe a sentinel through the logical construction/check root view, lifecycle
+must observe a different sentinel through the logical lifecycle root view, and
+each must reject the other root-view sentinel. Each phase also attempts to overwrite
+its positive root-view sentinel and must be refused, proving the admitted base
+root view is read-only while writable authority remains confined to explicit
+resource mounts. Durable evidence must contain exactly
+one construction and one check, while the managed target must retain both the
+BUILD payload and the post-install lifecycle witness.
+
+The matrix therefore qualifies these nine hostile cells:
+
+```
+             host runtime-root   host build-root   host artifact-root
+BUILD              hidden             hidden              hidden
+CHECK              hidden             hidden              hidden
+lifecycle          hidden             hidden              hidden
+```
+
+The same campaign then runs a second direct `pkgctl build matrix --check`
+transaction with an external caller-selected `--artifact-root`, separate from
+the private runtime hierarchy. BUILD and CHECK repeat the three hostile probes
+against that public projection coordinate and the harness again requires both
+public artifact sentinels to remain unchanged while one real package archive is
+published beside them. Lifecycle has no public-artifact-root cell because that
+authority does not exist in the `build` frontend; the test does not fabricate a
+surplus lifecycle capability merely to make the table cosmetically symmetric.
+
+`hidden` means that knowledge of the exact host pathname does not confer
+execution authority. The build root remains available to BUILD/CHECK only as
+the admitted read-only logical root view, not by its host coordinate. Lifecycle
+receives its separate root view and target binding. The run artifact root is
+deliberately a child of the private runtime hierarchy in this frontend, so the
+runtime-root and artifact-root cells are distinct sentinels even though their
+host ancestry
+overlaps. The test is intended to catch namespace collapse, accidental host
+binds, chroot/root-view regression, and a future adapter that leaks controller
+coordinates into process authority.
+
+The privileged observation matrix is backed by two unprivileged admission
+matrices. `run-locator` enumerates all 28 pairs among the eight native session
+roots and attacks each pair as an exact alias, ancestor, and descendant: 84
+refusal cases total. The native runtime test separately crosses those eight
+construction/check roots with lifecycle execution root, managed target root,
+and lifecycle session root as exact aliases, ancestors, and descendants: 72
+additional refusal cases. These do not replace
+the real process test; they ensure a future coordinate cannot silently fall out
+of either authority firewall while the happy-path fixture still runs.
+
+
 ## Release 0.36.0 real native construction qualification
 
 The privileged `cli-run-native-construction` campaign closes the remaining gap

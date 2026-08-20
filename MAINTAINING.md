@@ -638,3 +638,24 @@ Check-resource filesystem realizers prove content authority; they do not own
 `pkgexec::resource_identity`. Keep concrete check resource-instance identities in
 pkgctl composition, bound to semantic role plus retained construction authority.
 Never derive two disjoint check resources solely from package-image content.
+
+## Root-view isolation qualification
+
+Root-view isolation qualification must remain behavioral. The privileged
+`cli-run-root-authority-matrix` test deliberately gives BUILD, CHECK, and
+lifecycle the exact host root pathnames for runtime, build, and artifact
+authority, then attacks separate read/write sentinels beneath every phase/root
+cell and requires all observations to remain impossible and all host bytes
+unchanged. It must also repeat BUILD/CHECK with the build frontend's external
+public artifact root. Do not replace this with path-overlap assertions, request
+inspection, or a synthetic backend: those prove admission shape, not what a
+native process can observe after namespace composition. Positive logical-root
+sentinels are required so an unavailable phase cannot satisfy the matrix by
+doing nothing; those sentinels must also resist mutation so caller-owned base
+root views remain read-only outside admitted writable resource mounts. Do not
+invent lifecycle ownership of the build frontend's public artifact coordinate
+merely to create a symmetric authority table. Preserve the 84-case session-root
+alias/containment matrix and the 72-case exact-alias/ancestor/descendant
+construction/check-versus-lifecycle overlap matrix as admission firewalls; they
+complement but never substitute for
+the privileged process observation test.

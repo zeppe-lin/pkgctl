@@ -17,6 +17,7 @@
 #include <pkgctl/run_restart.h>
 #include <pkgctl/run_runtime.h>
 
+#include <array>
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
@@ -3310,31 +3311,103 @@ void check_native_posix_transaction_run_runtime()
   }
   CHECK(contradictory_root_refused);
 
-  bool mutable_overlap_refused = false;
-  try
+  const auto matrix_root = authority_root / "root-overlap-matrix";
+  auto matrix_session_configuration =
+      pkgctl::native_transaction_session_configuration::make(
+          {
+              matrix_root / "content" / "root",
+              matrix_root / "construction-session" / "root",
+              matrix_root / "package-output" / "root",
+              matrix_root / "artifact" / "root",
+              matrix_root / "installed-resource" / "root",
+              matrix_root / "check-resource" / "root",
+              matrix_root / "check-temporary" / "root",
+              pkgexec::root_view_identity::from_sha256(
+                  std::string(64U, '5')),
+              matrix_root / "construction-check-root-view" / "root",
+          },
+          session_configuration.policy());
+  const auto& session_roots = matrix_session_configuration.roots();
+  const std::array<std::pair<const std::filesystem::path*, const char*>, 8>
+      session_root_matrix{{
+          {&session_roots.content_store_root, "content"},
+          {&session_roots.construction_session_root, "construction-session"},
+          {&session_roots.package_output_root, "package-output"},
+          {&session_roots.artifact_root, "artifact"},
+          {&session_roots.installed_resource_root, "installed-resource"},
+          {&session_roots.check_resource_root, "check-resource"},
+          {&session_roots.check_temporary_root, "check-temporary"},
+          {&session_roots.root_view_path, "construction/check-root-view"},
+      }};
+  const std::array<const char*, 3> lifecycle_root_matrix{
+      "lifecycle-execution", "target", "lifecycle-session"};
+  const std::array<const char*, 3> overlap_relation_matrix{
+      "aliases", "contains", "is-contained-by"};
+  std::size_t lifecycle_overlap_cases = 0U;
+  for (const auto& [session_root, session_name] : session_root_matrix)
   {
-    auto overlapping_operation =
-        pkgctl::native_transaction_operation_configuration::make(
-            target_transaction, package_policy(),
-            {
-                pkgexec::root_view_identity::from_sha256(
-                    std::string(64U, '8')),
-                authority_root / "content" / "lifecycle-execution",
-                authority_root / "overlap-target",
-                authority_root / "overlap-lifecycle-sessions",
-                native_runtime_lifecycle_execution_identity(),
-            });
-    (void)pkgctl::native_transaction_run_runtime_configuration::make(
-        target_transaction, session_configuration,
-        std::move(overlapping_operation), {});
+    for (std::size_t selected = 0U; selected < lifecycle_root_matrix.size();
+         ++selected)
+    {
+      for (std::size_t relation = 0U;
+           relation < overlap_relation_matrix.size(); ++relation)
+      {
+        auto execution = authority_root / "matrix-lifecycle-execution";
+        auto target = authority_root / "matrix-target";
+        auto lifecycle_session = authority_root / "matrix-lifecycle-session";
+        auto operation_roots = std::array<std::filesystem::path*, 3>{
+            &execution, &target, &lifecycle_session};
+        switch (relation)
+        {
+          case 0U:
+            *operation_roots[selected] = *session_root;
+            break;
+          case 1U:
+            *operation_roots[selected] = *session_root / "nested-operation";
+            break;
+          case 2U:
+            *operation_roots[selected] = session_root->parent_path();
+            break;
+          default:
+            throw std::runtime_error("invalid overlap relation fixture");
+        }
+
+        bool refused = false;
+        try
+        {
+          auto overlapping_operation =
+              pkgctl::native_transaction_operation_configuration::make(
+                  target_transaction, package_policy(),
+                  {
+                      pkgexec::root_view_identity::from_sha256(
+                          std::string(64U, '8')),
+                      execution,
+                      target,
+                      lifecycle_session,
+                      native_runtime_lifecycle_execution_identity(),
+                  });
+          (void)pkgctl::native_transaction_run_runtime_configuration::make(
+              target_transaction, matrix_session_configuration,
+              std::move(overlapping_operation), {});
+        }
+        catch (const pkgctl::native_transaction_run_runtime_error& problem)
+        {
+          refused = problem.code() ==
+              pkgctl::native_transaction_run_runtime_error_code::
+                  invalid_configuration;
+        }
+        ++lifecycle_overlap_cases;
+        if (!refused)
+        {
+          std::cerr << "native root overlap matrix accepted " << session_name
+                    << ' ' << overlap_relation_matrix[relation] << ' '
+                    << lifecycle_root_matrix[selected] << '\n';
+          ++failures;
+        }
+      }
+    }
   }
-  catch (const pkgctl::native_transaction_run_runtime_error& problem)
-  {
-    mutable_overlap_refused = problem.code() ==
-        pkgctl::native_transaction_run_runtime_error_code::
-            invalid_configuration;
-  }
-  CHECK(mutable_overlap_refused);
+  CHECK(lifecycle_overlap_cases == 72U);
 
   auto operation_configuration = native_runtime_operation_configuration(
       target_transaction, authority_root);

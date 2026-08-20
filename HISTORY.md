@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add a privileged BUILD/CHECK/lifecycle × runtime/build/artifact host-root
+  authority matrix. Each real native phase receives the exact controller host
+  root coordinates, attacks independent read/write sentinels beneath each root,
+  and must leave those host bytes unchanged while positive root-view witnesses
+  prove execution actually ran. Exhaustive unprivileged admission matrices also
+  cover all 84 session-root alias/containment relations and all 72 exact-alias,
+  ancestor, and descendant construction/check-versus-lifecycle overlaps.
+
 - Adds the native installed-package resource plane. Fresh BUILD/CHECK dispatch
   preparation now consumes the exact artifact-content and artifact-image
   authority already retained by canonical installed state, requires those exact

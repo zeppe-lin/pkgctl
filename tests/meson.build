@@ -550,6 +550,31 @@ if not get_option('tests').disabled()
     suite: 'integration-privileged',
   )
 
+  cli_run_root_authority_matrix_test = find_program(
+    'integration/cli_run_root_authority_matrix_test.sh',
+  )
+  test(
+    'cli-run-root-authority-matrix',
+    cli_run_root_authority_matrix_test,
+    args: [
+      pkgctl_exe,
+      state_fixture,
+      state_inspect_fixture,
+      run_evidence_inspect_fixture,
+      native_runtime_root_fixture,
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/collections/root-authority-matrix',
+      ),
+      join_paths(
+        meson.project_source_root(),
+        'tests/fixtures/native_root_view_fixture.sh',
+      ),
+    ],
+    depends: [native_runtime_root_fixture, run_evidence_inspect_fixture],
+    suite: 'integration-privileged',
+  )
+
   cli_build_test = find_program(
     'integration/cli_build_test.sh',
   )
@@ -1375,6 +1400,16 @@ if not get_option('tests').disabled()
   test(
     'effect-inspect-cli-contract',
     effect_inspect_cli_contract,
+    args: [meson.project_source_root()],
+    suite: 'contract',
+  )
+
+  cli_root_authority_matrix_contract = find_program(
+    'contracts/check_cli_root_authority_matrix_contract.sh',
+  )
+  test(
+    'cli-root-authority-matrix-contract',
+    cli_root_authority_matrix_contract,
     args: [meson.project_source_root()],
     suite: 'contract',
   )

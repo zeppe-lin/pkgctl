@@ -1,0 +1,136 @@
+format: zeppe-lin.recipe/1
+
+package:
+  name: matrix
+  version: 1.0
+  release: 1
+  summary: native execution root authority matrix fixture
+  licenses:
+    - GPL-3.0-or-later
+
+requirements:
+  {}
+
+sources: []
+
+build:
+  language: posix-shell
+  script: |
+    set -eu
+    phase=BUILD
+    IFS= read -r logical_root < /matrix-build-root-view-sentinel
+    [ "$logical_root" = build-root-view-authority ]
+    if printf '%s\n' forbidden > /matrix-build-root-view-sentinel 2>/dev/null; then
+      printf '%s\n' "$phase mutated read-only build root view" >&2
+      exit 94
+    fi
+    [ ! -e /matrix-lifecycle-root-view-sentinel ]
+    {
+      IFS= read -r runtime_probe
+      IFS= read -r build_probe
+      IFS= read -r artifact_probe
+    } < /matrix-host-coordinates
+    probe_host_authority()
+    {
+      label=$1
+      coordinate=$2
+      token=$3
+      read_sentinel=$coordinate/matrix-host-read-authority
+      write_sentinel=$coordinate/matrix-host-write-authority
+      if IFS= read -r observed < "$read_sentinel" 2>/dev/null; then
+        if [ "$observed" = "$token" ]; then
+          printf '%s\n' "$phase observed forbidden host $label authority: $coordinate" >&2
+          exit 91
+        fi
+      fi
+      printf '%s\n' "$phase-host-write-attempt" > "$write_sentinel" 2>/dev/null || :
+    }
+    probe_host_authority runtime-root "$runtime_probe" runtime-host-read-authority
+    probe_host_authority build-root "$build_probe" build-host-read-authority
+    probe_host_authority artifact-root "$artifact_probe" artifact-host-read-authority
+    printf '%s\n' build-phase-ran > "$PKG_DESTDIR/matrix-build-ran"
+
+check:
+  language: posix-shell
+  script: |
+    set -eu
+    phase=CHECK
+    IFS= read -r logical_root < /matrix-build-root-view-sentinel
+    [ "$logical_root" = build-root-view-authority ]
+    if printf '%s\n' forbidden > /matrix-build-root-view-sentinel 2>/dev/null; then
+      printf '%s\n' "$phase mutated read-only build root view" >&2
+      exit 94
+    fi
+    [ ! -e /matrix-lifecycle-root-view-sentinel ]
+    {
+      IFS= read -r runtime_probe
+      IFS= read -r build_probe
+      IFS= read -r artifact_probe
+    } < /matrix-host-coordinates
+    probe_host_authority()
+    {
+      label=$1
+      coordinate=$2
+      token=$3
+      read_sentinel=$coordinate/matrix-host-read-authority
+      write_sentinel=$coordinate/matrix-host-write-authority
+      if IFS= read -r observed < "$read_sentinel" 2>/dev/null; then
+        if [ "$observed" = "$token" ]; then
+          printf '%s\n' "$phase observed forbidden host $label authority: $coordinate" >&2
+          exit 92
+        fi
+      fi
+      printf '%s\n' "$phase-host-write-attempt" > "$write_sentinel" 2>/dev/null || :
+    }
+    probe_host_authority runtime-root "$runtime_probe" runtime-host-read-authority
+    probe_host_authority build-root "$build_probe" build-host-read-authority
+    probe_host_authority artifact-root "$artifact_probe" artifact-host-read-authority
+    IFS= read -r payload < "$PKG_PACKAGE_ROOT/matrix-build-ran"
+    [ "$payload" = build-phase-ran ]
+    printf '%s\n' check-phase-ran > /tmp/matrix-check-ran
+
+lifecycle:
+  post-install:
+    language: posix-shell
+    script: |
+      set -eu
+      phase=LIFECYCLE
+      IFS= read -r logical_root < /matrix-lifecycle-root-view-sentinel
+      [ "$logical_root" = lifecycle-root-view-authority ]
+      if printf '%s\n' forbidden > /matrix-lifecycle-root-view-sentinel 2>/dev/null; then
+        printf '%s\n' "$phase mutated read-only lifecycle root view" >&2
+        exit 95
+      fi
+      [ ! -e /matrix-build-root-view-sentinel ]
+      {
+        IFS= read -r runtime_probe
+        IFS= read -r build_probe
+        IFS= read -r artifact_probe
+      } < /matrix-host-coordinates
+      probe_host_authority()
+      {
+        label=$1
+        coordinate=$2
+        token=$3
+        read_sentinel=$coordinate/matrix-host-read-authority
+        write_sentinel=$coordinate/matrix-host-write-authority
+        if IFS= read -r observed < "$read_sentinel" 2>/dev/null; then
+          if [ "$observed" = "$token" ]; then
+            printf '%s\n' "$phase observed forbidden host $label authority: $coordinate" >&2
+            exit 93
+          fi
+        fi
+        printf '%s\n' "$phase-host-write-attempt" > "$write_sentinel" 2>/dev/null || :
+      }
+      probe_host_authority runtime-root "$runtime_probe" runtime-host-read-authority
+      probe_host_authority build-root "$build_probe" build-host-read-authority
+      probe_host_authority artifact-root "$artifact_probe" artifact-host-read-authority
+      IFS= read -r payload < "$ZEPPE_LIN_TARGET_ROOT/matrix-build-ran"
+      [ "$payload" = build-phase-ran ]
+      printf '%s\n' lifecycle-phase-ran > "$ZEPPE_LIN_TARGET_ROOT/matrix-lifecycle-ran"
+
+architectures:
+  build:
+    - x86_64
+  target:
+    - x86_64

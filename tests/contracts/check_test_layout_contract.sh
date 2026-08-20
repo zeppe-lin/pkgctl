@@ -61,6 +61,7 @@ for path in \
   'fixtures/artifact_publication_interrupt_fixture.cpp' \
   'fixtures/collections/lifecycle-pre-install' \
   'fixtures/collections/native-construction' \
+  'fixtures/collections/root-authority-matrix' \
   'fixtures/collections/archive-source-check' \
   'fixtures/collections/runtime-cohort' \
   'fixtures/collections/rootfs-campaign' \
@@ -76,6 +77,7 @@ for path in \
   'integration/cli_readonly_test.sh' \
   'integration/cli_run_construction_only_test.sh' \
   'integration/cli_run_native_construction_test.sh' \
+  'integration/cli_run_root_authority_matrix_test.sh' \
   'integration/cli_build_test.sh' \
   'integration/cli_build_cleanup_test.sh' \
   'integration/cli_build_runtime_cohort_test.sh' \
@@ -99,6 +101,7 @@ for path in \
   'contracts/check_package_fault_matrix_contract.sh' \
   'contracts/check_cli_lease_contention_contract.sh' \
   'contracts/check_cli_native_construction_contract.sh' \
+  'contracts/check_cli_root_authority_matrix_contract.sh' \
   'contracts/check_cli_build_contract.sh' \
   'contracts/check_cli_archive_source_contract.sh' \
   'contracts/check_cli_runtime_cohort_contract.sh' \

@@ -124,7 +124,9 @@ for required_test in \
   'lifecycle-execution-root' \
   'surplus_operation_authority_refused' \
   'contradictory_root_refused' \
-  'mutable_overlap_refused' \
+  'session_root_matrix' \
+  'lifecycle_root_matrix' \
+  'CHECK(lifecycle_overlap_cases == 72U);' \
   'descriptor_alias_refused' \
   'surplus_target_lock_refused' \
   'construction_lock_path' \
