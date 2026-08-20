@@ -10,6 +10,15 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+Version 0.43.0 closes the installed-package resource side plane. Canonical
+installed state selects exact artifact content/image authority, `libpkgobject`
+supplies only present exact archive bytes, and `libpkgimage-exec` verifies and
+replays a fresh dispatch-scoped tree before the pure session locator runs.
+Missing/corrupt objects do not trigger target/history discovery or re-resolution.
+Privileged qualification also attacks BUILD/CHECK/lifecycle host-root isolation,
+and terminal cleanup owns only exact lifecycle-session leaves derived from
+completed operation membership.
+
 Version 0.42.2 keeps build-subject necessity and dependency preference as
 separate authorities. Resolver-owned direct BUILD/CHECK goals require catalog
 candidates; the build frontend proves those exact subject nodes while retaining
@@ -755,8 +764,8 @@ cleanup, compaction, garbage collection, or command action.
 
 # INSTALLED PACKAGE RESOURCE PREPARATION
 
-Current unreleased native execution separates installed-package semantic authority
-from present package-byte availability. Canonical installed state names the exact
+Version 0.43.0 separates installed-package semantic authority from present
+package-byte availability. Canonical installed state names the exact
 artifact-content and artifact-image identities already admitted for one package.
 *libpkgobject* answers only whether the exact archive bytes for that content
 identity are currently available. *libpkgimage-exec* verifies those bytes and the

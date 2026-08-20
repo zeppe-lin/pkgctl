@@ -32,8 +32,8 @@ _build-authority_
 
 # DESCRIPTION
 
-Current unreleased native execution obtains installed BUILD/CHECK package bytes
-from an explicit *libpkgobject* reservoir. Canonical state retains which exact
+Version 0.43.0 obtains installed BUILD/CHECK package bytes from an explicit
+*libpkgobject* reservoir. Canonical state retains which exact
 artifact-content and artifact-image authority was admitted; the reservoir answers
 only whether those exact bytes are currently available. *libpkgimage-exec*
 verifies/replays them into a call-scoped private tree before the pure session

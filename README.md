@@ -1,8 +1,7 @@
 # pkgctl
 
-Current unreleased native execution closes the installed-package resource side
-plane. Canonical state remains authority for which exact package artifact was
-admitted; `libpkgobject` supplies only present exact archive bytes, and
+Release 0.43.0 closes the installed-package resource side plane. Canonical
+state remains authority for which exact package artifact was admitted; `libpkgobject` supplies only present exact archive bytes, and
 `libpkgimage-exec` verifies/replays those bytes against the retained image
 identity into a fresh dispatch-scoped tree before the pure session locator runs.
 Successful native construction populates the same reservoir from its sealed

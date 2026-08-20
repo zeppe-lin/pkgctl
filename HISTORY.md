@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.43.0 - 2026-08-20
+
 - Add a privileged BUILD/CHECK/lifecycle × runtime/build/artifact host-root
   authority matrix. Each real native phase receives the exact controller host
   root coordinates, attacks independent read/write sentinels beneath each root,

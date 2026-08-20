@@ -4,8 +4,8 @@
 set -eu
 
 srcdir=${1:-.}
-version=0.42.2
-latest_release=0.42.2
+version=0.43.0
+latest_release=0.43.0
 
 require_line()
 {
@@ -22,13 +22,13 @@ require_line "$srcdir/meson.build" "  meson_version: '>=1.6.0',"
 require_line "$srcdir/include/pkgctl/version.h" \
   'inline constexpr unsigned version_major = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_minor = 42;'
+  'inline constexpr unsigned version_minor = 43;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr unsigned version_patch = 2;'
+  'inline constexpr unsigned version_patch = 0;'
 require_line "$srcdir/include/pkgctl/version.h" \
-  'inline constexpr const char* version_string = "0.42.2";'
+  'inline constexpr const char* version_string = "0.43.0";'
 require_line "$srcdir/src/core.cpp" \
-  'static_assert(pkgctl::version_minor == 42);'
+  'static_assert(pkgctl::version_minor == 43);'
 
 require_dependency_range()
 {
@@ -69,6 +69,7 @@ require_dependency_range libpkgapply-posix '>=4.0.0' '<5.0.0'
 require_dependency_range libpkgapply-exec '>=3.0.2' '<4.0.0'
 require_dependency_range libpkgexec-linux '>=0.7.1' '<1.0.0'
 
+grep -F '## 0.43.0 - 2026-08-20' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.42.2 - 2026-08-20' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.42.1 - 2026-08-19' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.42.0 - 2026-08-19' "$srcdir/HISTORY.md" >/dev/null
@@ -87,6 +88,7 @@ grep -F '`Unreleased` does not predict the next version number or release class.
 grep -F '## 0.36.0 - 2026-08-13' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.35.1 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
 grep -F '## 0.35.0 - 2026-08-12' "$srcdir/HISTORY.md" >/dev/null
+grep -F 'Release 0.43.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.42.2' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.42.1' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.42.0' "$srcdir/README.md" >/dev/null
@@ -100,6 +102,7 @@ grep -F 'Release 0.38.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.37.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.36.0' "$srcdir/README.md" >/dev/null
 grep -F 'Release 0.35.0' "$srcdir/README.md" >/dev/null
+grep -F 'Version 0.43.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.42.2' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.42.1' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.42.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
@@ -120,7 +123,7 @@ grep -F 'Version 0.35.0 exposes *pkgctl run*' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 
 temporary=${TMPDIR:-/tmp}/pkgctl-release-contract.$$
-trap 'rm -f "$temporary.current" "$temporary.deps" "$temporary.027" "$temporary.unreleased" "$temporary.0422" "$temporary.0421" "$temporary.0404" "$temporary.0403" "$temporary.0402" "$temporary.0401" "$temporary.040" "$temporary.039"' EXIT HUP INT TERM
+trap 'rm -f "$temporary.current" "$temporary.deps" "$temporary.027" "$temporary.unreleased" "$temporary.043" "$temporary.0422" "$temporary.0421" "$temporary.0404" "$temporary.0403" "$temporary.0402" "$temporary.0401" "$temporary.040" "$temporary.039"' EXIT HUP INT TERM
 
 awk '
   /^## 0\.35\.0 / { current = 1; next }
@@ -207,12 +210,25 @@ awk '
   current { print }
 ' "$srcdir/HISTORY.md" > "$temporary.unreleased"
 
-for unreleased_fact in \
+if grep -q '[^[:space:]]' "$temporary.unreleased"; then
+  echo 'release commit must leave a new empty Unreleased section' >&2
+  exit 1
+fi
+
+awk '
+  /^## 0\.43\.0 / { current = 1; next }
+  /^## / && current { exit }
+  current { print }
+' "$srcdir/HISTORY.md" > "$temporary.043"
+
+for release_fact in \
   'Adds the native installed-package resource plane.' \
   'Successful native construction now admits its exact sealed public archive into' \
-  'Replaces caller-supplied `--installed-tree` mappings with the explicit current'; do
-  grep -F -- "$unreleased_fact" "$temporary.unreleased" >/dev/null || {
-    echo "Unreleased history omits resource-plane fact: $unreleased_fact" >&2
+  'Replaces caller-supplied `--installed-tree` mappings with the explicit current' \
+  'Add a privileged BUILD/CHECK/lifecycle × runtime/build/artifact host-root' \
+  'Terminal cleanup now owns successful lifecycle scratch realizations as exact'; do
+  grep -F -- "$release_fact" "$temporary.043" >/dev/null || {
+    echo "0.43.0 history omits qualified resource-plane fact: $release_fact" >&2
     exit 1
   }
 done
