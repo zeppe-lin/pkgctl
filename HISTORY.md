@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.42.2 - 2026-08-20
+
 - Corrects build-frontend authority so the exact BUILD/CHECK subject remains
   catalog-required while flexible dependencies retain compatible installed
   authority. `pkgctl build` no longer manufactures global `prefer-catalog`

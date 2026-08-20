@@ -1,5 +1,13 @@
 # pkgctl
 
+Release 0.42.2 separates direct build-subject necessity from flexible dependency
+preference. `pkgctl build PACKAGE` retains the resolver's compatible-installed
+preference for dependencies while its exact BUILD/CHECK roots still require
+catalog candidates; frontend admission independently proves the requested
+subject has the catalog-backed build/check nodes it owns. This uses the existing
+retained-installed-package input path without adding artifact import, cache
+discovery, dependency reconstruction, or another resolver authority.
+
 Release 0.42.1 requires `libpkgbuild >= 3.0.3` so CHECK input authority is
 activated by exact CHECK-goal membership rather than by the mere presence of a
 CHECK declaration in a transitive BUILD-only recipe. pkgctl consumes that sealed

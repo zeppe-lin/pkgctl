@@ -10,6 +10,12 @@ pkgctl_orchestration - native pkgctl authority composition
 component to call next, retains the resulting handoff identities, and reports
 the resulting control state.
 
+Version 0.42.2 keeps build-subject necessity and dependency preference as
+separate authorities. Resolver-owned direct BUILD/CHECK goals require catalog
+candidates; the build frontend proves those exact subject nodes while retaining
+compatible installed authority for flexible dependencies. pkgctl adds no cache,
+artifact-import, or dependency-reconstruction authority.
+
 Version 0.42.1 requires libpkgbuild 3.0.3 so declared CHECK requirements
 remain dormant for transitive BUILD-only selections and activate only when the
 resolver seals that exact selection as a CHECK-goal member. pkgctl neither

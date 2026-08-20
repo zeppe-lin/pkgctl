@@ -34,6 +34,12 @@ _build-authority_
 
 *pkgctl* is the Zeppe-Lin package control-plane executable.
 
+Version 0.42.2 separates direct build-subject necessity from flexible dependency
+preference. Exact BUILD/CHECK roots require catalog candidates and the build
+frontend independently proves catalog-backed nodes for its requested subject,
+while compatible dependencies retain exact installed authority. No artifact
+import, cache discovery, or dependency reconstruction is introduced.
+
 Version 0.42.1 requires libpkgbuild 3.0.3 so CHECK input authority follows
 exact CHECK-goal membership. A transitive BUILD-only package may declare CHECK
 requirements without causing pkgctl to invent CHECK resolution authority for that

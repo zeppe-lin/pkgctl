@@ -42,6 +42,7 @@ for page in "$srcdir/man/pkgctl.1.scd" \
   }
 done
 
+grep -F 'Version 0.42.2' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.42.1' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.42.0' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F 'Version 0.40.4' "$srcdir/man/pkgctl.1.scd" >/dev/null
@@ -59,6 +60,8 @@ grep -F '*--artifact-root* _path_' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--build-root-view* _sha256_' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--lifecycle-root-view* _sha256_' "$srcdir/man/pkgctl.1.scd" >/dev/null
 grep -F '*--operation-policy* _profile_' "$srcdir/man/pkgctl.1.scd" >/dev/null
+grep -F 'Version 0.42.2 keeps build-subject necessity and dependency preference' \
+  "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.42.1 requires libpkgbuild 3.0.3' \
   "$srcdir/man/pkgctl_orchestration.7.scd" >/dev/null
 grep -F 'Version 0.42.0 separates execution-root identity from managed-target identity' \
