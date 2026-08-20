@@ -6,12 +6,13 @@ set -eu
 root=${1:-.}
 header=$root/include/pkgctl/run_operation.h
 source=$root/src/run_operation.cpp
+paths=$root/src/run_lifecycle_session.h
 test_source=$root/tests/unit/effect_test.cpp
 manual=$root/man/pkgctl_orchestration.7.scd
 codec_header=$root/include/pkgctl/operation_codec.h
 codec_source=$root/src/operation_session_codec.cpp
 
-for file in "$header" "$source" "$codec_header" "$codec_source" "$test_source" "$manual"; do
+for file in "$header" "$source" "$paths" "$codec_header" "$codec_source" "$test_source" "$manual"; do
   [ -s "$file" ] || {
     echo "missing native operation authority file: $file" >&2
     exit 1
@@ -34,9 +35,6 @@ for required in \
   'sessions_->load' \
   'specification.lifecycle()' \
   'if (order.empty())' \
-  'pkgctl/native-lifecycle-session-root/1' \
-  'record.journal().hex()' \
-  'dispatch.identity().hex()' \
   'native_operation_preparation_driver' \
   'effect_restart_checkpoint::make' \
   'effects_.load_latest' \
@@ -47,6 +45,17 @@ for required in \
   'incoming.image().receipt().archive_digest()'; do
   grep -F -- "$required" "$header" "$source" >/dev/null || {
     echo "missing native operation authority contract: $required" >&2
+    exit 1
+  }
+done
+
+for required_path in \
+  'pkgctl/native-lifecycle-session-root/1' \
+  'record.journal().hex()' \
+  'dispatch.identity().hex()' \
+  'lifecycle_node.hex()'; do
+  grep -F -- "$required_path" "$paths" >/dev/null || {
+    echo "missing lifecycle-session path authority contract: $required_path" >&2
     exit 1
   }
 done
@@ -67,6 +76,7 @@ for required_test in \
   'corrupt_specifications.calls() == 0U' \
   'lifecycle_session_parent' \
   'admitted_lifecycle.paths().session_root.parent_path()' \
+  'transaction_node.hex()' \
   '!std::filesystem::exists(authority_root)' \
   'effect_attempt_missing' \
   'planning_refused' \

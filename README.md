@@ -178,7 +178,11 @@ GPL-3.0-or-later and copyright Alexandr Savca.
 Release 0.39.0 also adds terminal disposal of private construction/check
 realizations. A successful durable run head, not directory discovery, authorizes
 the exact construction-session, package-output, check-resource, and check-temporary
-leaves owned by completed dispatches. Released reservations own no disposable
+leaves owned by completed dispatches. Current native operation cleanup extends
+that same rule to lifecycle scratch: each single-use lifecycle-session leaf is
+bound to the run journal, operation dispatch, and exact lifecycle transaction
+node, so terminal cleanup removes only member-derived leaves and never scans the
+lifecycle-session root. Released reservations own no disposable
 execution tree. Incomplete and failed runs retain their realizations for
 restart or diagnosis. Cleanup is idempotent operational work rather than new
 historical evidence: a refused or interrupted sweep leaves the completed

@@ -3,6 +3,8 @@
 
 #include <pkgctl/run_cleanup.h>
 
+#include "run_lifecycle_session.h"
+
 #include <cerrno>
 #include <cstring>
 #include <memory>
@@ -79,6 +81,8 @@ using directory_owner = std::unique_ptr<DIR, directory_closer>;
       return "check resource";
     case transaction_run_private_realization_kind::check_temporary:
       return "check temporary";
+    case transaction_run_private_realization_kind::lifecycle_session:
+      return "lifecycle session";
   }
   return "private realization";
 }
@@ -323,7 +327,8 @@ transaction_run_cleanup_plan::transaction_run_cleanup_plan(
 
 transaction_run_cleanup_plan transaction_run_cleanup_plan::make(
     const transaction_run_journal_record& record,
-    const native_transaction_session_configuration& configuration)
+    const native_transaction_session_configuration& configuration,
+    std::optional<std::filesystem::path> lifecycle_session_root)
 {
   const auto disposition = cleanup_disposition(record);
   std::vector<transaction_run_private_realization> targets;
@@ -362,6 +367,28 @@ transaction_run_cleanup_plan transaction_run_cleanup_plan::make(
               dispatch.identity(), roots.check_temporary_root, relative));
           break;
         case transaction_unit_kind::operation:
+          if (lifecycle_session_root)
+          {
+            bool primary_present = false;
+            for (const auto& member : dispatch.unit().members())
+            {
+              if (member == dispatch.unit().primary_node())
+              {
+                primary_present = true;
+                continue;
+              }
+              const auto path = detail::native_lifecycle_session_path(
+                  *lifecycle_session_root, record, dispatch, member);
+              targets.push_back(transaction_run_private_realization(
+                  transaction_run_private_realization_kind::lifecycle_session,
+                  dispatch.identity(), *lifecycle_session_root,
+                  path.filename()));
+            }
+            if (!primary_present)
+              cleanup_failure(
+                  transaction_run_cleanup_error_code::target_inspect_failed,
+                  "completed operation dispatch lacks its primary graph member");
+          }
           break;
       }
     }
@@ -423,6 +450,21 @@ void posix_transaction_run_private_realization_cleaner::remove(
   auto root = open_root(target);
   if (root.get() < 0)
     return;
+
+  if (target.kind() ==
+      transaction_run_private_realization_kind::lifecycle_session)
+  {
+    const auto leaf = target.relative_path().filename().string();
+    if (leaf.empty() || leaf == "." || leaf == ".." ||
+        target.relative_path() != std::filesystem::path(leaf))
+    {
+      cleanup_failure(
+          transaction_run_cleanup_error_code::target_inspect_failed,
+          "lifecycle session cleanup target is not one exact leaf");
+    }
+    remove_directory_at(root.get(), leaf);
+    return;
+  }
 
   const auto journal = target.relative_path().parent_path().filename().string();
   const auto dispatch = target.relative_path().filename().string();

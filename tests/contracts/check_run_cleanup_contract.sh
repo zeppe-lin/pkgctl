@@ -11,6 +11,7 @@ unit="$root/tests/unit/run_cleanup_test.cpp"
 cli="$root/tests/integration/cli_build_cleanup_test.sh"
 process="$root/tests/integration/cli_build_process_death_test.sh"
 refusal="$root/tests/integration/cli_build_check_authority_refusal_test.sh"
+matrix="$root/tests/integration/cli_run_root_authority_matrix_test.sh"
 inspector="$root/tests/fixtures/run_evidence_inspect_fixture.cpp"
 design="$root/DESIGN.md"
 readme="$root/README.md"
@@ -42,7 +43,7 @@ forbid()
 
 for file in \
   "$header" "$source" "$command" "$unit" "$cli" "$process" "$refusal" \
-  "$inspector" "$design" "$readme" "$history" "$manual"; do
+  "$matrix" "$inspector" "$design" "$readme" "$history" "$manual"; do
   [ -s "$file" ] || fail "missing cleanup qualification source: ${file#$root/}"
 done
 
@@ -65,6 +66,12 @@ require "$source" 'roots.package_output_root'
 require "$source" 'roots.check_resource_root'
 require "$source" 'roots.check_temporary_root'
 require "$source" 'roots.installed_resource_root'
+require "$header" 'lifecycle_session = 6'
+require "$source" 'case transaction_unit_kind::operation:'
+require "$source" 'dispatch.unit().members()'
+require "$source" 'dispatch.unit().primary_node()'
+require "$source" 'detail::native_lifecycle_session_path('
+require "$source" 'transaction_run_private_realization_kind::lifecycle_session'
 
 # The mechanism is descriptor anchored and must refuse path substitution rather
 # than following attacker-selected links out of private authority.
@@ -87,7 +94,7 @@ require "$command" 'pkgctl: private realization cleanup unavailable:'
 launch_render=$(grep -n 'render_terminal_failure(result.drive())' "$command" | head -n 1 | cut -d: -f1)
 launch_cleanup=$(grep -n 'cleanup_terminal_private_realizations(' "$command" | tail -n 2 | head -n 1 | cut -d: -f1)
 resume_render=$(grep -n 'render_terminal_failure(result);' "$command" | head -n 1 | cut -d: -f1)
-resume_cleanup=$(grep -n 'cleanup_terminal_private_realizations(result.record()' "$command" | head -n 1 | cut -d: -f1)
+resume_cleanup=$(grep -n 'cleanup_terminal_private_realizations(' "$command" | tail -n 1 | cut -d: -f1)
 [ "$launch_render" -lt "$launch_cleanup" ] || fail 'fresh-run cleanup precedes terminal reporting'
 [ "$resume_render" -lt "$resume_cleanup" ] || fail 'resume cleanup precedes terminal reporting'
 
@@ -107,10 +114,20 @@ for text in \
   'fs::create_directory_symlink(external, hostile_target.path())' \
   'fs::perms::owner_read | fs::perms::owner_exec' \
   'installed_resources == 2U' \
+  'lifecycle_sessions == 0U' \
   'transaction_run_private_realization_kind::installed_resource' \
   'not-authorized'; do
   require "$unit" "$text"
 done
+
+# The privileged lifecycle matrix is also a terminal-cleanup regression: a real
+# lifecycle process creates scratch through libpkgapply-exec, and completed run
+# cleanup must leave the private lifecycle-session owner root empty.
+require "$matrix" 'lifecycle-sessions'
+require "$matrix" 'terminal cleanup retained private realization under $directory'
+require "$history" 'exact lifecycle transaction node'
+require "$readme" 'never scans the'
+require "$readme" 'lifecycle-session root'
 
 # The CLI campaign crosses two resumable build stages, attacks one exact leaf,
 # completes check from durable authority, then retries a partial sweep with no

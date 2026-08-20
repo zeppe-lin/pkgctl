@@ -9,6 +9,11 @@
   prove execution actually ran. Exhaustive unprivileged admission matrices also
   cover all 84 session-root alias/containment relations and all 72 exact-alias,
   ancestor, and descendant construction/check-versus-lifecycle overlaps.
+- Terminal cleanup now owns successful lifecycle scratch realizations as exact
+  private leaves. Each leaf identity is derived from the run journal, operation
+  dispatch, and exact lifecycle transaction node, and completed operation
+  dispatches authorize removal only of those member-derived leaves. Cleanup does
+  not scan `lifecycle-sessions` or guess unused phase/index names.
 
 - Adds the native installed-package resource plane. Fresh BUILD/CHECK dispatch
   preparation now consumes the exact artifact-content and artifact-image

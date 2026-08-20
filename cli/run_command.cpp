@@ -2404,13 +2404,16 @@ void render_construction_artifacts(
 
 void cleanup_terminal_private_realizations(
     const transaction_run_journal_record& record,
-    const native_transaction_session_configuration& configuration)
+    const native_transaction_session_configuration& configuration,
+    std::optional<std::filesystem::path> lifecycle_session_root)
 {
   try
   {
     posix_transaction_run_private_realization_cleaner cleaner;
     auto result = cleanup_transaction_run_private_realizations(
-        transaction_run_cleanup_plan::make(record, configuration), cleaner);
+        transaction_run_cleanup_plan::make(
+            record, configuration, std::move(lifecycle_session_root)),
+        cleaner);
     for (const auto& failure : result.failures())
     {
       std::cerr << "pkgctl: private realization cleanup incomplete: "
@@ -2601,6 +2604,11 @@ int execute_transaction_run(transaction_run_command command)
       command, admitted_build_root_view, admitted_interpreter,
       admitted_build_policy);
   const auto cleanup_configuration = session_configuration;
+  const std::optional<std::filesystem::path> cleanup_lifecycle_session_root =
+      operation_runtime
+          ? std::optional<std::filesystem::path>(
+                runtime_path(command, "lifecycle-sessions"))
+          : std::nullopt;
 
   if (current_execution_backend)
   {
@@ -2647,7 +2655,8 @@ int execute_transaction_run(transaction_run_command command)
           command.frontend == transaction_run_command_frontend::build);
       render_terminal_failure(result.drive());
       cleanup_terminal_private_realizations(
-          result.drive().record(), cleanup_configuration);
+          result.drive().record(), cleanup_configuration,
+          cleanup_lifecycle_session_root);
       return drive_status(result.drive().disposition());
     }
 
@@ -2657,7 +2666,9 @@ int execute_transaction_run(transaction_run_command command)
     render_construction_artifacts(
         result, command.frontend == transaction_run_command_frontend::build);
     render_terminal_failure(result);
-    cleanup_terminal_private_realizations(result.record(), cleanup_configuration);
+    cleanup_terminal_private_realizations(
+        result.record(), cleanup_configuration,
+        cleanup_lifecycle_session_root);
     return drive_status(result.disposition());
   };
 

@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -25,6 +26,7 @@ enum class transaction_run_private_realization_kind : std::uint8_t {
   installed_resource = 3,
   check_resource = 4,
   check_temporary = 5,
+  lifecycle_session = 6,
 };
 
 /*! \brief One exact disposable leaf derived from durable run authority. */
@@ -61,8 +63,10 @@ enum class transaction_run_cleanup_disposition : std::uint8_t {
 /*! \brief Pure cleanup authority projected from one exact durable run head.
  *
  * Only a successfully completed run owns cleanup authority. Within that run,
- * only completed construction/check dispatches can have disposable realization;
- * released-unstarted reservations own no execution tree. Incomplete and
+ * only completed dispatches can have disposable realization; construction/check
+ * own their exact per-dispatch trees and operation dispatches may own exact
+ * lifecycle-session leaves. Released-unstarted reservations own no execution
+ * tree. Incomplete and
  * failure-contained runs produce an empty target set: retained work may still
  * be required for replay, diagnosis, or explicit recovery.
  */
@@ -70,7 +74,9 @@ class transaction_run_cleanup_plan final {
 public:
   [[nodiscard]] static transaction_run_cleanup_plan make(
       const transaction_run_journal_record& record,
-      const native_transaction_session_configuration& configuration);
+      const native_transaction_session_configuration& configuration,
+      std::optional<std::filesystem::path> lifecycle_session_root =
+          std::nullopt);
 
   [[nodiscard]] transaction_run_cleanup_disposition
   disposition() const noexcept;

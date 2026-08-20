@@ -411,30 +411,31 @@ void check_cleanup_authority_and_failure_containment()
   test_support::temporary_directory temporary;
   auto value = records(temporary.path());
   auto config = configuration(temporary.path() / "runtime");
+  const auto lifecycle_sessions = temporary.path() / "runtime" / "lifecycle-sessions";
 
   const auto admitted = pkgctl::transaction_run_cleanup_plan::make(
-      value.admitted, config);
+      value.admitted, config, lifecycle_sessions);
   CHECK(admitted.disposition() ==
         pkgctl::transaction_run_cleanup_disposition::incomplete);
   CHECK(!admitted.eligible());
   CHECK(admitted.targets().empty());
 
   const auto started = pkgctl::transaction_run_cleanup_plan::make(
-      value.started, config);
+      value.started, config, lifecycle_sessions);
   CHECK(started.disposition() ==
         pkgctl::transaction_run_cleanup_disposition::incomplete);
   CHECK(!started.eligible());
   CHECK(started.targets().empty());
 
   const auto failed = pkgctl::transaction_run_cleanup_plan::make(
-      value.failed, config);
+      value.failed, config, lifecycle_sessions);
   CHECK(failed.disposition() ==
         pkgctl::transaction_run_cleanup_disposition::stopped_after_failure);
   CHECK(!failed.eligible());
   CHECK(failed.targets().empty());
 
   auto completed = pkgctl::transaction_run_cleanup_plan::make(
-      value.completed, config);
+      value.completed, config, lifecycle_sessions);
   CHECK(completed.disposition() ==
         pkgctl::transaction_run_cleanup_disposition::completed);
   CHECK(completed.eligible());
@@ -449,7 +450,9 @@ void check_cleanup_authority_and_failure_containment()
         pkgctl::transaction_run_private_realization_kind::package_output);
   for (const auto& target : completed.targets())
   {
-    CHECK(target.dispatch() == value.completed.dispatches().front().dispatch().identity());
+    CHECK(
+        target.dispatch() ==
+        value.completed.dispatches().front().dispatch().identity());
     CHECK(target.relative_path() ==
           fs::path(value.completed.journal().hex()) /
               value.completed.dispatches().front().dispatch().identity().hex());
@@ -477,7 +480,8 @@ void check_cleanup_authority_and_failure_containment()
 
   unknown_refusing_cleaner unknown;
   auto unknown_result = pkgctl::cleanup_transaction_run_private_realizations(
-      pkgctl::transaction_run_cleanup_plan::make(value.completed, config),
+      pkgctl::transaction_run_cleanup_plan::make(
+          value.completed, config, lifecycle_sessions),
       unknown);
   CHECK(unknown.paths().size() == 3U);
   CHECK(unknown_result.cleaned() == 2U);
@@ -519,16 +523,17 @@ void check_build_and_check_stage_authority()
   test_support::temporary_directory temporary;
   auto value = checked_records(temporary.path());
   auto config = configuration(temporary.path() / "runtime");
+  const auto lifecycle_root = temporary.path() / "runtime" / "lifecycle-sessions";
 
   const auto started = pkgctl::transaction_run_cleanup_plan::make(
-      value.check_started, config);
+      value.check_started, config, lifecycle_root);
   CHECK(started.disposition() ==
         pkgctl::transaction_run_cleanup_disposition::incomplete);
   CHECK(!started.eligible());
   CHECK(started.targets().empty());
 
   const auto completed = pkgctl::transaction_run_cleanup_plan::make(
-      value.completed, config);
+      value.completed, config, lifecycle_root);
   CHECK(completed.eligible());
   CHECK(completed.targets().size() == 6U);
   std::size_t constructions = 0U;
@@ -536,6 +541,7 @@ void check_build_and_check_stage_authority()
   std::size_t installed_resources = 0U;
   std::size_t check_resources = 0U;
   std::size_t check_temporaries = 0U;
+  std::size_t lifecycle_sessions = 0U;
   for (const auto& target : completed.targets())
   {
     CHECK(target.relative_path().parent_path() ==
@@ -557,6 +563,9 @@ void check_build_and_check_stage_authority()
       case pkgctl::transaction_run_private_realization_kind::check_temporary:
         ++check_temporaries;
         break;
+      case pkgctl::transaction_run_private_realization_kind::lifecycle_session:
+        ++lifecycle_sessions;
+        break;
     }
   }
   CHECK(constructions == 1U);
@@ -564,6 +573,7 @@ void check_build_and_check_stage_authority()
   CHECK(installed_resources == 2U);
   CHECK(check_resources == 1U);
   CHECK(check_temporaries == 1U);
+  CHECK(lifecycle_sessions == 0U);
 }
 
 

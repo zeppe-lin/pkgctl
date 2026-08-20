@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <pkgctl/run_operation.h>
+
+#include "run_lifecycle_session.h"
 #include <pkgctl/operation_codec.h>
 #include <pkgctl/preparation.h>
 
@@ -158,21 +160,6 @@ void validate_specification(
       "unsupported operation kind in native specification");
 }
 
-[[nodiscard]] std::filesystem::path lifecycle_session_root(
-    const native_transaction_lifecycle_configuration& configuration,
-    const transaction_run_journal_record& record,
-    const transaction_dispatch& dispatch,
-    std::string_view phase,
-    std::size_t index)
-{
-  return configuration.session_root /
-      make_session_identity(
-          "pkgctl/native-lifecycle-session-root/1",
-          {record.journal().hex(), dispatch.identity().hex(),
-           std::string(phase), std::to_string(index)})
-          .hex();
-}
-
 [[nodiscard]] std::vector<pkgapply_exec::admitted_lifecycle_session>
 admit_lifecycle_sessions(
     const pkgapply::package_application_request& application,
@@ -181,8 +168,7 @@ admit_lifecycle_sessions(
     const std::vector<pkgtransaction::transaction_node_identity>& order,
     const native_transaction_lifecycle_configuration& configuration,
     const transaction_run_journal_record& record,
-    const transaction_dispatch& dispatch,
-    std::string_view phase)
+    const transaction_dispatch& dispatch)
 {
   if (order.empty())
     return {};
@@ -217,8 +203,8 @@ admit_lifecycle_sessions(
          configuration.execution_root_path,
          application.target().root_view(),
          configuration.target_root_path,
-         lifecycle_session_root(
-             configuration, record, dispatch, phase, index)},
+         detail::native_lifecycle_session_path(
+             configuration.session_root, record, dispatch, order[index])},
         configuration.execution_identity));
   }
   return result;
@@ -272,11 +258,11 @@ effectful_operation_session admit_native_operation_session(
     auto before = admit_lifecycle_sessions(
         *prepared.application(), progress.transaction(),
         dispatch.unit().primary_node(), prepared.effect()->lifecycle().before(),
-        lifecycle, record, dispatch, "before");
+        lifecycle, record, dispatch);
     auto after = admit_lifecycle_sessions(
         *prepared.application(), progress.transaction(),
         dispatch.unit().primary_node(), prepared.effect()->lifecycle().after(),
-        lifecycle, record, dispatch, "after");
+        lifecycle, record, dispatch);
     return effectful_operation_session::admit(
         *prepared.effect(), std::move(before), std::move(after));
   }

@@ -5891,12 +5891,28 @@ void check_native_operation_authority_source()
   CHECK(fresh.session.before().size() == value.before.size());
   CHECK(fresh.session.after().size() == value.after.size());
   const auto lifecycle_session_parent = authority_root / "sessions";
-  for (const auto& admitted_lifecycle : fresh.session.before())
-    CHECK(admitted_lifecycle.paths().session_root.parent_path() ==
-          lifecycle_session_parent);
-  for (const auto& admitted_lifecycle : fresh.session.after())
-    CHECK(admitted_lifecycle.paths().session_root.parent_path() ==
-          lifecycle_session_parent);
+  const auto check_lifecycle_session_path =
+      [&](const pkgapply_exec::admitted_lifecycle_session& admitted_lifecycle,
+          const pkgtransaction::transaction_node_identity& transaction_node) {
+        CHECK(admitted_lifecycle.paths().session_root.parent_path() ==
+              lifecycle_session_parent);
+        const auto expected = lifecycle_session_parent /
+            pkgctl::make_session_identity(
+                "pkgctl/native-lifecycle-session-root/1",
+                {reserved.journal().hex(),
+                 reservation.dispatch->identity().hex(),
+                 transaction_node.hex()})
+                .hex();
+        CHECK(admitted_lifecycle.paths().session_root == expected);
+      };
+  for (std::size_t index = 0U; index < fresh.session.before().size(); ++index)
+    check_lifecycle_session_path(
+        fresh.session.before()[index],
+        fresh.session.request().lifecycle().before()[index]);
+  for (std::size_t index = 0U; index < fresh.session.after().size(); ++index)
+    check_lifecycle_session_path(
+        fresh.session.after()[index],
+        fresh.session.request().lifecycle().after()[index]);
   if (!fresh.session.before().empty() && !fresh.session.after().empty())
     CHECK(fresh.session.before().front().paths().session_root !=
           fresh.session.after().front().paths().session_root);

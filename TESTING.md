@@ -330,7 +330,10 @@ its positive root-view sentinel and must be refused, proving the admitted base
 root view is read-only while writable authority remains confined to explicit
 resource mounts. Durable evidence must contain exactly
 one construction and one check, while the managed target must retain both the
-BUILD payload and the post-install lifecycle witness.
+BUILD payload and the post-install lifecycle witness. Terminal success must also
+leave `lifecycle-sessions` empty: the lifecycle executor may create its admitted
+single-use scratch leaf, but completed-run cleanup must dispose that exact leaf
+without enumerating the session root or touching durable effect evidence.
 
 The matrix therefore qualifies these nine hostile cells:
 

@@ -116,7 +116,11 @@ publication call. Lifecycle session coordinates are not an excuse to move POSIX
 preparation into operation authority: the configured session root is the
 caller-provisioned parent, and each admitted lifecycle scratch leaf must be a
 deterministic direct child of it. `libpkgapply-exec` owns creation and protection
-of that single-use leaf.
+of that single-use leaf. The leaf identity must bind the run journal, operation
+dispatch, and exact lifecycle transaction node so terminal cleanup can derive
+its authority from durable dispatch membership. Completed-run cleanup may remove
+those exact member-derived leaves; it must not enumerate `lifecycle-sessions`,
+infer phase slots, or treat lifecycle scratch as retained effect evidence.
 
 Keep uncertainty distinct from definitive failure in the same runtime campaign.
 A durable publication intent has not yet retained terminal publication evidence:
